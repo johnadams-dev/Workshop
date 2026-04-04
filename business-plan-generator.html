@@ -326,10 +326,10 @@
     <div class="modal-body">
 
       <div class="field">
-        <label>Gemini API Key <span class="req">*</span></label>
-        <input type="password" id="cfgGemini" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
-        <div class="key-status" id="geminiStat"><div class="dot"></div><span>Required — generates the business plan</span></div>
-        <div class="hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--gold)">aistudio.google.com</a> → API Keys</div>
+        <label>Proxy Secret Key <span class="req">*</span></label>
+        <input type="password" id="cfgProxy" placeholder="Your x-proxy-key value…" autocomplete="off" spellcheck="false">
+        <div class="key-status" id="proxyStat"><div class="dot"></div><span>Required — authenticates with the AC proxy server</span></div>
+        <div class="hint">The <code style="color:var(--gold2);font-size:0.72rem">PROXY_SECRET</code> value from your server environment. The Gemini API key stays on the server and is never exposed to the browser.</div>
       </div>
 
       <div class="field">
@@ -684,14 +684,15 @@ const S = {
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
-const ADMIN_PW = 'ac2025admin'; // ← change this to your preferred password
+const ADMIN_PW   = 'ac2025admin';
+const PROXY_BASE = 'https://johnadams.org'; // proxy server base URL
 
-function cfg()  { return { gem: ls('ac_gem') || '', oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
+function cfg()  { return { proxyKey: ls('ac_proxy') || '', oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
 function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
 
 function openSettings() {
   const c = cfg();
-  document.getElementById('cfgGemini').value = c.gem;
+  document.getElementById('cfgProxy').value  = c.proxyKey;
   document.getElementById('cfgOAuth').value  = c.oa;
   document.getElementById('cfgPrompt').value = c.prompt;
   document.getElementById('adminSection').style.display = 'none';
@@ -726,12 +727,12 @@ function resetPrompt() {
 }
 
 function saveSettings() {
-  const gem    = document.getElementById('cfgGemini').value.trim();
-  const oa     = document.getElementById('cfgOAuth').value.trim();
-  const prompt = document.getElementById('cfgPrompt').value.trim();
-  if (!gem) { toast('Gemini API key is required.', 'err'); return; }
-  ls('ac_gem', gem);
-  ls('ac_oa',  oa);
+  const proxyKey = document.getElementById('cfgProxy').value.trim();
+  const oa       = document.getElementById('cfgOAuth').value.trim();
+  const prompt   = document.getElementById('cfgPrompt').value.trim();
+  if (!proxyKey) { toast('Proxy secret key is required.', 'err'); return; }
+  ls('ac_proxy',  proxyKey);
+  ls('ac_oa',     oa);
   ls('ac_prompt', prompt);
   if (oa) initOAuth(oa);
   refreshStatDots();
@@ -741,8 +742,8 @@ function saveSettings() {
 
 function refreshStatDots() {
   const c = cfg();
-  setDot('geminiStat', c.gem ? 'ok' : 'warn', c.gem ? 'API key saved ✓' : 'Required — generates the plan');
-  setDot('oauthStat',  c.oa  ? 'ok' : '',     c.oa  ? 'Client ID saved — Gmail &amp; Docs enabled ✓' : 'Optional — enables Gmail &amp; Google Docs');
+  setDot('proxyStat', c.proxyKey ? 'ok' : 'warn', c.proxyKey ? 'Proxy key saved ✓' : 'Required — authenticates with the AC proxy server');
+  setDot('oauthStat', c.oa  ? 'ok' : '',     c.oa  ? 'Client ID saved — Gmail &amp; Docs enabled ✓' : 'Optional — enables Gmail sending &amp; Google Docs');
 }
 
 function setDot(id, cls, msg) {
@@ -909,20 +910,21 @@ Based on Budget (${d.budget || 'unspecified'}) and Time (${d.time || 'unspecifie
 Brief closing paragraph the agent can share with their Sales Manager to establish accountability.`;
 }
 
-/* ───────────────────────── GEMINI API ──────────────────── */
+/* ───────────────────────── GEMINI API (via proxy) ──────── */
 async function geminiCall(prompt, maxTokens = 8192) {
-  const { gem } = cfg();
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gem}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens }
-      })
-    }
-  );
+  const { proxyKey } = cfg();
+  const res = await fetch(`${PROXY_BASE}/gemini`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'x-proxy-key':   proxyKey
+    },
+    body: JSON.stringify({
+      model: 'gemini-2.5-flash',
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens }
+    })
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error?.message || `HTTP ${res.status}`);
@@ -936,8 +938,8 @@ async function geminiCall(prompt, maxTokens = 8192) {
 async function generatePlan() {
   if (!v('f_earn')) { toast('Please enter your annual earning goal.', 'err'); foc('f_earn'); return; }
 
-  const { gem } = cfg();
-  if (!gem) { openSettings(); toast('Add your Gemini API key first.', 'err'); return; }
+  const { proxyKey } = cfg();
+  if (!proxyKey) { openSettings(); toast('Add your proxy secret key first.', 'err'); return; }
 
   S.data = collect();
 
@@ -1333,8 +1335,8 @@ function toast(msg, cls = '') {
 
 /* ───────────────────────── INIT ────────────────────────── */
 window.addEventListener('load', () => {
-  const { gem, oa } = cfg();
-  if (!gem) setTimeout(openSettings, 600);
+  const { proxyKey, oa } = cfg();
+  if (!proxyKey) setTimeout(openSettings, 600);
   refreshStatDots();
   if (oa) {
     const poll = setInterval(() => {
