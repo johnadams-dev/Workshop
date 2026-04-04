@@ -325,22 +325,8 @@
     </div>
     <div class="modal-body">
 
-      <div class="field">
-        <label>Google OAuth Client ID <span class="opt">(optional)</span></label>
-        <input type="text" id="cfgOAuth" placeholder="123456789-abc…apps.googleusercontent.com" autocomplete="off" spellcheck="false">
-        <div class="key-status" id="oauthStat"><div class="dot"></div><span>Optional — enables Gmail sending &amp; Google Docs</span></div>
-      </div>
-
       <div class="info-box">
-        <p><strong style="color:var(--text)">Without OAuth:</strong> The plan displays on screen and can be copied, emailed via your default mail client, or downloaded as HTML.</p>
-        <p><strong style="color:var(--text)">To enable Gmail + Google Docs:</strong></p>
-        <ol>
-          <li>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → your project</li>
-          <li>Enable <strong>Gmail API</strong> and <strong>Google Drive API</strong></li>
-          <li>Credentials → OAuth 2.0 → Web Application</li>
-          <li>Add your site URL to <em>Authorized JavaScript Origins</em></li>
-          <li>Copy the Client ID above and save</li>
-        </ol>
+        <p><strong style="color:var(--text)">Gmail &amp; Google Docs</strong> are enabled via Google OAuth. When you click Email or Save to Google Doc, you'll be prompted to sign in with your Google account — no configuration needed.</p>
       </div>
 
       <div class="field" style="margin-top:0.5rem">
@@ -668,31 +654,32 @@
 /* ───────────────────────── STATE ───────────────────────── */
 const S = {
   step: 1,
-  plan: '',        // raw Gemini markdown
-  planHtml: '',    // rendered HTML
-  data: {},        // form values
+  plan: '',
+  planHtml: '',
+  data: {},
   accessToken: null,
   tokenClient: null,
-  pendingAction: null
+  pendingAction: null,
+  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '' }  // loaded from config.json
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
-const ADMIN_PW   = 'ac2025admin';
-const PROXY_BASE = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY  = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const ADMIN_PW_DEFAULT = 'ac2025admin'; // fallback if config.json not loaded yet
+const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT  = '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7d0dv.apps.googleusercontent.com';
+const CONFIG_URL    = './bizplan-config.json';
 
-function cfg()  { return { oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
+function cfg()  { return { prompt: ls('ac_prompt_draft') || S.config.prompt || '' }; }
 function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
 
 function openSettings() {
   const c = cfg();
-  document.getElementById('cfgOAuth').value  = c.oa;
   document.getElementById('cfgPrompt').value = c.prompt;
   document.getElementById('adminSection').style.display = 'none';
   document.getElementById('adminPwRow').style.display = 'flex';
   document.getElementById('adminUnlockBtn').textContent = '🔒 Unlock';
   document.getElementById('cfgAdminPw').value = '';
-  refreshStatDots();
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
@@ -706,7 +693,7 @@ function toggleAdminUnlock() {
     sec.style.display = 'none'; row.style.display = 'flex';
     btn.textContent = '🔒 Unlock'; return;
   }
-  if (pw !== ADMIN_PW) { toast('Incorrect admin password.', 'err'); return; }
+  if (pw !== S.config.adminPassword) { toast('Incorrect admin password.', 'err'); return; }
   sec.style.display = 'block'; row.style.display = 'none';
   btn.textContent = '🔓 Lock';
   document.getElementById('cfgPrompt').value = cfg().prompt;
@@ -715,25 +702,17 @@ function toggleAdminUnlock() {
 function resetPrompt() {
   if (!confirm('Reset to the default built-in prompt?')) return;
   document.getElementById('cfgPrompt').value = '';
-  ls('ac_prompt', '');
+  ls('ac_prompt_draft', '');
   toast('Prompt reset to default.', 'ok');
 }
 
 function saveSettings() {
-  const oa     = document.getElementById('cfgOAuth').value.trim();
   const prompt = document.getElementById('cfgPrompt').value.trim();
-  ls('ac_oa',     oa);
-  ls('ac_prompt', prompt);
-  if (oa) initOAuth(oa);
-  refreshStatDots();
+  ls('ac_prompt_draft', prompt);
   closeSettings();
-  toast('Settings saved!', 'ok');
+  toast('Prompt saved as a local draft. To make it permanent for all users, update bizplan-config.json on GitHub.', 'ok');
 }
 
-function refreshStatDots() {
-  const c = cfg();
-  setDot('oauthStat', c.oa  ? 'ok' : '',     c.oa  ? 'Client ID saved — Gmail &amp; Docs enabled ✓' : 'Optional — enables Gmail sending &amp; Google Docs');
-}
 
 function setDot(id, cls, msg) {
   const el = document.getElementById(id);
@@ -742,10 +721,10 @@ function setDot(id, cls, msg) {
 }
 
 /* ───────────────────────── GOOGLE OAUTH ───────────────── */
-function initOAuth(clientId) {
-  if (!window.google?.accounts?.oauth2 || !clientId) return;
+function initOAuth() {
+  if (!window.google?.accounts?.oauth2) return;
   S.tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
+    client_id: OAUTH_CLIENT,
     scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file',
     callback: (res) => {
       if (res.error) { toast('Google sign-in failed: ' + res.error, 'err'); return; }
@@ -837,9 +816,9 @@ function collect() {
 
 /* ───────────────────────── PROMPT ─────────────────────── */
 function buildPrompt(d) {
-  const custom = cfg().prompt;
+  // Priority: local draft override → config.json prompt → built-in default
+  const custom = ls('ac_prompt_draft') || S.config.prompt || '';
   if (custom) {
-    // Allow variable interpolation in custom prompts
     return custom.replace(/\$\{d\.(\w+)\}/g, (_, key) => d[key] || '');
   }
   return `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
@@ -1321,14 +1300,23 @@ function toast(msg, cls = '') {
 }
 
 /* ───────────────────────── INIT ────────────────────────── */
-window.addEventListener('load', () => {
-  const { oa } = cfg();
-  refreshStatDots();
-  if (oa) {
-    const poll = setInterval(() => {
-      if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(oa); }
-    }, 200);
+window.addEventListener('load', async () => {
+  // Load remote config first
+  try {
+    const res = await fetch(CONFIG_URL + '?v=' + Date.now());
+    if (res.ok) {
+      const remote = await res.json();
+      if (remote.adminPassword) S.config.adminPassword = remote.adminPassword;
+      if (remote.prompt)        S.config.prompt        = remote.prompt;
+    }
+  } catch (e) {
+    console.warn('Could not load bizplan-config.json — using defaults.', e);
   }
+
+  // Init Google OAuth
+  const poll = setInterval(() => {
+    if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
+  }, 200);
 });
 
 </script>
