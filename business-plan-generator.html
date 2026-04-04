@@ -321,16 +321,9 @@
   <div class="modal">
     <div class="modal-head">
       <div class="modal-title">⚙ Configuration</div>
-      <div class="modal-sub">API keys are saved locally in your browser and never transmitted elsewhere.</div>
+      <div class="modal-sub">Settings are saved locally in your browser.</div>
     </div>
     <div class="modal-body">
-
-      <div class="field">
-        <label>Proxy Secret Key <span class="req">*</span></label>
-        <input type="password" id="cfgProxy" placeholder="Your x-proxy-key value…" autocomplete="off" spellcheck="false">
-        <div class="key-status" id="proxyStat"><div class="dot"></div><span>Required — authenticates with the AC proxy server</span></div>
-        <div class="hint">The <code style="color:var(--gold2);font-size:0.72rem">PROXY_SECRET</code> value from your server environment. The Gemini API key stays on the server and is never exposed to the browser.</div>
-      </div>
 
       <div class="field">
         <label>Google OAuth Client ID <span class="opt">(optional)</span></label>
@@ -685,14 +678,14 @@ const S = {
 
 /* ───────────────────────── SETTINGS ───────────────────── */
 const ADMIN_PW   = 'ac2025admin';
-const PROXY_BASE = 'https://johnadams.org'; // proxy server base URL
+const PROXY_BASE = 'https://johnadams.org';
+const PROXY_KEY  = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37'; // hardcoded — never shown to users
 
-function cfg()  { return { proxyKey: ls('ac_proxy') || '', oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
+function cfg()  { return { oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
 function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
 
 function openSettings() {
   const c = cfg();
-  document.getElementById('cfgProxy').value  = c.proxyKey;
   document.getElementById('cfgOAuth').value  = c.oa;
   document.getElementById('cfgPrompt').value = c.prompt;
   document.getElementById('adminSection').style.display = 'none';
@@ -727,11 +720,8 @@ function resetPrompt() {
 }
 
 function saveSettings() {
-  const proxyKey = document.getElementById('cfgProxy').value.trim();
-  const oa       = document.getElementById('cfgOAuth').value.trim();
-  const prompt   = document.getElementById('cfgPrompt').value.trim();
-  if (!proxyKey) { toast('Proxy secret key is required.', 'err'); return; }
-  ls('ac_proxy',  proxyKey);
+  const oa     = document.getElementById('cfgOAuth').value.trim();
+  const prompt = document.getElementById('cfgPrompt').value.trim();
   ls('ac_oa',     oa);
   ls('ac_prompt', prompt);
   if (oa) initOAuth(oa);
@@ -742,7 +732,6 @@ function saveSettings() {
 
 function refreshStatDots() {
   const c = cfg();
-  setDot('proxyStat', c.proxyKey ? 'ok' : 'warn', c.proxyKey ? 'Proxy key saved ✓' : 'Required — authenticates with the AC proxy server');
   setDot('oauthStat', c.oa  ? 'ok' : '',     c.oa  ? 'Client ID saved — Gmail &amp; Docs enabled ✓' : 'Optional — enables Gmail sending &amp; Google Docs');
 }
 
@@ -912,12 +901,11 @@ Brief closing paragraph the agent can share with their Sales Manager to establis
 
 /* ───────────────────────── GEMINI API (via proxy) ──────── */
 async function geminiCall(prompt, maxTokens = 8192) {
-  const { proxyKey } = cfg();
   const res = await fetch(`${PROXY_BASE}/gemini`, {
     method: 'POST',
     headers: {
-      'Content-Type':  'application/json',
-      'x-proxy-key':   proxyKey
+      'Content-Type': 'application/json',
+      'x-proxy-key':  PROXY_KEY
     },
     body: JSON.stringify({
       model: 'gemini-2.5-flash',
@@ -938,8 +926,7 @@ async function geminiCall(prompt, maxTokens = 8192) {
 async function generatePlan() {
   if (!v('f_earn')) { toast('Please enter your annual earning goal.', 'err'); foc('f_earn'); return; }
 
-  const { proxyKey } = cfg();
-  if (!proxyKey) { openSettings(); toast('Add your proxy secret key first.', 'err'); return; }
+  const { oa } = cfg();
 
   S.data = collect();
 
@@ -1335,8 +1322,7 @@ function toast(msg, cls = '') {
 
 /* ───────────────────────── INIT ────────────────────────── */
 window.addEventListener('load', () => {
-  const { proxyKey, oa } = cfg();
-  if (!proxyKey) setTimeout(openSettings, 600);
+  const { oa } = cfg();
   refreshStatDots();
   if (oa) {
     const poll = setInterval(() => {
