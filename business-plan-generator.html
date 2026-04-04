@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Plan Generator — Adams, Cameron & Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0c0f16;
+      --surface: #121620;
+      --surface2: #181d2c;
+      --border: #242a3e;
+      --border2: #2e3655;
+      --gold: #c4a84f;
+      --gold2: #dfc278;
+      --gold-dim: #7a6428;
+      --gold-bg: rgba(196,168,79,0.07);
+      --text: #ede5d4;
+      --text2: #9a9080;
+      --text3: #545060;
+      --success: #3d8c58;
+      --error: #8c3d4a;
+      --radius: 10px;
+      --ease: 0.2s ease;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    .app-header {
+      padding: 1.1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand { display: flex; align-items: center; gap: 0.8rem; }
+    .brand-icon {
+      width: 34px; height: 34px; border-radius: 7px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .brand-name { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; font-weight: 600; line-height: 1.2; }
+    .brand-sub  { font-size: 0.68rem; color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase; }
+    .hdr-right  { display: flex; align-items: center; gap: 0.5rem; }
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 0.38rem 0.75rem;
+      border-radius: 7px;
+      font-size: 0.78rem;
+      font-family: 'Outfit', sans-serif;
+      cursor: pointer;
+      transition: all var(--ease);
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .btn-icon:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── LAYOUT ── */
+    .app-main  { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+    /* ── PROGRESS ── */
+    .progress {
+      display: flex; align-items: center; margin-bottom: 2.25rem;
+    }
+    .prog-step { display: flex; align-items: center; gap: 0.5rem; }
+    .prog-num {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1.5px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: 500; color: var(--text3);
+      background: var(--surface); transition: all var(--ease); flex-shrink: 0;
+    }
+    .prog-num.active { border-color: var(--gold); background: var(--gold); color: #0c0f16; font-weight: 700; }
+    .prog-num.done   { border-color: var(--gold); color: var(--gold); font-size: 0.7rem; }
+    .prog-label { font-size: 0.73rem; color: var(--text3); white-space: nowrap; transition: color var(--ease); }
+    .prog-label.active { color: var(--text); }
+    .prog-line  { flex: 1; height: 1px; background: var(--border); margin: 0 0.7rem; }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 1.7rem 2rem 1.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-tag {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--gold); margin-bottom: 0.35rem;
+    }
+    .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 500; }
+    .section-desc  { margin-top: 0.45rem; font-size: 0.83rem; color: var(--text2); line-height: 1.65; max-width: 580px; }
+    .card-body  { padding: 1.7rem 2rem; display: flex; flex-direction: column; gap: 1.4rem; }
+    .card-foot  {
+      padding: 1.1rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface2);
+    }
+
+    /* ── FIELDS ── */
+    .field { display: flex; flex-direction: column; gap: 0.38rem; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+    label {
+      font-size: 0.78rem; font-weight: 500; color: var(--text2); letter-spacing: 0.04em;
+    }
+    label .req { color: var(--gold); margin-left: 2px; }
+    label .opt { font-weight: 400; color: var(--text3); }
+    .hint { font-size: 0.73rem; color: var(--text3); margin-top: 0.2rem; }
+
+    input[type="text"], input[type="email"], input[type="number"], textarea, select {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem;
+      padding: 0.6rem 0.85rem;
+      transition: border-color var(--ease);
+      width: 100%;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--gold); }
+    textarea { resize: vertical; min-height: 85px; line-height: 1.65; }
+    select option { background: var(--surface2); color: var(--text); }
+
+    .input-wrap { position: relative; }
+    .input-pfx {
+      position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%);
+      color: var(--text3); font-size: 0.88rem; pointer-events: none;
+    }
+    .input-wrap input { padding-left: 1.6rem; }
+
+    /* range fields with labels */
+    .range-field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .range-labels {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.72rem; color: var(--text3);
+    }
+    .range-val {
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 5px; padding: 0.1rem 0.5rem;
+      font-size: 0.8rem; font-weight: 600; color: var(--gold); min-width: 36px; text-align: center;
+    }
+
+    /* sliders */
+    .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; }
+    input[type="range"] {
+      -webkit-appearance: none; width: 100%; height: 4px;
+      background: var(--border2); border-radius: 2px;
+      border: none; padding: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
+      background: var(--gold); cursor: pointer;
+    }
+    .slider-val { min-width: 46px; text-align: right; font-size: 0.9rem; font-weight: 600; color: var(--gold); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 0.6rem 1.4rem; border-radius: 8px;
+      font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 500;
+      cursor: pointer; transition: all var(--ease); border: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+    .btn-ghost    { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+    .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+    .btn-primary  { background: var(--gold); color: #0c0f16; font-weight: 600; }
+    .btn-primary:hover { background: var(--gold2); }
+    .btn-subtle   { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); }
+    .btn-subtle:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── LOADING ── */
+    .loading-view { text-align: center; padding: 3.5rem 2rem; }
+    .spinner {
+      width: 46px; height: 46px; border: 3px solid var(--border2);
+      border-top-color: var(--gold); border-radius: 50%;
+      animation: spin 0.75s linear infinite; margin: 0 auto 1.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin-bottom: 0.4rem; }
+    .loading-sub   { font-size: 0.83rem; color: var(--text2); }
+
+    /* ── RESULTS ── */
+    .results-head {
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .results-title { font-family: 'Cormorant Garamond', serif; font-size: 1.55rem; font-weight: 500; }
+    .results-meta  { font-size: 0.78rem; color: var(--text2); margin-top: 0.2rem; }
+    .results-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    .results-body  { padding: 1.75rem 2rem; max-height: 62vh; overflow-y: auto; }
+    .results-body::-webkit-scrollbar { width: 4px; }
+    .results-body::-webkit-scrollbar-track { background: transparent; }
+    .results-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* Plan formatting */
+    .plan h1, .plan h2, .plan h3 { font-family: 'Cormorant Garamond', serif; line-height: 1.3; }
+    .plan h1 { font-size: 1.55rem; color: var(--gold); margin: 1.6rem 0 0.65rem; }
+    .plan h2 { font-size: 1.22rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; margin: 1.4rem 0 0.65rem; }
+    .plan h3 { font-size: 1.05rem; color: var(--gold2); margin: 1.1rem 0 0.5rem; }
+    .plan p  { font-size: 0.875rem; margin-bottom: 0.8rem; color: var(--text); }
+    .plan p:first-child { margin-top: 0; }
+    .plan strong { color: var(--text); font-weight: 600; }
+    .plan em     { color: var(--text2); font-style: italic; }
+    .plan ul, .plan ol { padding-left: 1.4rem; margin-bottom: 0.8rem; }
+    .plan li { font-size: 0.875rem; margin-bottom: 0.3rem; }
+    .plan table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.83rem; }
+    .plan th { background: var(--surface2); padding: 0.55rem 0.8rem; text-align: left; font-weight: 600; color: var(--gold); border: 1px solid var(--border2); }
+    .plan td { padding: 0.5rem 0.8rem; border: 1px solid var(--border2); color: var(--text2); }
+    .plan tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+    .plan hr  { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+
+    /* ── MODAL ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 1rem; backdrop-filter: blur(5px);
+    }
+    .overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 14px; width: 100%; max-width: 510px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-head { padding: 1.4rem 1.75rem 1rem; border-bottom: 1px solid var(--border); }
+    .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; }
+    .modal-sub   { font-size: 0.8rem; color: var(--text2); margin-top: 0.3rem; }
+    .modal-body  { padding: 1.4rem 1.75rem; display: flex; flex-direction: column; gap: 1.2rem; }
+    .modal-foot  { padding: 1rem 1.75rem 1.4rem; display: flex; justify-content: flex-end; gap: 0.45rem; }
+
+    .info-box {
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: 8px; padding: 1rem;
+    }
+    .info-box p   { font-size: 0.79rem; color: var(--text2); margin-bottom: 0.5rem; }
+    .info-box p:last-child { margin-bottom: 0; }
+    .info-box ol  { padding-left: 1.2rem; }
+    .info-box li  { font-size: 0.77rem; color: var(--text3); margin-bottom: 0.3rem; }
+    .info-box a   { color: var(--gold); text-decoration: none; }
+    .info-box a:hover { text-decoration: underline; }
+    .info-box code { font-size: 0.74rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; color: var(--gold2); }
+
+    .key-status {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.74rem; margin-top: 0.25rem;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
+    .dot.ok { background: var(--success); }
+    .dot.warn { background: var(--gold); }
+
+    /* ── STEPS ── */
+    .step { display: none; }
+    .step.active { display: block; animation: fadeUp 0.22s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 9px; padding: 0.7rem 1rem;
+      font-size: 0.83rem; color: var(--text);
+      z-index: 200; transform: translateY(80px); opacity: 0;
+      transition: all 0.3s ease; max-width: 300px; line-height: 1.4;
+    }
+    .toast.show  { transform: translateY(0); opacity: 1; }
+    .toast.ok    { border-color: var(--success); }
+    .toast.err   { border-color: var(--error); }
+
+    /* ── INTRO BANNER ── */
+    .intro-banner {
+      background: var(--gold-bg); border: 1px solid rgba(196,168,79,0.18);
+      border-radius: 9px; padding: 0.9rem 1.1rem; margin-bottom: 1.35rem;
+      font-size: 0.8rem; color: var(--text2); line-height: 1.7;
+    }
+    .intro-banner strong { color: var(--text); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .field-row { grid-template-columns: 1fr; }
+      .card-head, .card-body, .card-foot { padding: 1.25rem; }
+      .results-head { flex-direction: column; }
+      .results-actions { width: 100%; }
+      .results-actions .btn { flex: 1; }
+      .app-main { padding: 1.5rem 1rem 3rem; }
+      .brand-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SETTINGS MODAL
+════════════════════════════════════════════ -->
+<div id="settingsModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">⚙ Configuration</div>
+      <div class="modal-sub">API keys are saved locally in your browser and never transmitted elsewhere.</div>
+    </div>
+    <div class="modal-body">
+
+      <div class="field">
+        <label>Gemini API Key <span class="req">*</span></label>
+        <input type="password" id="cfgGemini" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
+        <div class="key-status" id="geminiStat"><div class="dot"></div><span>Required — generates the business plan</span></div>
+        <div class="hint">Get a free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--gold)">aistudio.google.com</a> → API Keys</div>
+      </div>
+
+      <div class="field">
+        <label>Google OAuth Client ID <span class="opt">(optional)</span></label>
+        <input type="text" id="cfgOAuth" placeholder="123456789-abc…apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        <div class="key-status" id="oauthStat"><div class="dot"></div><span>Optional — enables Gmail sending &amp; Google Docs</span></div>
+      </div>
+
+      <div class="info-box">
+        <p><strong style="color:var(--text)">Without OAuth:</strong> The plan displays on screen and can be copied, emailed via your default mail client, or downloaded as HTML.</p>
+        <p><strong style="color:var(--text)">To enable Gmail + Google Docs:</strong></p>
+        <ol>
+          <li>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → your project</li>
+          <li>Enable <strong>Gmail API</strong> and <strong>Google Drive API</strong></li>
+          <li>Credentials → OAuth 2.0 → Web Application</li>
+          <li>Add your site URL to <em>Authorized JavaScript Origins</em></li>
+          <li>Copy the Client ID above and save</li>
+        </ol>
+      </div>
+
+      <div class="field" style="margin-top:0.5rem">
+        <label style="display:flex;align-items:center;justify-content:space-between">
+          <span>Admin Access <span class="opt">(prompt editor)</span></span>
+          <button class="btn btn-ghost" style="padding:0.25rem 0.6rem;font-size:0.72rem" id="adminUnlockBtn" onclick="toggleAdminUnlock()">🔒 Unlock</button>
+        </label>
+        <div id="adminPwRow" style="display:flex;gap:0.5rem;margin-top:0.35rem">
+          <input type="password" id="cfgAdminPw" placeholder="Admin password…" autocomplete="off" style="flex:1"
+            onkeydown="if(event.key==='Enter')toggleAdminUnlock()">
+        </div>
+      </div>
+
+      <div id="adminSection" style="display:none;border-top:1px solid var(--border);padding-top:1.2rem;margin-top:0.5rem">
+        <div class="field">
+          <label>AI Prompt Template <span class="opt">(admin only)</span></label>
+          <textarea id="cfgPrompt" rows="14" placeholder="Paste custom prompt here — use ${d.name}, ${d.why}, ${d.goals}, ${d.exp}, ${d.time}, ${d.budget}, ${d.soi}, ${d.earn}, ${d.price}, ${d.list} as variables." style="font-size:0.75rem;font-family:monospace;line-height:1.5"></textarea>
+          <div class="hint">Leave blank to use the default built-in prompt. Variables: <code style="color:var(--gold2);font-size:0.72rem">${d.name} ${d.why} ${d.goals} ${d.exp} ${d.time} ${d.budget} ${d.soi} ${d.earn} ${d.price} ${d.list}</code></div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:0.5rem;font-size:0.78rem" onclick="resetPrompt()">↩ Reset to Default Prompt</button>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     EMAIL MODAL
+════════════════════════════════════════════ -->
+<div id="emailModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">✉️ Email Business Plan</div>
+      <div class="modal-sub">Send this plan to the agent, their manager, or any other recipients.</div>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Recipients <span class="req">*</span></label>
+        <input type="text" id="emailTo" placeholder="manager@adamscameron.com, agent@adamscameron.com">
+        <div class="hint">Separate multiple addresses with a comma.</div>
+      </div>
+      <div class="field">
+        <label>Subject</label>
+        <input type="text" id="emailSubj" value="Your Business Plan — Adams, Cameron &amp; Co.">
+      </div>
+      <div class="field">
+        <label>Note <span class="opt">(optional)</span></label>
+        <textarea id="emailNote" placeholder="Add a personal message to include above the plan…" rows="2"></textarea>
+      </div>
+      <div class="info-box" id="emailMethodNote">
+        <p id="emailMethodText"></p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeEmailModal()">Cancel</button>
+      <button class="btn btn-primary" id="emailSendBtn" onclick="doEmail()">Send Email</button>
+    </div>
+  </div>
+</div>
+
+
+
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">🏡</div>
+    <div>
+      <div class="brand-name">Adams, Cameron & Co.</div>
+      <div class="brand-sub">Business Plan Generator</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn-icon" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</header>
+
+
+<!-- ══════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════ -->
+<main class="app-main">
+
+  <!-- Progress -->
+  <div class="progress" id="progressBar">
+    <div class="prog-step">
+      <div class="prog-num active" id="pn1">1</div>
+      <div class="prog-label active" id="pl1">Contact</div>
+    </div>
+    <div class="prog-line"></div>
+    <div class="prog-step">
+      <div class="prog-num" id="pn2">2</div>
+      <div class="prog-label" id="pl2">Overview</div>
+    </div>
+    <div class="prog-line"></div>
+    <div class="prog-step">
+      <div class="prog-num" id="pn3">3</div>
+      <div class="prog-label" id="pl3">Strategy</div>
+    </div>
+  </div>
+
+
+  <!-- ── STEP 1: Contact ── -->
+  <div class="step active" id="step1">
+    <div class="intro-banner">
+      <strong>Welcome.</strong> This tool uses Gemini AI to generate a personalized 12-month business plan based on your inputs.
+      It's a starting point — not a final document. Answer honestly, don't overthink it on the first pass, and you can always revise your assumptions.
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Section 1 of 3</div>
+        <div class="section-title">Contact &amp; Market</div>
+        <div class="section-desc">Basic information so we can personalize your plan and deliver it to the right place.</div>
+      </div>
+      <div class="card-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="f_name" placeholder="First Last">
+          </div>
+          <div class="field">
+            <label>Office Location</label>
+            <input type="text" id="f_office" placeholder="e.g. Ormond Beach, Daytona…">
+          </div>
+        </div>
+        <div class="field">
+          <label>Primary Market Focus</label>
+          <input type="text" id="f_market" placeholder="e.g. Volusia County, Palm Coast, State of Florida…">
+          <div class="hint">How targeted or broad is your geographic focus? Could be a neighborhood or an entire state.</div>
+        </div>
+      </div>
+      <div class="card-foot">
+        <div></div>
+        <button class="btn btn-primary" onclick="goTo(2)">Continue →</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── STEP 2: Overview ── -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Section 2 of 3</div>
+        <div class="section-title">Overview &amp; Context</div>
+        <div class="section-desc">Your "why," goals, and constraints shape the entire strategy. Be honest — the more context you give, the more actionable your plan will be.</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Brief Description <span class="opt">(optional)</span></label>
+          <textarea id="f_desc" placeholder="A few words about your practice or current situation…" rows="2"></textarea>
+        </div>
+        <div class="field">
+          <label>Your "Why" <span class="req">*</span></label>
+          <textarea id="f_why" placeholder="Why do you want to be in real estate? What do you ultimately want to accomplish?" rows="3" required></textarea>
+        </div>
+        <div class="field">
+          <label>Goals <span class="req">*</span></label>
+          <textarea id="f_goals" placeholder="What are your goals? Consider personal financial needs, business objectives, and long-term vision." rows="3" required></textarea>
+        </div>
+        <div class="field">
+          <label>Time Commitment — Hours per Week</label>
+          <div class="range-field">
+            <div class="range-labels"><span>0 hrs</span><span class="range-val" id="f_timeV">0 hrs/wk</span><span>80 hrs/wk</span></div>
+            <input type="range" id="f_timeR" min="0" max="80" value="0" step="1"
+              oninput="document.getElementById('f_timeV').textContent=this.value+' hrs/wk';document.getElementById('f_time').value=this.value">
+            <input type="hidden" id="f_time" value="0">
+          </div>
+          <div class="hint">How many hours per week can you dedicate to real estate? Consider other jobs or family commitments.</div>
+          <textarea id="f_time_note" placeholder="Optional: explain your schedule in more detail…" rows="2" style="margin-top:0.5rem"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Budget / Cost Constraints</label>
+          <div class="range-field">
+            <div class="range-labels"><span>None</span><span class="range-val" id="f_budgetV">0</span><span>Unlimited</span></div>
+            <input type="range" id="f_budgetR" min="0" max="100" value="0" step="1"
+              oninput="document.getElementById('f_budgetV').textContent=this.value;document.getElementById('f_budget').value=this.value">
+            <input type="hidden" id="f_budget" value="0">
+          </div>
+          <div class="hint">How much can you invest in your business? Consider marketing, tools, and education.</div>
+          <textarea id="f_budget_note" placeholder="Optional: describe your budget situation in more detail…" rows="2" style="margin-top:0.5rem"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Sphere of Influence — Number of Contacts</label>
+          <div class="range-field">
+            <div class="range-labels"><span>0</span><span class="range-val" id="f_soiV">0 contacts</span><span>1,000+</span></div>
+            <input type="range" id="f_soiR" min="0" max="1000" value="0" step="10"
+              oninput="document.getElementById('f_soiV').textContent=Number(this.value).toLocaleString()+' contacts';document.getElementById('f_soi').value=this.value">
+            <input type="hidden" id="f_soi" value="0">
+          </div>
+          <div class="hint">How large is your personal network in this market? New to area vs. long-time community member.</div>
+          <textarea id="f_soi_note" placeholder="Optional: long-time local, new to area, active in community…" rows="2" style="margin-top:0.5rem"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Real Estate Experience — Years</label>
+          <div class="range-field">
+            <div class="range-labels"><span>0 yrs</span><span class="range-val" id="f_expV">0 yrs</span><span>20 yrs</span></div>
+            <input type="range" id="f_expR" min="0" max="20" value="0" step="1"
+              oninput="document.getElementById('f_expV').textContent=this.value+' yrs';document.getElementById('f_exp').value=this.value">
+            <input type="hidden" id="f_exp" value="0">
+          </div>
+          <div class="hint">How many years have you been practicing real estate? Just licensed vs. seasoned veteran.</div>
+          <textarea id="f_exp_note" placeholder="Optional: transaction types, specialties, designations…" rows="2" style="margin-top:0.5rem"></textarea>
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(3)">Continue →</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── STEP 3: Prospecting ── -->
+  <div class="step" id="step3">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Section 3 of 3</div>
+        <div class="section-title">Prospecting Strategy</div>
+        <div class="section-desc">Let's define the numbers. These inputs drive the quantitative Revenue Roadmap in your plan, including transaction goals and required prospecting activity.</div>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>Annual Earning Goal <span class="req">*</span></label>
+          <div class="input-wrap">
+            <span class="input-pfx">$</span>
+            <input type="number" id="f_earn" placeholder="100000" min="0" step="1000">
+          </div>
+          <div class="hint">Include business expenses, personal needs (rent/mortgage, etc.), and long-term savings targets.</div>
+        </div>
+        <div class="field">
+          <label>Average Sale Price</label>
+          <div class="input-wrap">
+            <span class="input-pfx">$</span>
+            <input type="number" id="f_price" placeholder="350000" min="0" step="5000">
+          </div>
+          <div class="hint">Reflects your market and strategy — investors &amp; first-time buyers differ from luxury markets.</div>
+        </div>
+        <div class="field">
+          <label>Business Mix — Buyers vs. Sellers</label>
+          <div class="range-field">
+            <div class="range-labels"><span>100% Buyers</span><span class="range-val" id="f_listV">50% Sellers</span><span>100% Sellers</span></div>
+            <input type="range" id="f_listR" min="0" max="100" value="50" step="5"
+              oninput="document.getElementById('f_listV').textContent=this.value+'% Sellers';document.getElementById('f_list').value=this.value">
+          </div>
+          <input type="hidden" id="f_list" value="50">
+          <div class="hint">What share of your business will come from listings (sellers) vs. buyer representation?</div>
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
+        <button class="btn btn-primary" id="genBtn" onclick="generatePlan()">✨ Generate My Plan</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── LOADING ── -->
+  <div class="step" id="stepLoad">
+    <div class="card">
+      <div class="loading-view">
+        <div class="spinner"></div>
+        <div class="loading-title" id="loadingTitle">Crafting Your Business Plan…</div>
+        <div class="loading-sub" id="loadingSub">Gemini AI is analyzing your profile and building a personalized 12-month strategy.</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── RESULTS ── -->
+  <div class="step" id="stepResult">
+    <div class="card">
+      <div class="results-head">
+        <div>
+          <div class="results-title">Your Business Plan is Ready</div>
+          <div class="results-meta" id="resultsMeta">Adams, Cameron &amp; Co. · Generated by Gemini AI</div>
+        </div>
+        <div class="results-actions">
+          <button class="btn btn-ghost"   id="btnCopy"  onclick="doCopy()">📋 Copy</button>
+          <button class="btn btn-subtle"  id="btnEmail" onclick="openEmailModal()">✉️ Email</button>
+          <button class="btn btn-subtle"  id="btnDocs"  onclick="doDocs()">📄 Save to Google Doc</button>
+          <button class="btn btn-primary" onclick="doReset()">↩ Start Over</button>
+        </div>
+      </div>
+      <div class="results-body">
+        <div class="plan" id="planContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── INFOGRAPHIC ── -->
+  <div id="infographicCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Visual Summary</div>
+        <div class="section-title">Roadmap to Success</div>
+        <div class="section-desc">Key activities and milestones that will drive your results over the next 12 months.</div>
+      </div>
+      <div style="padding:1.5rem 2rem" id="infographicContent">
+        <div class="loading-view" style="padding:2rem 1rem">
+          <div class="spinner"></div>
+          <div class="loading-sub">Building your infographic…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+
+<!-- ══════════════════════════════════════════
+     SCRIPT
+════════════════════════════════════════════ -->
+<script>
+
+/* ───────────────────────── STATE ───────────────────────── */
+const S = {
+  step: 1,
+  plan: '',        // raw Gemini markdown
+  planHtml: '',    // rendered HTML
+  data: {},        // form values
+  accessToken: null,
+  tokenClient: null,
+  pendingAction: null
+};
+
+/* ───────────────────────── SETTINGS ───────────────────── */
+const ADMIN_PW = 'ac2025admin'; // ← change this to your preferred password
+
+function cfg()  { return { gem: ls('ac_gem') || '', oa: ls('ac_oa') || '', prompt: ls('ac_prompt') || '' }; }
+function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
+
+function openSettings() {
+  const c = cfg();
+  document.getElementById('cfgGemini').value = c.gem;
+  document.getElementById('cfgOAuth').value  = c.oa;
+  document.getElementById('cfgPrompt').value = c.prompt;
+  document.getElementById('adminSection').style.display = 'none';
+  document.getElementById('adminPwRow').style.display = 'flex';
+  document.getElementById('adminUnlockBtn').textContent = '🔒 Unlock';
+  document.getElementById('cfgAdminPw').value = '';
+  refreshStatDots();
+  document.getElementById('settingsModal').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+function toggleAdminUnlock() {
+  const pw  = document.getElementById('cfgAdminPw').value;
+  const sec = document.getElementById('adminSection');
+  const btn = document.getElementById('adminUnlockBtn');
+  const row = document.getElementById('adminPwRow');
+  if (sec.style.display !== 'none') {
+    sec.style.display = 'none'; row.style.display = 'flex';
+    btn.textContent = '🔒 Unlock'; return;
+  }
+  if (pw !== ADMIN_PW) { toast('Incorrect admin password.', 'err'); return; }
+  sec.style.display = 'block'; row.style.display = 'none';
+  btn.textContent = '🔓 Lock';
+  document.getElementById('cfgPrompt').value = cfg().prompt;
+}
+
+function resetPrompt() {
+  if (!confirm('Reset to the default built-in prompt?')) return;
+  document.getElementById('cfgPrompt').value = '';
+  ls('ac_prompt', '');
+  toast('Prompt reset to default.', 'ok');
+}
+
+function saveSettings() {
+  const gem    = document.getElementById('cfgGemini').value.trim();
+  const oa     = document.getElementById('cfgOAuth').value.trim();
+  const prompt = document.getElementById('cfgPrompt').value.trim();
+  if (!gem) { toast('Gemini API key is required.', 'err'); return; }
+  ls('ac_gem', gem);
+  ls('ac_oa',  oa);
+  ls('ac_prompt', prompt);
+  if (oa) initOAuth(oa);
+  refreshStatDots();
+  closeSettings();
+  toast('Settings saved!', 'ok');
+}
+
+function refreshStatDots() {
+  const c = cfg();
+  setDot('geminiStat', c.gem ? 'ok' : 'warn', c.gem ? 'API key saved ✓' : 'Required — generates the plan');
+  setDot('oauthStat',  c.oa  ? 'ok' : '',     c.oa  ? 'Client ID saved — Gmail &amp; Docs enabled ✓' : 'Optional — enables Gmail &amp; Google Docs');
+}
+
+function setDot(id, cls, msg) {
+  const el = document.getElementById(id);
+  el.querySelector('.dot').className = 'dot ' + cls;
+  el.querySelector('span').innerHTML = msg;
+}
+
+/* ───────────────────────── GOOGLE OAUTH ───────────────── */
+function initOAuth(clientId) {
+  if (!window.google?.accounts?.oauth2 || !clientId) return;
+  S.tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file',
+    callback: (res) => {
+      if (res.error) { toast('Google sign-in failed: ' + res.error, 'err'); return; }
+      S.accessToken = res.access_token;
+      if (S.pendingAction === 'email') doEmail();
+      if (S.pendingAction === 'docs')  doDocs();
+      S.pendingAction = null;
+    }
+  });
+}
+
+function requestToken(action) {
+  if (!S.tokenClient) return false;
+  if (S.accessToken)  return true;
+  S.pendingAction = action;
+  S.tokenClient.requestAccessToken();
+  return false;
+}
+
+/* ───────────────────────── NAVIGATION ─────────────────── */
+function show(id) {
+  document.querySelectorAll('.step').forEach(e => e.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function setProgress(step) {
+  const inForm = step >= 1 && step <= 3;
+  document.getElementById('progressBar').style.display = inForm ? 'flex' : 'none';
+  for (let i = 1; i <= 3; i++) {
+    const n = document.getElementById('pn' + i);
+    const l = document.getElementById('pl' + i);
+    if (i < step)       { n.className = 'prog-num done';   n.textContent = '✓'; l.className = 'prog-label'; }
+    else if (i === step){ n.className = 'prog-num active';  n.textContent = i;   l.className = 'prog-label active'; }
+    else                { n.className = 'prog-num';         n.textContent = i;   l.className = 'prog-label'; }
+  }
+}
+
+function goTo(step) {
+  if (step === 2 && !v1()) return;
+  if (step === 3 && !v2()) return;
+  S.step = step;
+  show('step' + step);
+  setProgress(step);
+  scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function v1() {
+  if (!v('f_name')) { toast('Please enter your name.', 'err'); foc('f_name'); return false; }
+  return true;
+}
+function v2() {
+  if (!v('f_why'))   { toast('Please fill in your motivation.', 'err'); foc('f_why');   return false; }
+  if (!v('f_goals')) { toast('Please fill in your goals.',      'err'); foc('f_goals'); return false; }
+  return true;
+}
+function v(id) { return document.getElementById(id).value.trim(); }
+function foc(id) { document.getElementById(id).focus(); }
+
+/* ───────────────────────── FORM DATA ──────────────────── */
+function collect() {
+  const earn  = v('f_earn');
+  const price = v('f_price');
+
+  function withNote(rawVal, unit, noteId) {
+    const note = document.getElementById(noteId).value.trim();
+    const label = unit === 'contacts'
+      ? Number(rawVal).toLocaleString() + ' contacts'
+      : rawVal + ' ' + unit;
+    return note ? `${label} — ${note}` : label;
+  }
+
+  return {
+    name:    v('f_name')  || 'Agent',
+    office:  v('f_office')|| 'Adams, Cameron & Co.',
+    market:  v('f_market'),
+    desc:    v('f_desc'),
+    why:     v('f_why'),
+    goals:   v('f_goals'),
+    time:    withNote(document.getElementById('f_time').value, 'hours/week', 'f_time_note'),
+    budget:  (() => { const val = parseInt(document.getElementById('f_budget').value); const note = document.getElementById('f_budget_note').value.trim(); const label = val === 0 ? 'None' : val <= 25 ? `Low (${val}/100)` : val <= 50 ? `Moderate (${val}/100)` : val <= 75 ? `High (${val}/100)` : `Very high (${val}/100)`; return note ? `${label} — ${note}` : label; })(),
+    soi:     withNote(document.getElementById('f_soi').value, 'contacts', 'f_soi_note'),
+    exp:     withNote(document.getElementById('f_exp').value, 'years experience', 'f_exp_note'),
+    earn:    earn  ? '$' + Number(earn).toLocaleString()  : 'Not specified',
+    split:   '65%',
+    price:   price ? '$' + Number(price).toLocaleString() : 'Not specified',
+    list:    document.getElementById('f_list').value + '% sellers / ' + (100 - parseInt(document.getElementById('f_list').value)) + '% buyers',
+  };
+}
+
+/* ───────────────────────── PROMPT ─────────────────────── */
+function buildPrompt(d) {
+  const custom = cfg().prompt;
+  if (custom) {
+    // Allow variable interpolation in custom prompts
+    return custom.replace(/\$\{d\.(\w+)\}/g, (_, key) => d[key] || '');
+  }
+  return `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
+
+The output must be formatted as a professional email intended for the agent, written in a supportive yet "boss-mode" encouraging tone. Use clear headings (##), bold text (**bold**) for emphasis, and Markdown tables for numeric goals. Avoid code blocks. Do not include a specific calendar year in the title.
+
+---
+
+### 1. AGENT PROFILE & CONTEXT
+- **Agent Name:** ${d.name}
+- **Office:** ${d.office}
+- **Primary Market Focus:** ${d.market || 'Not specified'}
+- **Motivation (The "Why"):** ${d.why}
+- **Primary Goals:** ${d.goals}
+- **Experience Level:** ${d.exp || 'Not specified'}
+- **Time Available:** ${d.time || 'Not specified'}
+- **Budgetary Constraints:** ${d.budget || 'Not specified'}
+- **Sphere of Influence (SOI):** ${d.soi || 'Not specified'}
+- **Description:** ${d.desc || 'Not provided'}
+
+### 2. THE ADAMS, CAMERON & CO. ADVANTAGE
+Incorporate these specific value propositions into the plan:
+- Global reach via Leading Real Estate Companies of the World.
+- Full marketing suite: AC Social, automated open house/listing posts, and automated SOI newsletters.
+- Technology: Personal websites and multi-channel marketing tools (Online, Print, Direct Mail).
+- Office Perks: Floor time available 7 days a week in any office — emphasize this for lead gen and experience building.
+
+### 3. QUANTITATIVE ANALYSIS (THE NUMBERS)
+Variables:
+- **Desired Net Take-Home:** ${d.earn}
+- **Commission Split:** Agent keeps ${d.split}
+- **Avg. Sale Price:** ${d.price}
+- **Avg. Commission per Side:** 3%
+- **Business Mix:** ${d.list}
+
+Calculations required:
+1. **GCI Required:** Net Goal ÷ Split %
+2. **Total Sides Required:** GCI ÷ (Avg. Sale Price × 3%)
+3. **Listing Goals:** Listing appointments needed (assume 80% closing rate)
+4. **Buyer Goals:** Buyer prospects needed (assume 3 prospects per closed buyer side)
+
+### 4. REQUIRED OUTPUT STRUCTURE
+
+**Section I: Executive Overview**
+Verbose, inspiring summary of the agent's "Why" and goals. Connect personal motivation to Adams, Cameron & Co. resources. Be specific and personal.
+
+**Section II: The Revenue Roadmap (Table)**
+Create a formatted Markdown table: GCI Required, Total Sides, Listing Appointments Needed, Buyer Prospects Needed.
+
+**Section III: Strategic Action Plan**
+Based on Budget (${d.budget || 'unspecified'}) and Time (${d.time || 'unspecified'}), outline 3–4 specific lead generation pillars. Explicitly mention AC Social and the importance of floor time.
+
+**Section IV: Weekly & Monthly Execution**
+"Weekly Scoreboard" table of activities (SOI calls, social posts, floor time, follow-ups). Include a motivational note: "What gets measured gets managed." Track your time.
+
+**Section V: Mentorship Note**
+Brief closing paragraph the agent can share with their Sales Manager to establish accountability.`;
+}
+
+/* ───────────────────────── GEMINI API ──────────────────── */
+async function geminiCall(prompt, maxTokens = 8192) {
+  const { gem } = cfg();
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gem}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens }
+      })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned an empty response.');
+  return text;
+}
+
+async function generatePlan() {
+  if (!v('f_earn')) { toast('Please enter your annual earning goal.', 'err'); foc('f_earn'); return; }
+
+  const { gem } = cfg();
+  if (!gem) { openSettings(); toast('Add your Gemini API key first.', 'err'); return; }
+
+  S.data = collect();
+
+  document.getElementById('loadingTitle').textContent = 'Crafting Your Business Plan…';
+  document.getElementById('loadingSub').textContent = 'Gemini AI is analyzing your profile and building a personalized 12-month strategy.';
+  show('stepLoad');
+  setProgress(99);
+
+  try {
+    // Step 1: Generate the business plan
+    S.plan     = await geminiCall(buildPrompt(S.data));
+    S.planHtml = md2html(S.plan);
+
+    document.getElementById('planContent').innerHTML = S.planHtml;
+    document.getElementById('resultsMeta').textContent =
+      `${S.data.name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+
+    show('stepResult');
+    setProgress(99);
+
+    // Step 2: Generate infographic asynchronously
+    document.getElementById('infographicCard').style.display = 'block';
+    generateInfographic();
+
+  } catch (e) {
+    show('step3');
+    setProgress(3);
+    toast('Generation failed: ' + e.message, 'err');
+    console.error(e);
+  }
+}
+
+/* ───────────────────────── MARKDOWN → HTML ─────────────── */
+function md2html(src) {
+  let t = src
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Tables
+  t = t.replace(/(\|[^\n]+\|\n?)+/g, m => {
+    const rows = m.trim().split('\n').filter(r => r.trim());
+    let html = '<table>', hdr = true;
+    for (const row of rows) {
+      if (/^\|[\s\-:|]+\|$/.test(row)) { hdr = false; continue; }
+      const cells = row.split('|').slice(1, -1);
+      const tag = hdr ? 'th' : 'td';
+      html += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+      if (hdr) hdr = false;
+    }
+    return html + '</table>';
+  });
+
+  // Headings
+  t = t.replace(/^#### (.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^### (.+)$/gm,  '<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm,   '<h2>$1</h2>');
+  t = t.replace(/^# (.+)$/gm,    '<h1>$1</h1>');
+
+  // Bold / Italic
+  t = t.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  t = t.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
+  t = t.replace(/__(.+?)__/g,          '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g,          '<em>$1</em>');
+
+  // HR
+  t = t.replace(/^---+$/gm, '<hr>');
+
+  // Lists (unordered)
+  t = t.replace(/((?:^[ \t]*[-*] .+\n?)+)/gm, m => {
+    const items = m.trim().split('\n').map(l => `<li>${l.replace(/^[ \t]*[-*] /, '')}</li>`);
+    return `<ul>${items.join('')}</ul>`;
+  });
+
+  // Lists (ordered)
+  t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, m => {
+    const items = m.trim().split('\n').map(l => `<li>${l.replace(/^[ \t]*\d+\. /, '')}</li>`);
+    return `<ol>${items.join('')}</ol>`;
+  });
+
+  // Paragraphs
+  t = t.replace(/\n\n+/g, '\n\n');
+  t = t.split('\n\n').map(block => {
+    const trimmed = block.trim();
+    if (!trimmed) return '';
+    if (/^<[huo1-9]/.test(trimmed) || /^<table/.test(trimmed) || /^<hr/.test(trimmed)) return trimmed;
+    return `<p>${trimmed.replace(/\n/g, ' ')}</p>`;
+  }).join('\n');
+
+  // Clean up
+  t = t.replace(/<p>\s*<\/p>/g, '');
+
+  return t;
+}
+
+/* ───────────────────────── INFOGRAPHIC ─────────────────── */
+async function generateInfographic() {
+  const d = S.data;
+  const infographicPrompt = `Based on this real estate agent's profile and business plan summary below, create a "Roadmap to Success" infographic as a single self-contained HTML snippet (no <!DOCTYPE>, no <html>, no <head>, no <body> tags — just the inner HTML with inline CSS and JS).
+
+The infographic should:
+- Be a visually rich, vertical timeline or milestone roadmap with 4–6 phases (e.g. Foundation, Lead Generation, Momentum, Closing, Scale)
+- Each phase must highlight 2–3 specific core ACTIVITIES (not just goals) the agent must do weekly/monthly to hit their targets
+- Use a warm gold (#c4a84f) and dark navy (#121620) color palette with white text
+- Include icons or emoji for each phase to make it scannable
+- Show the key numeric targets (GCI goal, sides needed, SOI contacts, hours/week)
+- End with an inspiring call-to-action tied to the agent's "Why"
+- Be fully responsive, max-width 680px, padding 20px
+- Use only inline CSS (no external stylesheets or scripts)
+
+Agent Profile:
+- Name: ${d.name}
+- Market: ${d.market || 'Florida'}
+- Why: ${d.why}
+- Goals: ${d.goals}
+- Experience: ${d.exp}
+- Time: ${d.time}
+- Budget: ${d.budget}
+- SOI: ${d.soi}
+- Earning Goal: ${d.earn}
+- Avg Sale Price: ${d.price}
+- Business Mix: ${d.list}
+- Commission Split: 65%
+
+Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
+
+  try {
+    const html = await geminiCall(infographicPrompt, 4096);
+    // Strip any accidental markdown fences
+    const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+    document.getElementById('infographicContent').innerHTML = clean;
+  } catch (e) {
+    document.getElementById('infographicContent').innerHTML =
+      `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Infographic could not be generated: ${e.message}</p>`;
+  }
+}
+
+/* ───────────────────────── COPY ────────────────────────── */
+async function doCopy() {
+  try {
+    await navigator.clipboard.writeText(S.plan);
+  } catch {
+    const el = Object.assign(document.createElement('textarea'), { value: S.plan });
+    document.body.appendChild(el); el.select(); document.execCommand('copy'); el.remove();
+  }
+  toast('Copied to clipboard!', 'ok');
+  const b = document.getElementById('btnCopy');
+  b.textContent = '✓ Copied';
+  setTimeout(() => b.textContent = '📋 Copy', 2200);
+}
+
+/* ───────────────────────── EMAIL MODAL ─────────────────── */
+function openEmailModal() {
+  const { oa } = cfg();
+  const hasOAuth = oa && S.tokenClient;
+  const note = document.getElementById('emailMethodText');
+  note.innerHTML = hasOAuth
+    ? '<strong style="color:var(--text)">Gmail API:</strong> Email will be sent directly via your connected Google account.'
+    : '<strong style="color:var(--text)">No OAuth configured:</strong> Clicking Send will open your default email client with the plan pre-filled. For direct Gmail sending, add your OAuth Client ID in ⚙ Settings.';
+
+  // Pre-fill subject with agent name if available
+  const subj = document.getElementById('emailSubj');
+  if (S.data.name && S.data.name !== 'Agent') {
+    subj.value = `Business Plan — ${S.data.name} — Adams, Cameron & Co.`;
+  }
+
+  document.getElementById('emailModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('emailTo').focus(), 100);
+}
+
+function closeEmailModal() {
+  document.getElementById('emailModal').classList.add('hidden');
+}
+
+/* ───────────────────────── EMAIL SEND ──────────────────── */
+async function doEmail() {
+  const to   = document.getElementById('emailTo').value.trim();
+  const subj = document.getElementById('emailSubj').value.trim() || 'Your Business Plan — Adams, Cameron & Co.';
+  const note = document.getElementById('emailNote').value.trim();
+
+  if (!to) { toast('Please enter at least one recipient.', 'err'); document.getElementById('emailTo').focus(); return; }
+
+  const { oa } = cfg();
+
+  if (oa && S.tokenClient) {
+    if (!S.accessToken) {
+      S.pendingAction = 'email';
+      closeEmailModal();
+      S.tokenClient.requestAccessToken();
+      return;
+    }
+    await gmailSend(to, subj, note);
+  } else {
+    mailtoFallback(to, subj, note);
+  }
+}
+
+async function gmailSend(to, subj, note) {
+  const btn = document.getElementById('emailSendBtn');
+  btn.textContent = '⏳ Sending…';
+  btn.disabled = true;
+
+  const bodyHtml = buildEmailHtml(note);
+  const raw = buildRaw(to, subj, bodyHtml);
+
+  try {
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${S.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw })
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      if (e.error?.code === 401) { S.accessToken = null; doEmail(); return; }
+      const msg = e.error?.message || 'Send failed';
+      if (msg.includes('Gmail API has not been used') || msg.includes('it is disabled')) {
+        const projectId = msg.match(/project (\d+)/)?.[1] || '';
+        const link = projectId
+          ? `https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=${projectId}`
+          : 'https://console.cloud.google.com/apis/library/gmail.googleapis.com';
+        toast(`Gmail API is not enabled. Click to fix →`, 'err');
+        setTimeout(() => window.open(link, '_blank'), 600);
+        throw new Error('Gmail API not enabled — opening Cloud Console to enable it.');
+      }
+      throw new Error(msg);
+    }
+    closeEmailModal();
+    toast(`Email sent to ${to}!`, 'ok');
+    const b = document.getElementById('btnEmail');
+    b.textContent = '✓ Sent!';
+    setTimeout(() => { b.textContent = '✉️ Email'; }, 3000);
+  } catch (e) {
+    toast('Email failed: ' + e.message, 'err');
+  } finally {
+    btn.textContent = 'Send Email';
+    btn.disabled = false;
+  }
+}
+
+function mailtoFallback(to, subj, note) {
+  // mailto has a ~2000 char URL limit so send a plain-text excerpt + note
+  const intro = note ? `${note}\n\n---\n\n` : '';
+  const body  = intro + S.plan.slice(0, 1800) + (S.plan.length > 1800 ? '\n\n[Plan continues — see full version in Google Docs or copied text]' : '');
+  const url   = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
+  closeEmailModal();
+  toast('Opening your email client…', 'ok');
+}
+
+function buildRaw(to, subject, htmlBody) {
+  const msg = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/html; charset=UTF-8',
+    '',
+    htmlBody
+  ].join('\r\n');
+  return btoa(unescape(encodeURIComponent(msg)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/* ───────────────────────── GOOGLE DOCS ─────────────────── */
+async function doDocs() {
+  const { oa } = cfg();
+
+  if (!oa || !S.tokenClient) {
+    // Fallback: download as HTML
+    downloadHtml();
+    toast('No OAuth configured — downloading as HTML instead. Set up Google OAuth in Settings for direct Docs saving.', 'ok');
+    return;
+  }
+
+  if (!S.accessToken) { S.pendingAction = 'docs'; S.tokenClient.requestAccessToken(); return; }
+
+  const b = document.getElementById('btnDocs');
+  b.textContent = '⏳ Saving…';
+  b.disabled = true;
+
+  try {
+    const html = buildEmailHtml('');
+    const name = `Business Plan — ${S.data.name} — ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify({ name, mimeType: 'application/vnd.google-apps.document' })], { type: 'application/json' }));
+    form.append('file',     new Blob([html], { type: 'text/html' }));
+
+    const res = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+      { method: 'POST', headers: { Authorization: `Bearer ${S.accessToken}` }, body: form }
+    );
+
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      if (e.error?.code === 401) { S.accessToken = null; doDocs(); return; }
+      throw new Error(e.error?.message || 'Upload failed');
+    }
+
+    const doc = await res.json();
+    toast('Saved to Google Docs!', 'ok');
+    b.textContent = '✓ Saved!';
+    if (doc.webViewLink) setTimeout(() => window.open(doc.webViewLink, '_blank'), 400);
+    setTimeout(() => { b.textContent = '📄 Google Doc'; b.disabled = false; }, 3000);
+
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'err');
+    b.textContent = '📄 Google Doc'; b.disabled = false;
+  }
+}
+
+function downloadHtml() {
+  const html = buildEmailHtml('');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([html], {type:'text/html'})),
+    download: `Business_Plan_${S.data.name.replace(/\s+/g,'_')}.html`
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function buildEmailHtml(note) {
+  const noteBlock = note
+    ? `<div style="background:#f5e8c8;border-left:3px solid #c4a84f;padding:10px 14px;margin-bottom:24px;font-style:italic;color:#5a3a1a;">${note.replace(/\n/g,'<br>')}</div>`
+    : '';
+  return `<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<style>
+  body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 20px;color:#1a1a1a;line-height:1.75;background:#fff;}
+  h1{font-size:1.6em;color:#8B5A1A;margin-top:1.5em;}
+  h2{font-size:1.25em;color:#5a3a1a;border-bottom:1px solid #e0c070;padding-bottom:6px;margin-top:1.8em;}
+  h3{font-size:1.05em;color:#7a5c2e;margin-top:1.2em;}
+  table{width:100%;border-collapse:collapse;margin:1em 0;font-size:0.9em;}
+  th{background:#f5e8c8;padding:8px 10px;text-align:left;border:1px solid #d4b875;font-weight:700;}
+  td{padding:7px 10px;border:1px solid #e0d0a8;}
+  tr:nth-child(even) td{background:#fdf8ee;}
+  strong{font-weight:700;}
+  ul,ol{padding-left:1.5em;margin-bottom:1em;}
+  li{margin-bottom:0.3em;}
+  hr{border:none;border-top:1px solid #e0d0a8;margin:1.5em 0;}
+  .footer{margin-top:3em;padding-top:1em;border-top:1px solid #e0d0a8;font-size:0.8em;color:#888;}
+</style>
+</head><body>
+${noteBlock}
+${S.planHtml}
+<div class="footer">Generated by Adams, Cameron &amp; Co. Business Plan Generator &mdash; ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
+</body></html>`;
+}
+
+/* ───────────────────────── RESET ───────────────────────── */
+function doReset() {
+  S.plan = ''; S.planHtml = ''; S.data = {};
+  document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea')
+    .forEach(el => el.value = '');
+
+  // Reset listing slider to 50%
+  document.getElementById('f_listR').value = 50;
+  document.getElementById('f_listV').textContent = '50% Sellers';
+  document.getElementById('f_list').value = 50;
+
+  // Reset constraint sliders to 0
+  document.getElementById('f_timeR').value = 0;
+  document.getElementById('f_timeV').textContent = '0 hrs/wk';
+  document.getElementById('f_time').value = 0;
+
+  document.getElementById('f_budgetR').value = 0;
+  document.getElementById('f_budgetV').textContent = '0';
+  document.getElementById('f_budget').value = 0;
+
+  document.getElementById('f_soiR').value = 0;
+  document.getElementById('f_soiV').textContent = '0 contacts';
+  document.getElementById('f_soi').value = 0;
+
+  document.getElementById('f_expR').value = 0;
+  document.getElementById('f_expV').textContent = '0 yrs';
+  document.getElementById('f_exp').value = 0;
+
+  // Hide infographic
+  document.getElementById('infographicCard').style.display = 'none';
+  document.getElementById('infographicContent').innerHTML = `
+    <div class="loading-view" style="padding:2rem 1rem">
+      <div class="spinner"></div>
+      <div class="loading-sub">Building your infographic…</div>
+    </div>`;
+
+  goTo(1);
+}
+
+/* ───────────────────────── TOAST ───────────────────────── */
+function toast(msg, cls = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${cls} show`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = 'toast', 3800);
+}
+
+/* ───────────────────────── INIT ────────────────────────── */
+window.addEventListener('load', () => {
+  const { gem, oa } = cfg();
+  if (!gem) setTimeout(openSettings, 600);
+  refreshStatDots();
+  if (oa) {
+    const poll = setInterval(() => {
+      if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(oa); }
+    }, 200);
+  }
+});
+
+</script>
+</body>
+</html>
