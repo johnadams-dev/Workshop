@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>John Adams | Real Estate AI Tools</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #1a1a2e;
+      --ink-soft: #2d2d4a;
+      --gold: #c9a84c;
+      --gold-light: #e8c96a;
+      --cream: #faf8f3;
+      --cream-dark: #f0ece0;
+      --slate: #5a5a78;
+      --muted: #8a8aa8;
+      --red: #c0392b;
+      --card-bg: #ffffff;
+      --shadow: 0 2px 20px rgba(26,26,46,0.08);
+      --shadow-hover: 0 8px 40px rgba(26,26,46,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 24px rgba(0,0,0,0.3);
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: 0.02em;
+    }
+    .logo span { color: var(--gold); }
+    .header-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      background: var(--ink);
+      padding: 5rem 2rem 4rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 120%, rgba(201,168,76,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.2rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 0.1s forwards;
+    }
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      font-weight: 600;
+      color: var(--cream);
+      line-height: 1.15;
+      margin-bottom: 1.2rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 0.2s forwards;
+    }
+    .hero h1 em {
+      color: var(--gold);
+      font-style: italic;
+    }
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 2rem;
+      line-height: 1.7;
+      font-weight: 300;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 0.3s forwards;
+    }
+    .beta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(201,168,76,0.12);
+      border: 1px solid rgba(201,168,76,0.3);
+      color: var(--gold-light);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.4rem 0.9rem;
+      border-radius: 100px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease 0.4s forwards;
+    }
+
+    /* ── NOTICE ── */
+    .notice {
+      background: var(--cream-dark);
+      border-left: 3px solid var(--gold);
+      max-width: 820px;
+      margin: 3rem auto 0;
+      padding: 1rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.85rem;
+      color: var(--slate);
+      line-height: 1.6;
+    }
+    .notice a {
+      color: var(--ink);
+      font-weight: 500;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    /* ── SECTION ── */
+    .section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2.5rem;
+    }
+
+    /* ── CARDS GRID ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,0.06);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--gold), var(--gold-light));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+    .card:hover::after { transform: scaleX(1); }
+
+    .card.coming-soon {
+      opacity: 0.75;
+      cursor: default;
+    }
+    .card.coming-soon:hover {
+      transform: none;
+      box-shadow: var(--shadow);
+    }
+    .card.coming-soon::after { display: none; }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .card-status {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: 100px;
+      margin-bottom: 0.8rem;
+      width: fit-content;
+    }
+    .status-beta {
+      background: rgba(201,168,76,0.12);
+      color: #9a7020;
+      border: 1px solid rgba(201,168,76,0.3);
+    }
+    .status-soon {
+      background: rgba(192,57,43,0.08);
+      color: var(--red);
+      border: 1px solid rgba(192,57,43,0.2);
+    }
+    .status-live {
+      background: rgba(39,174,96,0.1);
+      color: #1a7a42;
+      border: 1px solid rgba(39,174,96,0.25);
+    }
+
+    .card h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 0.6rem;
+      line-height: 1.25;
+    }
+
+    .card p {
+      font-size: 0.875rem;
+      color: var(--slate);
+      line-height: 1.65;
+      flex: 1;
+    }
+
+    .card-arrow {
+      margin-top: 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: 0.03em;
+    }
+    .card-arrow svg {
+      transition: transform 0.2s ease;
+    }
+    .card:hover .card-arrow svg { transform: translateX(4px); }
+    .card.coming-soon .card-arrow { color: var(--muted); }
+
+    .card-note {
+      margin-top: 0.8rem;
+      font-size: 0.75rem;
+      color: var(--red);
+      font-style: italic;
+    }
+
+    /* ── DIVIDER ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--cream-dark);
+      margin: 0 2rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--ink);
+      color: var(--muted);
+      text-align: center;
+      padding: 3rem 2rem;
+      font-size: 0.82rem;
+      line-height: 1.8;
+    }
+    footer a {
+      color: var(--gold);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+    .footer-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      color: var(--cream);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .hero { padding: 3.5rem 1.5rem 3rem; }
+      .section { padding: 3rem 1.25rem; }
+      .cards { grid-template-columns: 1fr; }
+      .header-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">John <span>Adams</span></div>
+    <span class="header-note">Real Estate AI Tools</span>
+  </div>
+</header>
+
+<div class="hero">
+  <p class="hero-eyebrow">Tools for Real Estate Professionals</p>
+  <h1>Work smarter.<br><em>Close faster.</em></h1>
+  <p class="hero-sub">A collection of AI-powered tools built for real estate agents — from contract timelines to listing enhancements, all in one place.</p>
+  <span class="beta-badge">⚠ Beta — All tools are actively being developed</span>
+</div>
+
+<div style="max-width:1100px; margin: 0 auto; padding: 0 2rem;">
+  <div class="notice">
+    These applications are developed in-house and considered beta releases. While tested, you may experience errors. If you do, please email <a href="mailto:john+apps@adamscameron.com">john+apps@adamscameron.com</a> and include: your device type (computer, Android, or iPhone), which tool you were using, and what went wrong. Your feedback helps improve these tools for everyone.
+  </div>
+</div>
+
+<!-- LIVE TOOLS -->
+<section class="section">
+  <p class="section-label">Available Now</p>
+  <h2 class="section-title">Ready to Use</h2>
+
+  <div class="cards">
+
+    <!-- Contract Date Calculator -->
+    <a href="./contract-calculator.html" target="_blank" class="card">
+      <div class="card-icon">📅</div>
+      <span class="card-status status-beta">Beta</span>
+      <h2>Contract Date Calculator</h2>
+      <p>Enter key dates from a Florida FAR/BAR residential contract to instantly calculate all due dates — inspection periods, financing contingencies, deposits, title, and more.</p>
+      <p class="card-note">Always double-check calculated dates against your contract.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+    <!-- Market Update -->
+    <a href="./market-update.html" target="_blank" class="card">
+      <div class="card-icon">📊</div>
+      <span class="card-status status-beta">Beta</span>
+      <h2>Comprehensive Market Update</h2>
+      <p>Upload an active and sold listing export from your MLS (Excel, CSV, and more) to generate a full market analysis — days on market, absorption rate, price per square foot, and beyond.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+    <!-- MLS Magic -->
+    <a href="https://mls-data-sync.web.app/" target="_blank" class="card">
+      <div class="card-icon">✨</div>
+      <span class="card-status status-beta">Beta</span>
+      <h2>MLS Magic</h2>
+      <p>Cross-reference listings between Daytona MLS and Stellar MLS effortlessly. It reads listings from one system and auto-fills the data entry sheet for the other — eventually entering them for you.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+    <!-- Cameron's Lens -->
+    <a href="./camerons-lens.html" target="_blank" class="card">
+      <div class="card-icon">📸</div>
+      <span class="card-status status-beta">Beta</span>
+      <h2>Cameron's Lens</h2>
+      <p>Take your existing listing information and let AI enhance the property description and suggest photo improvements — making every listing stand out without starting from scratch.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- COMING SOON -->
+<section class="section">
+  <p class="section-label">In Development</p>
+  <h2 class="section-title">Coming Soon</h2>
+
+  <div class="cards">
+
+    <!-- ACC Binder -->
+    <a href="https://accbinder-921b8.web.app/" target="_blank" class="card coming-soon">
+      <div class="card-icon" style="background: var(--ink-soft);">📋</div>
+      <span class="card-status status-soon">In Progress</span>
+      <h2>ACC Binder</h2>
+      <p>A digital transaction binder integrated with Form Simplicity. Centralizes your contract documents and key transaction details in one organized place. Form Simplicity integration is still being built.</p>
+      <div class="card-arrow">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        Not yet connected to Form Simplicity
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<footer>
+  <div class="footer-name">John Adams</div>
+  <p>Questions or bug reports? Email <a href="mailto:john+apps@adamscameron.com">john+apps@adamscameron.com</a></p>
+  <p style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.6;">All tools are beta releases. Verify all outputs before use in a transaction.</p>
+</footer>
+
+</body>
+</html>

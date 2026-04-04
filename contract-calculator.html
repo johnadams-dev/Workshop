@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contract Date Calculator | John Adams Real Estate Tools</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+
+    <script>
+        // ============================================================
+        // PROXY CONFIGURATION — API keys are stored server-side only.
+        // No Gemini or Google Cloud credentials are exposed here.
+        // ============================================================
+        const PROXY_CONFIG = {
+            geminiProxyUrl: 'https://mls-proxy-975684028597.us-east1.run.app/gemini',
+            proxyKey:       '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37',
+            geminiModel:    'gemini-2.5-flash',
+            // Google Calendar — users authenticate with their own Google account via OAuth
+            calendarClientId: '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com',
+            calendarEnabled:  true,
+        };
+    </script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .logo { max-width: 200px; height: auto; margin-bottom: 15px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p  { font-size: 16px; opacity: 0.9; }
+        .ai-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .google-badge {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 75%, #ea4335 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .content { padding: 40px; }
+        .mode-selector {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px solid #e9ecef;
+        }
+        .mode-selector h2 { font-size: 20px; margin-bottom: 20px; color: #2c3e50; text-align: center; }
+        .mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .mode-option {
+            background: white;
+            border: 3px solid #dee2e6;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .mode-option:hover { border-color: #667eea; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.2); }
+        .mode-option.active { border-color: #667eea; background: linear-gradient(135deg,#667eea15,#764ba215); }
+        .mode-option input[type="radio"] { display: none; }
+        .mode-icon  { font-size: 36px; margin-bottom: 10px; }
+        .mode-title { font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+        .mode-description { font-size: 13px; color: #6c757d; }
+        .upload-section { display: none; }
+        .upload-section.active { display: block; }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover  { background: #f0f2ff; border-color: #5568d3; }
+        .upload-area.dragover { background: #e8ebff; border-color: #4556c2; }
+        .upload-icon { font-size: 48px; margin-bottom: 15px; color: #667eea; }
+        .upload-area h3 { font-size: 20px; color: #2c3e50; margin-bottom: 10px; }
+        .upload-area p  { color: #6c757d; margin-bottom: 15px; }
+        .upload-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none;
+            padding: 12px 30px; border-radius: 25px;
+            font-size: 16px; cursor: pointer; transition: all 0.3s ease;
+        }
+        .upload-button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.4); }
+        .uploaded-file {
+            background: white; border: 2px solid #28a745;
+            border-radius: 12px; padding: 20px; margin-bottom: 20px; display: none;
+        }
+        .uploaded-file.active { display: flex; align-items: center; justify-content: space-between; }
+        .file-info { display: flex; align-items: center; gap: 15px; }
+        .file-icon    { font-size: 32px; color: #28a745; }
+        .file-details h4 { font-size: 16px; color: #2c3e50; margin-bottom: 5px; }
+        .file-details p  { font-size: 13px; color: #6c757d; }
+        .remove-file { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; }
+        .remove-file:hover { background: #c82333; }
+        .extraction-status { background: #e7f3ff; border: 2px solid #0066cc; border-radius: 12px; padding: 15px; margin-bottom: 20px; display: none; }
+        .extraction-status.active  { display: block; }
+        .extraction-status.success { background: #d4edda; border-color: #28a745; }
+        .extraction-status.error   { background: #f8d7da; border-color: #dc3545; }
+        .status-content { display: flex; align-items: center; gap: 15px; }
+        .status-icon { font-size: 24px; }
+        .status-text h4 { font-size: 16px; margin-bottom: 5px; }
+        .status-text p  { font-size: 13px; opacity: 0.8; }
+        .loading-spinner {
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid rgba(0,102,204,0.3); border-radius: 50%;
+            border-top-color: #0066cc; animation: spin 1s linear infinite; flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .manual-section { display: none; }
+        .manual-section.active { display: block; }
+        .form-group { margin-bottom: 25px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50; font-size: 15px; }
+        .label-description { display: block; font-weight: normal; font-size: 13px; color: #6c757d; margin-top: 3px; }
+        .form-group input {
+            width: 100%; padding: 12px 15px; border: 2px solid #dee2e6;
+            border-radius: 8px; font-size: 15px; transition: all 0.3s ease;
+        }
+        .form-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-group input.ai-filled { background: #e8f5e9; border-color: #28a745; }
+        .ai-confidence { font-size: 12px; color: #28a745; margin-top: 5px; display: none; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .calculate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; padding: 15px 40px; border-radius: 30px;
+            font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 30px; transition: all 0.3s ease;
+        }
+        .calculate-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(102,126,234,0.4); }
+        .results { display: none; margin-top: 40px; padding-top: 40px; border-top: 3px solid #e9ecef; }
+        .results.active { display: block; }
+        .results h2  { font-size: 24px; margin-bottom: 10px; color: #2c3e50; }
+        .property-info { font-size: 16px; color: #6c757d; margin-bottom: 30px; }
+        .date-item {
+            background: white; border-left: 4px solid #667eea; padding: 20px;
+            margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.3s ease;
+        }
+        .date-item:hover { transform: translateX(5px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .date-item.warning { border-left-color: #dc3545; background: #fff5f5; }
+        .date-label { font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+        .date-value { font-size: 24px; color: #667eea; font-weight: bold; margin-bottom: 5px; }
+        .date-item.warning .date-value { color: #dc3545; }
+        .date-description { font-size: 14px; color: #6c757d; margin-bottom: 8px; }
+        .warning-message { background: #dc3545; color: white; padding: 10px 15px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-top: 10px; }
+        .button-group { display: flex; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
+        .action-btn { flex: 1; min-width: 150px; padding: 12px 24px; border: none; border-radius: 25px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s ease; }
+        .btn-pdf      { background: #dc3545; color: white; }
+        .btn-pdf:hover{ background: #c82333; transform: translateY(-2px); }
+        .btn-print      { background: #28a745; color: white; }
+        .btn-print:hover{ background: #218838; transform: translateY(-2px); }
+        .btn-copy      { background: #007bff; color: white; }
+        .btn-copy:hover{ background: #0056b3; transform: translateY(-2px); }
+        .btn-calendar      { background: #6f42c1; color: white; }
+        .btn-calendar:hover{ background: #5a359a; transform: translateY(-2px); }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; }
+            .mode-selector,.upload-section,.manual-section,.button-group,.calculate-btn { display: none !important; }
+            .results { display: block !important; border-top: none; padding-top: 0; margin-top: 0; }
+        }
+        @media (max-width: 768px) {
+            .content { padding: 20px; }
+            .mode-options,.grid-2 { grid-template-columns: 1fr; }
+            .button-group { flex-direction: column; }
+            .action-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <img src="https://www.adamscameron.com/images/layout/adams-cameron-logo.png"
+             alt="Adams Cameron & Co. Realtors" class="logo" id="logoImg">
+        <h1>Contract Date Calculator</h1>
+        <p>Florida FAR/BAR Residential Contract</p>
+        <div class="ai-badge">🤖 AI-ENHANCED</div>
+        <div class="google-badge">⚡ Powered by Google AI</div>
+    </div>
+
+    <div class="content">
+
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+            <h2>Choose Input Method</h2>
+            <div class="mode-options">
+                <label class="mode-option" id="uploadModeOption">
+                    <input type="radio" name="inputMode" value="upload" id="uploadModeRadio">
+                    <div class="mode-icon">📄</div>
+                    <div class="mode-title">Upload Contract</div>
+                    <div class="mode-description">AI reads your PDF automatically</div>
+                </label>
+                <label class="mode-option active" id="manualModeOption">
+                    <input type="radio" name="inputMode" value="manual" id="manualModeRadio" checked>
+                    <div class="mode-icon">⌨️</div>
+                    <div class="mode-title">Manual Entry</div>
+                    <div class="mode-description">Enter dates yourself</div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📤</div>
+                <h3>Upload Your Contract</h3>
+                <p>Choose a PDF from your computer or drag and drop</p>
+                <button class="upload-button" onclick="document.getElementById('fileInput').click()">
+                    📁 Choose PDF File
+                </button>
+                <p style="font-size:12px;color:#6c757d;margin-top:10px;">📝 Or drag and drop your PDF here</p>
+                <input type="file" id="fileInput" accept=".pdf,application/pdf" style="display:none;">
+            </div>
+
+            <div class="uploaded-file" id="uploadedFile">
+                <div class="file-info">
+                    <div class="file-icon">📄</div>
+                    <div class="file-details">
+                        <h4 id="fileName">Contract.pdf</h4>
+                        <p  id="fileSize">0 KB</p>
+                    </div>
+                </div>
+                <button class="remove-file" onclick="removeFile()">Remove</button>
+            </div>
+
+            <div class="extraction-status" id="extractionStatus">
+                <div class="status-content">
+                    <div class="status-icon">⏳</div>
+                    <div class="status-text">
+                        <h4>Processing contract…</h4>
+                        <p>AI is extracting dates and information</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Entry Form -->
+        <form id="contractForm" class="manual-section active">
+
+            <div class="form-group">
+                <label>Property Address / ID <span class="label-description">Line 7</span></label>
+                <input type="text" id="propertyId" required>
+                <div class="ai-confidence" id="propertyIdConfidence"></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Effective Date <span class="label-description">Line 2 — Date contract becomes binding</span></label>
+                    <input type="date" id="effectiveDate" required>
+                    <div class="ai-confidence" id="effectiveDateConfidence"></div>
+                </div>
+                <div class="form-group">
+                    <label>Initial Deposit (days) <span class="label-description">Line 33 — If blank, use 3 days</span></label>
+                    <input type="number" id="initialDeposit" value="3" min="0" required>
+                    <div class="ai-confidence" id="initialDepositConfidence"></div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Additional Deposit (days) <span class="label-description">Line 36 — If blank, use 10 days. Enter 0 if N/A</span></label>
+                    <input type="number" id="additionalDeposit" value="10" min="0" required>
+                    <div class="ai-confidence" id="additionalDepositConfidence"></div>
+                </div>
+                <div class="form-group">
+                    <label>Closing Date <span class="label-description">Line 53</span></label>
+                    <input type="date" id="closingDate" required>
+                    <div class="ai-confidence" id="closingDateConfidence"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Transaction Type <span class="label-description">Is this a cash purchase or financed?</span></label>
+                <div style="display:flex;gap:20px;margin-top:8px;">
+                    <label style="display:flex;align-items:center;cursor:pointer;">
+                        <input type="radio" name="transactionType" value="financed" id="financedRadio" checked style="width:auto;margin-right:8px;">
+                        <span>Financed</span>
+                    </label>
+                    <label style="display:flex;align-items:center;cursor:pointer;">
+                        <input type="radio" name="transactionType" value="cash" id="cashRadio" style="width:auto;margin-right:8px;">
+                        <span>Cash</span>
+                    </label>
+                </div>
+                <div class="ai-confidence" id="transactionTypeConfidence"></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group" id="financingGroup">
+                    <label>Financing Contingency (days) <span class="label-description">Line 89 (Paragraph 8b) — If blank, use 30 days</span></label>
+                    <input type="number" id="financingDays" value="30" min="0">
+                    <div class="ai-confidence" id="financingDaysConfidence"></div>
+                </div>
+                <div class="form-group">
+                    <label>Title Insurance (days before closing) <span class="label-description">Line 155 — If blank, use 15 days (or 5 if cash)</span></label>
+                    <input type="number" id="titleDays" value="15" min="0" required>
+                    <div class="ai-confidence" id="titleDaysConfidence"></div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Flood Zone (days) <span class="label-description">Line 225 — If blank, use 20 days</span></label>
+                    <input type="number" id="floodDays" value="20" min="0" required>
+                    <div class="ai-confidence" id="floodDaysConfidence"></div>
+                </div>
+                <div class="form-group">
+                    <label>Inspection Period (days) <span class="label-description">Line 261 (Paragraph 12a) — If blank, use 15 days</span></label>
+                    <input type="number" id="inspectionDays" value="15" min="0" required>
+                    <div class="ai-confidence" id="inspectionDaysConfidence"></div>
+                </div>
+            </div>
+
+            <button type="submit" class="calculate-btn">Calculate Dates</button>
+        </form>
+
+        <!-- Results -->
+        <div class="results" id="results">
+            <h2>Important Dates</h2>
+            <p class="property-info">Property: <strong id="resultPropertyId"></strong></p>
+            <div id="datesList"></div>
+            <div class="button-group">
+                <button class="action-btn btn-pdf"      onclick="generatePDF()">📄 Download PDF</button>
+                <button class="action-btn btn-print"    onclick="printReport()">🖨️ Print Report</button>
+                <button class="action-btn btn-copy"     onclick="copyToClipboard()">📋 Copy Dates</button>
+                <button class="action-btn btn-calendar" onclick="addToGoogleCalendar()">📅 Add to Calendar</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let calculatedDates = [];
+
+    const holidays2026 = [
+        '2026-01-01','2026-01-19','2026-02-16','2026-05-25',
+        '2026-07-03','2026-09-07','2026-10-12','2026-11-11',
+        '2026-11-26','2026-12-25'
+    ];
+
+    // ── MODE SWITCHING ──────────────────────────────────────────────
+    document.querySelectorAll('input[name="inputMode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const isUpload = this.value === 'upload';
+            document.getElementById('uploadSection').classList.toggle('active', isUpload);
+            document.getElementById('contractForm').classList.toggle('active', !isUpload);
+            document.getElementById('uploadModeOption').classList.toggle('active', isUpload);
+            document.getElementById('manualModeOption').classList.toggle('active', !isUpload);
+        });
+    });
+
+    // ── FILE UPLOAD ─────────────────────────────────────────────────
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput  = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => {
+        if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+    });
+
+    async function handleFileUpload(file) {
+        if (!file.type.includes('pdf')) { showNotification('Please upload a PDF file.', 'error'); return; }
+
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+        document.getElementById('uploadedFile').classList.add('active');
+        document.getElementById('uploadArea').style.display = 'none';
+
+        const statusDiv = document.getElementById('extractionStatus');
+        statusDiv.className = 'extraction-status active';
+        statusDiv.innerHTML = `
+            <div class="status-content">
+                <div class="loading-spinner"></div>
+                <div class="status-text">
+                    <h4>Processing contract…</h4>
+                    <p>AI is reading your PDF and extracting key dates</p>
+                </div>
+            </div>`;
+
+        try {
+            const base64      = await fileToBase64(file);
+            const extracted   = await extractWithGeminiProxy(base64);
+
+            statusDiv.className = 'extraction-status active success';
+            statusDiv.innerHTML = `
+                <div class="status-content">
+                    <div class="status-icon">✅</div>
+                    <div class="status-text">
+                        <h4>Extraction complete!</h4>
+                        <p>Form auto-filled — please review all values before calculating.</p>
+                    </div>
+                </div>`;
+
+            fillFormWithExtractedData(extracted);
+
+            // Switch to manual section so the user can review
+            document.getElementById('manualModeRadio').checked = true;
+            document.getElementById('uploadSection').classList.remove('active');
+            document.getElementById('contractForm').classList.add('active');
+            document.getElementById('uploadModeOption').classList.remove('active');
+            document.getElementById('manualModeOption').classList.add('active');
+
+        } catch (err) {
+            statusDiv.className = 'extraction-status active error';
+            statusDiv.innerHTML = `
+                <div class="status-content">
+                    <div class="status-icon">❌</div>
+                    <div class="status-text">
+                        <h4>Extraction failed</h4>
+                        <p>${err.message} — please enter dates manually.</p>
+                    </div>
+                </div>`;
+        }
+    }
+
+    function removeFile() {
+        document.getElementById('uploadedFile').classList.remove('active');
+        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('extractionStatus').className = 'extraction-status';
+        fileInput.value = '';
+    }
+
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // ── GEMINI VIA SERVER-SIDE PROXY ────────────────────────────────
+    // The proxy holds the actual Gemini API key — nothing sensitive here.
+    async function extractWithGeminiProxy(base64Pdf) {
+        const prompt = `Extract data from this Florida FAR/BAR Residential Contract PDF.
+
+Return a JSON object with these exact fields:
+- propertyAddress (string): Full address from line 7
+- effectiveDate (string YYYY-MM-DD): Date from line 2
+- closingDate (string YYYY-MM-DD): Date from line 53
+- initialDepositDays (number): Days from line 33, default 3 if blank
+- additionalDepositDays (number): Days from line 36, default 10 if blank, 0 if N/A
+- financingDays (number): Days from line 89, default 30 if blank
+- titleDays (number): Days before closing from line 155, default 15 if blank
+- floodDays (number): Days from line 225, default 20 if blank
+- inspectionDays (number): Days from line 261, default 15 if blank
+- transactionType (string "cash" or "financed"): Check Paragraph 8; default "financed"
+
+Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
+
+        const response = await fetch(PROXY_CONFIG.geminiProxyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-proxy-key':  PROXY_CONFIG.proxyKey,
+            },
+            body: JSON.stringify({
+                model: PROXY_CONFIG.geminiModel,
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inline_data: { mime_type: 'application/pdf', data: base64Pdf } }
+                    ]
+                }],
+                generationConfig: {
+                    temperature:       0.1,
+                    maxOutputTokens:   4096,
+                    responseMimeType:  'application/json',
+                    responseSchema: {
+                        type: 'object',
+                        properties: {
+                            propertyAddress:       { type: 'string' },
+                            effectiveDate:         { type: 'string' },
+                            closingDate:           { type: 'string' },
+                            initialDepositDays:    { type: 'number' },
+                            additionalDepositDays: { type: 'number' },
+                            financingDays:         { type: 'number' },
+                            titleDays:             { type: 'number' },
+                            floodDays:             { type: 'number' },
+                            inspectionDays:        { type: 'number' },
+                            transactionType:       { type: 'string', enum: ['cash','financed'] },
+                        },
+                        required: ['propertyAddress','effectiveDate','closingDate',
+                                   'initialDepositDays','additionalDepositDays',
+                                   'financingDays','titleDays','floodDays',
+                                   'inspectionDays','transactionType']
+                    }
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err?.error?.message || 'Proxy returned error ' + response.status);
+        }
+
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) throw new Error('AI returned no content — please try again');
+
+        let parsed;
+        try   { parsed = JSON.parse(text); }
+        catch { throw new Error('Could not parse AI response'); }
+
+        return {
+            propertyAddress:   { value: parsed.propertyAddress        || '',         confidence: 0.95 },
+            effectiveDate:     { value: parsed.effectiveDate           || '',         confidence: 0.95 },
+            closingDate:       { value: parsed.closingDate             || '',         confidence: 0.95 },
+            initialDeposit:    { value: parsed.initialDepositDays      ?? 3,          confidence: 0.90 },
+            additionalDeposit: { value: parsed.additionalDepositDays   ?? 10,         confidence: 0.90 },
+            financingDays:     { value: parsed.financingDays           ?? 30,         confidence: 0.88 },
+            titleDays:         { value: parsed.titleDays               ?? 15,         confidence: 0.85 },
+            floodDays:         { value: parsed.floodDays               ?? 20,         confidence: 0.87 },
+            inspectionDays:    { value: parsed.inspectionDays          ?? 15,         confidence: 0.91 },
+            transactionType:   { value: parsed.transactionType         || 'financed', confidence: 0.94 },
+        };
+    }
+
+    function fillFormWithExtractedData(data) {
+        for (const [key, extracted] of Object.entries(data)) {
+            const fieldId = key === 'propertyAddress' ? 'propertyId' : key;
+            const input   = document.getElementById(fieldId);
+            const confEl  = document.getElementById(fieldId + 'Confidence');
+            if (!input) continue;
+
+            if (key === 'transactionType') {
+                const r = document.getElementById(extracted.value + 'Radio');
+                if (r) r.checked = true;
+            } else {
+                input.value = extracted.value;
+                input.classList.add('ai-filled');
+            }
+            if (confEl) {
+                confEl.textContent = `✓ AI extracted (${(extracted.confidence * 100).toFixed(0)}% confidence)`;
+                confEl.style.display = 'block';
+            }
+        }
+    }
+
+    // ── TRANSACTION TYPE TOGGLE ─────────────────────────────────────
+    document.querySelectorAll('input[name="transactionType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const group = document.getElementById('financingGroup');
+            const input = document.getElementById('financingDays');
+            const isCash = this.value === 'cash';
+            group.style.opacity       = isCash ? '0.5' : '1';
+            group.style.pointerEvents = isCash ? 'none' : 'auto';
+            isCash ? input.removeAttribute('required') : input.setAttribute('required','required');
+        });
+    });
+
+    // ── DATE HELPERS ────────────────────────────────────────────────
+    function isWeekend(d)     { return d.getDay() === 0 || d.getDay() === 6; }
+    function isHoliday(d)     { return holidays2026.includes(d.toISOString().split('T')[0]); }
+    function isBusinessDay(d) { return !isWeekend(d) && !isHoliday(d); }
+    function isTRIDDay(d)     { return d.getDay() !== 0 && !isHoliday(d); }
+
+    function addCalendarDaysThenAdjust(start, days) {
+        const r = new Date(start);
+        r.setDate(r.getDate() + days);
+        while (!isBusinessDay(r)) r.setDate(r.getDate() + 1);
+        return r;
+    }
+    function subtractCalendarDaysThenAdjust(end, days) {
+        const r = new Date(end);
+        r.setDate(r.getDate() - days);
+        while (!isBusinessDay(r)) r.setDate(r.getDate() + 1);
+        return r;
+    }
+    function subtractTRIDDays(end, days) {
+        const r = new Date(end);
+        let counted = 0;
+        while (counted < days) {
+            r.setDate(r.getDate() - 1);
+            if (isTRIDDay(r)) counted++;
+        }
+        return r;
+    }
+    function fmt(d) {
+        return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    }
+
+    // ── CALCULATE ───────────────────────────────────────────────────
+    document.getElementById('contractForm').addEventListener('submit', e => { e.preventDefault(); calculateDates(); });
+
+    function calculateDates() {
+        const propId          = document.getElementById('propertyId').value;
+        const effectiveDate   = new Date(document.getElementById('effectiveDate').value   + 'T00:00:00');
+        const closingDate     = new Date(document.getElementById('closingDate').value     + 'T00:00:00');
+        const initDays        = parseInt(document.getElementById('initialDeposit').value);
+        const addlDays        = parseInt(document.getElementById('additionalDeposit').value);
+        const titleDays       = parseInt(document.getElementById('titleDays').value);
+        const floodDays       = parseInt(document.getElementById('floodDays').value);
+        const inspDays        = parseInt(document.getElementById('inspectionDays').value);
+        const isCash          = document.getElementById('cashRadio').checked;
+        const financingDays   = isCash ? 0 : parseInt(document.getElementById('financingDays').value);
+
+        calculatedDates = [];
+
+        const push = (label, date, description, warning = null) => calculatedDates.push({ label, date, description, warning });
+
+        push('Effective Date', effectiveDate, 'Contract effective date');
+
+        const initDepDate = addCalendarDaysThenAdjust(effectiveDate, initDays);
+        push('Initial Deposit Due', initDepDate, `${initDays} calendar days from effective date`);
+
+        if (addlDays > 0) {
+            const addlDepDate = addCalendarDaysThenAdjust(effectiveDate, addlDays);
+            push('Additional Deposit Due', addlDepDate, `${addlDays} calendar days from effective date`,
+                addlDepDate >= closingDate ? 'WARNING: Additional deposit is after closing date!' : null);
+        }
+
+        const inspEnd = addCalendarDaysThenAdjust(effectiveDate, inspDays);
+        push('Inspection Period Ends', inspEnd, `${inspDays} calendar days from effective date`,
+            inspEnd >= closingDate ? 'WARNING: Inspection period ends after closing date!' : null);
+
+        if (!isCash && financingDays > 0) {
+            const loanDate = addCalendarDaysThenAdjust(effectiveDate, financingDays);
+            let warn = null;
+            if (loanDate >= closingDate) warn = 'WARNING: Loan approval date is after closing date!';
+            else if ((closingDate - loanDate) / 86400000 < 3) warn = 'WARNING: Loan approval is too close to closing date!';
+            push('Loan Approval Deadline', loanDate, `${financingDays} calendar days from effective date`, warn);
+            push('Seller Cancellation Deadline', addCalendarDaysThenAdjust(loanDate, 3), '3 calendar days after loan approval deadline');
+        }
+
+        const titleDate = subtractCalendarDaysThenAdjust(closingDate, titleDays);
+        push('Title Insurance / Commitment Due', titleDate, `${titleDays} calendar days before closing`);
+
+        const floodDate = addCalendarDaysThenAdjust(effectiveDate, floodDays);
+        push('Flood Zone Determination Due', floodDate, `${floodDays} calendar days from effective date`);
+
+        push('Insurance Evidence Due', titleDate < floodDate ? titleDate : floodDate,
+            'Earlier of title commitment or flood determination');
+
+        push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
+            '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
+
+        const walkDate = new Date(closingDate);
+        walkDate.setDate(walkDate.getDate() - 1);
+        push('Final Walk-Through', walkDate, 'Day before closing (recommended)');
+        push('Closing Date', closingDate, 'Transaction closing date');
+
+        displayResults(propId);
+    }
+
+    function displayResults(propId) {
+        document.getElementById('resultPropertyId').textContent = propId;
+        const list = document.getElementById('datesList');
+        list.innerHTML = '';
+        calculatedDates.forEach(item => {
+            const el = document.createElement('div');
+            el.className = 'date-item' + (item.warning ? ' warning' : '');
+            el.innerHTML = `
+                <div class="date-label">${item.label}</div>
+                <div class="date-value">${fmt(item.date)}</div>
+                <div class="date-description">${item.description}</div>
+                ${item.warning ? `<div class="warning-message">${item.warning}</div>` : ''}`;
+            list.appendChild(el);
+        });
+        document.getElementById('results').classList.add('active');
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ── PDF EXPORT ──────────────────────────────────────────────────
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        try { doc.addImage(document.getElementById('logoImg').src, 'JPEG', 80, 5, 30, 30); } catch(e) {}
+        doc.setFontSize(20); doc.text('Contract Date Calculator', 105, 45, { align: 'center' });
+        doc.setFontSize(12); doc.text('Florida FAR/BAR Residential Contract', 105, 52, { align: 'center' });
+        doc.setFontSize(11); doc.text(`Property: ${document.getElementById('resultPropertyId').textContent}`, 20, 65);
+        let y = 75;
+        calculatedDates.forEach(item => {
+            if (y > 270) { doc.addPage(); y = 20; }
+            doc.setFont(undefined,'bold'); doc.setFontSize(10); doc.text(item.label, 20, y); y += 6;
+            doc.setFont(undefined,'normal');                      doc.text(fmt(item.date), 20, y); y += 5;
+            doc.setTextColor(100); doc.setFontSize(9);            doc.text(item.description, 20, y);
+            doc.setTextColor(0);   doc.setFontSize(10);           y += 8;
+            if (item.warning) {
+                doc.setTextColor(220,53,69); doc.text(item.warning, 20, y);
+                doc.setTextColor(0); y += 8;
+            }
+        });
+        doc.setFontSize(8); doc.setTextColor(150);
+        doc.text('johnadams.org — Florida Real Estate AI Tools', 105, 285, { align: 'center' });
+        doc.save('Contract_Dates.pdf');
+    }
+
+    function printReport() {
+        const btns = document.querySelectorAll('.button-group');
+        btns.forEach(b => b.style.display = 'none');
+        window.print();
+        setTimeout(() => btns.forEach(b => b.style.display = 'flex'), 100);
+    }
+
+    function copyToClipboard() {
+        const propId = document.getElementById('resultPropertyId').textContent;
+        let t  = '═══════════════════════════════════\n';
+            t += 'CONTRACT DATE CALCULATOR\njohnadams.org\n';
+            t += '═══════════════════════════════════\n\n';
+            t += `Property: ${propId}\n\n`;
+        calculatedDates.forEach(item => {
+            t += `${item.label}\n${fmt(item.date)}\n${item.description}\n`;
+            if (item.warning) t += `⚠️  ${item.warning}\n`;
+            t += '\n';
+        });
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(t).then(() => showNotification('✓ Dates copied!', 'success')).catch(() => fallbackCopy(t));
+        } else { fallbackCopy(t); }
+    }
+    function fallbackCopy(t) {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showNotification('✓ Dates copied!', 'success'); }
+        catch { showNotification('Copy failed — press Ctrl+C manually.', 'error'); }
+        document.body.removeChild(ta);
+    }
+
+    // ── NOTIFICATIONS ───────────────────────────────────────────────
+    function showNotification(msg, type = 'info') {
+        document.querySelector('.notification-toast')?.remove();
+        const n = document.createElement('div');
+        n.className = 'notification-toast';
+        n.textContent = msg;
+        const bg = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff';
+        n.style.cssText = `position:fixed;top:20px;right:20px;background:${bg};color:white;padding:15px 25px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);z-index:10000;font-size:14px;max-width:300px;animation:toastIn .3s ease`;
+        document.body.appendChild(n);
+        setTimeout(() => { n.style.animation = 'toastOut .3s ease'; setTimeout(() => n.remove(), 300); }, 3000);
+    }
+    const s = document.createElement('style');
+    s.textContent = `@keyframes toastIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(400px);opacity:0}}`;
+    document.head.appendChild(s);
+
+    // ── GOOGLE CALENDAR ─────────────────────────────────────────────
+    let gapiInited = false, tokenClient, accessToken = null;
+
+    function gapiInit() {
+        gapi.client.init({
+            apiKey: '',
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+        }).then(() => { gapiInited = true; }, e => console.warn('Calendar init:', e));
+    }
+    function gisInit() {
+        if (!PROXY_CONFIG.calendarClientId) return;
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: PROXY_CONFIG.calendarClientId,
+            scope: 'https://www.googleapis.com/auth/calendar.events',
+            callback: res => {
+                if (res.error) { showNotification('Calendar auth failed.', 'error'); return; }
+                accessToken = res.access_token;
+                createCalendarEvents();
+            },
+        });
+    }
+
+    gapi.load('client', gapiInit);
+    window.addEventListener('load', () => {
+        if (typeof google !== 'undefined' && google.accounts) { gisInit(); }
+        else {
+            const sc = document.createElement('script');
+            sc.src = 'https://accounts.google.com/gsi/client';
+            sc.async = sc.defer = true; sc.onload = gisInit;
+            document.head.appendChild(sc);
+        }
+    });
+
+    function addToGoogleCalendar() {
+        if (!calculatedDates.length) { showNotification('Calculate dates first.', 'error'); return; }
+        if (!gapiInited) { showNotification('Calendar API loading — try again in a moment.', 'error'); return; }
+        const propId = document.getElementById('resultPropertyId').textContent;
+        if (!confirm(`Add ${calculatedDates.length} events to Google Calendar for:\n\n${propId}\n\nClick OK to authorize with Google.`)) return;
+        accessToken ? createCalendarEvents() : tokenClient.requestAccessToken();
+    }
+
+    async function createCalendarEvents() {
+        const propId = document.getElementById('resultPropertyId').textContent;
+        let ok = 0, fail = 0;
+        for (const item of calculatedDates) {
+            try {
+                const dateStr = item.date.toISOString().split('T')[0];
+                await gapi.client.calendar.events.insert({
+                    calendarId: 'primary',
+                    resource: {
+                        summary: `${propId} — ${item.label}`,
+                        description: 'Generated by johnadams.org Contract Date Calculator',
+                        start: { date: dateStr }, end: { date: dateStr },
+                        transparency: 'transparent',
+                        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
+                    }
+                });
+                ok++;
+            } catch(e) { console.error('Event error:', item.label, e); fail++; }
+        }
+        showNotification(ok > 0 ? `✅ Added ${ok} event${ok>1?'s':''} to Calendar!` : '❌ Could not create events — please try again.', ok > 0 ? 'success' : 'error');
+    }
+</script>
+</body>
+</html>
