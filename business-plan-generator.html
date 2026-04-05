@@ -1080,7 +1080,10 @@ Output the complete HTML document only. No explanation, no markdown fences.`;
 /* ───────────────────────── DESK CARD ───────────────────── */
 async function generateDeskCard() {
   const d = S.data;
-  const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page when printed.
+
+  // Try Gemini first
+  try {
+    const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page when printed.
 
 Include these sections:
 1. Header: Agent name large, "My Daily Playbook" subtitle, earning goal
@@ -1094,21 +1097,133 @@ Agent: Name: ${d.name} | Office: ${d.office} | Why: ${d.why} | Goals: ${d.goals}
 
 Output the complete HTML document only. No explanation, no markdown fences.`;
 
-  try {
     const html = await geminiCall(prompt, 8192);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-    if (!clean) throw new Error('Gemini returned empty content for desk card.');
     console.log('[DeskCard] HTML length:', clean.length);
     console.log('[DeskCard] Raw response:', clean.substring(0, 300));
-    S.deskCardHtml = clean;
-    renderInIframe('deskCardContent', clean, 'light');
+
+    // Validate — must be a real HTML doc
+    if (clean.length > 1000 && (clean.toLowerCase().includes('<!doctype') || clean.toLowerCase().startsWith('<html'))) {
+      S.deskCardHtml = clean;
+      renderInIframe('deskCardContent', clean, 'light');
+      return;
+    }
+    console.warn('[DeskCard] Response too short or not valid HTML — using built-in template.');
   } catch (e) {
-    console.error('[DeskCard] Error:', e);
-    document.getElementById('deskCardContent').innerHTML =
-      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem;font-family:sans-serif">
-        <strong>Playbook generation failed:</strong><br>${e.message}
-      </div>`;
+    console.error('[DeskCard] Gemini error:', e);
   }
+
+  // Fallback: generate the desk card ourselves from the agent data
+  const card = buildDeskCardHtml(d);
+  S.deskCardHtml = card;
+  renderInIframe('deskCardContent', card, 'light');
+}
+
+function buildDeskCardHtml(d) {
+  // Calculate numbers
+  const earnNum   = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
+  const priceNum  = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
+  const gci       = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
+  const sides     = (gci > 0 && priceNum > 0) ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+  const listPct   = parseFloat(d.list) / 100 || 0.5;
+  const listSides = Math.ceil(sides * listPct);
+  const buyeSides = sides - listSides;
+  const listAppts = Math.ceil((listSides / 12) / 0.8);
+  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
+  const hoursStr  = d.time || '0 hours/week';
+  const hoursNum  = parseInt(hoursStr) || 0;
+  const soiStr    = d.soi || '0 contacts';
+
+  // Weekly activity numbers based on hours
+  const soiCalls    = Math.max(5,  Math.round(hoursNum * 0.5));
+  const socialPosts = Math.max(3,  Math.round(hoursNum * 0.15));
+  const floorHrs    = Math.max(2,  Math.round(hoursNum * 0.15));
+  const followUps   = Math.max(5,  Math.round(hoursNum * 0.4));
+  const rprReports  = Math.max(2,  Math.round(hoursNum * 0.1));
+
+  const fmt = n => n > 0 ? '$' + n.toLocaleString() : '—';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; background: #fff; color: #1a1a1a; padding: 24px; max-width: 750px; margin: 0 auto; }
+  @media print {
+    body { padding: 0; }
+    @page { margin: 0.4in; size: letter portrait; }
+    .no-print { display: none; }
+  }
+  .header { background: #0c1524; color: #fff; padding: 16px 20px; border-radius: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .header-left h1 { font-size: 1.6rem; color: #c4a84f; margin-bottom: 2px; }
+  .header-left p  { font-size: 0.8rem; color: #aaa; letter-spacing: 0.08em; text-transform: uppercase; }
+  .header-right   { text-align: right; }
+  .header-right .earn { font-size: 1.5rem; font-weight: bold; color: #c4a84f; }
+  .header-right .earn-label { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
+  .section { margin-bottom: 12px; }
+  .section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: #c4a84f; font-family: sans-serif; font-weight: 700; margin-bottom: 6px; border-bottom: 1px solid #c4a84f; padding-bottom: 3px; }
+  .why-text { font-style: italic; font-size: 0.92rem; color: #333; line-height: 1.5; background: #fdf8ee; padding: 10px 14px; border-left: 3px solid #c4a84f; border-radius: 0 4px 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  td { padding: 5px 8px; border: 1px solid #e0d0a8; }
+  td:first-child { font-weight: 600; color: #0c1524; background: #fdf8ee; width: 60%; }
+  td:last-child  { text-align: right; font-weight: 700; color: #c4a84f; }
+  .checklist { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .checklist li { font-size: 0.83rem; padding: 5px 8px; background: #f8f8f8; border: 1px solid #e8e8e8; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+  .checklist li .box { width: 16px; height: 16px; border: 2px solid #0c1524; border-radius: 3px; flex-shrink: 0; }
+  .mantra { background: #0c1524; color: #c4a84f; padding: 12px 16px; border-radius: 6px; font-style: italic; font-size: 1rem; text-align: center; line-height: 1.5; margin-bottom: 10px; }
+  .footer { text-align: center; font-size: 0.68rem; color: #888; font-family: sans-serif; border-top: 1px solid #eee; padding-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>${d.name}</h1>
+      <p>My Daily Playbook &nbsp;·&nbsp; Adams, Cameron &amp; Co.</p>
+    </div>
+    <div class="header-right">
+      <div class="earn">${d.earn}</div>
+      <div class="earn-label">Annual Goal</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">My Why</div>
+    <div class="why-text">${d.why}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Goals at a Glance</div>
+    <table>
+      <tr><td>Annual Earning Goal</td><td>${d.earn}</td></tr>
+      <tr><td>GCI Required (÷ 65%)</td><td>${fmt(gci)}</td></tr>
+      <tr><td>Total Transactions Needed</td><td>${sides} sides</td></tr>
+      <tr><td>Listing Appointments / Month</td><td>${listAppts} appts</td></tr>
+      <tr><td>Buyer Prospects / Month</td><td>${buyProsp} prospects</td></tr>
+      <tr><td>Sphere of Influence</td><td>${soiStr}</td></tr>
+      <tr><td>Hours / Week Committed</td><td>${hoursStr}</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">My Weekly Non-Negotiables</div>
+    <ul class="checklist">
+      <li><span class="box"></span> Call ${soiCalls} SOI contacts</li>
+      <li><span class="box"></span> ${socialPosts} AC Social posts</li>
+      <li><span class="box"></span> ${floorHrs} hrs floor time</li>
+      <li><span class="box"></span> ${followUps} lead follow-ups</li>
+      <li><span class="box"></span> ${rprReports} RPR reports sent</li>
+      <li><span class="box"></span> Review pipeline &amp; CRM</li>
+      <li><span class="box"></span> Schedule next week's posts</li>
+      <li><span class="box"></span> 1 open house / showing</li>
+    </ul>
+  </div>
+
+  <div class="mantra">"${d.why.split('.')[0].trim()}. This is my reason. This is my plan."</div>
+
+  <div class="footer">Adams, Cameron &amp; Co. &nbsp;|&nbsp; What gets measured gets managed. &nbsp;|&nbsp; ${new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+</body>
+</html>`;
 }
 
 function printDeskCard() {
