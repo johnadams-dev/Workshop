@@ -660,7 +660,7 @@ const S = {
   accessToken: null,
   tokenClient: null,
   pendingAction: null,
-  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '' }  // loaded from config.json
+  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' }  // loaded from config.json
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
@@ -818,10 +818,16 @@ function collect() {
 function buildPrompt(d) {
   // Priority: local draft override → config.json prompt → built-in default
   const custom = ls('ac_prompt_draft') || S.config.prompt || '';
+
+  // Prepend company context if present in config
+  const contextBlock = S.config.context
+    ? `### ADAMS, CAMERON & CO. TRAINING CONTEXT\nUse the following company philosophy and framework when building this plan. Let it inform your strategy recommendations, language, and priorities throughout.\n\n${S.config.context}\n\n---\n\n`
+    : '';
+
   if (custom) {
-    return custom.replace(/\$\{d\.(\w+)\}/g, (_, key) => d[key] || '');
+    return contextBlock + custom.replace(/\$\{d\.(\w+)\}/g, (_, key) => d[key] || '');
   }
-  return `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
+  return contextBlock + `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
 
 The output must be formatted as a professional email intended for the agent, written in a supportive yet "boss-mode" encouraging tone. Use clear headings (##), bold text (**bold**) for emphasis, and Markdown tables for numeric goals. Avoid code blocks. Do not include a specific calendar year in the title.
 
@@ -1308,6 +1314,7 @@ window.addEventListener('load', async () => {
       const remote = await res.json();
       if (remote.adminPassword) S.config.adminPassword = remote.adminPassword;
       if (remote.prompt)        S.config.prompt        = remote.prompt;
+      if (remote.context)       S.config.context       = remote.context;
     }
   } catch (e) {
     console.warn('Could not load bizplan-config.json — using defaults.', e);
