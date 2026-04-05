@@ -676,7 +676,7 @@
 const ADMIN_PW_DEFAULT = 'ac2025admin';
 const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
-const OAUTH_CLIENT  = '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com';
+const OAUTH_CLIENT  = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 const CONFIG_URL    = './bizplan-config.json';
 
 /* ───────────────────────── STATE ───────────────────────── */
@@ -1033,30 +1033,20 @@ function md2html(src) {
 function renderInIframe(containerId, html, theme = 'dark') {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
+
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = `
-    width: 100%; border: none; display: block;
-    background: ${theme === 'dark' ? '#0c0f16' : '#fff'};
-    min-height: 200px;
-  `;
-  iframe.setAttribute('sandbox', 'allow-same-origin');
+  iframe.style.cssText = 'width:100%;border:none;display:block;min-height:300px;';
+  iframe.srcdoc = html;
   container.appendChild(iframe);
 
-  // Write content and auto-resize to fit
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-
-  // Resize after content loads
-  const resize = () => {
+  // Auto-resize once content has loaded
+  iframe.addEventListener('load', () => {
     try {
-      const h = iframe.contentDocument.documentElement.scrollHeight;
-      iframe.style.height = h + 'px';
-    } catch(_) {}
-  };
-  iframe.onload = resize;
-  setTimeout(resize, 300);
-  setTimeout(resize, 800); // second pass for any late-rendering content
+      const body = iframe.contentDocument.body;
+      const h = Math.max(body.scrollHeight, body.offsetHeight);
+      if (h > 50) iframe.style.height = h + 32 + 'px';
+    } catch(e) {}
+  });
 }
 
 /* ───────────────────────── INFOGRAPHIC ─────────────────── */
