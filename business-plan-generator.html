@@ -651,6 +651,13 @@
 ════════════════════════════════════════════ -->
 <script>
 
+/* ───────────────────────── CONSTANTS ───────────────────── */
+const ADMIN_PW_DEFAULT = 'ac2025admin';
+const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT  = '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7d0dv.apps.googleusercontent.com';
+const CONFIG_URL    = './bizplan-config.json';
+
 /* ───────────────────────── STATE ───────────────────────── */
 const S = {
   step: 1,
@@ -660,15 +667,10 @@ const S = {
   accessToken: null,
   tokenClient: null,
   pendingAction: null,
-  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' }  // loaded from config.json
+  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' }
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
-const ADMIN_PW_DEFAULT = 'ac2025admin'; // fallback if config.json not loaded yet
-const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
-const OAUTH_CLIENT  = '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7d0dv.apps.googleusercontent.com';
-const CONFIG_URL    = './bizplan-config.json';
 
 function cfg()  { return { prompt: ls('ac_prompt_draft') || S.config.prompt || '' }; }
 function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
@@ -910,8 +912,6 @@ async function geminiCall(prompt, maxTokens = 8192) {
 
 async function generatePlan() {
   if (!v('f_earn')) { toast('Please enter your annual earning goal.', 'err'); foc('f_earn'); return; }
-
-  const { oa } = cfg();
 
   S.data = collect();
 
