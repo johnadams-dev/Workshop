@@ -1029,20 +1029,50 @@ function md2html(src) {
   return t;
 }
 
+/* ───────────────────────── IFRAME RENDERER ─────────────── */
+function renderInIframe(containerId, html, theme = 'dark') {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `
+    width: 100%; border: none; display: block;
+    background: ${theme === 'dark' ? '#0c0f16' : '#fff'};
+    min-height: 200px;
+  `;
+  iframe.setAttribute('sandbox', 'allow-same-origin');
+  container.appendChild(iframe);
+
+  // Write content and auto-resize to fit
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+
+  // Resize after content loads
+  const resize = () => {
+    try {
+      const h = iframe.contentDocument.documentElement.scrollHeight;
+      iframe.style.height = h + 'px';
+    } catch(_) {}
+  };
+  iframe.onload = resize;
+  setTimeout(resize, 300);
+  setTimeout(resize, 800); // second pass for any late-rendering content
+}
+
 /* ───────────────────────── INFOGRAPHIC ─────────────────── */
 async function generateInfographic() {
   const d = S.data;
-  const infographicPrompt = `Based on this real estate agent's profile and business plan summary below, create a "Roadmap to Success" infographic as a single self-contained HTML snippet (no <!DOCTYPE>, no <html>, no <head>, no <body> tags — just the inner HTML with inline CSS and JS).
+  const infographicPrompt = `Based on this real estate agent's profile, create a "Roadmap to Success" infographic as a complete, self-contained HTML document (include <!DOCTYPE html>, <html>, <head> with <style>, and <body> tags).
 
 The infographic should:
 - Be a visually rich, vertical timeline or milestone roadmap with 4–6 phases (e.g. Foundation, Lead Generation, Momentum, Closing, Scale)
-- Each phase must highlight 2–3 specific core ACTIVITIES (not just goals) the agent must do weekly/monthly to hit their targets
+- Each phase must highlight 2–3 specific core ACTIVITIES (not just goals) the agent must do weekly/monthly
 - Use a warm gold (#c4a84f) and dark navy (#121620) color palette with white text
 - Include icons or emoji for each phase to make it scannable
 - Show the key numeric targets (GCI goal, sides needed, SOI contacts, hours/week)
 - End with an inspiring call-to-action tied to the agent's "Why"
-- Be fully responsive, max-width 680px, padding 20px
-- Use only inline CSS (no external stylesheets or scripts)
+- Max-width 680px, centered, padding 20px, background #0c0f16
+- All CSS must be inside a <style> tag in the <head>
 
 Agent Profile:
 - Name: ${d.name}
@@ -1058,13 +1088,12 @@ Agent Profile:
 - Business Mix: ${d.list}
 - Commission Split: 65%
 
-Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
+Output ONLY the complete HTML document. No markdown, no code fences, no explanation.`;
 
   try {
     const html = await geminiCall(infographicPrompt, 4096);
-    // Strip any accidental markdown fences
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-    document.getElementById('infographicContent').innerHTML = clean;
+    renderInIframe('infographicContent', clean, 'dark');
   } catch (e) {
     document.getElementById('infographicContent').innerHTML =
       `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Infographic could not be generated: ${e.message}</p>`;
@@ -1074,45 +1103,32 @@ Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
 /* ───────────────────────── DESK CARD ───────────────────── */
 async function generateDeskCard() {
   const d = S.data;
-  const prompt = `Create a print-ready one-page "Daily Playbook" card for a real estate agent. Output a single self-contained HTML snippet (no <!DOCTYPE>, no <html>, no <head>, no <body> tags — just inner HTML with inline CSS only, no scripts).
+  const prompt = `Create a print-ready one-page "Daily Playbook" card for a real estate agent as a complete, self-contained HTML document (include <!DOCTYPE html>, <html>, <head> with <style> and print CSS, and <body> tags).
 
-This card will be printed on standard 8.5x11 paper and placed on the agent's desk, car dashboard, or work binder. It must be instantly readable at a glance and deeply personal to this agent.
+This card will be printed on standard 8.5x11 paper and placed on the agent's desk, car, or binder. It must be instantly readable at a glance and deeply personal to this agent.
 
 DESIGN REQUIREMENTS:
-- Use @media print CSS to ensure clean printing (no shadows, crisp borders)
-- Max-width 750px, centered, optimized for letter-size print
-- Color scheme: deep navy (#0c1524) headers/accents, gold (#c4a84f) highlights, white background for print
-- Bold, large typography — minimum 13px body, 22px+ for headings
-- Divide into clear sections with strong visual separation
-- Must fit on ONE page when printed — be concise and punchy, not verbose
+- All CSS inside a <style> tag in <head> — include @media print rules
+- @page { margin: 0.5in; size: letter portrait; }
+- Max-width 750px, centered, white background, dark text for print readability
+- Bold, large typography — 13px+ body, 22px+ headings
+- Gold (#c4a84f) accents, navy (#0c1524) headers
+- Must fit ONE printed page — be concise and punchy
 
-REQUIRED SECTIONS (in this order):
-
-1. HEADER — Agent name in large bold type, "My Daily Playbook" subtitle, today's date, and their earning goal prominently displayed
-
-2. MY WHY — 1-2 sentence personal statement distilled from their motivation. Make it visceral and personal, not generic.
-
-3. MY GOALS AT A GLANCE — A compact 2-column table with their key numbers:
+REQUIRED SECTIONS:
+1. HEADER — Agent name large + bold, "My Daily Playbook" subtitle, earning goal prominent
+2. MY WHY — 1-2 personal sentences from their motivation (visceral, not generic)
+3. MY GOALS AT A GLANCE — compact 2-column table with:
    - Annual Earning Goal: ${d.earn}
    - GCI Required (goal ÷ 65%): calculate this
    - Transactions Needed: calculate from GCI ÷ (${d.price} × 3%)
-   - Listing Appointments/Month: spread annually, assume 80% close rate
-   - Buyer Prospects/Month: spread annually, assume 3 prospects per side
+   - Listing Appts/Month: spread annually, 80% close rate
+   - Buyer Prospects/Month: 3 prospects per buyer side per month
    - SOI Size: ${d.soi}
    - Hours/Week Committed: ${d.time}
-
-4. MY WEEKLY NON-NEGOTIABLES — A bold checklist of 6-8 specific weekly activities this agent MUST do. Tailor each item to their profile. Format as large checkboxes they can physically check off. Examples (customize based on their data):
-   - □ Call [X] SOI contacts
-   - □ Post [X] times on social media via AC Social
-   - □ Take floor time [X] hours
-   - □ Send [X] RPR reports to prospects
-   - □ Follow up with [X] active leads
-   - □ Attend open house / host open house
-   Make the numbers specific and achievable based on their time commitment of ${d.time}.
-
-5. MY MANTRA — One short, powerful, personalized motivational sentence tied directly to their "Why": ${d.why}. Make it something they'd want to say out loud every morning.
-
-6. FOOTER — Small text: "Adams, Cameron & Co. | What gets measured gets managed." and today's date.
+4. MY WEEKLY NON-NEGOTIABLES — bold checklist of 6-8 specific weekly activities with checkboxes (□), numbers tailored to their time commitment of ${d.time}
+5. MY MANTRA — one short powerful sentence tied to their Why: ${d.why}
+6. FOOTER — "Adams, Cameron & Co. | What gets measured gets managed."
 
 Agent Profile:
 - Name: ${d.name}
@@ -1121,21 +1137,20 @@ Agent Profile:
 - Why: ${d.why}
 - Goals: ${d.goals}
 - Experience: ${d.exp}
-- Time Available: ${d.time}
-- Budget Level: ${d.budget}
-- SOI Contacts: ${d.soi}
+- Time: ${d.time}
+- Budget: ${d.budget}
+- SOI: ${d.soi}
 - Earning Goal: ${d.earn}
 - Avg Sale Price: ${d.price}
 - Business Mix: ${d.list}
 
-Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
+Output ONLY the complete HTML document. No markdown, no code fences, no explanation.`;
 
   try {
     const html = await geminiCall(prompt, 4096);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-    // Store for printing
     S.deskCardHtml = clean;
-    document.getElementById('deskCardContent').innerHTML = clean;
+    renderInIframe('deskCardContent', clean, 'light');
   } catch (e) {
     document.getElementById('deskCardContent').innerHTML =
       `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Playbook card could not be generated: ${e.message}</p>`;
