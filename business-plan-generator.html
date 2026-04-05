@@ -954,10 +954,11 @@ async function generatePlan() {
     show('stepResult');
     setProgress(99);
 
-    // Step 2: Generate infographic then desk card (serialized to avoid rate limits)
+    // Step 2: Generate infographic and desk card independently
     document.getElementById('infographicCard').style.display = 'block';
     document.getElementById('deskCard').style.display = 'block';
-    generateInfographic().then(() => generateDeskCard());
+    generateInfographic().catch(e => console.error('[Infographic] Uncaught:', e));
+    generateDeskCard().catch(e => console.error('[DeskCard] Uncaught:', e));
 
   } catch (e) {
     show('step3');
@@ -1333,6 +1334,13 @@ async function doDocs() {
     if (!res.ok) {
       const e = await res.json().catch(()=>({}));
       if (e.error?.code === 401) { S.accessToken = null; doDocs(); return; }
+      if (e.error?.code === 403) {
+        const projectId = '205198562122';
+        const link = `https://console.cloud.google.com/apis/library/drive.googleapis.com?project=${projectId}`;
+        toast('Google Drive API not enabled — opening Cloud Console to fix →', 'err');
+        setTimeout(() => window.open(link, '_blank'), 600);
+        throw new Error('Google Drive API is not enabled for this project.');
+      }
       throw new Error(e.error?.message || 'Upload failed');
     }
 
