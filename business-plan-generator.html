@@ -954,11 +954,10 @@ async function generatePlan() {
     show('stepResult');
     setProgress(99);
 
-    // Step 2: Generate infographic and desk card in parallel
+    // Step 2: Generate infographic then desk card (serialized to avoid rate limits)
     document.getElementById('infographicCard').style.display = 'block';
     document.getElementById('deskCard').style.display = 'block';
-    generateInfographic();
-    generateDeskCard();
+    generateInfographic().then(() => generateDeskCard());
 
   } catch (e) {
     show('step3');
@@ -1034,18 +1033,20 @@ function renderInIframe(containerId, html, theme = 'dark') {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
+  const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'width:100%;border:none;display:block;min-height:300px;';
-  iframe.srcdoc = html;
+  iframe.style.cssText = 'width:100%;border:none;display:block;min-height:400px;';
+  iframe.src = url;
   container.appendChild(iframe);
 
-  // Auto-resize once content has loaded
   iframe.addEventListener('load', () => {
     try {
-      const body = iframe.contentDocument.body;
-      const h = Math.max(body.scrollHeight, body.offsetHeight);
-      if (h > 50) iframe.style.height = h + 32 + 'px';
+      const h = iframe.contentDocument.body.scrollHeight;
+      if (h > 100) iframe.style.height = (h + 40) + 'px';
     } catch(e) {}
+    URL.revokeObjectURL(url);
   });
 }
 
@@ -1083,10 +1084,15 @@ Output ONLY the complete HTML document. No markdown, no code fences, no explanat
   try {
     const html = await geminiCall(infographicPrompt, 4096);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+    if (!clean) throw new Error('Gemini returned empty content for infographic.');
+    console.log('[Infographic] HTML length:', clean.length);
     renderInIframe('infographicContent', clean, 'dark');
   } catch (e) {
+    console.error('[Infographic] Error:', e);
     document.getElementById('infographicContent').innerHTML =
-      `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Infographic could not be generated: ${e.message}</p>`;
+      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem;font-family:sans-serif">
+        <strong>Infographic generation failed:</strong><br>${e.message}
+      </div>`;
   }
 }
 
@@ -1139,11 +1145,16 @@ Output ONLY the complete HTML document. No markdown, no code fences, no explanat
   try {
     const html = await geminiCall(prompt, 4096);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+    if (!clean) throw new Error('Gemini returned empty content for desk card.');
+    console.log('[DeskCard] HTML length:', clean.length);
     S.deskCardHtml = clean;
     renderInIframe('deskCardContent', clean, 'light');
   } catch (e) {
+    console.error('[DeskCard] Error:', e);
     document.getElementById('deskCardContent').innerHTML =
-      `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Playbook card could not be generated: ${e.message}</p>`;
+      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem;font-family:sans-serif">
+        <strong>Playbook generation failed:</strong><br>${e.message}
+      </div>`;
   }
 }
 
