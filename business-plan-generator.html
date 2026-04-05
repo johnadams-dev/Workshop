@@ -1054,39 +1054,19 @@ function renderInIframe(containerId, html, theme = 'dark') {
 /* ───────────────────────── INFOGRAPHIC ─────────────────── */
 async function generateInfographic() {
   const d = S.data;
-  const infographicPrompt = `Based on this real estate agent's profile, create a "Roadmap to Success" infographic as a complete, self-contained HTML document (include <!DOCTYPE html>, <html>, <head> with <style>, and <body> tags).
+  const infographicPrompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) that shows a "Roadmap to Success" visual for a real estate agent. The page should have a dark navy (#0c1524) background, gold (#c4a84f) accents, and white text. Include a vertical timeline with 5 phases: Foundation, Lead Generation, Momentum, Closing, Scale. Each phase has an emoji icon, a heading, and 2-3 bullet activities. At the top show the agent's key numbers. At the bottom show their personal "Why" as a motivational quote.
 
-The infographic should:
-- Be a visually rich, vertical timeline or milestone roadmap with 4–6 phases (e.g. Foundation, Lead Generation, Momentum, Closing, Scale)
-- Each phase must highlight 2–3 specific core ACTIVITIES (not just goals) the agent must do weekly/monthly
-- Use a warm gold (#c4a84f) and dark navy (#121620) color palette with white text
-- Include icons or emoji for each phase to make it scannable
-- Show the key numeric targets (GCI goal, sides needed, SOI contacts, hours/week)
-- End with an inspiring call-to-action tied to the agent's "Why"
-- Max-width 680px, centered, padding 20px, background #0c0f16
-- All CSS must be inside a <style> tag in the <head>
+Agent data:
+Name: ${d.name} | Market: ${d.market || 'Florida'} | Why: ${d.why} | Earning Goal: ${d.earn} | Avg Sale Price: ${d.price} | SOI: ${d.soi} | Hours/week: ${d.time} | Business Mix: ${d.list}
 
-Agent Profile:
-- Name: ${d.name}
-- Market: ${d.market || 'Florida'}
-- Why: ${d.why}
-- Goals: ${d.goals}
-- Experience: ${d.exp}
-- Time: ${d.time}
-- Budget: ${d.budget}
-- SOI: ${d.soi}
-- Earning Goal: ${d.earn}
-- Avg Sale Price: ${d.price}
-- Business Mix: ${d.list}
-- Commission Split: 65%
-
-Output ONLY the complete HTML document. No markdown, no code fences, no explanation.`;
+Output the complete HTML document only. No explanation, no markdown fences.`;
 
   try {
-    const html = await geminiCall(infographicPrompt, 4096);
+    const html = await geminiCall(infographicPrompt, 8192);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
     if (!clean) throw new Error('Gemini returned empty content for infographic.');
     console.log('[Infographic] HTML length:', clean.length);
+    console.log('[Infographic] Raw response:', clean.substring(0, 300));
     renderInIframe('infographicContent', clean, 'dark');
   } catch (e) {
     console.error('[Infographic] Error:', e);
@@ -1100,54 +1080,26 @@ Output ONLY the complete HTML document. No markdown, no code fences, no explanat
 /* ───────────────────────── DESK CARD ───────────────────── */
 async function generateDeskCard() {
   const d = S.data;
-  const prompt = `Create a print-ready one-page "Daily Playbook" card for a real estate agent as a complete, self-contained HTML document (include <!DOCTYPE html>, <html>, <head> with <style> and print CSS, and <body> tags).
+  const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page when printed.
 
-This card will be printed on standard 8.5x11 paper and placed on the agent's desk, car, or binder. It must be instantly readable at a glance and deeply personal to this agent.
+Include these sections:
+1. Header: Agent name large, "My Daily Playbook" subtitle, earning goal
+2. My Why: 1-2 personal sentences based on their motivation
+3. Goals at a Glance: compact table with GCI needed (${d.earn} ÷ 65%), transactions needed (GCI ÷ ${d.price} × 3%), monthly listing appts (80% close rate), monthly buyer prospects (3 per side), SOI size (${d.soi}), hours/week (${d.time})
+4. Weekly Non-Negotiables: 6-8 checkbox items (□) with specific numbers tailored to ${d.time} hours/week
+5. My Mantra: one powerful sentence tied to their Why
+6. Footer: "Adams, Cameron & Co. | What gets measured gets managed."
 
-DESIGN REQUIREMENTS:
-- All CSS inside a <style> tag in <head> — include @media print rules
-- @page { margin: 0.5in; size: letter portrait; }
-- Max-width 750px, centered, white background, dark text for print readability
-- Bold, large typography — 13px+ body, 22px+ headings
-- Gold (#c4a84f) accents, navy (#0c1524) headers
-- Must fit ONE printed page — be concise and punchy
+Agent: Name: ${d.name} | Office: ${d.office} | Why: ${d.why} | Goals: ${d.goals} | Earn: ${d.earn} | Price: ${d.price} | SOI: ${d.soi} | Time: ${d.time} | Mix: ${d.list}
 
-REQUIRED SECTIONS:
-1. HEADER — Agent name large + bold, "My Daily Playbook" subtitle, earning goal prominent
-2. MY WHY — 1-2 personal sentences from their motivation (visceral, not generic)
-3. MY GOALS AT A GLANCE — compact 2-column table with:
-   - Annual Earning Goal: ${d.earn}
-   - GCI Required (goal ÷ 65%): calculate this
-   - Transactions Needed: calculate from GCI ÷ (${d.price} × 3%)
-   - Listing Appts/Month: spread annually, 80% close rate
-   - Buyer Prospects/Month: 3 prospects per buyer side per month
-   - SOI Size: ${d.soi}
-   - Hours/Week Committed: ${d.time}
-4. MY WEEKLY NON-NEGOTIABLES — bold checklist of 6-8 specific weekly activities with checkboxes (□), numbers tailored to their time commitment of ${d.time}
-5. MY MANTRA — one short powerful sentence tied to their Why: ${d.why}
-6. FOOTER — "Adams, Cameron & Co. | What gets measured gets managed."
-
-Agent Profile:
-- Name: ${d.name}
-- Office: ${d.office}
-- Market: ${d.market || 'Florida'}
-- Why: ${d.why}
-- Goals: ${d.goals}
-- Experience: ${d.exp}
-- Time: ${d.time}
-- Budget: ${d.budget}
-- SOI: ${d.soi}
-- Earning Goal: ${d.earn}
-- Avg Sale Price: ${d.price}
-- Business Mix: ${d.list}
-
-Output ONLY the complete HTML document. No markdown, no code fences, no explanation.`;
+Output the complete HTML document only. No explanation, no markdown fences.`;
 
   try {
-    const html = await geminiCall(prompt, 4096);
+    const html = await geminiCall(prompt, 8192);
     const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
     if (!clean) throw new Error('Gemini returned empty content for desk card.');
     console.log('[DeskCard] HTML length:', clean.length);
+    console.log('[DeskCard] Raw response:', clean.substring(0, 300));
     S.deskCardHtml = clean;
     renderInIframe('deskCardContent', clean, 'light');
   } catch (e) {
