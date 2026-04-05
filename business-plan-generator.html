@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Business Plan Generator — Adams, Cameron & Co.</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
@@ -640,6 +641,26 @@
     </div>
   </div>
 
+  <!-- ── DESK CARD ── -->
+  <div id="deskCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+        <div>
+          <div class="section-tag">Daily Reminder</div>
+          <div class="section-title">Your Weekly Playbook</div>
+          <div class="section-desc">Print this and put it somewhere you'll see it every day — desk, car, binder. One page. No excuses.</div>
+        </div>
+        <button class="btn btn-subtle" onclick="printDeskCard()" style="flex-shrink:0">🖨️ Print</button>
+      </div>
+      <div style="padding:1.5rem 2rem" id="deskCardContent">
+        <div class="loading-view" style="padding:2rem 1rem">
+          <div class="spinner"></div>
+          <div class="loading-sub">Building your printable playbook…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- Toast -->
@@ -667,7 +688,8 @@ const S = {
   accessToken: null,
   tokenClient: null,
   pendingAction: null,
-  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' }
+  config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
+  deskCardHtml: ''
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
@@ -932,9 +954,11 @@ async function generatePlan() {
     show('stepResult');
     setProgress(99);
 
-    // Step 2: Generate infographic asynchronously
+    // Step 2: Generate infographic and desk card in parallel
     document.getElementById('infographicCard').style.display = 'block';
+    document.getElementById('deskCard').style.display = 'block';
     generateInfographic();
+    generateDeskCard();
 
   } catch (e) {
     show('step3');
@@ -1047,6 +1071,99 @@ Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
   }
 }
 
+/* ───────────────────────── DESK CARD ───────────────────── */
+async function generateDeskCard() {
+  const d = S.data;
+  const prompt = `Create a print-ready one-page "Daily Playbook" card for a real estate agent. Output a single self-contained HTML snippet (no <!DOCTYPE>, no <html>, no <head>, no <body> tags — just inner HTML with inline CSS only, no scripts).
+
+This card will be printed on standard 8.5x11 paper and placed on the agent's desk, car dashboard, or work binder. It must be instantly readable at a glance and deeply personal to this agent.
+
+DESIGN REQUIREMENTS:
+- Use @media print CSS to ensure clean printing (no shadows, crisp borders)
+- Max-width 750px, centered, optimized for letter-size print
+- Color scheme: deep navy (#0c1524) headers/accents, gold (#c4a84f) highlights, white background for print
+- Bold, large typography — minimum 13px body, 22px+ for headings
+- Divide into clear sections with strong visual separation
+- Must fit on ONE page when printed — be concise and punchy, not verbose
+
+REQUIRED SECTIONS (in this order):
+
+1. HEADER — Agent name in large bold type, "My Daily Playbook" subtitle, today's date, and their earning goal prominently displayed
+
+2. MY WHY — 1-2 sentence personal statement distilled from their motivation. Make it visceral and personal, not generic.
+
+3. MY GOALS AT A GLANCE — A compact 2-column table with their key numbers:
+   - Annual Earning Goal: ${d.earn}
+   - GCI Required (goal ÷ 65%): calculate this
+   - Transactions Needed: calculate from GCI ÷ (${d.price} × 3%)
+   - Listing Appointments/Month: spread annually, assume 80% close rate
+   - Buyer Prospects/Month: spread annually, assume 3 prospects per side
+   - SOI Size: ${d.soi}
+   - Hours/Week Committed: ${d.time}
+
+4. MY WEEKLY NON-NEGOTIABLES — A bold checklist of 6-8 specific weekly activities this agent MUST do. Tailor each item to their profile. Format as large checkboxes they can physically check off. Examples (customize based on their data):
+   - □ Call [X] SOI contacts
+   - □ Post [X] times on social media via AC Social
+   - □ Take floor time [X] hours
+   - □ Send [X] RPR reports to prospects
+   - □ Follow up with [X] active leads
+   - □ Attend open house / host open house
+   Make the numbers specific and achievable based on their time commitment of ${d.time}.
+
+5. MY MANTRA — One short, powerful, personalized motivational sentence tied directly to their "Why": ${d.why}. Make it something they'd want to say out loud every morning.
+
+6. FOOTER — Small text: "Adams, Cameron & Co. | What gets measured gets managed." and today's date.
+
+Agent Profile:
+- Name: ${d.name}
+- Office: ${d.office}
+- Market: ${d.market || 'Florida'}
+- Why: ${d.why}
+- Goals: ${d.goals}
+- Experience: ${d.exp}
+- Time Available: ${d.time}
+- Budget Level: ${d.budget}
+- SOI Contacts: ${d.soi}
+- Earning Goal: ${d.earn}
+- Avg Sale Price: ${d.price}
+- Business Mix: ${d.list}
+
+Output ONLY the raw HTML snippet. No markdown, no code fences, no explanation.`;
+
+  try {
+    const html = await geminiCall(prompt, 4096);
+    const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
+    // Store for printing
+    S.deskCardHtml = clean;
+    document.getElementById('deskCardContent').innerHTML = clean;
+  } catch (e) {
+    document.getElementById('deskCardContent').innerHTML =
+      `<p style="color:var(--text2);font-size:0.83rem;padding:1rem 0">Playbook card could not be generated: ${e.message}</p>`;
+  }
+}
+
+function printDeskCard() {
+  if (!S.deskCardHtml) { toast('Playbook is still generating — try again in a moment.', 'err'); return; }
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Weekly Playbook — ${S.data.name}</title>
+<style>
+  @media print {
+    body { margin: 0; }
+    @page { margin: 0.5in; size: letter portrait; }
+  }
+  body { font-family: Georgia, serif; background: #fff; color: #1a1a1a; }
+</style>
+</head><body>
+${S.deskCardHtml}
+</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
 /* ───────────────────────── COPY ────────────────────────── */
 async function doCopy() {
   try {
@@ -1063,12 +1180,11 @@ async function doCopy() {
 
 /* ───────────────────────── EMAIL MODAL ─────────────────── */
 function openEmailModal() {
-  const { oa } = cfg();
-  const hasOAuth = oa && S.tokenClient;
+  const hasOAuth = !!S.tokenClient;
   const note = document.getElementById('emailMethodText');
   note.innerHTML = hasOAuth
     ? '<strong style="color:var(--text)">Gmail API:</strong> Email will be sent directly via your connected Google account.'
-    : '<strong style="color:var(--text)">No OAuth configured:</strong> Clicking Send will open your default email client with the plan pre-filled. For direct Gmail sending, add your OAuth Client ID in ⚙ Settings.';
+    : '<strong style="color:var(--text)">Google sign-in unavailable:</strong> Clicking Send will open your default email client with the plan pre-filled.';
 
   // Pre-fill subject with agent name if available
   const subj = document.getElementById('emailSubj');
@@ -1092,9 +1208,7 @@ async function doEmail() {
 
   if (!to) { toast('Please enter at least one recipient.', 'err'); document.getElementById('emailTo').focus(); return; }
 
-  const { oa } = cfg();
-
-  if (oa && S.tokenClient) {
+  if (S.tokenClient) {
     if (!S.accessToken) {
       S.pendingAction = 'email';
       closeEmailModal();
@@ -1174,12 +1288,10 @@ function buildRaw(to, subject, htmlBody) {
 
 /* ───────────────────────── GOOGLE DOCS ─────────────────── */
 async function doDocs() {
-  const { oa } = cfg();
 
-  if (!oa || !S.tokenClient) {
-    // Fallback: download as HTML
+  if (!S.tokenClient) {
     downloadHtml();
-    toast('No OAuth configured — downloading as HTML instead. Set up Google OAuth in Settings for direct Docs saving.', 'ok');
+    toast('Google sign-in unavailable — downloading as HTML instead.', 'ok');
     return;
   }
 
@@ -1285,13 +1397,20 @@ function doReset() {
   document.getElementById('f_expV').textContent = '0 yrs';
   document.getElementById('f_exp').value = 0;
 
-  // Hide infographic
+  // Hide infographic and desk card
   document.getElementById('infographicCard').style.display = 'none';
+  document.getElementById('deskCard').style.display = 'none';
   document.getElementById('infographicContent').innerHTML = `
     <div class="loading-view" style="padding:2rem 1rem">
       <div class="spinner"></div>
       <div class="loading-sub">Building your infographic…</div>
     </div>`;
+  document.getElementById('deskCardContent').innerHTML = `
+    <div class="loading-view" style="padding:2rem 1rem">
+      <div class="spinner"></div>
+      <div class="loading-sub">Building your printable playbook…</div>
+    </div>`;
+  S.deskCardHtml = '';
 
   goTo(1);
 }
