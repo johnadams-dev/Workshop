@@ -395,6 +395,54 @@
 
 
 
+<!-- ══════════════════════════════════════════
+     ENROLLMENT MODAL
+════════════════════════════════════════════ -->
+<div id="enrollModal" class="overlay hidden">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <div class="modal-title">🤝 AC Pathfinder Coaching</div>
+      <div class="modal-sub">A voluntary coaching program built around your plan. You set the goals — your coach helps you follow through.</div>
+    </div>
+    <div class="modal-body">
+
+      <div class="info-box">
+        <p><strong style="color:var(--text)">Here's what you're agreeing to:</strong></p>
+        <p>✓ &nbsp;Check in weekly — about 5 minutes by text<br>
+           ✓ &nbsp;Be honest about what's working and what isn't<br>
+           ✓ &nbsp;Meet monthly with your coach to review and adjust<br>
+           ✓ &nbsp;Reply STOP anytime to pause. Message &amp; data rates may apply.</p>
+      </div>
+
+      <!-- Weekly commitments -->
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:1rem 1.25rem;">
+        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.6rem;font-weight:600">Your Weekly Commitments (from your plan)</div>
+        <div id="commitmentList" style="font-size:0.84rem;color:var(--text2);line-height:2.1"></div>
+      </div>
+
+      <!-- Coach selection -->
+      <div class="field">
+        <label>Choose Your Coach</label>
+        <div class="hint" style="margin-bottom:0.6rem">Based on your office we've made a suggestion — but you can work with anyone.</div>
+        <div id="coachOptions" style="display:flex;flex-direction:column;gap:0.55rem"></div>
+      </div>
+
+      <!-- Personal reason -->
+      <div class="field">
+        <label>In your own words… <span class="opt">(optional but powerful)</span></label>
+        <textarea id="enrollReason" rows="2" placeholder="The most important reason I'm doing this is…"></textarea>
+        <div class="hint">Shared with your coach and shown at the top of every coaching session.</div>
+      </div>
+
+    </div>
+    <div class="modal-foot" style="flex-direction:column;gap:0.5rem;align-items:stretch">
+      <button class="btn btn-primary" id="enrollBtn" onclick="doEnroll()" style="padding:0.75rem;font-size:0.9rem">🤝 Yes, I'm in — Start My Coaching</button>
+      <button class="btn btn-ghost" onclick="closeEnrollModal()" style="text-align:center">Not right now</button>
+    </div>
+  </div>
+</div>
+
+
 <header class="app-header">
   <div class="brand">
     <div class="brand-icon">🏡</div>
@@ -446,6 +494,11 @@
         <div class="section-desc">Basic information so we can personalize your plan and deliver it to the right place.</div>
       </div>
       <div class="card-body">
+        <div class="field">
+          <label>Email Address <span class="req">*</span></label>
+          <input type="email" id="f_email" placeholder="you@adamscameron.com">
+          <div class="hint">Used to save your plan and enroll in coaching. Must be your @adamscameron.com address.</div>
+        </div>
         <div class="field-row">
           <div class="field">
             <label>Full Name</label>
@@ -661,53 +714,23 @@
     </div>
   </div>
 
-  <!-- ── ENROLLMENT ── -->
+  <!-- ── ENROLLMENT BUTTON ── -->
   <div id="enrollmentCard" style="display:none;margin-top:1.5rem">
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">AC Pathfinder Coaching</div>
-        <div class="section-title">Join the Coaching Program</div>
-        <div class="section-desc">You've built your plan. The next step is having someone in your corner to help you follow it. Enrollment is entirely voluntary.</div>
-      </div>
-      <div class="card-body">
-
-        <!-- What you're agreeing to -->
-        <div class="intro-banner">
-          <strong>Here's what you're agreeing to:</strong><br>
-          ✓ Check in weekly — about 5 minutes by text &nbsp;·&nbsp;
-          ✓ Be honest about what's working and what isn't &nbsp;·&nbsp;
-          ✓ Meet monthly with your coach to adjust &nbsp;·&nbsp;
-          Reply <strong>STOP</strong> anytime to pause. Message &amp; data rates may apply.
-        </div>
-
-        <!-- Weekly commitments -->
-        <div id="enrollCommitments" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:1rem 1.25rem;">
-          <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.6rem">Your Weekly Commitments</div>
-          <div id="commitmentList" style="font-size:0.85rem;color:var(--text2);line-height:2"></div>
-        </div>
-
-        <!-- Coach selection -->
-        <div class="field">
-          <label>Choose Your Coach</label>
-          <div class="hint" style="margin-bottom:0.5rem">Based on your office we've suggested a coach, but you can work with anyone.</div>
-          <div id="coachOptions" style="display:flex;flex-direction:column;gap:0.6rem"></div>
-        </div>
-
-        <!-- Personal reason -->
-        <div class="field">
-          <label>In your own words… <span class="opt">(optional but powerful)</span></label>
-          <textarea id="enrollReason" rows="2" placeholder="The most important reason I'm doing this is…"></textarea>
-          <div class="hint">This will be shared with your coach and shown at the top of every coaching session.</div>
-        </div>
-
-      </div>
-      <div class="card-foot" style="flex-direction:column;align-items:stretch;gap:0.75rem">
-        <button class="btn btn-primary" id="enrollBtn" onclick="doEnroll()" style="width:100%;padding:0.85rem;font-size:0.95rem">
-          🤝 Yes, I'm in — Start My Coaching
+      <div class="card-body" style="text-align:center;padding:2rem">
+        <div style="font-size:2rem;margin-bottom:0.75rem">🤝</div>
+        <div class="section-title" style="margin-bottom:0.5rem">Ready to take it further?</div>
+        <p style="color:var(--text2);font-size:0.88rem;max-width:480px;margin:0 auto 1.5rem">
+          The AC Pathfinder coaching program pairs you with a sales manager who helps you follow through on this plan — weekly check-ins by text, monthly sessions, and real accountability.
+        </p>
+        <button class="btn btn-primary" onclick="openEnrollModal()" style="padding:0.75rem 2rem;font-size:0.95rem">
+          Learn About Coaching →
         </button>
-        <button class="btn btn-ghost" onclick="document.getElementById('enrollmentCard').style.display='none'" style="width:100%;text-align:center">
-          Not right now
-        </button>
+        <div style="margin-top:0.75rem">
+          <button class="btn btn-ghost" onclick="document.getElementById('enrollmentCard').style.display='none'" style="font-size:0.8rem">
+            Not right now
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -886,7 +909,11 @@ function goTo(step) {
 }
 
 function v1() {
+  const e = v('f_email');
+  if (!e || !e.includes('@')) { toast('Please enter your email address.', 'err'); foc('f_email'); return false; }
   if (!v('f_name')) { toast('Please enter your name.', 'err'); foc('f_name'); return false; }
+  // Auto-load profile if email entered and not already loaded
+  if (e !== S.userEmail) loadAgentProfile(e);
   return true;
 }
 function v2() {
@@ -911,6 +938,7 @@ function collect() {
   }
 
   return {
+    email:   v('f_email'),
     name:    v('f_name')  || 'Agent',
     office:  v('f_office')|| 'Adams, Cameron & Co.',
     market:  v('f_market'),
@@ -943,7 +971,7 @@ function buildPrompt(d) {
   }
   return contextBlock + `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
 
-The output must be formatted as a professional email intended for the agent, written in a supportive yet "boss-mode" encouraging tone. Use clear headings (##), bold text (**bold**) for emphasis, and Markdown tables for numeric goals. Avoid code blocks. Do not include a specific calendar year in the title.
+The output must be formatted as a professional email intended for the agent, written in a supportive yet "boss-mode" encouraging tone. Use clear headings (##), bold text (**bold**) for emphasis, and Markdown tables for numeric goals. Avoid code blocks. Do not include a specific calendar year in the title. Sign off with "To your guaranteed success, — The Adams, Cameron & Co. Coaching Team" — do not use placeholders like [Your Name].
 
 ---
 
@@ -1130,21 +1158,22 @@ function renderInIframe(containerId, html, theme = 'dark') {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'width:100%;border:none;display:block;min-height:400px;';
-  iframe.src = url;
+  iframe.style.cssText = `width:100%;border:none;display:block;min-height:400px;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
+  iframe.setAttribute('scrolling', 'no');
   container.appendChild(iframe);
 
+  // Write HTML directly into iframe document — most reliable cross-origin approach
   iframe.addEventListener('load', () => {
     try {
-      const h = iframe.contentDocument.body.scrollHeight;
-      if (h > 100) iframe.style.height = (h + 40) + 'px';
+      const doc = iframe.contentDocument;
+      const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
+      if (h > 100) iframe.style.height = (h + 30) + 'px';
     } catch(e) {}
-    URL.revokeObjectURL(url);
   });
+
+  // Use srcdoc — widely supported and works on GitHub Pages
+  iframe.srcdoc = html;
 }
 
 /* ───────────────────────── INFOGRAPHIC ─────────────────── */
@@ -1677,26 +1706,24 @@ async function loadAgentProfile(email) {
 
 /* ───────────────────────── COACHES ─────────────────────── */
 async function loadCoaches() {
-  // Hardcoded coaches — avoids needing a separate API endpoint
-  // Update this list if coaches change
   S.coaches = [
-    { id: 3, name: 'Ashlee Selman',   title: 'Sales Manager',  offices: 'Port Orange & Ormond Mainland' },
+    { id: 3, name: 'Ashlee Selman',    title: 'Sales Manager', offices: 'Port Orange & Ormond Mainland' },
     { id: 4, name: 'Kristin Petersen', title: 'Sales Manager', offices: 'Beachside, Daytona & Flagler' },
-    { id: 1, name: 'John Adams',       title: 'President',     offices: 'Ponce Inlet & West Volusia' },
+    { id: 1, name: 'John Adams',       title: 'President',     offices: 'Ponce Inlet, West Volusia & Commercial' },
   ];
 
-  // Determine suggested coach based on agent's office
-  const office = S.agentProfile?.office || '';
+  // Use the office the agent typed in the form (most current) or their profile office
+  const officeRaw = (v('f_office') || S.agentProfile?.office || '').toLowerCase();
   let suggestedId = 3; // default Ashlee
-  if (['Ormond Beachside','Daytona Beach','Flagler'].includes(office)) suggestedId = 4;
-  if (['Ponce Inlet','West Volusia','Commercial'].includes(office)) suggestedId = 1;
+  if (['ormond beachside','daytona beach','flagler'].some(o => officeRaw.includes(o))) suggestedId = 4;
+  if (['ponce inlet','west volusia','deland','commercial'].some(o => officeRaw.includes(o))) suggestedId = 1;
 
   const container = document.getElementById('coachOptions');
   container.innerHTML = S.coaches.map(c => `
     <label style="display:flex;align-items:flex-start;gap:0.75rem;background:var(--surface2);border:1px solid ${c.id === suggestedId ? 'var(--gold)' : 'var(--border2)'};border-radius:8px;padding:0.85rem 1rem;cursor:pointer">
       <input type="radio" name="coachSelect" value="${c.id}" ${c.id === suggestedId ? 'checked' : ''} style="margin-top:3px;accent-color:var(--gold)">
       <div>
-        <div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name} ${c.id === suggestedId ? '<span style="font-size:0.68rem;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase"> ← suggested</span>' : ''}</div>
+        <div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name}${c.id === suggestedId ? ' <span style="font-size:0.68rem;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase">← suggested</span>' : ''}</div>
         <div style="font-size:0.78rem;color:var(--text2)">${c.title} &nbsp;·&nbsp; ${c.offices}</div>
       </div>
     </label>
@@ -1733,12 +1760,20 @@ function buildCommitmentList() {
 }
 
 function showEnrollmentCard() {
-  loadCoaches();
-  buildCommitmentList();
   document.getElementById('enrollmentCard').style.display = 'block';
   setTimeout(() => {
     document.getElementById('enrollmentCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 400);
+}
+
+function openEnrollModal() {
+  loadCoaches();
+  buildCommitmentList();
+  document.getElementById('enrollModal').classList.remove('hidden');
+}
+
+function closeEnrollModal() {
+  document.getElementById('enrollModal').classList.add('hidden');
 }
 
 /* ───────────────────────── ENROLL ──────────────────────── */
@@ -1763,7 +1798,7 @@ async function doEnroll() {
     const buyeSides = sides - listSides;
 
     const payload = {
-      agentEmail:            S.userEmail,
+      agentEmail:            S.userEmail || S.data.email || '',
       coachId,
       agentReason:           reason || null,
       earningGoal:           earnNum,
@@ -1795,7 +1830,7 @@ async function doEnroll() {
 
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.userEmail || '' },
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.userEmail || S.data.email || '' },
       body: JSON.stringify(payload)
     });
 
@@ -1815,6 +1850,7 @@ async function doEnroll() {
     const checkinDate = firstCheckin.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
     // Show success
+    closeEnrollModal();
     document.getElementById('enrollmentCard').style.display = 'none';
     document.getElementById('enrolledCard').style.display = 'block';
     document.getElementById('enrolledMsg').innerHTML = `
