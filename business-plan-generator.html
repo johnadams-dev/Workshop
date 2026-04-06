@@ -661,6 +661,68 @@
     </div>
   </div>
 
+  <!-- ── ENROLLMENT ── -->
+  <div id="enrollmentCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">AC Pathfinder Coaching</div>
+        <div class="section-title">Join the Coaching Program</div>
+        <div class="section-desc">You've built your plan. The next step is having someone in your corner to help you follow it. Enrollment is entirely voluntary.</div>
+      </div>
+      <div class="card-body">
+
+        <!-- What you're agreeing to -->
+        <div class="intro-banner">
+          <strong>Here's what you're agreeing to:</strong><br>
+          ✓ Check in weekly — about 5 minutes by text &nbsp;·&nbsp;
+          ✓ Be honest about what's working and what isn't &nbsp;·&nbsp;
+          ✓ Meet monthly with your coach to adjust &nbsp;·&nbsp;
+          Reply <strong>STOP</strong> anytime to pause. Message &amp; data rates may apply.
+        </div>
+
+        <!-- Weekly commitments -->
+        <div id="enrollCommitments" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:1rem 1.25rem;">
+          <div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.6rem">Your Weekly Commitments</div>
+          <div id="commitmentList" style="font-size:0.85rem;color:var(--text2);line-height:2"></div>
+        </div>
+
+        <!-- Coach selection -->
+        <div class="field">
+          <label>Choose Your Coach</label>
+          <div class="hint" style="margin-bottom:0.5rem">Based on your office we've suggested a coach, but you can work with anyone.</div>
+          <div id="coachOptions" style="display:flex;flex-direction:column;gap:0.6rem"></div>
+        </div>
+
+        <!-- Personal reason -->
+        <div class="field">
+          <label>In your own words… <span class="opt">(optional but powerful)</span></label>
+          <textarea id="enrollReason" rows="2" placeholder="The most important reason I'm doing this is…"></textarea>
+          <div class="hint">This will be shared with your coach and shown at the top of every coaching session.</div>
+        </div>
+
+      </div>
+      <div class="card-foot" style="flex-direction:column;align-items:stretch;gap:0.75rem">
+        <button class="btn btn-primary" id="enrollBtn" onclick="doEnroll()" style="width:100%;padding:0.85rem;font-size:0.95rem">
+          🤝 Yes, I'm in — Start My Coaching
+        </button>
+        <button class="btn btn-ghost" onclick="document.getElementById('enrollmentCard').style.display='none'" style="width:100%;text-align:center">
+          Not right now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ENROLLMENT SUCCESS ── -->
+  <div id="enrolledCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-body" style="text-align:center;padding:2.5rem 2rem">
+        <div style="font-size:2.5rem;margin-bottom:1rem">🏡</div>
+        <div class="section-title" style="margin-bottom:0.5rem">You're Enrolled!</div>
+        <div id="enrolledMsg" style="font-size:0.88rem;color:var(--text2);line-height:1.75;max-width:480px;margin:0 auto"></div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- Toast -->
@@ -674,7 +736,7 @@
 
 /* ───────────────────────── CONSTANTS ───────────────────── */
 const ADMIN_PW_DEFAULT = 'ac2025admin';
-const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
 const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT  = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 const CONFIG_URL    = './bizplan-config.json';
@@ -689,7 +751,12 @@ const S = {
   tokenClient: null,
   pendingAction: null,
   config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
-  deskCardHtml: ''
+  deskCardHtml: '',
+  agentProfile: null,
+  userEmail: null,
+  planId: null,
+  enrollmentId: null,
+  coaches: []
 };
 
 /* ───────────────────────── SETTINGS ───────────────────── */
@@ -749,15 +816,38 @@ function initOAuth() {
   if (!window.google?.accounts?.oauth2) return;
   S.tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: OAUTH_CLIENT,
-    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file',
-    callback: (res) => {
+    scope: 'https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+    callback: async (res) => {
       if (res.error) { toast('Google sign-in failed: ' + res.error, 'err'); return; }
       S.accessToken = res.access_token;
+      // Fetch Google user email
+      try {
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${S.accessToken}` }
+        });
+        if (userRes.ok) {
+          const userInfo = await userRes.json();
+          if (userInfo.email) await loadAgentProfile(userInfo.email);
+        }
+      } catch(e) { console.warn('Could not fetch user info:', e.message); }
       if (S.pendingAction === 'email') doEmail();
       if (S.pendingAction === 'docs')  doDocs();
       S.pendingAction = null;
     }
   });
+
+  // Silently try to get identity on load (prompt: 'none' won't show popup)
+  try {
+    google.accounts.id.initialize({
+      client_id: OAUTH_CLIENT,
+      callback: async (credentialResponse) => {
+        // Decode JWT to get email
+        const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+        if (payload.email) await loadAgentProfile(payload.email);
+      }
+    });
+    google.accounts.id.prompt(); // Shows One Tap if user is signed in
+  } catch(e) {}
 }
 
 function requestToken(action) {
@@ -959,6 +1049,12 @@ async function generatePlan() {
     document.getElementById('deskCard').style.display = 'block';
     generateInfographic().catch(e => console.error('[Infographic] Uncaught:', e));
     generateDeskCard().catch(e => console.error('[DeskCard] Uncaught:', e));
+
+    // Step 3: Show enrollment card (after a short delay so plan is visible first)
+    // Only show if not already enrolled
+    if (!S.enrollmentId) {
+      setTimeout(() => showEnrollmentCard(), 2000);
+    }
 
   } catch (e) {
     show('step3');
@@ -1502,6 +1598,12 @@ function doReset() {
       <div class="loading-sub">Building your printable playbook…</div>
     </div>`;
   S.deskCardHtml = '';
+  S.planId = null;
+  S.enrollmentId = null;
+
+  // Hide enrollment cards
+  document.getElementById('enrollmentCard').style.display = 'none';
+  document.getElementById('enrolledCard').style.display = 'none';
 
   goTo(1);
 }
@@ -1535,6 +1637,204 @@ window.addEventListener('load', async () => {
     if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
   }, 200);
 });
+
+/* ───────────────────────── AGENT PROFILE ───────────────── */
+async function loadAgentProfile(email) {
+  if (!email) return;
+  S.userEmail = email;
+  try {
+    const res = await fetch(`${PROXY_BASE}/agent/profile`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+    });
+    if (!res.ok) return;
+    const profile = await res.json();
+    if (!profile.found) {
+      // Auto-register new agent
+      await fetch(`${PROXY_BASE}/agent/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+        body: JSON.stringify({ email })
+      });
+      return;
+    }
+    S.agentProfile = profile;
+
+    // Pre-populate form fields
+    if (profile.first_name || profile.last_name) {
+      const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+      const nameField = document.getElementById('f_name');
+      if (nameField && !nameField.value) nameField.value = name;
+    }
+    if (profile.office) {
+      const officeField = document.getElementById('f_office');
+      if (officeField && !officeField.value) officeField.value = profile.office;
+    }
+    console.log('[Profile] Loaded:', profile.first_name, profile.last_name, profile.office);
+  } catch (e) {
+    console.warn('[Profile] Could not load agent profile:', e.message);
+  }
+}
+
+/* ───────────────────────── COACHES ─────────────────────── */
+async function loadCoaches() {
+  // Hardcoded coaches — avoids needing a separate API endpoint
+  // Update this list if coaches change
+  S.coaches = [
+    { id: 3, name: 'Ashlee Selman',   title: 'Sales Manager',  offices: 'Port Orange & Ormond Mainland' },
+    { id: 4, name: 'Kristin Petersen', title: 'Sales Manager', offices: 'Beachside, Daytona & Flagler' },
+    { id: 1, name: 'John Adams',       title: 'President',     offices: 'Ponce Inlet & West Volusia' },
+  ];
+
+  // Determine suggested coach based on agent's office
+  const office = S.agentProfile?.office || '';
+  let suggestedId = 3; // default Ashlee
+  if (['Ormond Beachside','Daytona Beach','Flagler'].includes(office)) suggestedId = 4;
+  if (['Ponce Inlet','West Volusia','Commercial'].includes(office)) suggestedId = 1;
+
+  const container = document.getElementById('coachOptions');
+  container.innerHTML = S.coaches.map(c => `
+    <label style="display:flex;align-items:flex-start;gap:0.75rem;background:var(--surface2);border:1px solid ${c.id === suggestedId ? 'var(--gold)' : 'var(--border2)'};border-radius:8px;padding:0.85rem 1rem;cursor:pointer">
+      <input type="radio" name="coachSelect" value="${c.id}" ${c.id === suggestedId ? 'checked' : ''} style="margin-top:3px;accent-color:var(--gold)">
+      <div>
+        <div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name} ${c.id === suggestedId ? '<span style="font-size:0.68rem;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase"> ← suggested</span>' : ''}</div>
+        <div style="font-size:0.78rem;color:var(--text2)">${c.title} &nbsp;·&nbsp; ${c.offices}</div>
+      </div>
+    </label>
+  `).join('');
+}
+
+function buildCommitmentList() {
+  const d = S.data;
+  if (!d || !d.earn) return;
+
+  const earnNum  = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
+  const priceNum = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
+  const gci      = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
+  const sides    = gci > 0 && priceNum > 0 ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+  const listPct  = parseInt(d.list) / 100 || 0.5;
+  const listSides = Math.ceil(sides * listPct);
+  const buyeSides = sides - listSides;
+  const listAppts = Math.ceil((listSides / 12) / 0.8);
+  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
+  const hoursNum  = parseInt(d.time) || 0;
+  const soiCalls  = Math.max(5, Math.round(hoursNum * 0.5));
+  const socialPosts = Math.max(3, Math.round(hoursNum * 0.15));
+  const floorHrs  = Math.max(2, Math.round(hoursNum * 0.15));
+
+  document.getElementById('commitmentList').innerHTML = [
+    `□ &nbsp;${soiCalls} SOI contacts per week`,
+    `□ &nbsp;${socialPosts} social posts via AC Social`,
+    `□ &nbsp;${floorHrs} hours of floor time`,
+    `□ &nbsp;${listAppts} listing appointments per month`,
+    `□ &nbsp;${buyProsp} buyer prospects per month`,
+    `□ &nbsp;Weekly check-in by text (5 minutes)`,
+    `□ &nbsp;Monthly coaching session with your coach`,
+  ].join('<br>');
+}
+
+function showEnrollmentCard() {
+  loadCoaches();
+  buildCommitmentList();
+  document.getElementById('enrollmentCard').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('enrollmentCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 400);
+}
+
+/* ───────────────────────── ENROLL ──────────────────────── */
+async function doEnroll() {
+  const coachInput = document.querySelector('input[name="coachSelect"]:checked');
+  if (!coachInput) { toast('Please select a coach.', 'err'); return; }
+  const coachId = parseInt(coachInput.value);
+  const reason  = document.getElementById('enrollReason').value.trim();
+  const d = S.data;
+
+  const btn = document.getElementById('enrollBtn');
+  btn.textContent = '⏳ Enrolling…';
+  btn.disabled = true;
+
+  try {
+    const earnNum  = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
+    const priceNum = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
+    const gci      = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
+    const sides    = gci > 0 && priceNum > 0 ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+    const listPct  = parseInt(d.list) / 100 || 0.5;
+    const listSides = Math.ceil(sides * listPct);
+    const buyeSides = sides - listSides;
+
+    const payload = {
+      agentEmail:            S.userEmail,
+      coachId,
+      agentReason:           reason || null,
+      earningGoal:           earnNum,
+      avgSalePrice:          priceNum,
+      listingPct:            parseInt(d.list) || 50,
+      timeCommitmentHrs:     parseInt(d.time) || 0,
+      budgetScore:           parseInt(document.getElementById('f_budget').value) || 0,
+      soiContacts:           parseInt(document.getElementById('f_soi').value) || 0,
+      experienceYrs:         parseInt(document.getElementById('f_exp').value) || 0,
+      marketFocus:           d.market || '',
+      whyText:               d.why || '',
+      goalsText:             d.goals || '',
+      descriptionText:       d.desc || '',
+      timeNotes:             document.getElementById('f_time_note').value.trim(),
+      budgetNotes:           document.getElementById('f_budget_note').value.trim(),
+      soiNotes:              document.getElementById('f_soi_note').value.trim(),
+      expNotes:              document.getElementById('f_exp_note').value.trim(),
+      gciRequired:           gci,
+      sidesRequired:         sides,
+      listingSides:          listSides,
+      buyerSides:            buyeSides,
+      listingApptsMonthly:   Math.ceil((listSides / 12) / 0.8),
+      buyerProspectsMonthly: Math.ceil((buyeSides / 12) * 3),
+      planText:              S.plan,
+      planHtml:              S.planHtml,
+      infographicHtml:       null,
+      deskcardHtml:          S.deskCardHtml || null,
+    };
+
+    const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.userEmail || '' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || `HTTP ${res.status}`);
+    }
+
+    const result = await res.json();
+    S.planId      = result.planId;
+    S.enrollmentId = result.enrollmentId;
+
+    // Find coach name
+    const coach = S.coaches.find(c => c.id === coachId);
+    const firstCheckin = new Date();
+    firstCheckin.setDate(firstCheckin.getDate() + 7);
+    const checkinDate = firstCheckin.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
+    // Show success
+    document.getElementById('enrollmentCard').style.display = 'none';
+    document.getElementById('enrolledCard').style.display = 'block';
+    document.getElementById('enrolledMsg').innerHTML = `
+      <strong style="color:var(--text)">Welcome to AC Pathfinder, ${d.name}!</strong><br><br>
+      Your coach is <strong style="color:var(--gold)">${coach?.name || 'your sales manager'}</strong>.
+      They've been notified and will be in touch soon.<br><br>
+      Your first check-in text arrives on <strong style="color:var(--text)">${checkinDate}</strong>.
+      It takes about 5 minutes to complete.<br><br>
+      <span style="font-size:0.8rem;opacity:0.7">Reply STOP to any message to pause check-ins. Message &amp; data rates may apply.</span>
+    `;
+    document.getElementById('enrolledCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast('Enrolled successfully! Your coaching journey starts now. 🏡', 'ok');
+
+  } catch (e) {
+    console.error('[Enroll]', e);
+    toast('Enrollment failed: ' + e.message, 'err');
+    btn.textContent = '🤝 Yes, I\'m in — Start My Coaching';
+    btn.disabled = false;
+  }
+}
 
 </script>
 </body>
