@@ -1671,6 +1671,11 @@ window.addEventListener('load', async () => {
 async function loadAgentProfile(email) {
   if (!email) return;
   S.userEmail = email;
+
+  // Populate email field immediately — don't wait for the API call
+  const emailField = document.getElementById('f_email');
+  if (emailField && !emailField.value) emailField.value = email;
+
   try {
     const res = await fetch(`${PROXY_BASE}/agent/profile`, {
       headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
@@ -1688,7 +1693,7 @@ async function loadAgentProfile(email) {
     }
     S.agentProfile = profile;
 
-    // Pre-populate form fields
+    // Pre-populate name and office
     if (profile.first_name || profile.last_name) {
       const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
       const nameField = document.getElementById('f_name');
