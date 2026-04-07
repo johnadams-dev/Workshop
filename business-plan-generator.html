@@ -311,6 +311,41 @@
       .app-main { padding: 1.5rem 1rem 3rem; }
       .brand-sub { display: none; }
     }
+
+    /* ── Strategy cards ── */
+    .strategy-card {
+      background: var(--surface2);
+      border: 2px solid var(--border2);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      user-select: none;
+    }
+    .strategy-card:hover { border-color: var(--border); background: #1e2438; }
+    .strategy-card.selected { border-color: var(--gold); background: var(--gold-bg); }
+    .strategy-card.primary  { border-color: var(--gold); background: var(--gold-bg); box-shadow: 0 0 0 1px var(--gold); }
+    .strategy-card.disabled { opacity: 0.4; cursor: not-allowed; }
+    .strategy-card-icon   { font-size: 1.4rem; margin-bottom: 0.4rem; }
+    .strategy-card-name   { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
+    .strategy-card-desc   { font-size: 0.72rem; color: var(--text2); line-height: 1.5; }
+    .strategy-primary-badge {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--gold); font-weight: 600;
+      background: rgba(196,168,79,0.15); border-radius: 4px; padding: 0.1rem 0.4rem;
+    }
+    .strategy-check {
+      position: absolute; top: 0.5rem; left: 0.5rem;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: var(--navy); font-weight: 700;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .strategy-card.selected .strategy-check,
+    .strategy-card.primary .strategy-check { opacity: 1; }
+
   </style>
 </head>
 <body>
@@ -714,6 +749,30 @@
     </div>
   </div>
 
+  <!-- ── STRATEGY SELECTION ── -->
+  <div id="strategyCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Your Strategy</div>
+        <div class="section-title">How You'll Build Your Business</div>
+        <div class="section-desc">Based on your plan, we've suggested the strategies that best fit your market, time commitment, and goals. You can adjust these — but keep it focused. One primary strategy and up to four supporting ones.</div>
+      </div>
+      <div class="card-body">
+        <div id="strategyRationale" style="display:none;background:var(--gold-bg);border:1px solid rgba(196,168,79,0.2);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1.25rem;font-size:0.84rem;color:var(--text2);line-height:1.65"></div>
+        <div id="strategyGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem"></div>
+        <div id="strategyError" style="display:none;font-size:0.8rem;color:#c0392b;margin-top:0.5rem;text-align:center"></div>
+      </div>
+      <div class="card-foot">
+        <div style="font-size:0.75rem;color:var(--text3)">
+          <span id="strategyCount">0</span> selected · 1 primary required · max 5 total
+        </div>
+        <button class="btn btn-primary" id="strategyConfirmBtn" onclick="confirmStrategies()">
+          Confirm My Strategy →
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── ENROLLMENT BUTTON ── -->
   <div id="enrollmentCard" style="display:none;margin-top:1.5rem">
     <div class="card">
@@ -1078,10 +1137,10 @@ async function generatePlan() {
     generateInfographic().catch(e => console.error('[Infographic] Uncaught:', e));
     generateDeskCard().catch(e => console.error('[DeskCard] Uncaught:', e));
 
-    // Step 3: Show enrollment card (after a short delay so plan is visible first)
-    // Only show if not already enrolled
+    // Step 3: Show strategy card (Gemini suggests, agent confirms)
+    // This feeds into enrollment — enrollment only shows after strategy is confirmed
     if (!S.enrollmentId) {
-      setTimeout(() => showEnrollmentCard(), 2000);
+      setTimeout(() => showStrategyCard(), 2000);
     }
 
   } catch (e) {
@@ -1629,8 +1688,11 @@ function doReset() {
   S.deskCardHtml = '';
   S.planId = null;
   S.enrollmentId = null;
+  S.selectedStrategies = [];
+  S.suggestedStrategies = [];
 
-  // Hide enrollment cards
+  // Hide enrollment and strategy cards
+  document.getElementById('strategyCard').style.display = 'none';
   document.getElementById('enrollmentCard').style.display = 'none';
   document.getElementById('enrolledCard').style.display = 'none';
 
@@ -1736,9 +1798,37 @@ async function loadCoaches() {
 }
 
 function buildCommitmentList() {
+  const el = document.getElementById('commitmentList');
+  if (!el) return;
+
+  // If agent has selected strategies, show those commitments
+  if (S.selectedStrategies.length) {
+    const items = [];
+    const primary = S.selectedStrategies.find(s => s.isPrimary);
+    const all = [primary, ...S.selectedStrategies.filter(s => !s.isPrimary)].filter(Boolean);
+
+    all.forEach(sel => {
+      const strat = S.strategies.find(s => s.slug === sel.slug);
+      if (!strat) return;
+      // Show top 2 activities per strategy with their targets
+      strat.activities?.slice(0, 2).forEach(act => {
+        const target = sel.commitments?.[act.slug] || act.default_weekly_target;
+        if (!target && act.input_type !== 'boolean') return;
+        const freq = act.is_monthly_target ? '/month' : '/week';
+        const val  = act.input_type === 'boolean' ? 'Active' : `${target} ${act.unit}${freq}`;
+        items.push(`□ &nbsp;<strong>${val}</strong> — ${act.label}`);
+      });
+    });
+
+    items.push('□ &nbsp;Weekly check-in (web or text, 5 minutes)');
+    items.push('□ &nbsp;Monthly coaching session with your coach');
+    el.innerHTML = items.join('<br>');
+    return;
+  }
+
+  // Fallback: calculate from plan numbers
   const d = S.data;
   if (!d || !d.earn) return;
-
   const earnNum  = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
   const priceNum = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
   const gci      = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
@@ -1753,15 +1843,223 @@ function buildCommitmentList() {
   const socialPosts = Math.max(3, Math.round(hoursNum * 0.15));
   const floorHrs  = Math.max(2, Math.round(hoursNum * 0.15));
 
-  document.getElementById('commitmentList').innerHTML = [
+  el.innerHTML = [
     `□ &nbsp;${soiCalls} SOI contacts per week`,
     `□ &nbsp;${socialPosts} social posts via AC Social`,
     `□ &nbsp;${floorHrs} hours of floor time`,
     `□ &nbsp;${listAppts} listing appointments per month`,
     `□ &nbsp;${buyProsp} buyer prospects per month`,
-    `□ &nbsp;Weekly check-in by text (5 minutes)`,
+    `□ &nbsp;Weekly check-in (web or text, 5 minutes)`,
     `□ &nbsp;Monthly coaching session with your coach`,
   ].join('<br>');
+}
+
+/* ───────────────────────── STRATEGIES ──────────────────── */
+
+// Load full strategy library from server
+async function loadStrategyLibrary() {
+  if (S.strategies.length) return; // already loaded
+  try {
+    const res = await fetch(`${PROXY_BASE}/strategies`, {
+      headers: { 'x-proxy-key': PROXY_KEY }
+    });
+    if (res.ok) S.strategies = await res.json();
+  } catch(e) {
+    console.warn('[Strategies] Could not load library:', e.message);
+  }
+}
+
+// Ask Gemini to suggest strategies based on the agent's plan
+async function suggestStrategies() {
+  try {
+    const res = await fetch(`${PROXY_BASE}/agent/suggest-strategies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+      body: JSON.stringify({
+        planText: S.plan,
+        agentData: {
+          market:     S.data.market,
+          time:       S.data.time,
+          soi:        S.data.soi,
+          experience: S.data.exp,
+          list:       S.data.list,
+          why:        S.data.why,
+        }
+      })
+    });
+    if (!res.ok) throw new Error('Strategy suggestion failed');
+    const data = await res.json();
+    return data.suggestions;
+  } catch(e) {
+    console.warn('[Strategies] Suggestion failed, using defaults:', e.message);
+    return {
+      primary: 'soi',
+      secondary: ['open_house', 'social'],
+      rationale: 'Based on your plan, we\'ve suggested these core strategies as a starting point. Adjust to fit your preferred approach.',
+      commitments: { soi_contacts_weekly: 15, open_houses_held: 1, social_posts_weekly: 3 }
+    };
+  }
+}
+
+// Show the strategy selection card after plan generates
+async function showStrategyCard() {
+  await loadStrategyLibrary();
+  const suggestions = await suggestStrategies();
+  S.suggestedStrategies = suggestions;
+
+  // Build initial selection from suggestions
+  S.selectedStrategies = [];
+  const allSlugs = [suggestions.primary, ...(suggestions.secondary || [])].slice(0, 5);
+  allSlugs.forEach((slug, i) => {
+    const strat = S.strategies.find(s => s.slug === slug);
+    if (!strat) return;
+    S.selectedStrategies.push({
+      slug,
+      strategyId: strat.id,
+      isPrimary:  i === 0,
+      commitments: suggestions.commitments || {},
+      aiSuggested: true,
+    });
+  });
+
+  // Show rationale
+  if (suggestions.rationale) {
+    const el = document.getElementById('strategyRationale');
+    el.textContent = '💡 ' + suggestions.rationale;
+    el.style.display = 'block';
+  }
+
+  renderStrategyGrid();
+  document.getElementById('strategyCard').style.display = 'block';
+  setTimeout(() => {
+    document.getElementById('strategyCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 300);
+}
+
+function renderStrategyGrid() {
+  const grid = document.getElementById('strategyGrid');
+  const selectedSlugs = S.selectedStrategies.map(s => s.slug);
+  const primarySlug = S.selectedStrategies.find(s => s.isPrimary)?.slug;
+  const count = S.selectedStrategies.length;
+
+  grid.innerHTML = S.strategies.map(strat => {
+    const isSelected = selectedSlugs.includes(strat.slug);
+    const isPrimary  = strat.slug === primarySlug;
+    const isDisabled = !isSelected && count >= 5;
+
+    return `
+      <div class="strategy-card ${isPrimary ? 'primary' : isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}"
+           onclick="toggleStrategy('${strat.slug}')"
+           title="${isDisabled ? 'Maximum 5 strategies selected' : ''}">
+        <div class="strategy-check">✓</div>
+        ${isPrimary ? '<div class="strategy-primary-badge">Primary</div>' : ''}
+        <div class="strategy-card-icon">${strat.icon}</div>
+        <div class="strategy-card-name">${strat.name}</div>
+        <div class="strategy-card-desc">${strat.description}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('strategyCount').textContent = count;
+
+  // Clear error if valid
+  if (count > 0 && S.selectedStrategies.some(s => s.isPrimary)) {
+    document.getElementById('strategyError').style.display = 'none';
+  }
+}
+
+function toggleStrategy(slug) {
+  const strat = S.strategies.find(s => s.slug === slug);
+  if (!strat) return;
+
+  const idx = S.selectedStrategies.findIndex(s => s.slug === slug);
+
+  if (idx >= 0) {
+    // Already selected — deselect or make primary
+    const current = S.selectedStrategies[idx];
+    if (current.isPrimary) {
+      // If it's primary and there are others, can't deselect unless another becomes primary
+      if (S.selectedStrategies.length > 1) {
+        toast('Please select a different primary strategy first, then remove this one.', 'err');
+        return;
+      }
+      // Only one — just deselect it
+      S.selectedStrategies.splice(idx, 1);
+    } else {
+      // Not primary — make it primary (demote current primary to secondary)
+      S.selectedStrategies.forEach(s => s.isPrimary = false);
+      S.selectedStrategies[idx].isPrimary = true;
+      toast(`${strat.name} is now your primary strategy.`, 'ok');
+    }
+  } else {
+    // Not selected — add it
+    if (S.selectedStrategies.length >= 5) {
+      document.getElementById('strategyError').textContent = 'Maximum 5 strategies. Tap an existing one to remove it.';
+      document.getElementById('strategyError').style.display = 'block';
+      return;
+    }
+    // If none selected yet, make it primary
+    const isPrimary = S.selectedStrategies.length === 0;
+    S.selectedStrategies.push({
+      slug,
+      strategyId: strat.id,
+      isPrimary,
+      commitments: S.suggestedStrategies?.commitments || {},
+      aiSuggested: false,
+    });
+  }
+
+  renderStrategyGrid();
+}
+
+async function confirmStrategies() {
+  if (!S.selectedStrategies.length) {
+    document.getElementById('strategyError').textContent = 'Please select at least one strategy.';
+    document.getElementById('strategyError').style.display = 'block';
+    return;
+  }
+  if (!S.selectedStrategies.some(s => s.isPrimary)) {
+    document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.';
+    document.getElementById('strategyError').style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('strategyConfirmBtn');
+  btn.textContent = '⏳ Saving…';
+  btn.disabled = true;
+
+  // Save strategies to server if we have an agent ID
+  try {
+    const email = S.userEmail || S.data.email;
+    if (email && S.planId) {
+      // Look up agent ID
+      const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
+        headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        if (profile.found && profile.id) {
+          await fetch(`${PROXY_BASE}/agent/${profile.id}/strategies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+            body: JSON.stringify({
+              planId: S.planId,
+              enrollmentId: S.enrollmentId,
+              strategies: S.selectedStrategies,
+            })
+          });
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('[Strategies] Could not save to server:', e.message);
+    // Continue anyway — strategies are stored in S.selectedStrategies locally
+  }
+
+  // Hide strategy card and show enrollment
+  document.getElementById('strategyCard').style.display = 'none';
+  btn.textContent = 'Confirm My Strategy →';
+  btn.disabled = false;
+  showEnrollmentCard();
 }
 
 function showEnrollmentCard() {
