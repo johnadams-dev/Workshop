@@ -828,10 +828,9 @@ function updateStats() {
   const scored  = agents.filter(a => a.commitment_score !== null);
   const avg     = scored.length ? Math.round(scored.reduce((s,a) => s + a.commitment_score, 0) / scored.length) : '—';
   const thisWk  = agents.filter(a => {
-    if (!a.last_scored) return false;
-    const d = new Date(a.last_scored);
-    const now = new Date();
-    return (now - d) < 7 * 24 * 3600 * 1000;
+    const d = a.last_activity || a.last_scored;
+    if (!d) return false;
+    return (new Date() - new Date(d)) < 7 * 24 * 3600 * 1000;
   }).length;
 
   document.getElementById('statTotal').textContent  = agents.length;
@@ -906,8 +905,12 @@ function renderList() {
     const scoreDisplay = a.commitment_score !== null ? a.commitment_score : '—';
     const trendIcon = a.trend === 'improving' ? '↑' : a.trend === 'declining' ? '↓' : '→';
     const trendClass = a.trend === 'improving' ? 'trend-up' : a.trend === 'declining' ? 'trend-down' : '';
-    const lastCheckin = a.last_scored
-      ? new Date(a.last_scored).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const lastActivity = a.last_activity || a.last_scored;
+    const lastCheckin = lastActivity
+      ? new Date(lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : null;
+    const checkinMeta = lastCheckin
+      ? `last checked in ${lastCheckin}${a.checkin_count ? ' · ' + a.checkin_count + ' total' : ''}`
       : 'no check-ins yet';
     const isActive = S.activeAgent?.agent_id === a.agent_id || S.activeAgent?.id === a.id;
     const agentEmail = a.agent_email || a.email || '';
@@ -922,7 +925,7 @@ function renderList() {
         </div>
         <div class="agent-info">
           <div class="agent-name">${a.agent_name}</div>
-          <div class="agent-meta">${a.office || ''} · last checked in ${lastCheckin}</div>
+          <div class="agent-meta">${a.office || ''} · ${checkinMeta}</div>
           ${a.coach_attention_needed ? `<div class="urgent-flag">⚠ Needs attention</div>` : ''}
         </div>
         <div class="agent-score-col">

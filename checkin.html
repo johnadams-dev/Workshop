@@ -33,7 +33,7 @@
     }
 
     html, body {
-      height: 100%; overflow: hidden;
+      height: 100%;
       font-family: 'Outfit', sans-serif;
       background: var(--bg);
       color: var(--text);
@@ -42,11 +42,13 @@
     /* ── APP SHELL ── */
     #app {
       height: 100vh;
+      height: 100dvh; /* dynamic viewport height — accounts for mobile browser chrome */
       display: flex;
       flex-direction: column;
       max-width: 520px;
       margin: 0 auto;
       position: relative;
+      overflow: hidden;
     }
 
     /* ── TOP BAR ── */
@@ -124,11 +126,15 @@
 
     /* ── BOTTOM ACTIONS ── */
     .bottom-bar {
-      padding: 1rem 1.5rem;
-      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      padding: 0.75rem 1.5rem;
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
       flex-shrink: 0;
       display: flex;
       gap: 0.75rem;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
     }
     .btn-back {
       width: 48px; height: 52px;
@@ -681,12 +687,17 @@ function buildCheckin() {
   S.screens.push({ type: 'welcome' });
 
   // Activity questions from strategies
+  // Cap: max 2 activities per strategy, max 6 total activity questions
   if (S.strategies.length) {
-    // Primary strategy first
     const sorted = [...S.strategies].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+    let totalActivities = 0;
     sorted.forEach(strat => {
-      const activities = Array.isArray(strat.activities) ? strat.activities : [];
+      if (totalActivities >= 6) return;
+      const activities = (Array.isArray(strat.activities) ? strat.activities : [])
+        .filter(a => a.input_type !== 'boolean') // skip yes/no in main flow
+        .slice(0, strat.is_primary ? 2 : 1);    // 2 for primary, 1 for secondary
       activities.forEach(act => {
+        if (totalActivities >= 6) return;
         S.screens.push({
           type:        'question',
           activityId:  act.id,
@@ -701,16 +712,17 @@ function buildCheckin() {
           stratIcon:   strat.icon,
           isPrimary:   strat.is_primary,
         });
+        totalActivities++;
       });
     });
   } else {
-    // No strategies — use universal defaults
+    // No strategies — use 5 universal defaults
     [
-      { slug: 'soi_contacts_weekly',  question: 'How many people from your sphere did you reach out to this week?', label: 'SOI Contacts', unit: 'contacts', inputType: 'number', target: 15, stratName: 'Sphere of Influence', stratIcon: '👥' },
-      { slug: 'open_houses_held',     question: 'How many open houses did you host this week?', label: 'Open Houses', unit: 'open houses', inputType: 'number', target: 1, stratName: 'Open Houses', stratIcon: '🏡' },
-      { slug: 'social_posts_weekly',  question: 'How many social media posts did you publish this week?', label: 'Social Posts', unit: 'posts', inputType: 'number', target: 3, stratName: 'Social Media', stratIcon: '📱' },
-      { slug: 'listing_appts_set',    question: 'How many listing appointments did you schedule this week?', label: 'Listing Appointments', unit: 'appointments', inputType: 'number', target: 1, stratName: 'Listings', stratIcon: '📋' },
-      { slug: 'showings_held',        question: 'How many buyer showings did you conduct this week?', label: 'Buyer Showings', unit: 'showings', inputType: 'number', target: 3, stratName: 'Buyers', stratIcon: '🔑' },
+      { slug: 'soi_contacts_weekly', question: 'How many people from your sphere did you reach out to this week?', label: 'SOI Contacts', unit: 'contacts', inputType: 'number', target: 15, stratName: 'Sphere of Influence', stratIcon: '👥' },
+      { slug: 'open_houses_held',    question: 'How many open houses did you host this week?', label: 'Open Houses', unit: 'open houses', inputType: 'number', target: 1, stratName: 'Open Houses', stratIcon: '🏡' },
+      { slug: 'social_posts_weekly', question: 'How many social media posts did you publish this week?', label: 'Social Posts', unit: 'posts', inputType: 'number', target: 3, stratName: 'Social Media', stratIcon: '📱' },
+      { slug: 'listing_appts_set',   question: 'How many listing appointments did you schedule this week?', label: 'Listing Appointments', unit: 'appointments', inputType: 'number', target: 1, stratName: 'Listings', stratIcon: '📋' },
+      { slug: 'showings_held',       question: 'How many buyer showings did you conduct this week?', label: 'Buyer Showings', unit: 'showings', inputType: 'number', target: 3, stratName: 'Buyers', stratIcon: '🔑' },
     ].forEach(q => S.screens.push({ type: 'question', ...q }));
   }
 
@@ -833,8 +845,10 @@ function renderQuestion(screen) {
       </div>`;
   }
 
-  // Number input
-  const numVal = val !== undefined ? val : (target || 0);
+  // Number input — initialize from existing response or target
+  const numVal = S.responses[screen.slug] !== undefined ? S.responses[screen.slug] : (target || 0);
+  // Initialize response so +/- starts from right place
+  if (S.responses[screen.slug] === undefined && target) S.responses[screen.slug] = target;
   const pct    = target ? Math.round((numVal / target) * 100) : null;
   const fillPct = target ? Math.min(100, pct) : 50;
   const fillColor = !pct ? 'var(--border)' : pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
@@ -857,6 +871,14 @@ function renderQuestion(screen) {
         <div class="num-unit">${screen.unit || ''}</div>
       </div>
       <button class="num-btn" ontouchstart="startRepeat('${screen.slug}',1)" onmousedown="startRepeat('${screen.slug}',1)" ontouchend="stopRepeat()" onmouseup="stopRepeat()" onclick="adjustNum('${screen.slug}',1)">+</button>
+    </div>
+    <div style="text-align:center;margin-bottom:0.5rem">
+      <input type="number" inputmode="numeric" min="0"
+        style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.4rem 0.75rem;font-family:'Outfit',sans-serif;font-size:0.88rem;color:var(--text);width:120px;text-align:center;outline:none"
+        value="${numVal}"
+        placeholder="or type a number"
+        oninput="setNum('${screen.slug}', this.value)"
+        onfocus="this.select()">
     </div>
     ${target ? `
       <div class="compare-bar">
@@ -986,6 +1008,17 @@ let repeatTimer = null;
 function adjustNum(slug, delta) {
   const current = S.responses[slug] !== undefined ? S.responses[slug] : 0;
   const next = Math.max(0, current + delta);
+  S.responses[slug] = next;
+  const el = document.getElementById(`numDisplay-${slug}`);
+  if (el) el.textContent = next;
+  // Sync text input if present
+  const input = document.querySelector(`input[oninput*="${slug}"]`);
+  if (input) input.value = next;
+  updateCompare(slug, next);
+}
+
+function setNum(slug, rawVal) {
+  const next = Math.max(0, parseInt(rawVal) || 0);
   S.responses[slug] = next;
   const el = document.getElementById(`numDisplay-${slug}`);
   if (el) el.textContent = next;
