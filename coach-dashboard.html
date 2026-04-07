@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coach Dashboard — Adams, Cameron & Co.</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f5f3ef;
+      --surface:  #ffffff;
+      --surface2: #faf8f5;
+      --border:   #e5ddd0;
+      --navy:     #0c1524;
+      --navy2:    #16243a;
+      --gold:     #c4a84f;
+      --gold2:    #e8c96a;
+      --gold-bg:  rgba(196,168,79,0.08);
+      --text:     #1a1a1a;
+      --text2:    #555;
+      --text3:    #999;
+      --red:      #c0392b;
+      --red-bg:   rgba(192,57,43,0.08);
+      --green:    #27ae60;
+      --green-bg: rgba(39,174,96,0.08);
+      --amber:    #e67e22;
+      --amber-bg: rgba(230,126,34,0.08);
+      --shadow:   0 2px 16px rgba(12,21,36,0.08);
+      --shadow-lg:0 8px 40px rgba(12,21,36,0.14);
+      --radius:   10px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── HEADER ── */
+    .app-header {
+      background: var(--navy);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    }
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--gold), #8a6a20);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; flex-shrink: 0;
+    }
+    .brand-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem; font-weight: 600;
+      color: #fff; line-height: 1.1;
+    }
+    .brand-sub { font-size: 0.65rem; color: var(--gold); letter-spacing: 0.08em; text-transform: uppercase; }
+    .hdr-right { display: flex; align-items: center; gap: 1rem; }
+    .user-pill {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 100px;
+      padding: 0.3rem 0.8rem 0.3rem 0.4rem;
+      font-size: 0.78rem; color: rgba(255,255,255,0.8);
+    }
+    .user-avatar {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; color: var(--navy); font-weight: 600;
+    }
+    .btn-sm {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.78rem; font-weight: 500;
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px; border: none; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-gold { background: var(--gold); color: var(--navy); }
+    .btn-gold:hover { background: var(--gold2); }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.7);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.08); }
+
+    /* ── AUTH GATE ── */
+    #authGate {
+      min-height: calc(100vh - 60px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem 2.5rem;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+    }
+    .auth-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .auth-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; font-weight: 600;
+      color: var(--navy); margin-bottom: 0.5rem;
+    }
+    .auth-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 2rem; line-height: 1.6; }
+    .btn-signin {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: var(--navy); color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem; font-weight: 500;
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px; border: none; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-signin:hover { background: var(--navy2); }
+
+    /* ── MAIN LAYOUT ── */
+    #dashApp { display: none; }
+    .app-body {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      position: sticky;
+      top: 76px;
+    }
+    .sidebar-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .sidebar-head {
+      background: var(--navy);
+      padding: 1rem 1.25rem;
+    }
+    .sidebar-head-label {
+      font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--gold); margin-bottom: 0.2rem;
+    }
+    .sidebar-head-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem; font-weight: 600; color: #fff;
+    }
+
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 1px; background: var(--border);
+    }
+    .stat-box {
+      background: var(--surface2);
+      padding: 0.9rem 1rem;
+      text-align: center;
+    }
+    .stat-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; font-weight: 600; color: var(--navy);
+      line-height: 1;
+    }
+    .stat-num.urgent { color: var(--red); }
+    .stat-label { font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.2rem; }
+
+    .filter-list { padding: 0.5rem 0; }
+    .filter-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.55rem 1.25rem;
+      font-size: 0.82rem; color: var(--text2);
+      cursor: pointer; transition: background 0.15s;
+      border: none; background: none; width: 100%; text-align: left;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item.active { background: var(--gold-bg); color: var(--navy); font-weight: 500; }
+    .filter-item.active .filter-dot { background: var(--gold); }
+    .filter-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--border); flex-shrink: 0;
+    }
+    .filter-count {
+      font-size: 0.72rem; color: var(--text3);
+      background: var(--bg); border-radius: 100px;
+      padding: 0.1rem 0.45rem;
+    }
+    .filter-divider { height: 1px; background: var(--border); margin: 0.25rem 0; }
+
+    .search-wrap { padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+    .search-input {
+      width: 100%; padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-family: 'Outfit', sans-serif; font-size: 0.82rem;
+      background: var(--bg); color: var(--text);
+      outline: none; transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: var(--gold); }
+    .search-input::placeholder { color: var(--text3); }
+
+    /* ── AGENT LIST ── */
+    .list-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .list-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem; font-weight: 600; color: var(--navy);
+    }
+    .list-meta { font-size: 0.78rem; color: var(--text3); }
+
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s;
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      gap: 0.9rem;
+      align-items: center;
+      box-shadow: var(--shadow);
+    }
+    .agent-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--gold);
+    }
+    .agent-card.urgent {
+      border-left: 3px solid var(--red);
+    }
+    .agent-card.active-card {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 2px rgba(196,168,79,0.2), var(--shadow-lg);
+    }
+
+    .agent-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      object-fit: cover; background: var(--navy);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem; color: var(--gold); font-weight: 600;
+      flex-shrink: 0;
+    }
+    .agent-avatar img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+
+    .agent-info { min-width: 0; }
+    .agent-name {
+      font-size: 0.9rem; font-weight: 600; color: var(--navy);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .agent-meta {
+      font-size: 0.75rem; color: var(--text3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .urgent-flag {
+      font-size: 0.68rem; color: var(--red);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    .agent-score-col { text-align: right; flex-shrink: 0; }
+    .score-ring {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; font-weight: 600;
+      border: 2.5px solid;
+      margin-left: auto;
+    }
+    .score-none { border-color: var(--border); color: var(--text3); font-size: 0.65rem; }
+    .score-low  { border-color: var(--red);   color: var(--red); }
+    .score-mid  { border-color: var(--amber); color: var(--amber); }
+    .score-high { border-color: var(--green); color: var(--green); }
+
+    .trend-badge {
+      font-size: 0.65rem; color: var(--text3);
+      margin-top: 0.2rem; text-align: right;
+    }
+    .trend-up   { color: var(--green); }
+    .trend-down { color: var(--red); }
+
+    /* ── AGENT DETAIL PANEL ── */
+    #detailPanel {
+      display: none;
+      position: sticky;
+      top: 76px;
+      max-height: calc(100vh - 96px);
+      overflow-y: auto;
+    }
+    #detailPanel.open { display: block; }
+
+    .detail-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+
+    .detail-head {
+      background: var(--navy);
+      padding: 1.5rem;
+      position: relative;
+    }
+    .detail-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: rgba(255,255,255,0.1); border: none;
+      color: rgba(255,255,255,0.6); width: 28px; height: 28px;
+      border-radius: 50%; cursor: pointer; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .detail-close:hover { background: rgba(255,255,255,0.2); color: #fff; }
+    .detail-agent-row { display: flex; align-items: center; gap: 1rem; }
+    .detail-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--gold); display: flex; align-items: center; justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem; color: var(--navy); font-weight: 600;
+      flex-shrink: 0; overflow: hidden;
+    }
+    .detail-avatar img { width: 52px; height: 52px; object-fit: cover; }
+    .detail-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem; font-weight: 600; color: #fff;
+    }
+    .detail-sub { font-size: 0.78rem; color: rgba(255,255,255,0.5); }
+    .detail-score-row {
+      display: flex; gap: 1rem; margin-top: 1rem;
+    }
+    .detail-score-box {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 0.6rem 1rem;
+      flex: 1; text-align: center;
+    }
+    .detail-score-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem; font-weight: 600; color: var(--gold);
+    }
+    .detail-score-lbl { font-size: 0.65rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .detail-tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .detail-tab {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.8rem; font-weight: 500; color: var(--text2);
+      border: none; background: none; cursor: pointer;
+      border-bottom: 2px solid transparent; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .detail-tab.active { color: var(--navy); border-bottom-color: var(--gold); font-weight: 600; }
+    .detail-tab:hover:not(.active) { color: var(--navy); }
+
+    .detail-body { padding: 1.25rem; }
+
+    .section-label {
+      font-size: 0.68rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--gold);
+      font-weight: 600; margin-bottom: 0.6rem;
+    }
+
+    /* Checkin cards */
+    .checkin-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.9rem 1rem;
+      margin-bottom: 0.6rem;
+    }
+    .checkin-date { font-size: 0.72rem; color: var(--text3); margin-bottom: 0.5rem; }
+    .checkin-stats {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      margin-bottom: 0.6rem;
+    }
+    .checkin-stat {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 0.2rem 0.5rem;
+      font-size: 0.72rem; color: var(--text2);
+    }
+    .checkin-stat strong { color: var(--navy); }
+    .checkin-qual { font-size: 0.8rem; color: var(--text2); line-height: 1.6; }
+    .checkin-qual-label { font-size: 0.68rem; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.4rem; }
+
+    /* Scorecard */
+    .score-card-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .score-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .score-big {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 600;
+    }
+    .narrative { font-size: 0.82rem; color: var(--text2); line-height: 1.65; margin-bottom: 0.6rem; }
+    .questions-list { padding-left: 1rem; }
+    .questions-list li { font-size: 0.8rem; color: var(--text2); margin-bottom: 0.3rem; line-height: 1.5; }
+
+    /* Plan summary */
+    .plan-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.6rem; margin-bottom: 1rem;
+    }
+    .plan-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.7rem 0.9rem;
+    }
+    .plan-item-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem; font-weight: 600; color: var(--navy);
+    }
+    .plan-item-lbl { font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* Feedback */
+    .feedback-form textarea {
+      width: 100%; padding: 0.75rem;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: 'Outfit', sans-serif; font-size: 0.85rem;
+      background: var(--surface2); color: var(--text);
+      resize: vertical; min-height: 90px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .feedback-form textarea:focus { border-color: var(--gold); }
+    .feedback-form textarea::placeholder { color: var(--text3); }
+    .btn-primary {
+      background: var(--navy); color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem; font-weight: 500;
+      padding: 0.55rem 1.1rem; border-radius: 7px;
+      border: none; cursor: pointer; transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--navy2); }
+    .btn-outline {
+      background: transparent; color: var(--text2);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.82rem; font-weight: 500;
+      padding: 0.55rem 1.1rem; border-radius: 7px;
+      border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
+    }
+    .btn-outline:hover { border-color: var(--navy); color: var(--navy); }
+    .btn-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+    .feedback-history-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 0.5rem;
+    }
+    .feedback-meta { font-size: 0.7rem; color: var(--text3); margin-bottom: 0.4rem; }
+    .feedback-text { font-size: 0.82rem; color: var(--text2); line-height: 1.6; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center; padding: 2.5rem 1rem; color: var(--text3);
+      font-size: 0.85rem;
+    }
+    .empty-state-icon { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5; }
+
+    /* Loading */
+    .loading-state { text-align: center; padding: 3rem 1rem; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-text { font-size: 0.82rem; color: var(--text3); }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--navy); color: #fff;
+      padding: 0.75rem 1.25rem; border-radius: 8px;
+      font-size: 0.82rem; box-shadow: var(--shadow-lg);
+      opacity: 0; transform: translateY(8px);
+      transition: all 0.25s ease;
+      pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.err { background: var(--red); }
+
+    /* Access denied */
+    .access-denied {
+      text-align: center; padding: 3rem 1rem; color: var(--text2);
+    }
+
+    /* Attention banner */
+    .attention-banner {
+      background: var(--red-bg); border: 1px solid rgba(192,57,43,0.2);
+      border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem;
+      font-size: 0.82rem; color: var(--red); line-height: 1.5;
+    }
+    .attention-banner strong { display: block; margin-bottom: 0.2rem; }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Reason box */
+    .reason-box {
+      background: var(--gold-bg); border: 1px solid rgba(196,168,79,0.2);
+      border-radius: 8px; padding: 0.9rem 1rem;
+      font-size: 0.85rem; color: var(--text2);
+      font-style: italic; line-height: 1.65;
+      margin-bottom: 1rem;
+    }
+    .reason-box::before {
+      content: '"';
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; color: var(--gold);
+      line-height: 0; vertical-align: -0.4em;
+      margin-right: 0.25rem;
+    }
+
+    @media (max-width: 900px) {
+      .app-body { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      #detailPanel { position: static; max-height: none; }
+    }
+    @media (max-width: 600px) {
+      .app-body { padding: 1rem; }
+      .plan-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">🏡</div>
+    <div>
+      <div class="brand-name">Adams, Cameron & Co.</div>
+      <div class="brand-sub">Coach Dashboard</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="user-pill" id="userPill" style="display:none">
+      <div class="user-avatar" id="userInitials">?</div>
+      <span id="userName">Loading…</span>
+    </div>
+    <button class="btn-sm btn-gold" id="signInBtn" onclick="requestSignIn()">Sign In with Google</button>
+  </div>
+</header>
+
+<!-- AUTH GATE -->
+<div id="authGate">
+  <div class="auth-card">
+    <div class="auth-icon">📊</div>
+    <div class="auth-title">Coach Dashboard</div>
+    <div class="auth-sub">Sign in with your Adams, Cameron &amp; Co. Google account to access your agent roster and coaching data.</div>
+    <button class="btn-signin" onclick="requestSignIn()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+  </div>
+</div>
+
+<!-- DASHBOARD APP -->
+<div id="dashApp">
+  <div class="app-body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <div class="sidebar-head">
+          <div class="sidebar-head-label">Overview</div>
+          <div class="sidebar-head-title" id="sidebarTitle">Your Agents</div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-box">
+            <div class="stat-num" id="statTotal">—</div>
+            <div class="stat-label">Enrolled</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num urgent" id="statUrgent">—</div>
+            <div class="stat-label">Need Attention</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="statAvgScore">—</div>
+            <div class="stat-label">Avg Score</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="statCheckins">—</div>
+            <div class="stat-label">This Week</div>
+          </div>
+        </div>
+
+        <div class="filter-list">
+          <button class="filter-item active" onclick="setFilter('all')" id="filter-all">
+            <span style="display:flex;align-items:center;gap:0.5rem">
+              <span class="filter-dot"></span> All Agents
+            </span>
+            <span class="filter-count" id="fc-all">0</span>
+          </button>
+          <button class="filter-item" onclick="setFilter('urgent')" id="filter-urgent">
+            <span style="display:flex;align-items:center;gap:0.5rem">
+              <span class="filter-dot" style="background:var(--red)"></span> Needs Attention
+            </span>
+            <span class="filter-count" id="fc-urgent">0</span>
+          </button>
+          <div class="filter-divider"></div>
+          <button class="filter-item" onclick="setFilter('low')" id="filter-low">
+            <span style="display:flex;align-items:center;gap:0.5rem">
+              <span class="filter-dot" style="background:var(--amber)"></span> Low Score (&lt;50)
+            </span>
+            <span class="filter-count" id="fc-low">0</span>
+          </button>
+          <button class="filter-item" onclick="setFilter('on-track')" id="filter-on-track">
+            <span style="display:flex;align-items:center;gap:0.5rem">
+              <span class="filter-dot" style="background:var(--green)"></span> On Track (≥50)
+            </span>
+            <span class="filter-count" id="fc-on-track">0</span>
+          </button>
+          <button class="filter-item" onclick="setFilter('new')" id="filter-new">
+            <span style="display:flex;align-items:center;gap:0.5rem">
+              <span class="filter-dot" style="background:var(--text3)"></span> No Score Yet
+            </span>
+            <span class="filter-count" id="fc-new">0</span>
+          </button>
+        </div>
+
+        <div class="search-wrap">
+          <input type="text" class="search-input" id="searchInput"
+            placeholder="Search agents…" oninput="renderList()">
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main>
+      <div class="list-header">
+        <div>
+          <div class="list-title" id="listTitle">All Agents</div>
+          <div class="list-meta" id="listMeta">Loading…</div>
+        </div>
+        <button class="btn-sm btn-outline" onclick="loadDashboard()" style="color:var(--text2);border-color:var(--border)">↻ Refresh</button>
+      </div>
+
+      <div id="agentList">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <div class="spinner-text">Loading your agents…</div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- DETAIL PANEL (full-width below on mobile, sticky aside on desktop) -->
+  <div style="max-width:1200px;margin:0 auto;padding:0 2rem 2rem" id="detailWrap" style="display:none">
+    <div id="detailPanel">
+      <div class="detail-card" id="detailCard"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─────────────────────── CONFIG ─────────────────────── */
+const PROXY_BASE   = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
+const PROXY_KEY    = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+/* ─────────────────────── STATE ──────────────────────── */
+const S = {
+  email:        null,
+  name:         null,
+  role:         null,
+  agents:       [],
+  filter:       'all',
+  activeAgent:  null,
+  activeDetail: null,
+  activeTab:    'overview',
+  tokenClient:  null,
+  accessToken:  null,
+};
+
+/* ─────────────────────── AUTH ───────────────────────── */
+function requestSignIn() {
+  if (S.tokenClient) {
+    S.tokenClient.requestAccessToken();
+  }
+}
+
+window.addEventListener('load', () => {
+  const poll = setInterval(() => {
+    if (!window.google?.accounts) return;
+    clearInterval(poll);
+
+    // Token client for OAuth
+    S.tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: OAUTH_CLIENT,
+      scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+      callback: async (res) => {
+        if (res.error) { toast('Sign-in failed: ' + res.error, 'err'); return; }
+        S.accessToken = res.access_token;
+        await fetchUserInfo();
+      }
+    });
+
+    // One Tap for silent sign-in
+    google.accounts.id.initialize({
+      client_id: OAUTH_CLIENT,
+      callback: async (credentialResponse) => {
+        try {
+          const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+          S.email = payload.email;
+          S.name  = payload.name || payload.email.split('@')[0];
+          onSignedIn();
+        } catch(e) {
+          console.warn('One Tap decode failed:', e);
+        }
+      }
+    });
+    google.accounts.id.prompt();
+  }, 200);
+});
+
+async function fetchUserInfo() {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${S.accessToken}` }
+    });
+    const info = await res.json();
+    S.email = info.email;
+    S.name  = info.name || info.email.split('@')[0];
+    onSignedIn();
+  } catch(e) {
+    toast('Could not fetch user info.', 'err');
+  }
+}
+
+function onSignedIn() {
+  if (!S.email?.endsWith('@adamscameron.com')) {
+    document.getElementById('authGate').innerHTML = `
+      <div class="auth-card">
+        <div class="auth-icon">🔒</div>
+        <div class="auth-title">Access Restricted</div>
+        <div class="auth-sub">This dashboard is for Adams, Cameron &amp; Co. staff only. Please sign in with your @adamscameron.com Google account.</div>
+        <button class="btn-signin" onclick="requestSignIn()">Try Again</button>
+      </div>`;
+    return;
+  }
+
+  // Update header
+  const initials = S.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('userInitials').textContent = initials;
+  document.getElementById('userName').textContent = S.name.split(' ')[0];
+  document.getElementById('userPill').style.display = 'flex';
+  document.getElementById('signInBtn').style.display = 'none';
+
+  // Show dashboard
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('dashApp').style.display = 'block';
+
+  loadDashboard();
+}
+
+/* ─────────────────────── DATA ───────────────────────── */
+async function loadDashboard() {
+  document.getElementById('agentList').innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div class="spinner-text">Loading agents…</div>
+    </div>`;
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/coach/dashboard`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    S.role   = data.role;
+    S.agents = data.agents || [];
+
+    // Update sidebar title
+    document.getElementById('sidebarTitle').textContent =
+      data.role === 'admin' ? 'All Agents' : 'Your Agents';
+
+    updateStats();
+    renderList();
+
+  } catch(e) {
+    document.getElementById('agentList').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div>Could not load agent data.<br>${e.message}</div>
+      </div>`;
+    toast('Failed to load dashboard: ' + e.message, 'err');
+  }
+}
+
+function updateStats() {
+  const agents  = S.agents;
+  const urgent  = agents.filter(a => a.coach_attention_needed).length;
+  const scored  = agents.filter(a => a.commitment_score !== null);
+  const avg     = scored.length ? Math.round(scored.reduce((s,a) => s + a.commitment_score, 0) / scored.length) : '—';
+  const thisWk  = agents.filter(a => {
+    if (!a.last_scored) return false;
+    const d = new Date(a.last_scored);
+    const now = new Date();
+    return (now - d) < 7 * 24 * 3600 * 1000;
+  }).length;
+
+  document.getElementById('statTotal').textContent  = agents.length;
+  document.getElementById('statUrgent').textContent = urgent;
+  document.getElementById('statAvgScore').textContent = avg;
+  document.getElementById('statCheckins').textContent = thisWk;
+
+  // Filter counts
+  document.getElementById('fc-all').textContent      = agents.length;
+  document.getElementById('fc-urgent').textContent   = urgent;
+  document.getElementById('fc-low').textContent      = agents.filter(a => a.commitment_score !== null && a.commitment_score < 50).length;
+  document.getElementById('fc-on-track').textContent = agents.filter(a => a.commitment_score >= 50).length;
+  document.getElementById('fc-new').textContent      = agents.filter(a => a.commitment_score === null).length;
+}
+
+/* ─────────────────────── FILTER & SEARCH ────────────── */
+function setFilter(f) {
+  S.filter = f;
+  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('filter-' + f).classList.add('active');
+  renderList();
+}
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let list = S.agents;
+
+  if (S.filter === 'urgent')   list = list.filter(a => a.coach_attention_needed);
+  if (S.filter === 'low')      list = list.filter(a => a.commitment_score !== null && a.commitment_score < 50);
+  if (S.filter === 'on-track') list = list.filter(a => a.commitment_score >= 50);
+  if (S.filter === 'new')      list = list.filter(a => a.commitment_score === null);
+
+  if (q) list = list.filter(a =>
+    (a.agent_name || '').toLowerCase().includes(q) ||
+    (a.office || '').toLowerCase().includes(q) ||
+    (a.agent_email || '').toLowerCase().includes(q)
+  );
+
+  return list;
+}
+
+/* ─────────────────────── RENDER LIST ────────────────── */
+function renderList() {
+  const agents = getFiltered();
+  const filterLabels = {
+    all: 'All Agents', urgent: 'Needs Attention',
+    low: 'Low Score', 'on-track': 'On Track', new: 'No Score Yet'
+  };
+  document.getElementById('listTitle').textContent = filterLabels[S.filter];
+  document.getElementById('listMeta').textContent  = `${agents.length} agent${agents.length !== 1 ? 's' : ''}`;
+
+  if (!agents.length) {
+    document.getElementById('agentList').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <div>No agents match this filter.</div>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('agentList').innerHTML = agents.map(a => {
+    const initials = (a.agent_name || '??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const scoreClass = a.commitment_score === null ? 'score-none'
+      : a.commitment_score < 40 ? 'score-low'
+      : a.commitment_score < 70 ? 'score-mid' : 'score-high';
+    const scoreDisplay = a.commitment_score !== null ? a.commitment_score : '—';
+    const trendIcon = a.trend === 'improving' ? '↑' : a.trend === 'declining' ? '↓' : '→';
+    const trendClass = a.trend === 'improving' ? 'trend-up' : a.trend === 'declining' ? 'trend-down' : '';
+    const lastCheckin = a.last_scored
+      ? new Date(a.last_scored).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : 'no check-ins yet';
+    const isActive = S.activeAgent?.agent_id === a.agent_id;
+
+    return `
+      <div class="agent-card ${a.coach_attention_needed ? 'urgent' : ''} ${isActive ? 'active-card' : ''}"
+           onclick="openDetail(${a.agent_id})">
+        <div class="agent-avatar">
+          ${a.photo_url
+            ? `<img src="${a.photo_url}" alt="${a.agent_name}" onerror="this.parentElement.textContent='${initials}'">`
+            : initials}
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">${a.agent_name || 'Unknown'}</div>
+          <div class="agent-meta">${a.office || ''} · last checked in ${lastCheckin}</div>
+          ${a.coach_attention_needed ? `<div class="urgent-flag">⚠ Needs attention</div>` : ''}
+        </div>
+        <div class="agent-score-col">
+          <div class="score-ring ${scoreClass}">${scoreDisplay}</div>
+          <div class="trend-badge ${trendClass}">${a.trend ? trendIcon + ' ' + a.trend : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ─────────────────────── DETAIL ─────────────────────── */
+async function openDetail(agentId) {
+  S.activeAgent = S.agents.find(a => a.agent_id === agentId);
+  S.activeTab = 'overview';
+  renderList(); // re-render to show active card
+
+  const panel = document.getElementById('detailPanel');
+  const wrap  = document.getElementById('detailWrap');
+  panel.classList.add('open');
+  wrap.style.display = 'block';
+
+  document.getElementById('detailCard').innerHTML = `
+    <div class="loading-state" style="padding:3rem">
+      <div class="spinner"></div>
+      <div class="spinner-text">Loading ${S.activeAgent?.agent_name || 'agent'} data…</div>
+    </div>`;
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/coach/agent/${agentId}`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    S.activeDetail = await res.json();
+    renderDetail();
+  } catch(e) {
+    document.getElementById('detailCard').innerHTML = `
+      <div class="empty-state">⚠️ Could not load agent data: ${e.message}</div>`;
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  document.getElementById('detailWrap').style.display = 'none';
+  S.activeAgent  = null;
+  S.activeDetail = null;
+  renderList();
+}
+
+function switchTab(tab) {
+  S.activeTab = tab;
+  document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-btn-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function renderDetail() {
+  const d  = S.activeDetail;
+  const a  = d.agent;
+  const sc = d.scorecards?.[0];
+  const ci = d.checkins?.[0];
+
+  const initials = [a.first_name?.[0], a.last_name?.[0]].join('').toUpperCase();
+  const scoreClass = sc?.commitment_score == null ? 'score-none'
+    : sc.commitment_score < 40 ? 'score-low'
+    : sc.commitment_score < 70 ? 'score-mid' : 'score-high';
+
+  const enrolled = a.enrolled_at
+    ? new Date(a.enrolled_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'Not enrolled';
+
+  document.getElementById('detailCard').innerHTML = `
+    <!-- HEAD -->
+    <div class="detail-head">
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+      <div class="detail-agent-row">
+        <div class="detail-avatar">
+          ${a.photo_url
+            ? `<img src="${a.photo_url}" alt="${a.first_name}" onerror="this.parentElement.textContent='${initials}'">`
+            : initials}
+        </div>
+        <div>
+          <div class="detail-name">${a.first_name} ${a.last_name}</div>
+          <div class="detail-sub">${a.office || ''} · ${a.agent_email || ''}</div>
+          ${a.cell_e164 ? `<div class="detail-sub">${a.cell_e164}</div>` : ''}
+        </div>
+      </div>
+      <div class="detail-score-row">
+        <div class="detail-score-box">
+          <div class="detail-score-val ${scoreClass}">${sc?.commitment_score ?? '—'}</div>
+          <div class="detail-score-lbl">Score</div>
+        </div>
+        <div class="detail-score-box">
+          <div class="detail-score-val" style="color:rgba(255,255,255,0.7);font-size:1rem">${sc?.trend || '—'}</div>
+          <div class="detail-score-lbl">Trend</div>
+        </div>
+        <div class="detail-score-box">
+          <div class="detail-score-val" style="color:rgba(255,255,255,0.7);font-size:0.95rem">${d.checkins?.length || 0}</div>
+          <div class="detail-score-lbl">Check-ins</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="detail-tabs">
+      <button class="detail-tab active" id="tab-btn-overview" onclick="switchTab('overview')">Overview</button>
+      <button class="detail-tab" id="tab-btn-checkins" onclick="switchTab('checkins')">Check-ins (${d.checkins?.length || 0})</button>
+      <button class="detail-tab" id="tab-btn-coaching" onclick="switchTab('coaching')">Coaching</button>
+      <button class="detail-tab" id="tab-btn-plan" onclick="switchTab('plan')">Plan</button>
+    </div>
+
+    <!-- TAB BODIES -->
+    <div class="detail-body">
+
+      <!-- OVERVIEW TAB -->
+      <div class="tab-panel active" id="tab-overview">
+        ${sc?.coach_attention_needed ? `
+          <div class="attention-banner">
+            <strong>⚠ Coach Attention Needed</strong>
+            ${sc.attention_reason || 'This agent may need a check-in call.'}
+          </div>` : ''}
+
+        ${a.agent_reason ? `<div class="reason-box">${a.agent_reason}</div>` : ''}
+
+        <div class="section-label">Latest Scorecard</div>
+        ${sc ? `
+          <div class="score-card-item" style="margin-bottom:1rem">
+            <div class="score-row">
+              <div>
+                <div class="score-big ${scoreClass}">${sc.commitment_score}</div>
+                <div style="font-size:0.72rem;color:var(--text3)">${sc.trend || ''} · ${new Date(sc.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+              </div>
+            </div>
+            ${sc.wins_narrative ? `<div class="narrative"><strong style="color:var(--green);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em">Wins</strong><br>${sc.wins_narrative}</div>` : ''}
+            ${sc.challenges_narrative ? `<div class="narrative"><strong style="color:var(--amber);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em">Challenges</strong><br>${sc.challenges_narrative}</div>` : ''}
+            ${sc.conversation_starter ? `
+              <div style="background:var(--gold-bg);border:1px solid rgba(196,168,79,0.2);border-radius:7px;padding:0.7rem 0.9rem;margin-top:0.5rem">
+                <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);font-weight:600;margin-bottom:0.3rem">Conversation Starter</div>
+                <div style="font-size:0.82rem;color:var(--text2);font-style:italic">"${sc.conversation_starter}"</div>
+              </div>` : ''}
+          </div>` : `
+          <div class="empty-state" style="padding:1.5rem">
+            <div class="empty-state-icon">📋</div>
+            <div>No scorecard yet — check-in first</div>
+          </div>`}
+
+        ${ci ? `
+          <div class="section-label" style="margin-top:1rem">Latest Check-in</div>
+          <div class="checkin-item">
+            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+            <div class="checkin-stats">
+              <span class="checkin-stat"><strong>${ci.soi_calls ?? '—'}</strong> SOI calls</span>
+              <span class="checkin-stat"><strong>${ci.floor_hours ?? '—'}</strong> floor hrs</span>
+              <span class="checkin-stat"><strong>${ci.social_posts ?? '—'}</strong> posts</span>
+              <span class="checkin-stat"><strong>${ci.listing_appts ?? '—'}</strong> listing appts</span>
+              <span class="checkin-stat"><strong>${ci.buyer_prospects ?? '—'}</strong> buyers</span>
+            </div>
+            ${ci.biggest_challenge ? `<div class="checkin-qual-label">Biggest Challenge</div><div class="checkin-qual">${ci.biggest_challenge}</div>` : ''}
+            ${ci.new_opportunities ? `<div class="checkin-qual-label">New Opportunities</div><div class="checkin-qual">${ci.new_opportunities}</div>` : ''}
+            ${ci.time_sink ? `<div class="checkin-qual-label">Time Sink</div><div class="checkin-qual">${ci.time_sink}</div>` : ''}
+          </div>` : ''}
+
+        <div class="section-label" style="margin-top:1rem">Enrolled</div>
+        <div style="font-size:0.82rem;color:var(--text2)">${enrolled} · Coach: ${a.coach_name || 'Not assigned'}</div>
+      </div>
+
+      <!-- CHECK-INS TAB -->
+      <div class="tab-panel" id="tab-checkins">
+        ${d.checkins?.length ? d.checkins.map(ci => `
+          <div class="checkin-item">
+            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+            <div class="checkin-stats">
+              <span class="checkin-stat"><strong>${ci.soi_calls ?? '—'}</strong> SOI</span>
+              <span class="checkin-stat"><strong>${ci.floor_hours ?? '—'}</strong> floor hrs</span>
+              <span class="checkin-stat"><strong>${ci.social_posts ?? '—'}</strong> posts</span>
+              <span class="checkin-stat"><strong>${ci.listing_appts ?? '—'}</strong> listing appts</span>
+              <span class="checkin-stat"><strong>${ci.buyer_prospects ?? '—'}</strong> buyers</span>
+              ${ci.transactions_closed ? `<span class="checkin-stat" style="background:var(--green-bg);border-color:rgba(39,174,96,0.2)"><strong>${ci.transactions_closed}</strong> closed</span>` : ''}
+            </div>
+            ${ci.biggest_challenge ? `<div class="checkin-qual-label">Biggest Challenge</div><div class="checkin-qual">${ci.biggest_challenge}</div>` : ''}
+            ${ci.new_opportunities ? `<div class="checkin-qual-label">Opportunities</div><div class="checkin-qual">${ci.new_opportunities}</div>` : ''}
+            ${ci.time_sink ? `<div class="checkin-qual-label">Time Sink</div><div class="checkin-qual">${ci.time_sink}</div>` : ''}
+          </div>`).join('') : `
+          <div class="empty-state">
+            <div class="empty-state-icon">📱</div>
+            <div>No check-ins yet. The agent will receive their first SMS check-in 7 days after enrollment.</div>
+          </div>`}
+      </div>
+
+      <!-- COACHING TAB -->
+      <div class="tab-panel" id="tab-coaching">
+        ${sc?.coaching_questions?.length ? `
+          <div class="section-label">Suggested Coaching Questions</div>
+          <div class="score-card-item" style="margin-bottom:1rem">
+            <ul class="questions-list">
+              ${(typeof sc.coaching_questions === 'string'
+                  ? JSON.parse(sc.coaching_questions)
+                  : sc.coaching_questions
+                ).map(q => `<li>${q}</li>`).join('')}
+            </ul>
+          </div>` : ''}
+
+        ${sc?.training_opportunities ? `
+          <div class="section-label">Training Opportunities</div>
+          <div class="score-card-item" style="margin-bottom:1rem">
+            <ul class="questions-list">
+              ${(typeof sc.training_opportunities === 'string'
+                  ? JSON.parse(sc.training_opportunities)
+                  : sc.training_opportunities
+                ).map(t => `<li>${t}</li>`).join('')}
+            </ul>
+          </div>` : ''}
+
+        <div class="section-label">Add Coaching Note</div>
+        <div class="feedback-form">
+          <textarea id="feedbackText" placeholder="What did you discuss? What commitments did the agent make? What follow-up is needed?"></textarea>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="submitFeedback()">Save Note</button>
+            <button class="btn-outline" onclick="document.getElementById('feedbackText').value=''">Clear</button>
+          </div>
+        </div>
+
+        ${d.feedback?.length ? `
+          <div class="section-label" style="margin-top:1.25rem">Previous Notes</div>
+          ${d.feedback.map(f => `
+            <div class="feedback-history-item">
+              <div class="feedback-meta">${f.coach_name} · ${new Date(f.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+              <div class="feedback-text">${f.feedback_text}</div>
+            </div>`).join('')}` : ''}
+      </div>
+
+      <!-- PLAN TAB -->
+      <div class="tab-panel" id="tab-plan">
+        ${a.plan_id ? `
+          <div class="plan-grid">
+            <div class="plan-item">
+              <div class="plan-item-val">${a.earning_goal ? '$' + Number(a.earning_goal).toLocaleString() : '—'}</div>
+              <div class="plan-item-lbl">Earning Goal</div>
+            </div>
+            <div class="plan-item">
+              <div class="plan-item-val">${a.gci_required ? '$' + Number(a.gci_required).toLocaleString() : '—'}</div>
+              <div class="plan-item-lbl">GCI Required</div>
+            </div>
+            <div class="plan-item">
+              <div class="plan-item-val">${a.sides_required ?? '—'}</div>
+              <div class="plan-item-lbl">Sides Needed</div>
+            </div>
+            <div class="plan-item">
+              <div class="plan-item-val">${a.time_commitment_hrs ?? '—'} hrs</div>
+              <div class="plan-item-lbl">Hours/Week</div>
+            </div>
+            <div class="plan-item">
+              <div class="plan-item-val">${a.listing_appts_monthly ?? '—'}</div>
+              <div class="plan-item-lbl">Listing Appts/Mo</div>
+            </div>
+            <div class="plan-item">
+              <div class="plan-item-val">${a.buyer_prospects_monthly ?? '—'}</div>
+              <div class="plan-item-lbl">Buyer Prospects/Mo</div>
+            </div>
+          </div>
+          ${a.why_text ? `
+            <div class="section-label">Their Why</div>
+            <div class="reason-box">${a.why_text}</div>` : ''}
+          ${a.goals_text ? `
+            <div class="section-label">Goals</div>
+            <div style="font-size:0.85rem;color:var(--text2);line-height:1.7">${a.goals_text}</div>` : ''}
+        ` : `
+          <div class="empty-state">
+            <div class="empty-state-icon">📄</div>
+            <div>No plan data available yet.</div>
+          </div>`}
+      </div>
+
+    </div><!-- end detail-body -->
+  `;
+}
+
+/* ─────────────────────── FEEDBACK ───────────────────── */
+async function submitFeedback() {
+  const text = document.getElementById('feedbackText')?.value.trim();
+  if (!text) { toast('Please enter a note first.', 'err'); return; }
+  if (!S.activeDetail) return;
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/coach/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-proxy-key': PROXY_KEY,
+        'x-user-email': S.email,
+      },
+      body: JSON.stringify({
+        agentId:      S.activeDetail.agent.id,
+        feedbackText: text,
+        isPrivate:    false,
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    toast('Note saved successfully.', 'ok');
+    document.getElementById('feedbackText').value = '';
+    // Reload detail to show new note
+    openDetail(S.activeDetail.agent.id);
+  } catch(e) {
+    toast('Could not save note: ' + e.message, 'err');
+  }
+}
+
+/* ─────────────────────── TOAST ──────────────────────── */
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type === 'err' ? ' err' : '');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
