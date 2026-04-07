@@ -1159,7 +1159,9 @@ function renderDetail() {
       <!-- PLAN TAB -->
       <div class="tab-panel" id="tab-plan">
         ${a.plan_id ? `
-          <div class="plan-grid">
+          <!-- Financial targets -->
+          <div class="section-label">Financial Targets</div>
+          <div class="plan-grid" style="margin-bottom:1rem">
             <div class="plan-item">
               <div class="plan-item-val">${a.earning_goal ? '$' + Number(a.earning_goal).toLocaleString() : '—'}</div>
               <div class="plan-item-lbl">Earning Goal</div>
@@ -1170,27 +1172,59 @@ function renderDetail() {
             </div>
             <div class="plan-item">
               <div class="plan-item-val">${a.sides_required ?? '—'}</div>
-              <div class="plan-item-lbl">Sides Needed</div>
+              <div class="plan-item-lbl">Total Sides</div>
             </div>
             <div class="plan-item">
-              <div class="plan-item-val">${a.time_commitment_hrs ?? '—'} hrs</div>
-              <div class="plan-item-lbl">Hours/Week</div>
-            </div>
-            <div class="plan-item">
-              <div class="plan-item-val">${a.listing_appts_monthly ?? '—'}</div>
-              <div class="plan-item-lbl">Listing Appts/Mo</div>
-            </div>
-            <div class="plan-item">
-              <div class="plan-item-val">${a.buyer_prospects_monthly ?? '—'}</div>
-              <div class="plan-item-lbl">Buyer Prospects/Mo</div>
+              <div class="plan-item-val">${a.listing_sides ?? '—'} / ${a.buyer_sides ?? '—'}</div>
+              <div class="plan-item-lbl">Listing / Buyer Sides</div>
             </div>
           </div>
+
+          <!-- Weekly commitments -->
+          <div class="section-label">Weekly Commitments</div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1rem">
+            ${(() => {
+              const hrs  = a.time_commitment_hrs || 0;
+              const soi  = a.soi_contacts || 0;
+              const laM  = a.listing_appts_monthly || 0;
+              const bpM  = a.buyer_prospects_monthly || 0;
+              const soiW = Math.max(5, Math.round(hrs * 0.5));
+              const posts = Math.max(3, Math.round(hrs * 0.15));
+              const floor = Math.max(2, Math.round(hrs * 0.15));
+              return `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem 1rem;font-size:0.83rem;color:var(--text2);line-height:1.8">
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${soiW}</strong> SOI contacts</div>
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${posts}</strong> social posts</div>
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${floor}</strong> hrs floor time</div>
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${hrs}</strong> total hrs/week</div>
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${Math.ceil(laM/4)}</strong> listing appts/wk</div>
+                  <div>□ &nbsp;<strong style="color:var(--navy)">${Math.ceil(bpM/4)}</strong> buyer prospects/wk</div>
+                  <div style="grid-column:1/-1">□ &nbsp;Weekly SMS check-in (5 min)</div>
+                  <div style="grid-column:1/-1">□ &nbsp;Monthly coaching session</div>
+                </div>`;
+            })()}
+          </div>
+
+          <!-- Why & Goals -->
           ${a.why_text ? `
             <div class="section-label">Their Why</div>
-            <div class="reason-box">${a.why_text}</div>` : ''}
+            <div class="reason-box" style="margin-bottom:1rem">${a.why_text}</div>` : ''}
           ${a.goals_text ? `
             <div class="section-label">Goals</div>
-            <div style="font-size:0.85rem;color:var(--text2);line-height:1.7">${a.goals_text}</div>` : ''}
+            <div style="font-size:0.85rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">${a.goals_text}</div>` : ''}
+
+          <!-- Full business plan -->
+          ${a.plan_text ? `
+            <div class="section-label" style="display:flex;align-items:center;justify-content:space-between">
+              <span>Full Business Plan</span>
+              <button class="btn-outline" style="font-size:0.72rem;padding:0.25rem 0.6rem"
+                onclick="document.getElementById('fullPlanBody').style.display = document.getElementById('fullPlanBody').style.display === 'none' ? 'block' : 'none'">
+                Show / Hide
+              </button>
+            </div>
+            <div id="fullPlanBody" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-top:0.5rem;font-size:0.82rem;color:var(--text2);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto">
+              ${a.plan_text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/^## (.+)$/gm, '<div style="font-size:0.9rem;font-weight:600;color:var(--navy);margin:0.75rem 0 0.25rem">$1</div>').replace(/^### (.+)$/gm, '<div style="font-size:0.82rem;font-weight:600;color:var(--text);margin:0.5rem 0 0.2rem">$1</div>')}
+            </div>` : ''}
         ` : `
           <div class="empty-state">
             <div class="empty-state-icon">📄</div>
