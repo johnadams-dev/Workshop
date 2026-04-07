@@ -859,6 +859,12 @@ function getFiltered() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   let list = S.agents;
 
+  // Normalize agent_name from separate fields if needed
+  list = list.map(a => ({
+    ...a,
+    agent_name: a.agent_name || [a.first_name, a.last_name].filter(Boolean).join(' ') || 'Unknown',
+  }));
+
   if (S.filter === 'urgent')   list = list.filter(a => a.coach_attention_needed);
   if (S.filter === 'low')      list = list.filter(a => a.commitment_score !== null && a.commitment_score < 50);
   if (S.filter === 'on-track') list = list.filter(a => a.commitment_score >= 50);
@@ -867,7 +873,7 @@ function getFiltered() {
   if (q) list = list.filter(a =>
     (a.agent_name || '').toLowerCase().includes(q) ||
     (a.office || '').toLowerCase().includes(q) ||
-    (a.agent_email || '').toLowerCase().includes(q)
+    (a.agent_email || a.email || '').toLowerCase().includes(q)
   );
 
   return list;
@@ -903,18 +909,19 @@ function renderList() {
     const lastCheckin = a.last_scored
       ? new Date(a.last_scored).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : 'no check-ins yet';
-    const isActive = S.activeAgent?.agent_id === a.agent_id;
+    const isActive = S.activeAgent?.agent_id === a.agent_id || S.activeAgent?.id === a.id;
+    const agentEmail = a.agent_email || a.email || '';
 
     return `
       <div class="agent-card ${a.coach_attention_needed ? 'urgent' : ''} ${isActive ? 'active-card' : ''}"
-           onclick="openDetail(${a.agent_id})">
+           onclick="openDetail(${a.agent_id || a.id})">
         <div class="agent-avatar">
           ${a.photo_url
             ? `<img src="${a.photo_url}" alt="${a.agent_name}" onerror="this.parentElement.textContent='${initials}'">`
             : initials}
         </div>
         <div class="agent-info">
-          <div class="agent-name">${a.agent_name || 'Unknown'}</div>
+          <div class="agent-name">${a.agent_name}</div>
           <div class="agent-meta">${a.office || ''} · last checked in ${lastCheckin}</div>
           ${a.coach_attention_needed ? `<div class="urgent-flag">⚠ Needs attention</div>` : ''}
         </div>
