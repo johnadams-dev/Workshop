@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Weekly Check-in — AC Pathfinder</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0c1524">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0c1524;
+      --surface:  #131d2e;
+      --surface2: #1a2640;
+      --border:   #253450;
+      --gold:     #c4a84f;
+      --gold2:    #dfc278;
+      --gold-dim: rgba(196,168,79,0.15);
+      --text:     #ede5d4;
+      --text2:    #8a9ab5;
+      --text3:    #4a5a70;
+      --green:    #2ecc71;
+      --green-bg: rgba(46,204,113,0.1);
+      --red:      #e74c3c;
+      --red-bg:   rgba(231,76,60,0.1);
+      --amber:    #f39c12;
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── APP SHELL ── */
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      max-width: 520px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      padding: 1rem 1.5rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .top-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem; font-weight: 600;
+      color: var(--gold); letter-spacing: 0.04em;
+    }
+    .top-week {
+      font-size: 0.72rem; color: var(--text3);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap {
+      padding: 0 1.5rem;
+      flex-shrink: 0;
+    }
+    .progress-track {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold), var(--gold2));
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.4rem;
+      font-size: 0.68rem;
+      color: var(--text3);
+    }
+
+    /* ── SCREEN CONTAINER ── */
+    .screens {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── INDIVIDUAL SCREEN ── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(40px);
+      transition: all 0.3s ease;
+      overflow-y: auto;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+      transform: translateX(0);
+    }
+    .screen.exit-left {
+      opacity: 0;
+      transform: translateX(-40px);
+    }
+
+    /* ── BOTTOM ACTIONS ── */
+    .bottom-bar {
+      padding: 1rem 1.5rem;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      flex-shrink: 0;
+      display: flex;
+      gap: 0.75rem;
+    }
+    .btn-back {
+      width: 48px; height: 52px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; cursor: pointer;
+      color: var(--text2); flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .btn-back:hover { border-color: var(--text2); color: var(--text); }
+    .btn-back:disabled { opacity: 0.3; cursor: default; }
+    .btn-next {
+      flex: 1; height: 52px;
+      background: linear-gradient(135deg, var(--gold), #a8882a);
+      color: var(--bg);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem; font-weight: 600;
+      border: none; border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .btn-next:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(196,168,79,0.3); }
+    .btn-next:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+    .btn-next.submitting { background: var(--surface2); color: var(--text2); }
+
+    /* ── SCREEN: WELCOME ── */
+    .welcome-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; flex: 1;
+      gap: 1rem;
+    }
+    .welcome-avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--gold);
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem; color: var(--gold);
+    }
+    .welcome-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; font-weight: 600; color: var(--text);
+      line-height: 1.2;
+    }
+    .welcome-sub {
+      font-size: 0.85rem; color: var(--text2); line-height: 1.65;
+      max-width: 300px;
+    }
+    .week-badge {
+      background: var(--gold-dim);
+      border: 1px solid rgba(196,168,79,0.3);
+      color: var(--gold);
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 0.35rem 0.9rem; border-radius: 100px;
+    }
+    .strategy-pills {
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      justify-content: center;
+      margin-top: 0.25rem;
+    }
+    .strategy-pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.72rem; color: var(--text2);
+    }
+    .strategy-pill.primary {
+      border-color: rgba(196,168,79,0.4);
+      color: var(--gold);
+    }
+
+    /* ── SCREEN: QUESTION ── */
+    .q-strategy-tag {
+      font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 0.12em; color: var(--gold);
+      font-weight: 600; margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .q-question {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; font-weight: 500;
+      color: var(--text); line-height: 1.35;
+      margin-bottom: 0.5rem;
+    }
+    .q-hint {
+      font-size: 0.78rem; color: var(--text2);
+      line-height: 1.65; margin-bottom: 1.5rem;
+    }
+
+    /* Target comparison bar */
+    .target-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.65rem 0.9rem;
+      margin-bottom: 1rem;
+      font-size: 0.78rem;
+    }
+    .target-label { color: var(--text3); }
+    .target-val   { color: var(--gold); font-weight: 600; }
+
+    /* Number input */
+    .num-input-wrap {
+      display: flex; align-items: center; gap: 1rem;
+      justify-content: center; margin: 0.5rem 0 1rem;
+    }
+    .num-btn {
+      width: 52px; height: 52px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 50%; font-size: 1.4rem;
+      color: var(--text2); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.1s; flex-shrink: 0;
+      font-family: monospace;
+    }
+    .num-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .num-btn:active { transform: scale(0.92); }
+    .num-display {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3.5rem; font-weight: 600;
+      color: var(--text); min-width: 100px; text-align: center;
+      line-height: 1;
+    }
+    .num-unit {
+      font-size: 0.8rem; color: var(--text3);
+      text-align: center; margin-top: 0.35rem;
+    }
+
+    /* Comparison feedback */
+    .compare-bar {
+      margin-top: 0.75rem;
+      height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+    }
+    .compare-fill {
+      height: 100%; border-radius: 3px;
+      transition: width 0.3s ease, background 0.3s ease;
+    }
+    .compare-text {
+      font-size: 0.75rem; margin-top: 0.4rem; text-align: center;
+      transition: color 0.3s;
+    }
+
+    /* Boolean input */
+    .bool-options {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.75rem; margin-top: 0.5rem;
+    }
+    .bool-btn {
+      height: 72px;
+      background: var(--surface2); border: 2px solid var(--border);
+      border-radius: 12px; cursor: pointer;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.3rem;
+      transition: all 0.15s;
+    }
+    .bool-btn:hover { border-color: var(--text2); }
+    .bool-btn.selected-yes { border-color: var(--green); background: var(--green-bg); }
+    .bool-btn.selected-no  { border-color: var(--red);   background: var(--red-bg); }
+    .bool-btn-icon { font-size: 1.5rem; }
+    .bool-btn-label { font-size: 0.8rem; font-weight: 500; color: var(--text2); }
+    .bool-btn.selected-yes .bool-btn-label { color: var(--green); }
+    .bool-btn.selected-no  .bool-btn-label { color: var(--red); }
+
+    /* Text input */
+    .text-area {
+      width: 100%; min-height: 120px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem;
+      font-family: 'Outfit', sans-serif; font-size: 0.9rem;
+      color: var(--text); resize: none; outline: none;
+      line-height: 1.6; transition: border-color 0.15s;
+    }
+    .text-area:focus { border-color: var(--gold); }
+    .text-area::placeholder { color: var(--text3); }
+    .char-count { font-size: 0.68rem; color: var(--text3); text-align: right; margin-top: 0.35rem; }
+
+    /* ── SCREEN: MOOD ── */
+    .mood-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.5rem; flex: 1; justify-content: center;
+    }
+    .mood-q {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; font-weight: 500;
+      text-align: center; margin-bottom: 0.5rem;
+    }
+    .mood-sub { font-size: 0.8rem; color: var(--text2); text-align: center; margin-bottom: 1.5rem; }
+    .mood-emojis {
+      display: flex; gap: 0.75rem;
+    }
+    .mood-btn {
+      width: 58px; height: 58px;
+      background: var(--surface2); border: 2px solid var(--border);
+      border-radius: 50%; cursor: pointer; font-size: 1.6rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .mood-btn:hover { transform: scale(1.1); border-color: var(--text2); }
+    .mood-btn.selected { transform: scale(1.15); border-color: var(--gold); background: var(--gold-dim); }
+    .mood-labels {
+      display: flex; gap: 0.75rem; margin-top: 0.35rem;
+    }
+    .mood-label {
+      width: 58px; text-align: center;
+      font-size: 0.6rem; color: var(--text3);
+    }
+
+    /* ── SCREEN: SUMMARY ── */
+    .summary-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem; font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .summary-sub { font-size: 0.8rem; color: var(--text2); margin-bottom: 1.25rem; }
+    .summary-row {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-label { color: var(--text2); }
+    .summary-val   { font-weight: 600; color: var(--text); }
+    .summary-pct {
+      font-size: 0.7rem; padding: 0.15rem 0.45rem;
+      border-radius: 100px; margin-left: 0.4rem;
+    }
+    .pct-great { background: var(--green-bg); color: var(--green); }
+    .pct-ok    { background: rgba(243,156,18,0.12); color: var(--amber); }
+    .pct-low   { background: var(--red-bg); color: var(--red); }
+    .summary-section-label {
+      font-size: 0.65rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--gold);
+      font-weight: 600; margin: 1rem 0 0.25rem;
+    }
+    .summary-qual {
+      font-size: 0.82rem; color: var(--text2);
+      line-height: 1.6; padding: 0.4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-qual:last-child { border-bottom: none; }
+    .summary-qual-label { font-size: 0.7rem; color: var(--text3); margin-bottom: 0.2rem; }
+
+    /* ── SCREEN: CONFIRMATION ── */
+    .confirm-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; flex: 1; gap: 0.75rem;
+    }
+    .confirm-icon { font-size: 3rem; }
+    .confirm-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 600; color: var(--text);
+    }
+    .confirm-sub {
+      font-size: 0.85rem; color: var(--text2);
+      line-height: 1.7; max-width: 280px;
+    }
+    .confirm-score {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 3px solid var(--gold);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      margin: 0.5rem 0;
+    }
+    .confirm-score-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem; font-weight: 600; color: var(--gold);
+      line-height: 1;
+    }
+    .confirm-score-lbl { font-size: 0.6rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+    .confirm-next { font-size: 0.78rem; color: var(--text3); }
+
+    /* ── AUTH SCREEN ── */
+    .auth-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      flex: 1; gap: 1rem; text-align: center;
+      padding: 2rem;
+    }
+    .auth-icon { font-size: 2.5rem; }
+    .auth-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem; font-weight: 600;
+    }
+    .auth-sub { font-size: 0.82rem; color: var(--text2); line-height: 1.65; }
+    .btn-google {
+      display: flex; align-items: center; gap: 0.6rem;
+      background: #fff; color: #333;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.88rem; font-weight: 500;
+      padding: 0.75rem 1.5rem; border-radius: 10px;
+      border: none; cursor: pointer; width: 100%; max-width: 260px;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.15s;
+    }
+    .btn-google:hover { transform: translateY(-1px); }
+
+    /* ── NO ENROLLMENT ── */
+    .no-enrollment {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      flex: 1; gap: 0.75rem; text-align: center; padding: 2rem;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 5rem; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.65rem 1.25rem; border-radius: 100px;
+      font-size: 0.82rem; white-space: nowrap;
+      opacity: 0; transition: all 0.25s ease;
+      pointer-events: none; z-index: 99;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── LOADING SPINNER ── */
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (min-width: 520px) {
+      #app {
+        border-left: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="top-bar">
+    <div class="top-logo">AC Pathfinder</div>
+    <div class="top-week" id="weekLabel"></div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div class="progress-label">
+      <span id="progressStep"></span>
+      <span id="progressTotal"></span>
+    </div>
+  </div>
+  <div class="screens" id="screens"></div>
+  <div class="bottom-bar" id="bottomBar" style="display:none">
+    <button class="btn-back" id="btnBack" onclick="goBack()">←</button>
+    <button class="btn-next" id="btnNext" onclick="goNext()">Continue →</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ─────────────────────── CONFIG ─────────────────────── */
+const PROXY_BASE = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
+const PROXY_KEY  = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+/* ─────────────────────── STATE ──────────────────────── */
+const S = {
+  email:        null,
+  agentId:      null,
+  agentName:    null,
+  photoUrl:     null,
+  strategies:   [],   // [{slug, name, icon, isPrimary, activities:[{id,slug,label,question,unit,input_type,agent_target,hint}]}]
+  screens:      [],   // built dynamically
+  currentIdx:   0,
+  responses:    {},   // { activity_slug: value } for quantitative
+  mood:         null,
+  challenge:    '',
+  opportunities:'',
+  timeSink:     '',
+  submitting:   false,
+  scorecard:    null,
+  tokenClient:  null,
+};
+
+/* ─────────────────────── INIT ───────────────────────── */
+window.addEventListener('load', () => {
+  setWeekLabel();
+  const poll = setInterval(() => {
+    if (!window.google?.accounts) return;
+    clearInterval(poll);
+    initAuth();
+  }, 200);
+});
+
+function setWeekLabel() {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - now.getDay() + 1);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  document.getElementById('weekLabel').textContent = `Week of ${fmt(start)}`;
+}
+
+function initAuth() {
+  S.tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT,
+    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+    callback: async (res) => {
+      if (res.error) { showAuthError(); return; }
+      try {
+        const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${res.access_token}` }
+        });
+        const info = await res.ok ? r.json() : null;
+        if (info?.email) { S.email = info.email; await loadAgent(); }
+        else showAuthError();
+      } catch(e) { showAuthError(); }
+    }
+  });
+
+  // Try One Tap first
+  google.accounts.id.initialize({
+    client_id: OAUTH_CLIENT,
+    callback: async (cred) => {
+      try {
+        const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+        if (payload.email) { S.email = payload.email; await loadAgent(); }
+      } catch(e) { showSignIn(); }
+    }
+  });
+  google.accounts.id.prompt((notification) => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) showSignIn();
+  });
+}
+
+function showSignIn() {
+  renderScreen(`
+    <div class="auth-wrap">
+      <div class="auth-icon">📋</div>
+      <div class="auth-title">Weekly Check-in</div>
+      <div class="auth-sub">Sign in with your Adams, Cameron &amp; Co. Google account to begin your check-in.</div>
+      <button class="btn-google" onclick="S.tokenClient.requestAccessToken()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>`, false);
+}
+
+function showAuthError() {
+  renderScreen(`
+    <div class="auth-wrap">
+      <div class="auth-icon">⚠️</div>
+      <div class="auth-title">Access Restricted</div>
+      <div class="auth-sub">Please use your @adamscameron.com Google account to check in.</div>
+      <button class="btn-google" onclick="S.tokenClient.requestAccessToken()">Try Again</button>
+    </div>`, false);
+}
+
+/* ─────────────────────── LOAD AGENT ─────────────────── */
+async function loadAgent() {
+  renderScreen(`
+    <div class="auth-wrap">
+      <div class="spinner"></div>
+      <div class="auth-sub">Loading your check-in…</div>
+    </div>`, false);
+
+  try {
+    // Load agent profile
+    const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+    });
+    if (!profileRes.ok) throw new Error('Profile load failed');
+    const profile = await profileRes.json();
+
+    if (!profile.found) {
+      renderScreen(`
+        <div class="no-enrollment">
+          <div style="font-size:2rem">📋</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600">No Plan Found</div>
+          <div style="font-size:0.82rem;color:var(--text2);line-height:1.65">
+            You don't have a business plan yet. Visit the Business Plan Generator to create your plan and enroll in coaching.
+          </div>
+          <a href="./business-plan-generator.html" style="margin-top:0.5rem;color:var(--gold);font-size:0.85rem">
+            Create My Business Plan →
+          </a>
+        </div>`, false);
+      return;
+    }
+
+    if (!profile.enrollment_id) {
+      renderScreen(`
+        <div class="no-enrollment">
+          <div style="font-size:2rem">🤝</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600">Not Yet Enrolled</div>
+          <div style="font-size:0.82rem;color:var(--text2);line-height:1.65">
+            You have a plan but aren't enrolled in coaching yet. Head back to your business plan to enroll.
+          </div>
+          <a href="./business-plan-generator.html" style="margin-top:0.5rem;color:var(--gold);font-size:0.85rem">
+            Enroll in Coaching →
+          </a>
+        </div>`, false);
+      return;
+    }
+
+    S.agentId   = profile.id;
+    S.agentName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || S.email.split('@')[0];
+    S.photoUrl  = profile.photo_url;
+
+    // Load strategies
+    const stratRes = await fetch(`${PROXY_BASE}/agent/${S.agentId}/strategies`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+    });
+    if (stratRes.ok) {
+      const data = await stratRes.json();
+      S.strategies = data || [];
+    }
+
+    buildCheckin();
+  } catch(e) {
+    renderScreen(`
+      <div class="no-enrollment">
+        <div style="font-size:2rem">⚠️</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem">Something went wrong</div>
+        <div style="font-size:0.82rem;color:var(--text2)">${e.message}</div>
+        <button onclick="loadAgent()" style="margin-top:1rem;background:var(--gold);color:var(--bg);border:none;padding:0.65rem 1.25rem;border-radius:8px;cursor:pointer;font-family:'Outfit',sans-serif">Try Again</button>
+      </div>`, false);
+  }
+}
+
+/* ─────────────────────── BUILD CHECK-IN ─────────────── */
+function buildCheckin() {
+  S.screens = [];
+  S.currentIdx = 0;
+  S.responses = {};
+  S.mood = null;
+  S.challenge = '';
+  S.opportunities = '';
+  S.timeSink = '';
+
+  // Screen 0: Welcome
+  S.screens.push({ type: 'welcome' });
+
+  // Activity questions from strategies
+  if (S.strategies.length) {
+    // Primary strategy first
+    const sorted = [...S.strategies].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+    sorted.forEach(strat => {
+      const activities = Array.isArray(strat.activities) ? strat.activities : [];
+      activities.forEach(act => {
+        S.screens.push({
+          type:        'question',
+          activityId:  act.id,
+          slug:        act.slug,
+          question:    act.question,
+          label:       act.label,
+          hint:        act.hint,
+          unit:        act.unit,
+          inputType:   act.input_type,
+          target:      act.agent_target,
+          stratName:   strat.name,
+          stratIcon:   strat.icon,
+          isPrimary:   strat.is_primary,
+        });
+      });
+    });
+  } else {
+    // No strategies — use universal defaults
+    [
+      { slug: 'soi_contacts_weekly',  question: 'How many people from your sphere did you reach out to this week?', label: 'SOI Contacts', unit: 'contacts', inputType: 'number', target: 15, stratName: 'Sphere of Influence', stratIcon: '👥' },
+      { slug: 'open_houses_held',     question: 'How many open houses did you host this week?', label: 'Open Houses', unit: 'open houses', inputType: 'number', target: 1, stratName: 'Open Houses', stratIcon: '🏡' },
+      { slug: 'social_posts_weekly',  question: 'How many social media posts did you publish this week?', label: 'Social Posts', unit: 'posts', inputType: 'number', target: 3, stratName: 'Social Media', stratIcon: '📱' },
+      { slug: 'listing_appts_set',    question: 'How many listing appointments did you schedule this week?', label: 'Listing Appointments', unit: 'appointments', inputType: 'number', target: 1, stratName: 'Listings', stratIcon: '📋' },
+      { slug: 'showings_held',        question: 'How many buyer showings did you conduct this week?', label: 'Buyer Showings', unit: 'showings', inputType: 'number', target: 3, stratName: 'Buyers', stratIcon: '🔑' },
+    ].forEach(q => S.screens.push({ type: 'question', ...q }));
+  }
+
+  // Mood screen
+  S.screens.push({ type: 'mood' });
+
+  // Qualitative screens
+  S.screens.push({ type: 'qualitative', key: 'challenge',     question: "What's been your biggest challenge this week?",                    placeholder: "Be honest — there's no wrong answer here. The more specific, the better your coach can help.", hint: 'This is the most important question. Your coach reads this first.' });
+  S.screens.push({ type: 'qualitative', key: 'opportunities', question: 'Any new opportunities or unexpected leads come up this week?',    placeholder: "Someone you ran into, a referral that came in, a lead from an open house…", hint: 'Optional — but often the most interesting part of your week.' });
+  S.screens.push({ type: 'qualitative', key: 'timeSink',      question: 'Name one thing that took longer than it should have this week.',   placeholder: "Making a flyer, dealing with a title issue, chasing a lead that went nowhere…", hint: 'This helps identify where coaching or tools could save you time.' });
+
+  // Summary
+  S.screens.push({ type: 'summary' });
+
+  renderCurrentScreen();
+}
+
+/* ─────────────────────── RENDER ─────────────────────── */
+function renderScreen(html, showNav = true) {
+  document.getElementById('screens').innerHTML = `<div class="screen active">${html}</div>`;
+  document.getElementById('bottomBar').style.display = showNav ? 'flex' : 'none';
+}
+
+function renderCurrentScreen() {
+  const screen = S.screens[S.currentIdx];
+  const total  = S.screens.length;
+  const pct    = Math.round((S.currentIdx / (total - 1)) * 100);
+
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStep').textContent  = `Step ${S.currentIdx + 1}`;
+  document.getElementById('progressTotal').textContent = `of ${total}`;
+
+  let html = '';
+  const isLast = S.currentIdx === total - 1;
+
+  if (screen.type === 'welcome') {
+    html = renderWelcome();
+  } else if (screen.type === 'question') {
+    html = renderQuestion(screen);
+  } else if (screen.type === 'mood') {
+    html = renderMood();
+  } else if (screen.type === 'qualitative') {
+    html = renderQualitative(screen);
+  } else if (screen.type === 'summary') {
+    html = renderSummary();
+  }
+
+  const existing = document.querySelector('.screen.active');
+  if (existing) existing.classList.add('exit-left');
+
+  const el = document.createElement('div');
+  el.className = 'screen active';
+  el.innerHTML = html;
+  document.getElementById('screens').appendChild(el);
+
+  setTimeout(() => existing?.remove(), 300);
+
+  // Update nav buttons
+  document.getElementById('bottomBar').style.display = 'flex';
+  const backBtn = document.getElementById('btnBack');
+  const nextBtn = document.getElementById('btnNext');
+  backBtn.disabled = S.currentIdx === 0;
+
+  if (isLast) {
+    nextBtn.textContent = S.submitting ? '⏳ Saving…' : '✓ Submit Check-in';
+    nextBtn.className = 'btn-next' + (S.submitting ? ' submitting' : '');
+  } else {
+    nextBtn.textContent = 'Continue →';
+    nextBtn.className = 'btn-next';
+  }
+}
+
+function renderWelcome() {
+  const initials = S.agentName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const primaryStrat = S.strategies.find(s => s.is_primary);
+  const allStrats = [...S.strategies].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+
+  const pillsHtml = allStrats.length ? `
+    <div class="strategy-pills">
+      ${allStrats.map(s => `<div class="strategy-pill ${s.is_primary ? 'primary' : ''}">${s.icon} ${s.name}</div>`).join('')}
+    </div>` : '';
+
+  return `
+    <div class="welcome-wrap">
+      <div class="week-badge">Weekly Check-in</div>
+      <div class="welcome-avatar">
+        ${S.photoUrl
+          ? `<img src="${S.photoUrl}" style="width:72px;height:72px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`
+          : initials}
+      </div>
+      <div class="welcome-name">${greeting},<br>${S.agentName.split(' ')[0]}.</div>
+      <div class="welcome-sub">
+        This takes about 3 minutes. Be honest — the more real you are, the more useful your coaching becomes.
+        ${primaryStrat ? `<br><br>Today we're tracking your <strong style="color:var(--gold)">${primaryStrat.name}</strong> strategy${allStrats.length > 1 ? ' and ' + (allStrats.length - 1) + ' other' + (allStrats.length > 2 ? 's' : '') : ''}.` : ''}
+      </div>
+      ${pillsHtml}
+    </div>`;
+}
+
+function renderQuestion(screen) {
+  const val    = S.responses[screen.slug];
+  const target = screen.target;
+
+  if (screen.inputType === 'boolean') {
+    return `
+      <div class="q-strategy-tag">${screen.stratIcon} ${screen.stratName}</div>
+      <div class="q-question">${screen.question}</div>
+      ${screen.hint ? `<div class="q-hint">${screen.hint}</div>` : ''}
+      <div class="bool-options">
+        <button class="bool-btn ${val === true ? 'selected-yes' : ''}" onclick="setBool('${screen.slug}', true)">
+          <div class="bool-btn-icon">✅</div>
+          <div class="bool-btn-label">Yes</div>
+        </button>
+        <button class="bool-btn ${val === false ? 'selected-no' : ''}" onclick="setBool('${screen.slug}', false)">
+          <div class="bool-btn-icon">❌</div>
+          <div class="bool-btn-label">No</div>
+        </button>
+      </div>`;
+  }
+
+  // Number input
+  const numVal = val !== undefined ? val : (target || 0);
+  const pct    = target ? Math.round((numVal / target) * 100) : null;
+  const fillPct = target ? Math.min(100, pct) : 50;
+  const fillColor = !pct ? 'var(--border)' : pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+  const pctText   = pct === null ? '' : pct >= 100 ? `🎯 ${pct}% of goal — on track!` : pct >= 60 ? `${pct}% of goal — keep going` : `${pct}% of goal this week`;
+  const pctColor  = !pct ? 'var(--text3)' : pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+
+  return `
+    <div class="q-strategy-tag">${screen.stratIcon} ${screen.stratName}${screen.isPrimary ? ' · <span style="color:var(--gold)">Primary</span>' : ''}</div>
+    <div class="q-question">${screen.question}</div>
+    ${screen.hint ? `<div class="q-hint">${screen.hint}</div>` : ''}
+    ${target ? `
+      <div class="target-row">
+        <span class="target-label">Your weekly goal</span>
+        <span class="target-val">${target} ${screen.unit || ''}</span>
+      </div>` : ''}
+    <div class="num-input-wrap">
+      <button class="num-btn" ontouchstart="startRepeat('${screen.slug}',-1)" onmousedown="startRepeat('${screen.slug}',-1)" ontouchend="stopRepeat()" onmouseup="stopRepeat()" onclick="adjustNum('${screen.slug}',-1)">−</button>
+      <div>
+        <div class="num-display" id="numDisplay-${screen.slug}">${numVal}</div>
+        <div class="num-unit">${screen.unit || ''}</div>
+      </div>
+      <button class="num-btn" ontouchstart="startRepeat('${screen.slug}',1)" onmousedown="startRepeat('${screen.slug}',1)" ontouchend="stopRepeat()" onmouseup="stopRepeat()" onclick="adjustNum('${screen.slug}',1)">+</button>
+    </div>
+    ${target ? `
+      <div class="compare-bar">
+        <div class="compare-fill" style="width:${fillPct}%;background:${fillColor}"></div>
+      </div>
+      <div class="compare-text" style="color:${pctColor}">${pctText}</div>` : ''}`;
+}
+
+function renderMood() {
+  const emojis = ['😞', '😕', '😐', '🙂', '🔥'];
+  const labels = ['Rough', 'Slow', 'Okay', 'Good', 'Crushing it'];
+  return `
+    <div class="mood-wrap">
+      <div class="mood-q">How did this week feel?</div>
+      <div class="mood-sub">Honest answers help your coach understand the full picture — the numbers don't always tell the whole story.</div>
+      <div class="mood-emojis">
+        ${emojis.map((e, i) => `
+          <button class="mood-btn ${S.mood === i+1 ? 'selected' : ''}" onclick="setMood(${i+1})">${e}</button>`).join('')}
+      </div>
+      <div class="mood-labels">
+        ${labels.map(l => `<div class="mood-label">${l}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderQualitative(screen) {
+  const val = screen.key === 'challenge' ? S.challenge : screen.key === 'opportunities' ? S.opportunities : S.timeSink;
+  return `
+    <div class="q-strategy-tag">💬 Reflection</div>
+    <div class="q-question">${screen.question}</div>
+    ${screen.hint ? `<div class="q-hint">${screen.hint}</div>` : ''}
+    <textarea class="text-area" id="qual-${screen.key}" placeholder="${screen.placeholder}"
+      oninput="setQual('${screen.key}', this.value)">${val}</textarea>
+    <div class="char-count" id="char-${screen.key}">${val.length} characters</div>`;
+}
+
+function renderSummary() {
+  const activityScreens = S.screens.filter(s => s.type === 'question');
+  const rows = activityScreens.map(s => {
+    const val = S.responses[s.slug];
+    if (val === undefined || val === null) return '';
+    const display = typeof val === 'boolean' ? (val ? 'Yes ✓' : 'No') : val;
+    let pctHtml = '';
+    if (s.target && typeof val === 'number') {
+      const pct = Math.round((val / s.target) * 100);
+      const cls = pct >= 100 ? 'pct-great' : pct >= 60 ? 'pct-ok' : 'pct-low';
+      pctHtml = `<span class="summary-pct ${cls}">${pct}%</span>`;
+    }
+    return `
+      <div class="summary-row">
+        <span class="summary-label">${s.label}</span>
+        <span class="summary-val">${display} ${s.unit && typeof val === 'number' ? s.unit : ''}${pctHtml}</span>
+      </div>`;
+  }).join('');
+
+  const moodEmoji = ['😞','😕','😐','🙂','🔥'][S.mood - 1] || '—';
+
+  return `
+    <div class="summary-title">Looking good.</div>
+    <div class="summary-sub">Review your responses before submitting. Tap Back to make any changes.</div>
+
+    ${rows}
+
+    <div class="summary-row">
+      <span class="summary-label">Mood</span>
+      <span class="summary-val">${moodEmoji} ${['','Rough','Slow','Okay','Good','Crushing it'][S.mood] || '—'}</span>
+    </div>
+
+    ${S.challenge ? `
+      <div class="summary-section-label">Biggest Challenge</div>
+      <div class="summary-qual">${S.challenge}</div>` : ''}
+    ${S.opportunities ? `
+      <div class="summary-section-label">New Opportunities</div>
+      <div class="summary-qual">${S.opportunities}</div>` : ''}
+    ${S.timeSink ? `
+      <div class="summary-section-label">Time Sink</div>
+      <div class="summary-qual">${S.timeSink}</div>` : ''}`;
+}
+
+/* ─────────────────────── NAVIGATION ─────────────────── */
+function goNext() {
+  const screen = S.screens[S.currentIdx];
+  const isLast = S.currentIdx === S.screens.length - 1;
+
+  if (isLast) { submitCheckin(); return; }
+
+  // Validate current screen
+  if (screen.type === 'mood' && !S.mood) {
+    toast('Tap an emoji to rate your week'); return;
+  }
+  if (screen.type === 'qualitative' && screen.key === 'challenge' && !S.challenge.trim()) {
+    toast('Share your biggest challenge — it\'s the most valuable question'); return;
+  }
+  if (screen.type === 'question' && screen.inputType !== 'boolean') {
+    // Auto-initialize to 0 if not touched
+    if (S.responses[screen.slug] === undefined) {
+      S.responses[screen.slug] = 0;
+    }
+  }
+
+  S.currentIdx++;
+  renderCurrentScreen();
+}
+
+function goBack() {
+  if (S.currentIdx === 0) return;
+  S.currentIdx--;
+  // Reverse animation
+  const existing = document.querySelector('.screen.active');
+  if (existing) { existing.style.transform = 'translateX(40px)'; existing.style.opacity = '0'; }
+  setTimeout(() => {
+    renderCurrentScreen();
+    const newScreen = document.querySelector('.screen.active');
+    if (newScreen) {
+      newScreen.style.transform = 'translateX(-40px)';
+      newScreen.style.opacity = '0';
+      setTimeout(() => {
+        newScreen.style.transform = '';
+        newScreen.style.opacity = '';
+      }, 30);
+    }
+  }, 200);
+}
+
+/* ─────────────────────── INPUT HANDLERS ─────────────── */
+let repeatTimer = null;
+function adjustNum(slug, delta) {
+  const current = S.responses[slug] !== undefined ? S.responses[slug] : 0;
+  const next = Math.max(0, current + delta);
+  S.responses[slug] = next;
+  const el = document.getElementById(`numDisplay-${slug}`);
+  if (el) el.textContent = next;
+  updateCompare(slug, next);
+}
+
+function startRepeat(slug, delta) {
+  stopRepeat();
+  repeatTimer = setInterval(() => adjustNum(slug, delta), 120);
+}
+function stopRepeat() {
+  if (repeatTimer) { clearInterval(repeatTimer); repeatTimer = null; }
+}
+
+function updateCompare(slug, val) {
+  const screen = S.screens.find(s => s.slug === slug);
+  if (!screen?.target) return;
+  const pct = Math.round((val / screen.target) * 100);
+  const fillPct = Math.min(100, pct);
+  const color = pct >= 100 ? 'var(--green)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+  const text  = pct >= 100 ? `🎯 ${pct}% of goal — on track!` : pct >= 60 ? `${pct}% of goal — keep going` : `${pct}% of goal this week`;
+
+  const bar = document.querySelector('.compare-fill');
+  const txt = document.querySelector('.compare-text');
+  if (bar) { bar.style.width = fillPct + '%'; bar.style.background = color; }
+  if (txt) { txt.textContent = text; txt.style.color = color; }
+}
+
+function setBool(slug, val) {
+  S.responses[slug] = val;
+  renderCurrentScreen();
+}
+
+function setMood(val) {
+  S.mood = val;
+  document.querySelectorAll('.mood-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i + 1 === val);
+  });
+}
+
+function setQual(key, val) {
+  if (key === 'challenge')     S.challenge = val;
+  if (key === 'opportunities') S.opportunities = val;
+  if (key === 'timeSink')      S.timeSink = val;
+  const counter = document.getElementById(`char-${key}`);
+  if (counter) counter.textContent = val.length + ' characters';
+}
+
+/* ─────────────────────── SUBMIT ─────────────────────── */
+async function submitCheckin() {
+  if (S.submitting) return;
+  S.submitting = true;
+  document.getElementById('btnNext').textContent = '⏳ Saving…';
+  document.getElementById('btnNext').disabled = true;
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/checkin/flexible`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-proxy-key': PROXY_KEY,
+        'x-user-email': S.email,
+      },
+      body: JSON.stringify({
+        agentEmail:    S.email,
+        responses:     S.responses,
+        mood:          S.mood,
+        challenge:     S.challenge,
+        opportunities: S.opportunities,
+        timeSink:      S.timeSink,
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await res.json();
+
+    // Poll for scorecard (up to 15 seconds)
+    let scorecard = null;
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 2500));
+      try {
+        const scRes = await fetch(`${PROXY_BASE}/checkin/history/${S.agentId}`, {
+          headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+        });
+        if (scRes.ok) {
+          const history = await scRes.json();
+          const latest = history.find(c => c.id === result.checkinId);
+          if (latest?.commitment_score !== undefined && latest.commitment_score !== null) {
+            scorecard = latest;
+            break;
+          }
+        }
+      } catch(_) {}
+    }
+
+    showConfirmation(scorecard);
+  } catch(e) {
+    S.submitting = false;
+    document.getElementById('btnNext').textContent = '✓ Submit Check-in';
+    document.getElementById('btnNext').disabled = false;
+    toast('Submission failed: ' + e.message);
+  }
+}
+
+function showConfirmation(scorecard) {
+  document.getElementById('bottomBar').style.display = 'none';
+  document.getElementById('progressFill').style.width = '100%';
+
+  const score = scorecard?.commitment_score;
+  const scoreHtml = score !== undefined && score !== null ? `
+    <div class="confirm-score">
+      <div class="confirm-score-val">${score}</div>
+      <div class="confirm-score-lbl">Score</div>
+    </div>
+    <div style="font-size:0.8rem;color:var(--text2)">${scorecard.trend ? scorecard.trend.charAt(0).toUpperCase() + scorecard.trend.slice(1) : ''}</div>` : `
+    <div style="font-size:0.8rem;color:var(--text3)">Your scorecard is being generated…</div>`;
+
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + 7);
+  const nextFmt = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  const existing = document.querySelector('.screen.active');
+  if (existing) existing.classList.add('exit-left');
+
+  const el = document.createElement('div');
+  el.className = 'screen active';
+  el.innerHTML = `
+    <div class="confirm-wrap">
+      <div class="confirm-icon">🏡</div>
+      <div class="confirm-title">Check-in complete!</div>
+      ${scoreHtml}
+      <div class="confirm-sub">
+        ${scorecard?.wins_narrative ? `<em>${scorecard.wins_narrative}</em><br><br>` : ''}
+        Your coach will review your responses. Keep the momentum going.
+      </div>
+      <div class="confirm-next">Next check-in: ${nextFmt}</div>
+    </div>`;
+  document.getElementById('screens').appendChild(el);
+  setTimeout(() => existing?.remove(), 300);
+}
+
+/* ─────────────────────── TOAST ──────────────────────── */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
