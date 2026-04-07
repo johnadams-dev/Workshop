@@ -981,6 +981,40 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
 }
 
+/* ─────────────────────── CHECKIN STATS ─────────────── */
+// Renders check-in activity stats for both legacy and flexible check-ins
+function renderCheckinStats(ci) {
+  // Flexible check-in — read from flex_responses JSON
+  if (ci.is_flexible && ci.flex_responses && Object.keys(ci.flex_responses).length) {
+    const responses = typeof ci.flex_responses === 'string'
+      ? JSON.parse(ci.flex_responses)
+      : ci.flex_responses;
+
+    return Object.entries(responses).map(([slug, r]) => {
+      if (!r || r.value === null || r.value === undefined) return '';
+      const display = r.boolean !== null && r.boolean !== undefined
+        ? (r.boolean ? 'Yes ✓' : 'No')
+        : r.numeric !== null && r.numeric !== undefined
+          ? r.numeric
+          : r.value;
+      const pctHtml = r.target && r.pct !== null
+        ? `<span style="font-size:0.65rem;margin-left:2px;color:${r.pct >= 100 ? 'var(--green)' : r.pct >= 60 ? 'var(--amber)' : 'var(--red)'}">${Math.round(r.pct)}%</span>`
+        : '';
+      const label = r.label || slug;
+      return `<span class="checkin-stat" title="${r.target ? 'Goal: ' + r.target + ' ' + (r.unit||'') : ''}">${r.icon ? r.icon + ' ' : ''}<strong>${display}</strong>${r.unit && typeof display === 'number' ? ' ' + r.unit : ''}${pctHtml} <span style="color:var(--text3)">${label}</span></span>`;
+    }).filter(Boolean).join('');
+  }
+
+  // Legacy check-in — read from fixed columns
+  const stats = [];
+  if (ci.soi_calls       !== null && ci.soi_calls       !== undefined) stats.push(`<span class="checkin-stat"><strong>${ci.soi_calls}</strong> SOI</span>`);
+  if (ci.floor_hours     !== null && ci.floor_hours     !== undefined) stats.push(`<span class="checkin-stat"><strong>${ci.floor_hours}</strong> floor hrs</span>`);
+  if (ci.social_posts    !== null && ci.social_posts    !== undefined) stats.push(`<span class="checkin-stat"><strong>${ci.social_posts}</strong> posts</span>`);
+  if (ci.listing_appts   !== null && ci.listing_appts   !== undefined) stats.push(`<span class="checkin-stat"><strong>${ci.listing_appts}</strong> listing appts</span>`);
+  if (ci.buyer_prospects !== null && ci.buyer_prospects !== undefined) stats.push(`<span class="checkin-stat"><strong>${ci.buyer_prospects}</strong> buyers</span>`);
+  return stats.length ? stats.join('') : '<span style="font-size:0.75rem;color:var(--text3)">No activity recorded</span>';
+}
+
 function renderDetail() {
   const d  = S.activeDetail;
   const a  = d.agent;
@@ -1074,13 +1108,9 @@ function renderDetail() {
         ${ci ? `
           <div class="section-label" style="margin-top:1rem">Latest Check-in</div>
           <div class="checkin-item">
-            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}${ci.mood_score ? ' · ' + ['😞','😕','😐','🙂','🔥'][ci.mood_score-1] : ''}</div>
             <div class="checkin-stats">
-              <span class="checkin-stat"><strong>${ci.soi_calls ?? '—'}</strong> SOI calls</span>
-              <span class="checkin-stat"><strong>${ci.floor_hours ?? '—'}</strong> floor hrs</span>
-              <span class="checkin-stat"><strong>${ci.social_posts ?? '—'}</strong> posts</span>
-              <span class="checkin-stat"><strong>${ci.listing_appts ?? '—'}</strong> listing appts</span>
-              <span class="checkin-stat"><strong>${ci.buyer_prospects ?? '—'}</strong> buyers</span>
+              ${renderCheckinStats(ci)}
             </div>
             ${ci.biggest_challenge ? `<div class="checkin-qual-label">Biggest Challenge</div><div class="checkin-qual">${ci.biggest_challenge}</div>` : ''}
             ${ci.new_opportunities ? `<div class="checkin-qual-label">New Opportunities</div><div class="checkin-qual">${ci.new_opportunities}</div>` : ''}
@@ -1095,13 +1125,9 @@ function renderDetail() {
       <div class="tab-panel" id="tab-checkins">
         ${d.checkins?.length ? d.checkins.map(ci => `
           <div class="checkin-item">
-            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+            <div class="checkin-date">${new Date(ci.check_in_date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}${ci.mood_score ? ' · ' + ['😞','😕','😐','🙂','🔥'][ci.mood_score-1] : ''}${ci.channel ? ' · ' + ci.channel : ''}</div>
             <div class="checkin-stats">
-              <span class="checkin-stat"><strong>${ci.soi_calls ?? '—'}</strong> SOI</span>
-              <span class="checkin-stat"><strong>${ci.floor_hours ?? '—'}</strong> floor hrs</span>
-              <span class="checkin-stat"><strong>${ci.social_posts ?? '—'}</strong> posts</span>
-              <span class="checkin-stat"><strong>${ci.listing_appts ?? '—'}</strong> listing appts</span>
-              <span class="checkin-stat"><strong>${ci.buyer_prospects ?? '—'}</strong> buyers</span>
+              ${renderCheckinStats(ci)}
               ${ci.transactions_closed ? `<span class="checkin-stat" style="background:var(--green-bg);border-color:rgba(39,174,96,0.2)"><strong>${ci.transactions_closed}</strong> closed</span>` : ''}
             </div>
             ${ci.biggest_challenge ? `<div class="checkin-qual-label">Biggest Challenge</div><div class="checkin-qual">${ci.biggest_challenge}</div>` : ''}
