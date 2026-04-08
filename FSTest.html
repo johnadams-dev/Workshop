@@ -52,6 +52,13 @@
     <br>
     <label>Description</label>
     <input id="uploadDesc" value="ACC Binder Test Upload" />
+    <label>Upload Format to Test</label>
+    <select id="uploadFormat" style="background:#2d2d2d;border:1px solid #555;color:#d4d4d4;padding:8px;border-radius:4px;width:100%;margin-bottom:8px;">
+      <option value="b64_filename">A: file_name=base64, all fields</option>
+      <option value="b64_minimal">B: file_name=base64, minimal (no optional fields)</option>
+      <option value="b64_file">C: file_name=filename string, file=base64</option>
+      <option value="b64_no_pages">D: file_name=base64, no no_of_pages</option>
+    </select>
     <button onclick="testUpload()">Test Upload</button>
     <pre id="uploadResult">— select a PDF and click to run —</pre>
   </div>
@@ -118,14 +125,22 @@
         r.readAsDataURL(file);
       });
 
-      // Send minimal payload — only documented required fields
-      const body = {
-        transId:     transId(),
-        file_name:   b64,
-        description: desc,
-        sender:      "Adams, Cameron & Co.",
-        no_of_pages: "1",
-      };
+      // Try three different upload formats to find what FS actually expects
+      const format = document.getElementById("uploadFormat").value;
+      let body;
+      if (format === "b64_filename") {
+        // Format A: file_name = base64, all fields
+        body = { transId: transId(), file_name: b64, description: desc, sender: "Adams, Cameron & Co.", no_of_pages: "1" };
+      } else if (format === "b64_minimal") {
+        // Format B: only userId + transId + file_name (no optional fields)
+        body = { transId: transId(), file_name: b64 };
+      } else if (format === "b64_file") {
+        // Format C: file_name = actual filename, file = base64 content
+        body = { transId: transId(), file_name: "document.pdf", file: b64, description: desc };
+      } else if (format === "b64_no_pages") {
+        // Format D: no no_of_pages field
+        body = { transId: transId(), file_name: b64, description: desc, sender: "Adams, Cameron & Co." };
+      }
 
       try {
         const resp = await fetch(`${base()}/uploadfiles`, {
