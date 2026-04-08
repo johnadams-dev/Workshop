@@ -109,27 +109,29 @@
       const el = document.getElementById("uploadResult");
       const fileInput = document.getElementById("testFile");
       const desc = document.getElementById("uploadDesc").value;
-
-      if (!fileInput.files[0]) {
-        el.textContent = "Please select a PDF first.";
-        el.className = "err";
-        return;
-      }
+      const format = document.getElementById("uploadFormat").value;
 
       el.textContent = "Uploading...";
       el.className = "";
 
-      // Convert to base64
-      const file = fileInput.files[0];
-      const b64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result.split(",")[1]);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      // Format E uses a URL — no file needed
+      let b64 = null;
+      if (format !== "url") {
+        if (!fileInput.files[0]) {
+          el.textContent = "Please select a PDF first (not needed for Format E).";
+          el.className = "err";
+          return;
+        }
+        const file = fileInput.files[0];
+        b64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
 
-      // Try three different upload formats to find what FS actually expects
-      const format = document.getElementById("uploadFormat").value;
+      // Try different upload formats to find what FS actually expects
       let body;
       if (format === "b64_filename") {
         // Format A: file_name = base64, all fields
