@@ -58,7 +58,10 @@
       <option value="b64_minimal">B: file_name=base64, minimal (no optional fields)</option>
       <option value="b64_file">C: file_name=filename string, file=base64</option>
       <option value="b64_no_pages">D: file_name=base64, no no_of_pages</option>
+      <option value="url">E: file_name=public URL (no file upload needed)</option>
     </select>
+    <label>Public File URL (for Format E)</label>
+    <input id="fileUrl" value="https://johnadams.org/FSTestFileOrmondBeachHOA.pdf" />
     <button onclick="testUpload()">Test Upload</button>
     <pre id="uploadResult">— select a PDF and click to run —</pre>
   </div>
@@ -140,6 +143,10 @@
       } else if (format === "b64_no_pages") {
         // Format D: no no_of_pages field
         body = { transId: transId(), file_name: b64, description: desc, sender: "Adams, Cameron & Co." };
+      } else if (format === "url") {
+        // Format E: file_name = public URL — FS fetches the file themselves
+        const url = document.getElementById("fileUrl").value.trim();
+        body = { transId: transId(), file_name: url, description: desc, sender: "Adams, Cameron & Co.", no_of_pages: "1" };
       }
 
       try {
