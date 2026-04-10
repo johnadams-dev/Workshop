@@ -138,36 +138,7 @@
 </head>
 <body>
 
-<!-- SETTINGS MODAL -->
-<div id="settingsModal" class="overlay hidden">
-  <div class="modal">
-    <div class="modal-head"><div class="modal-title">⚙ Configuration</div><div class="modal-sub">Settings are saved locally in your browser.</div></div>
-    <div class="modal-body">
-      <div class="info-box"><p><strong style="color:var(--text)">Gmail &amp; Google Docs</strong> are enabled via Google OAuth. When you click Email or Save to Google Doc, you'll be prompted to sign in with your Google account.</p></div>
-      <div class="field" style="margin-top:0.5rem">
-        <label style="display:flex;align-items:center;justify-content:space-between">
-          <span>Admin Access <span class="opt">(prompt editor)</span></span>
-          <button class="btn btn-ghost" style="padding:0.25rem 0.6rem;font-size:0.72rem" id="adminUnlockBtn" onclick="toggleAdminUnlock()">🔒 Unlock</button>
-        </label>
-        <div id="adminPwRow" style="display:flex;gap:0.5rem;margin-top:0.35rem">
-          <input type="password" id="cfgAdminPw" placeholder="Admin password…" autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')toggleAdminUnlock()">
-        </div>
-      </div>
-      <div id="adminSection" style="display:none;border-top:1px solid var(--border);padding-top:1.2rem;margin-top:0.5rem">
-        <div class="field">
-          <label>AI Prompt Template <span class="opt">(admin only)</span></label>
-          <textarea id="cfgPrompt" rows="14" placeholder="Paste custom prompt here…" style="font-size:0.75rem;font-family:monospace;line-height:1.5"></textarea>
-          <div class="hint">Leave blank to use the default built-in prompt.</div>
-        </div>
-        <button class="btn btn-ghost" style="margin-top:0.5rem;font-size:0.78rem" onclick="resetPrompt()">↩ Reset to Default Prompt</button>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
-    </div>
-  </div>
-</div>
+<!-- Settings moved to admin panel -->
 
 <!-- EMAIL MODAL -->
 <div id="emailModal" class="overlay hidden">
@@ -222,7 +193,7 @@
     <div class="brand-icon">🏡</div>
     <div><div class="brand-name">Adams, Cameron & Co.</div><div class="brand-sub">Business Plan Generator</div></div>
   </div>
-  <div class="hdr-right"><button class="btn-icon" onclick="openSettings()">⚙ Settings</button></div>
+  <div class="hdr-right"></div>
 </header>
 
 <main class="app-main">
@@ -342,6 +313,72 @@
     </div>
   </div>
 
+
+  <!-- GOAL CONFIRMATION -->
+  <div id="goalConfirmCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Before You Commit</div>
+        <div class="section-title">Confirm Your Goals</div>
+        <div class="section-desc">These are the numbers your coaching program will be built around. Review them, make any adjustments, then confirm to continue.</div>
+      </div>
+      <div class="card-body">
+
+        <!-- Numbers summary -->
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:1.25rem 1.4rem">
+          <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);margin-bottom:1rem;font-weight:600">Your Revenue Targets</div>
+          <div id="goalConfirmNumbers" style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem"></div>
+        </div>
+
+        <!-- Adjustable inputs -->
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:1.25rem 1.4rem">
+          <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);margin-bottom:1rem;font-weight:600">Adjust If Needed</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div class="field">
+              <label>Annual Earning Goal</label>
+              <div class="input-wrap"><span class="input-pfx">$</span><input type="number" id="gc_earn" min="0" step="1000" oninput="recalcGoals()"></div>
+            </div>
+            <div class="field">
+              <label>Avg Sale Price</label>
+              <div class="input-wrap"><span class="input-pfx">$</span><input type="number" id="gc_price" min="0" step="5000" oninput="recalcGoals()"></div>
+            </div>
+            <div class="field">
+              <label>Hours / Week</label>
+              <input type="number" id="gc_hours" min="0" max="80" step="1" oninput="recalcGoals()">
+            </div>
+            <div class="field">
+              <label>Buyers vs Sellers</label>
+              <select id="gc_mix" onchange="recalcGoals()">
+                <option value="25">25% Sellers</option>
+                <option value="50" selected>50% Sellers</option>
+                <option value="75">75% Sellers</option>
+                <option value="100">100% Sellers</option>
+                <option value="0">100% Buyers</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly commitments preview -->
+        <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:1.25rem 1.4rem">
+          <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);margin-bottom:0.75rem;font-weight:600">Your Weekly Commitments</div>
+          <div id="goalConfirmCommitments" style="font-size:0.84rem;color:var(--text2);line-height:2.1"></div>
+        </div>
+
+        <div style="background:rgba(196,168,79,0.07);border:1px solid rgba(196,168,79,0.2);border-radius:8px;padding:0.9rem 1rem;font-size:0.8rem;color:var(--text2);line-height:1.65">
+          <strong style="color:var(--text)">These goals are yours.</strong> The coaching program is built to help you hit the targets you set — not targets set for you. If these numbers feel off, adjust them now.
+        </div>
+
+      </div>
+      <div class="card-foot" style="justify-content:space-between">
+        <button class="btn btn-ghost" onclick="doReset()" style="font-size:0.8rem">↩ Start Over</button>
+        <button class="btn btn-primary" id="goalConfirmBtn" onclick="confirmGoalsAndContinue()" style="padding:0.7rem 1.75rem">
+          These are my goals — Continue to Coaching →
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- INFOGRAPHIC -->
   <div id="infographicCard" style="display:none;margin-top:1.5rem">
     <div class="card">
@@ -425,41 +462,7 @@ const S = {
   strategies: [], selectedStrategies: [], suggestedStrategies: [],
 };
 
-/* ── SETTINGS ────────────────────────────────────────────────────── */
-function cfg() { return { prompt: ls('ac_prompt_draft') || S.config.prompt || '' }; }
-function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
-
-function openSettings() {
-  document.getElementById('cfgPrompt').value = cfg().prompt;
-  document.getElementById('adminSection').style.display = 'none';
-  document.getElementById('adminPwRow').style.display = 'flex';
-  document.getElementById('adminUnlockBtn').textContent = '🔒 Unlock';
-  document.getElementById('cfgAdminPw').value = '';
-  document.getElementById('settingsModal').classList.remove('hidden');
-}
-function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
-
-function toggleAdminUnlock() {
-  const pw  = document.getElementById('cfgAdminPw').value;
-  const sec = document.getElementById('adminSection');
-  const btn = document.getElementById('adminUnlockBtn');
-  const row = document.getElementById('adminPwRow');
-  if (sec.style.display !== 'none') { sec.style.display = 'none'; row.style.display = 'flex'; btn.textContent = '🔒 Unlock'; return; }
-  if (pw !== S.config.adminPassword) { toast('Incorrect admin password.', 'err'); return; }
-  sec.style.display = 'block'; row.style.display = 'none'; btn.textContent = '🔓 Lock';
-  document.getElementById('cfgPrompt').value = cfg().prompt;
-}
-function resetPrompt() {
-  if (!confirm('Reset to the default built-in prompt?')) return;
-  document.getElementById('cfgPrompt').value = '';
-  ls('ac_prompt_draft', '');
-  toast('Prompt reset to default.', 'ok');
-}
-function saveSettings() {
-  ls('ac_prompt_draft', document.getElementById('cfgPrompt').value.trim());
-  closeSettings();
-  toast('Prompt saved. To make it permanent for all users, update bizplan-config.json on GitHub.', 'ok');
-}
+/* Settings removed — prompt config managed server-side via admin panel */
 
 /* ── GOOGLE OAUTH ─────────────────────────────────────────────────── */
 function initOAuth() {
@@ -547,7 +550,7 @@ function collect() {
 
 /* ── PROMPT ───────────────────────────────────────────────────────── */
 function buildPrompt(d) {
-  const custom = ls('ac_prompt_draft') || S.config.prompt || '';
+  const custom = S.config.prompt || '';
   const ctx = S.config.context ? `### ADAMS, CAMERON & CO. TRAINING CONTEXT\n${S.config.context}\n\n---\n\n` : '';
   if (custom) return ctx + custom.replace(/\$\{d\.(\w+)\}/g, (_, k) => d[k] || '');
   return ctx + `Act as a Senior Real Estate Coach and Business Strategist. Generate a comprehensive, professional, highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
@@ -606,7 +609,7 @@ async function generatePlan() {
     document.getElementById('deskCard').style.display = 'block';
     generateInfographic().catch(e => console.error('[Infographic]', e));
     generateDeskCard().catch(e => console.error('[DeskCard]', e));
-    if (!S.enrollmentId) setTimeout(() => showStrategyCard(), 2000);
+    if (!S.enrollmentId) setTimeout(() => showGoalConfirmCard(), 1500);
   } catch (e) {
     show('step3'); setProgress(3);
     toast('Generation failed: ' + e.message, 'err');
@@ -830,7 +833,7 @@ function doReset() {
   S.planId = null; S.enrollmentId = null;
   document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea').forEach(el => el.value = '');
   [['f_listR',50,'f_listV','50% Sellers'],['f_timeR',0,'f_timeV','0 hrs/wk'],['f_budgetR',0,'f_budgetV','0'],['f_soiR',0,'f_soiV','0 contacts'],['f_expR',0,'f_expV','0 yrs']].forEach(([r,v,lbl,txt]) => { document.getElementById(r).value=v; document.getElementById(lbl).textContent=txt; if(document.getElementById(r.replace('R',''))){ document.getElementById(r.replace('R','')).value=v; } });
-  ['infographicCard','deskCard','strategyCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['infographicCard','deskCard','goalConfirmCard','strategyCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
   goTo(1);
 }
 
@@ -908,13 +911,106 @@ function buildCommitmentList() {
   el.innerHTML = [`□ &nbsp;${Math.max(5,Math.round(h*0.5))} SOI contacts per week`,`□ &nbsp;${Math.max(3,Math.round(h*0.15))} social posts via AC Social`,`□ &nbsp;${Math.max(2,Math.round(h*0.15))} hours of floor time`,`□ &nbsp;${Math.ceil((listSides/12)/0.8)} listing appointments per month`,`□ &nbsp;${Math.ceil((buyeSides/12)*3)} buyer prospects per month`,'□ &nbsp;Weekly check-in (web or text, 5 minutes)','□ &nbsp;Monthly coaching session with your coach'].join('<br>');
 }
 
+
+/* ── GOAL CONFIRMATION ────────────────────────────────────────────── */
+function showGoalConfirmCard() {
+  const d = S.data;
+  // Populate adjust fields from current data
+  const earnNum  = parseFloat((d.earn  || '0').replace(/[^0-9.]/g, '')) || 0;
+  const priceNum = parseFloat((d.price || '0').replace(/[^0-9.]/g, '')) || 0;
+  const hoursNum = parseInt(d.time) || 0;
+  const listNum  = parseInt(d.list) || 50;
+
+  document.getElementById('gc_earn').value  = earnNum  || '';
+  document.getElementById('gc_price').value = priceNum || '';
+  document.getElementById('gc_hours').value = hoursNum || '';
+  const mixSel = document.getElementById('gc_mix');
+  const closest = ['0','25','50','75','100'].reduce((a, b) => Math.abs(parseInt(b) - listNum) < Math.abs(parseInt(a) - listNum) ? b : a);
+  mixSel.value = closest;
+
+  recalcGoals();
+  document.getElementById('goalConfirmCard').style.display = 'block';
+  setTimeout(() => document.getElementById('goalConfirmCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+}
+
+function recalcGoals() {
+  const earnNum  = parseFloat(document.getElementById('gc_earn').value)  || 0;
+  const priceNum = parseFloat(document.getElementById('gc_price').value) || 0;
+  const hoursNum = parseInt(document.getElementById('gc_hours').value)   || 0;
+  const listPct  = parseInt(document.getElementById('gc_mix').value)     / 100;
+
+  const gci       = earnNum  > 0 ? Math.ceil(earnNum / 0.65) : 0;
+  const sides     = (gci > 0 && priceNum > 0) ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+  const listSides = Math.ceil(sides * listPct);
+  const buyeSides = sides - listSides;
+  const listAppts = Math.ceil((listSides / 12) / 0.8);
+  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
+
+  const soiCalls    = Math.max(5,  Math.round(hoursNum * 0.5));
+  const socialPosts = Math.max(3,  Math.round(hoursNum * 0.15));
+  const floorHrs    = Math.max(2,  Math.round(hoursNum * 0.15));
+  const followUps   = Math.max(5,  Math.round(hoursNum * 0.4));
+
+  const fmt = n => n > 0 ? '$' + n.toLocaleString() : '—';
+
+  // Numbers grid
+  const nums = [
+    ['Annual Goal',          earnNum > 0 ? '$' + earnNum.toLocaleString() : '—'],
+    ['GCI Required',         fmt(gci)],
+    ['Total Sides Needed',   sides > 0 ? sides + ' sides' : '—'],
+    ['Listing Appts / Mo',   listAppts > 0 ? listAppts + ' appts' : '—'],
+    ['Buyer Prospects / Mo', buyProsp > 0 ? buyProsp + ' prospects' : '—'],
+    ['Hours / Week',         hoursNum > 0 ? hoursNum + ' hrs' : '—'],
+  ];
+  document.getElementById('goalConfirmNumbers').innerHTML = nums.map(([label, val]) => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:0.65rem 0.85rem">
+      <div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.2rem">${label}</div>
+      <div style="font-size:1.05rem;font-weight:600;color:var(--gold);font-family:'Cormorant Garamond',serif">${val}</div>
+    </div>`).join('');
+
+  // Weekly commitments
+  const commitments = [
+    `${soiCalls} SOI contacts`,
+    `${socialPosts} AC Social posts`,
+    `${floorHrs} hrs floor time`,
+    `${followUps} lead follow-ups`,
+    `${listAppts} listing appts (monthly target)`,
+    `${buyProsp} buyer prospects (monthly target)`,
+    'Weekly check-in — about 5 minutes',
+    'Monthly coaching session',
+  ];
+  document.getElementById('goalConfirmCommitments').innerHTML = commitments.map(c => `□ &nbsp;${c}`).join('<br>');
+}
+
+function confirmGoalsAndContinue() {
+  // Write adjusted values back into S.data
+  const earnNum  = parseFloat(document.getElementById('gc_earn').value)  || 0;
+  const priceNum = parseFloat(document.getElementById('gc_price').value) || 0;
+  const hoursNum = parseInt(document.getElementById('gc_hours').value)   || 0;
+  const listPct  = parseInt(document.getElementById('gc_mix').value);
+
+  if (earnNum > 0) S.data.earn  = '$' + earnNum.toLocaleString();
+  if (priceNum > 0) S.data.price = '$' + priceNum.toLocaleString();
+  if (hoursNum > 0) S.data.time  = hoursNum + ' hours/week';
+  S.data.list = listPct + '% sellers / ' + (100 - listPct) + '% buyers';
+
+  document.getElementById('goalConfirmCard').style.display = 'none';
+  showStrategyCard();
+}
+
 /* ── STRATEGIES ───────────────────────────────────────────────────── */
 async function loadStrategyLibrary() {
-  if (S.strategies.length) return;
+  if (Array.isArray(S.strategies) && S.strategies.length) return;
   try {
     const res = await fetch(`${PROXY_BASE}/strategies`, { headers: {'x-proxy-key': PROXY_KEY} });
-    if (res.ok) S.strategies = await res.json();
-  } catch(e) { console.warn('[Strategies]', e.message); }
+    if (res.ok) {
+      const data = await res.json();
+      S.strategies = Array.isArray(data) ? data : [];
+    }
+  } catch(e) {
+    console.warn('[Strategies]', e.message);
+    S.strategies = [];
+  }
 }
 
 async function suggestStrategies() {
