@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Progress — AC Pathfinder</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #1a1a2e;
+      --ink-soft:   #2d2d4a;
+      --gold:       #c9a84c;
+      --gold-light: #e8c96a;
+      --cream:      #faf8f3;
+      --cream-dark: #f0ece0;
+      --slate:      #5a5a78;
+      --muted:      #8a8aa8;
+      --green:      #2ecc71;
+      --green-soft: rgba(46,204,113,.1);
+      --red:        #e74c3c;
+      --red-soft:   rgba(231,76,60,.1);
+      --shadow:     0 2px 20px rgba(26,26,46,.08);
+      --shadow-lg:  0 8px 40px rgba(26,26,46,.14);
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 24px rgba(0,0,0,.3);
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      text-decoration: none;
+    }
+    .logo-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--cream);
+    }
+    .logo-text span { color: var(--gold); }
+    .logo-back {
+      font-size: .75rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    .logo-back:hover { color: var(--gold); }
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+    #userAvatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1.5px solid rgba(255,255,255,.2);
+    }
+    #userName {
+      font-size: .82rem;
+      font-weight: 500;
+      color: var(--cream);
+    }
+    #signOutBtn {
+      font-size: .72rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      margin-left: .25rem;
+    }
+    #signOutBtn:hover { color: var(--gold); }
+
+    /* ── STATES ── */
+    .state {
+      display: none;
+      text-align: center;
+      padding: 6rem 2rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .state.active { display: block; }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid var(--cream-dark);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    .state p { font-size: .9rem; color: var(--muted); }
+    .state h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      color: var(--ink);
+      margin-bottom: .75rem;
+    }
+    .btn-primary {
+      display: inline-block;
+      margin-top: 1.25rem;
+      padding: .75rem 1.75rem;
+      background: var(--gold);
+      color: var(--ink);
+      font-family: 'Outfit', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: var(--gold-light); }
+
+    /* ── PROFILE HERO ── */
+    #dashboard { display: none; }
+    .profile-hero {
+      background: var(--ink);
+      padding: 2.5rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .profile-hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 100% 50%, rgba(201,168,76,.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .profile-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1.75rem;
+      flex-wrap: wrap;
+    }
+    #profilePhoto {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(201,168,76,.4);
+      flex-shrink: 0;
+      background: var(--ink-soft);
+    }
+    .profile-info {}
+    .profile-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--cream);
+      line-height: 1.2;
+    }
+    .profile-meta {
+      display: flex;
+      gap: 1.25rem;
+      margin-top: .5rem;
+      flex-wrap: wrap;
+    }
+    .profile-meta-item {
+      font-size: .8rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .meta-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    /* ── STAT CARDS ── */
+    .stats-row {
+      max-width: 1100px;
+      margin: -1.5rem auto 0;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      position: relative;
+      z-index: 10;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(26,26,46,.05);
+    }
+    .stat-label {
+      font-size: .68rem;
+      font-weight: 500;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .4rem;
+    }
+    .stat-value {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1;
+    }
+    .stat-value.gold { color: var(--gold); }
+    .stat-sub {
+      font-size: .75rem;
+      color: var(--slate);
+      margin-top: .3rem;
+    }
+
+    /* ── MAIN GRID ── */
+    .main-grid {
+      max-width: 1100px;
+      margin: 2.5rem auto;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: white;
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,.06);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--cream-dark);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .panel-tag {
+      font-size: .68rem;
+      font-weight: 500;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: .2rem .6rem;
+      border-radius: 100px;
+      background: rgba(201,168,76,.12);
+      color: var(--gold);
+    }
+    .panel-body { padding: 1.5rem; }
+
+    /* ── CHECK-IN HISTORY ── */
+    .checkin-list { display: flex; flex-direction: column; gap: .75rem; }
+    .checkin-row {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      align-items: center;
+      gap: 1rem;
+      padding: .85rem 1rem;
+      background: var(--cream);
+      border-radius: 10px;
+      border: 1px solid rgba(26,26,46,.06);
+      transition: border-color .2s;
+    }
+    .checkin-row:hover { border-color: rgba(201,168,76,.3); }
+    .checkin-date {
+      font-size: .78rem;
+      font-weight: 500;
+      color: var(--slate);
+    }
+    .checkin-activities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .activity-pill {
+      font-size: .72rem;
+      padding: .2rem .55rem;
+      border-radius: 100px;
+      background: rgba(26,26,46,.06);
+      color: var(--slate);
+    }
+    .checkin-score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 48px;
+    }
+    .score-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .score-num.high   { color: #27ae60; }
+    .score-num.mid    { color: var(--gold); }
+    .score-num.low    { color: var(--red); }
+    .score-num.none   { color: var(--muted); font-size: 1rem; }
+    .score-label { font-size: .62rem; color: var(--muted); margin-top: .15rem; }
+
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--muted);
+      font-size: .88rem;
+    }
+    .empty-state .empty-icon { font-size: 2rem; margin-bottom: .75rem; }
+
+    /* ── SCORECARD PANEL ── */
+    .score-trend {
+      display: flex;
+      gap: .5rem;
+      align-items: flex-end;
+      height: 60px;
+      margin-bottom: 1rem;
+    }
+    .trend-bar {
+      flex: 1;
+      border-radius: 4px 4px 0 0;
+      min-height: 4px;
+      position: relative;
+      transition: background .3s;
+    }
+    .trend-bar:hover::after {
+      content: attr(data-score);
+      position: absolute;
+      bottom: 105%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--cream);
+      font-size: .7rem;
+      padding: .2rem .45rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .wins-box {
+      background: var(--green-soft);
+      border: 1px solid rgba(46,204,113,.2);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .wins-label {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #27ae60;
+      margin-bottom: .4rem;
+    }
+    .wins-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
+    .attention-box {
+      background: rgba(201,168,76,.08);
+      border: 1px solid rgba(201,168,76,.25);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .attention-label {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: .4rem;
+    }
+    .attention-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
+
+    /* ── PLAN PANEL ── */
+    .plan-targets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+      margin-bottom: 1.25rem;
+    }
+    .target-item {
+      background: var(--cream);
+      border-radius: 10px;
+      padding: .85rem 1rem;
+    }
+    .target-label {
+      font-size: .7rem;
+      color: var(--muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .25rem;
+    }
+    .target-val {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .why-box {
+      background: linear-gradient(135deg, rgba(201,168,76,.08), rgba(201,168,76,.04));
+      border: 1px solid rgba(201,168,76,.2);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+    }
+    .why-label {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: .4rem;
+    }
+    .why-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem;
+      font-style: italic;
+      color: var(--ink-soft);
+      line-height: 1.55;
+    }
+
+    /* ── PREFERENCES PANEL ── */
+    .pref-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--cream-dark);
+      gap: 1rem;
+    }
+    .pref-row:last-child { border-bottom: none; }
+    .pref-info {}
+    .pref-title { font-size: .92rem; font-weight: 500; color: var(--ink); margin-bottom: .2rem; }
+    .pref-desc { font-size: .78rem; color: var(--slate); line-height: 1.5; }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--cream-dark);
+      border-radius: 24px;
+      cursor: pointer;
+      transition: background .3s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: white;
+      left: 3px; top: 3px;
+      transition: transform .3s;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    .toggle input:checked + .toggle-slider { background: var(--gold); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .pref-status {
+      font-size: .72rem;
+      font-weight: 500;
+      margin-top: .3rem;
+    }
+    .pref-status.on  { color: #27ae60; }
+    .pref-status.off { color: var(--muted); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--ink);
+      color: var(--muted);
+      text-align: center;
+      padding: 2rem;
+      font-size: .8rem;
+      margin-top: 3rem;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 820px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .profile-inner { gap: 1rem; }
+      .profile-name { font-size: 1.4rem; }
+      .checkin-row { grid-template-columns: 80px 1fr auto; gap: .6rem; }
+      .plan-targets { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="./pathfinder.html">
+      <span class="logo-back">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Hub
+      </span>
+      <span class="logo-text">AC <span>Pathfinder</span></span>
+    </a>
+    <div class="header-user">
+      <img id="userAvatar" src="" alt="" style="display:none">
+      <span id="userName" style="display:none"></span>
+      <button id="signOutBtn" style="display:none" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<!-- LOADING -->
+<div class="state active" id="loadingState">
+  <div class="spinner"></div>
+  <p>Loading your dashboard…</p>
+</div>
+
+<!-- SIGN IN REQUIRED -->
+<div class="state" id="signInState">
+  <h2>Sign in to continue</h2>
+  <p>Use your @adamscameron.com Google account to view your coaching dashboard.</p>
+  <button class="btn-primary" onclick="startSignIn()">Sign in with Google</button>
+</div>
+
+<!-- NOT ENROLLED -->
+<div class="state" id="notEnrolledState">
+  <div style="font-size:2.5rem;margin-bottom:1rem">📋</div>
+  <h2>No active plan yet</h2>
+  <p>You'll need to build your business plan first — that's what enrolls you in coaching and unlocks your dashboard.</p>
+  <a class="btn-primary" href="./business-plan-generator.html">Build My Business Plan</a>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- Profile Hero -->
+  <div class="profile-hero">
+    <div class="profile-inner">
+      <img id="profilePhoto" src="" alt="">
+      <div class="profile-info">
+        <div class="profile-name" id="profileName">Loading…</div>
+        <div class="profile-meta">
+          <div class="profile-meta-item"><div class="meta-dot"></div> <span id="profileOffice"></span></div>
+          <div class="profile-meta-item" id="profileCoachWrap" style="display:none">
+            <div class="meta-dot" style="background:var(--muted)"></div>
+            Coach: <span id="profileCoach"></span>
+          </div>
+          <div class="profile-meta-item" id="enrollBadge"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">GCI Goal</div>
+      <div class="stat-value gold" id="statGci">—</div>
+      <div class="stat-sub">Annual target</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sides Needed</div>
+      <div class="stat-value" id="statSides">—</div>
+      <div class="stat-sub" id="statSidesSub">per year</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Hrs / Week</div>
+      <div class="stat-value" id="statHours">—</div>
+      <div class="stat-sub">committed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Check-ins</div>
+      <div class="stat-value" id="statCheckins">—</div>
+      <div class="stat-sub" id="statCheckinSub">total completed</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+
+    <!-- LEFT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+      <!-- Check-in History -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Recent Check-Ins</div>
+          <span class="panel-tag" id="historyCount">Last 8 weeks</span>
+        </div>
+        <div class="panel-body">
+          <div class="checkin-list" id="checkinList">
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <p>No check-ins yet.<br>Your history will appear here after your first check-in.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Plan -->
+      <div class="panel" id="planPanel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">My Business Plan</div>
+          <a href="./business-plan-generator.html" style="font-size:.8rem;color:var(--gold);text-decoration:none;font-weight:500">Revisit Plan →</a>
+        </div>
+        <div class="panel-body">
+          <div class="plan-targets" id="planTargets"></div>
+          <div class="why-box" id="whyBox" style="display:none">
+            <div class="why-label">Why I'm doing this</div>
+            <div class="why-text" id="whyText"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+      <!-- Latest Scorecard -->
+      <div class="panel" id="scorecardPanel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">Scorecard Trend</div>
+          <span class="panel-tag" id="latestScore"></span>
+        </div>
+        <div class="panel-body">
+          <div class="score-trend" id="scoreTrend"></div>
+          <div class="wins-box" id="winsBox" style="display:none">
+            <div class="wins-label">🟢 Wins this week</div>
+            <div class="wins-text" id="winsText"></div>
+          </div>
+          <div class="attention-box" id="attentionBox" style="display:none">
+            <div class="attention-label">💡 For your coach</div>
+            <div class="attention-text" id="attentionText"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Communication Preferences -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Notifications</div>
+        </div>
+        <div class="panel-body">
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <div class="pref-title">Weekly SMS Check-In</div>
+              <div class="pref-desc">Receive a text message each week with your check-in questions. Reply directly to complete your check-in from your phone.</div>
+              <div class="pref-status" id="smsStatus"></div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="smsToggle" onchange="updateSmsPref(this.checked)">
+              <div class="toggle-slider"></div>
+            </label>
+          </div>
+
+          <div class="pref-row">
+            <div class="pref-info">
+              <div class="pref-title">Coach Feedback Emails</div>
+              <div class="pref-desc">Get an email when your coach leaves feedback or coaching notes on your check-in.</div>
+              <div class="pref-status off">Coming soon</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" disabled>
+              <div class="toggle-slider" style="opacity:.4;cursor:not-allowed"></div>
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Coach Info -->
+      <div class="panel" id="coachPanel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">My Coach</div>
+        </div>
+        <div class="panel-body" style="display:flex;align-items:center;gap:1rem">
+          <div style="width:48px;height:48px;border-radius:50%;background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">👤</div>
+          <div>
+            <div style="font-weight:600;color:var(--ink)" id="coachName"></div>
+            <div style="font-size:.8rem;color:var(--slate);margin-top:.2rem" id="coachEmail"></div>
+            <div style="font-size:.75rem;color:var(--muted);margin-top:.1rem">Adams, Cameron & Co.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- /dashboard -->
+
+<footer>
+  AC Pathfinder &nbsp;·&nbsp; Adams, Cameron & Co.  &nbsp;·&nbsp;
+  <a href="./terms.html">Terms</a> &nbsp;·&nbsp;
+  <a href="./privacy-policy.html">Privacy</a>
+</footer>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let agentId = null;
+let smsOptedIn = false;
+
+// ── Google Auth ────────────────────────────────────────────────────────────────
+let tokenClient;
+const poll = setInterval(() => {
+  if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
+}, 100);
+
+function initOAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT,
+    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+    callback: async (resp) => {
+      if (resp.error) return;
+      const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${resp.access_token}` }
+      });
+      const user = await r.json();
+      onSignedIn(user.email, user.given_name || user.name, user.picture);
+    }
+  });
+
+  google.accounts.id.initialize({
+    client_id: OAUTH_CLIENT,
+    callback: (resp) => {
+      const p = JSON.parse(atob(resp.credential.split('.')[1]));
+      onSignedIn(p.email, p.given_name || p.name, p.picture);
+    },
+    auto_select: true,
+  });
+  google.accounts.id.prompt();
+
+  // Give auto-select 1.5s, then show sign-in prompt if not signed in
+  setTimeout(() => {
+    if (document.getElementById('loadingState').classList.contains('active')) {
+      setState('signInState');
+    }
+  }, 1500);
+}
+
+function startSignIn() {
+  if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function signOut() {
+  google.accounts.id.disableAutoSelect();
+  location.href = './pathfinder.html';
+}
+
+async function onSignedIn(email, name, picture) {
+  // Show header user
+  const av = document.getElementById('userAvatar');
+  av.src = picture || '';
+  av.style.display = 'block';
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userName').style.display = 'inline';
+  document.getElementById('signOutBtn').style.display = 'inline';
+
+  setState('loadingState');
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/agent/profile`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+    });
+    const profile = await res.json();
+
+    if (!profile.found || !profile.enrollment_id) {
+      setState('notEnrolledState');
+      return;
+    }
+
+    agentId    = profile.id;
+    smsOptedIn = profile.sms_opted_in || false;
+
+    populateProfile(profile, picture);
+
+    // Load check-in history in parallel
+    const histRes = await fetch(`${PROXY_BASE}/checkin/history/${agentId}`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+    });
+    const history = histRes.ok ? await histRes.json() : [];
+
+    populateHistory(history);
+    populatePlan(profile);
+    populatePreferences(profile);
+
+    setState(null);
+    document.getElementById('dashboard').style.display = 'block';
+
+  } catch (e) {
+    setState('notEnrolledState');
+    console.error(e);
+  }
+}
+
+function setState(id) {
+  ['loadingState','signInState','notEnrolledState'].forEach(s => {
+    document.getElementById(s).classList.toggle('active', s === id);
+  });
+}
+
+// ── Profile ────────────────────────────────────────────────────────────────────
+function populateProfile(p, picture) {
+  document.getElementById('profilePhoto').src = picture || p.photo_url || '';
+  document.getElementById('profileName').textContent = `${p.first_name} ${p.last_name}`;
+  document.getElementById('profileOffice').textContent = p.office || 'Adams, Cameron & Co.';
+
+  if (p.coach_name) {
+    document.getElementById('profileCoach').textContent = p.coach_name;
+    document.getElementById('profileCoachWrap').style.display = 'flex';
+    document.getElementById('coachPanel').style.display = 'block';
+    document.getElementById('coachName').textContent  = p.coach_name;
+    document.getElementById('coachEmail').textContent = p.coach_email || '';
+  }
+
+  const badge = document.getElementById('enrollBadge');
+  if (p.enrollment_status === 'active') {
+    badge.innerHTML = '<span style="color:#27ae60;font-size:.9rem">●</span> &nbsp;Enrolled in coaching';
+  } else {
+    badge.innerHTML = '<span style="color:var(--muted);font-size:.9rem">●</span> &nbsp;Coaching paused';
+  }
+
+  // Stats
+  const fmt = (n) => n ? '$' + Number(n).toLocaleString() : '—';
+  document.getElementById('statGci').textContent    = fmt(p.gci_required);
+  document.getElementById('statSides').textContent  = p.sides_required || '—';
+  document.getElementById('statHours').textContent  = p.time_commitment_hrs || '—';
+}
+
+// ── Check-in History ───────────────────────────────────────────────────────────
+function populateHistory(rows) {
+  const list = document.getElementById('checkinList');
+  const completed = rows.filter(r => r.completed);
+
+  document.getElementById('statCheckins').textContent = completed.length;
+
+  if (!completed.length) return;
+
+  document.getElementById('historyCount').textContent = `${Math.min(completed.length, 8)} weeks`;
+
+  // Show scorecard panel if any scores exist
+  const withScores = completed.filter(r => r.commitment_score != null);
+  if (withScores.length) populateScorecard(withScores);
+
+  list.innerHTML = completed.slice(0, 8).map(c => {
+    const date = c.completed_at
+      ? new Date(c.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : (c.check_in_year && c.week_number ? `Wk ${c.week_number}` : '—');
+
+    const pills = [];
+    if (c.soi_calls)       pills.push(`${c.soi_calls} calls`);
+    if (c.floor_hours)     pills.push(`${c.floor_hours}h floor`);
+    if (c.social_posts)    pills.push(`${c.social_posts} posts`);
+    if (c.listing_appts)   pills.push(`${c.listing_appts} listing appts`);
+    if (c.buyer_prospects) pills.push(`${c.buyer_prospects} buyers`);
+    if (!pills.length)     pills.push('Completed');
+
+    const score = c.commitment_score;
+    let scoreClass = 'none', scoreDisplay = '—';
+    if (score != null) {
+      scoreDisplay = score;
+      scoreClass = score >= 75 ? 'high' : score >= 45 ? 'mid' : 'low';
+    }
+
+    const channel = c.channel === 'web' ? '🌐' : '📱';
+
+    return `
+      <div class="checkin-row">
+        <div class="checkin-date">${channel} ${date}</div>
+        <div class="checkin-activities">
+          ${pills.slice(0, 3).map(p => `<span class="activity-pill">${p}</span>`).join('')}
+          ${pills.length > 3 ? `<span class="activity-pill">+${pills.length - 3} more</span>` : ''}
+        </div>
+        <div class="checkin-score">
+          <div class="score-num ${scoreClass}">${scoreDisplay}</div>
+          <div class="score-label">${score != null ? 'score' : 'pending'}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Scorecard ─────────────────────────────────────────────────────────────────
+function populateScorecard(rows) {
+  const panel = document.getElementById('scorecardPanel');
+  panel.style.display = 'block';
+
+  const latest = rows[0];
+  const score  = latest.commitment_score;
+  document.getElementById('latestScore').textContent = `Score: ${score}`;
+
+  // Trend bars (last 8)
+  const trendData = rows.slice(0, 8).reverse();
+  const trendEl   = document.getElementById('scoreTrend');
+  trendEl.innerHTML = trendData.map(r => {
+    const s   = r.commitment_score || 0;
+    const pct = Math.max(8, (s / 100) * 100);
+    const col = s >= 75 ? '#27ae60' : s >= 45 ? '#c9a84c' : '#e74c3c';
+    return `<div class="trend-bar" style="height:${pct}%;background:${col}" data-score="${s}" title="${s}"></div>`;
+  }).join('');
+
+  if (latest.wins_narrative) {
+    document.getElementById('winsBox').style.display = 'block';
+    document.getElementById('winsText').textContent  = latest.wins_narrative;
+  }
+  if (latest.coach_attention_needed) {
+    document.getElementById('attentionBox').style.display = 'block';
+    document.getElementById('attentionText').textContent  = latest.coach_attention_needed;
+  }
+}
+
+// ── Plan ───────────────────────────────────────────────────────────────────────
+function populatePlan(p) {
+  if (!p.plan_id) return;
+  document.getElementById('planPanel').style.display = 'block';
+
+  const fmt = (n) => n ? '$' + Number(n).toLocaleString() : '—';
+  const targets = [
+    { label: 'Earning Goal',         val: fmt(p.earning_goal) },
+    { label: 'GCI Required',         val: fmt(p.gci_required) },
+    { label: 'Listing Appts/Mo',     val: p.listing_appts_monthly || '—' },
+    { label: 'Buyer Prospects/Mo',   val: p.buyer_prospects_monthly || '—' },
+  ];
+
+  document.getElementById('planTargets').innerHTML = targets.map(t => `
+    <div class="target-item">
+      <div class="target-label">${t.label}</div>
+      <div class="target-val">${t.val}</div>
+    </div>
+  `).join('');
+
+  if (p.why_text) {
+    document.getElementById('whyBox').style.display = 'block';
+    document.getElementById('whyText').textContent  = p.why_text;
+  }
+}
+
+// ── Preferences ───────────────────────────────────────────────────────────────
+function populatePreferences(p) {
+  const toggle = document.getElementById('smsToggle');
+  toggle.checked = p.sms_opted_in || false;
+  smsOptedIn = p.sms_opted_in || false;
+  updateSmsStatus(p.sms_opted_in);
+}
+
+function updateSmsStatus(on) {
+  const el = document.getElementById('smsStatus');
+  el.textContent = on ? 'Currently receiving weekly SMS check-ins' : 'SMS check-ins are off';
+  el.className   = 'pref-status ' + (on ? 'on' : 'off');
+}
+
+async function updateSmsPref(enabled) {
+  updateSmsStatus(enabled);
+  if (!agentId) return;
+
+  try {
+    await fetch(`${PROXY_BASE}/agent/${agentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-proxy-key': PROXY_KEY,
+      },
+      body: JSON.stringify({ smsOptedIn: enabled }),
+    });
+  } catch (e) {
+    console.error('Failed to update SMS preference:', e);
+    // Revert on failure
+    document.getElementById('smsToggle').checked = !enabled;
+    updateSmsStatus(!enabled);
+  }
+}
+</script>
+</body>
+</html>

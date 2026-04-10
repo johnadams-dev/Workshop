@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AC Pathfinder — Adams, Cameron & Co.</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #1a1a2e;
+      --ink-soft:   #2d2d4a;
+      --gold:       #c9a84c;
+      --gold-light: #e8c96a;
+      --cream:      #faf8f3;
+      --cream-dark: #f0ece0;
+      --slate:      #5a5a78;
+      --muted:      #8a8aa8;
+      --green:      #2ecc71;
+      --red:        #e74c3c;
+      --shadow:     0 2px 20px rgba(26,26,46,.08);
+      --shadow-lg:  0 8px 40px rgba(26,26,46,.15);
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 24px rgba(0,0,0,.3);
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: .02em;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .logo-path { color: var(--gold); }
+    .logo-sub {
+      font-family: 'Outfit', sans-serif;
+      font-size: .65rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-left: .25rem;
+      align-self: flex-end;
+      padding-bottom: .1rem;
+    }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    #userChip {
+      display: none;
+      align-items: center;
+      gap: .6rem;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 100px;
+      padding: .3rem .8rem .3rem .4rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #userChip:hover { background: rgba(255,255,255,.12); }
+    #userAvatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    #userName {
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--cream);
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #signOutBtn {
+      font-size: .72rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    #signOutBtn:hover { color: var(--gold); }
+
+    /* ── HERO ── */
+    .hero {
+      background: var(--ink);
+      padding: 5rem 2rem 4.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 120%, rgba(201,168,76,.14) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: .7rem;
+      font-weight: 500;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1.2rem;
+      opacity: 0;
+      animation: fadeUp .6s ease .1s forwards;
+    }
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      font-weight: 600;
+      color: var(--cream);
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      opacity: 0;
+      animation: fadeUp .6s ease .2s forwards;
+    }
+    .hero h1 em { color: var(--gold); font-style: italic; }
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 500px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.7;
+      font-weight: 300;
+      opacity: 0;
+      animation: fadeUp .6s ease .3s forwards;
+    }
+
+    /* Pre-auth sign-in block */
+    #preAuth {
+      opacity: 0;
+      animation: fadeUp .6s ease .4s forwards;
+    }
+    .signin-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .75rem;
+      background: white;
+      color: #3c4043;
+      font-family: 'Outfit', sans-serif;
+      font-size: .95rem;
+      font-weight: 500;
+      padding: .75rem 1.75rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0,0,0,.25);
+      transition: box-shadow .2s, transform .15s;
+    }
+    .signin-btn:hover { box-shadow: 0 4px 20px rgba(0,0,0,.35); transform: translateY(-1px); }
+    .signin-btn svg { flex-shrink: 0; }
+    .signin-note {
+      margin-top: 1rem;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    /* ── GREETING BAR (post-auth) ── */
+    #greeting {
+      display: none;
+      background: rgba(201,168,76,.08);
+      border-bottom: 1px solid rgba(201,168,76,.2);
+    }
+    .greeting-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .75rem;
+    }
+    .greeting-text { font-size: .95rem; color: var(--ink-soft); }
+    .greeting-text strong { color: var(--ink); font-weight: 600; }
+    .greeting-meta {
+      font-size: .8rem;
+      color: var(--slate);
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .greeting-meta span { display: flex; align-items: center; gap: .35rem; }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot-green { background: var(--green); }
+    .dot-gold  { background: var(--gold); }
+    .dot-muted { background: var(--muted); }
+
+    /* ── MAIN CONTENT ── */
+    #mainContent { display: none; }
+
+    .section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3.5rem 2rem;
+    }
+    .section-label {
+      font-size: .68rem;
+      font-weight: 500;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: .4rem;
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 2rem;
+    }
+
+    /* ── PORTAL CARDS ── */
+    .portal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 1.25rem;
+    }
+    .portal-card {
+      background: white;
+      border-radius: 14px;
+      padding: 1.75rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,.06);
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: transform .22s ease, box-shadow .22s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .portal-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gold);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform .3s ease;
+    }
+    .portal-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .portal-card:hover::after { transform: scaleX(1); }
+    .portal-card.locked { opacity: .5; cursor: not-allowed; }
+    .portal-card.locked:hover { transform: none; box-shadow: var(--shadow); }
+    .portal-card.locked::after { display: none; }
+    .portal-card.highlight { border-color: rgba(201,168,76,.3); background: linear-gradient(135deg, #fff 80%, rgba(201,168,76,.04)); }
+
+    .card-icon {
+      font-size: 2rem;
+      line-height: 1;
+    }
+    .card-badge {
+      position: absolute;
+      top: 1.25rem; right: 1.25rem;
+      font-size: .65rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: .2rem .6rem;
+      border-radius: 100px;
+    }
+    .badge-gold { background: rgba(201,168,76,.15); color: var(--gold); }
+    .badge-green { background: rgba(46,204,113,.12); color: #27ae60; }
+    .badge-slate { background: rgba(90,90,120,.1); color: var(--slate); }
+
+    .card-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+    .card-desc {
+      font-size: .85rem;
+      color: var(--slate);
+      line-height: 1.65;
+      flex: 1;
+    }
+    .card-action {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .82rem;
+      font-weight: 500;
+      color: var(--gold);
+      margin-top: .25rem;
+    }
+    .card-action svg { transition: transform .2s; }
+    .portal-card:hover .card-action svg { transform: translateX(3px); }
+
+    /* ── DIVIDER ── */
+    hr.divider { border: none; border-top: 1px solid var(--cream-dark); }
+
+    /* ── CHECK-IN MODAL ── */
+    #checkinOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26,26,46,.75);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    #checkinOverlay.open { display: flex; }
+    .checkin-modal {
+      background: white;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(0,0,0,.3);
+    }
+    .checkin-header {
+      background: var(--ink);
+      border-radius: 20px 20px 0 0;
+      padding: 1.75rem 2rem 1.5rem;
+      position: relative;
+    }
+    .checkin-header h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--cream);
+      margin-bottom: .25rem;
+    }
+    .checkin-header p {
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    .checkin-close {
+      position: absolute;
+      top: 1.25rem; right: 1.25rem;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.1);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--cream);
+      font-size: 1.1rem;
+      transition: background .2s;
+    }
+    .checkin-close:hover { background: rgba(255,255,255,.2); }
+
+    /* Progress dots */
+    .checkin-progress {
+      display: flex;
+      gap: .4rem;
+      padding: 1.25rem 2rem .5rem;
+      align-items: center;
+    }
+    .progress-dot {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--cream-dark);
+      transition: background .3s;
+    }
+    .progress-dot.done { background: var(--gold); }
+    .progress-dot.active { background: var(--gold-light); }
+
+    /* Steps */
+    .checkin-body { padding: 1.5rem 2rem 2rem; }
+    .checkin-step { display: none; }
+    .checkin-step.active { display: block; }
+
+    .step-question {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: .5rem;
+      line-height: 1.3;
+    }
+    .step-hint {
+      font-size: .82rem;
+      color: var(--slate);
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+
+    .step-input {
+      width: 100%;
+      padding: .85rem 1rem;
+      border: 1.5px solid var(--cream-dark);
+      border-radius: 10px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      color: var(--ink);
+      background: var(--cream);
+      transition: border-color .2s;
+      outline: none;
+    }
+    .step-input:focus { border-color: var(--gold); background: white; }
+    textarea.step-input { resize: vertical; min-height: 90px; }
+
+    .pair-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .pair-label {
+      font-size: .75rem;
+      font-weight: 500;
+      color: var(--slate);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: .35rem;
+    }
+
+    /* Mood picker */
+    .mood-row {
+      display: flex;
+      gap: .75rem;
+      justify-content: space-between;
+      margin-top: .5rem;
+    }
+    .mood-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .4rem;
+      padding: .85rem .5rem;
+      border: 1.5px solid var(--cream-dark);
+      border-radius: 10px;
+      background: var(--cream);
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      font-size: 1.5rem;
+    }
+    .mood-btn span { font-size: .7rem; color: var(--slate); font-weight: 500; }
+    .mood-btn.selected { border-color: var(--gold); background: rgba(201,168,76,.08); }
+    .mood-btn:hover { border-color: var(--gold-light); }
+
+    .step-nav {
+      display: flex;
+      gap: .75rem;
+      margin-top: 1.5rem;
+    }
+    .btn-back {
+      flex: 0 0 auto;
+      padding: .75rem 1.25rem;
+      border: 1.5px solid var(--cream-dark);
+      border-radius: 8px;
+      background: none;
+      font-family: 'Outfit', sans-serif;
+      font-size: .9rem;
+      color: var(--slate);
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-back:hover { border-color: var(--slate); color: var(--ink); }
+    .btn-next {
+      flex: 1;
+      padding: .75rem 1.25rem;
+      background: var(--ink);
+      border: none;
+      border-radius: 8px;
+      font-family: 'Outfit', sans-serif;
+      font-size: .9rem;
+      font-weight: 500;
+      color: var(--cream);
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-next:hover { background: var(--ink-soft); }
+    .btn-next.gold { background: var(--gold); color: var(--ink); }
+    .btn-next.gold:hover { background: var(--gold-light); }
+    .btn-next:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Check-in success */
+    #checkinSuccess {
+      display: none;
+      text-align: center;
+      padding: 3rem 2rem;
+    }
+    #checkinSuccess .success-icon { font-size: 3rem; margin-bottom: 1rem; }
+    #checkinSuccess h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.6rem;
+      color: var(--ink);
+      margin-bottom: .5rem;
+    }
+    #checkinSuccess p { font-size: .9rem; color: var(--slate); line-height: 1.6; }
+
+    /* ── LOADING STATE ── */
+    #loadingState {
+      display: none;
+      text-align: center;
+      padding: 6rem 2rem;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--cream-dark);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    #loadingState p { font-size: .9rem; color: var(--muted); }
+
+    /* ── NOT FOUND ── */
+    #notFound {
+      display: none;
+      text-align: center;
+      padding: 5rem 2rem;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    #notFound h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      color: var(--ink);
+      margin-bottom: .75rem;
+    }
+    #notFound p { font-size: .9rem; color: var(--slate); line-height: 1.6; margin-bottom: 1.5rem; }
+    .btn-primary {
+      display: inline-block;
+      padding: .75rem 1.75rem;
+      background: var(--gold);
+      color: var(--ink);
+      font-family: 'Outfit', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-primary:hover { background: var(--gold-light); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--ink);
+      color: var(--muted);
+      text-align: center;
+      padding: 2.5rem 2rem;
+      font-size: .8rem;
+      line-height: 1.8;
+      margin-top: 4rem;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .hero { padding: 3.5rem 1.5rem 3rem; }
+      .section { padding: 2.5rem 1.25rem; }
+      .portal-grid { grid-template-columns: 1fr; }
+      .greeting-inner { flex-direction: column; align-items: flex-start; }
+      .pair-inputs { grid-template-columns: 1fr; }
+      .mood-btn span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      AC <span class="logo-path">Pathfinder</span>
+      <span class="logo-sub">Adams, Cameron & Co.</span>
+    </div>
+    <div class="header-right">
+      <div id="userChip">
+        <img id="userAvatar" src="" alt="">
+        <span id="userName"></span>
+        <button id="signOutBtn" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <p class="hero-eyebrow">Coaching &amp; Business Planning</p>
+  <h1>Your path to a<br><em>stronger year.</em></h1>
+  <p class="hero-sub">Build your plan, track your progress, and stay connected with your coach — all in one place.</p>
+
+  <div id="preAuth">
+    <button class="signin-btn" onclick="startSignIn()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+      Sign in with Google
+    </button>
+    <p class="signin-note">Use your @adamscameron.com account</p>
+  </div>
+</div>
+
+<!-- GREETING (post-auth) -->
+<div id="greeting">
+  <div class="greeting-inner">
+    <div class="greeting-text">Welcome back, <strong id="greetName"></strong></div>
+    <div class="greeting-meta">
+      <span id="greetOffice"></span>
+      <span id="greetCoach"></span>
+      <span id="greetEnrollment"></span>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loadingState">
+  <div class="spinner"></div>
+  <p>Loading your profile…</p>
+</div>
+
+<!-- NOT FOUND -->
+<div id="notFound">
+  <h2>Not in the system yet</h2>
+  <p>Your account isn't in AC Pathfinder yet. Start by building your business plan — that's how you get enrolled in coaching.</p>
+  <a class="btn-primary" href="./business-plan-generator.html">Build My Business Plan</a>
+</div>
+
+<!-- MAIN CONTENT (post-auth) -->
+<div id="mainContent">
+
+  <!-- AGENT SECTION -->
+  <section id="agentSection" style="display:none">
+    <div class="section">
+      <p class="section-label">Your Tools</p>
+      <h2 class="section-title">What would you like to do?</h2>
+      <div class="portal-grid">
+
+        <!-- Check In Now -->
+        <div class="portal-card highlight" onclick="openCheckin()" id="checkinCard">
+          <div class="card-icon">✅</div>
+          <span class="card-badge badge-green" id="checkinBadge">This Week</span>
+          <div class="card-title">Weekly Check-In</div>
+          <div class="card-desc">Take 3 minutes to check in on your week — what you did, what challenged you, and what's coming up. Your coach will review it.</div>
+          <div class="card-action">
+            Start Check-In
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </div>
+
+        <!-- Business Plan -->
+        <a class="portal-card" href="./business-plan-generator.html">
+          <div class="card-icon">🏡</div>
+          <span class="card-badge badge-gold">AI-Powered</span>
+          <div class="card-title">Business Plan Generator</div>
+          <div class="card-desc">Build or revisit your 12-month plan. Set your earning goals, define your strategy, and get a complete roadmap generated by Gemini AI.</div>
+          <div class="card-action">
+            Open Tool
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </a>
+
+        <!-- My Progress -->
+        <a class="portal-card" href="./agent-dashboard.html">
+          <div class="card-icon">📊</div>
+          <span class="card-badge badge-slate">Dashboard</span>
+          <div class="card-title">My Progress</div>
+          <div class="card-desc">See your check-in history, scorecard trends, current plan targets, and manage your communication preferences including SMS check-ins.</div>
+          <div class="card-action">
+            View Dashboard
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" id="coachDivider" style="display:none">
+
+  <!-- COACH / ADMIN SECTION -->
+  <section id="coachSection" style="display:none">
+    <div class="section">
+      <p class="section-label" id="coachSectionLabel">Coaching Tools</p>
+      <h2 class="section-title" id="coachSectionTitle">Manage Your Agents</h2>
+      <div class="portal-grid">
+
+        <!-- Coach Dashboard -->
+        <a class="portal-card" href="./coach-dashboard.html">
+          <div class="card-icon">👥</div>
+          <span class="card-badge badge-slate">Coaches</span>
+          <div class="card-title">Coach Dashboard</div>
+          <div class="card-desc">Review agent check-ins, scorecards, and progress. See who needs attention, add coaching notes, and track enrollment activity across your roster.</div>
+          <div class="card-action">
+            Open Dashboard
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </div>
+        </a>
+
+        <!-- Admin Panel (admin only) -->
+        <div class="portal-card locked" id="adminCard" style="display:none">
+          <div class="card-icon">⚙️</div>
+          <span class="card-badge badge-slate">Coming Soon</span>
+          <div class="card-title">Admin Panel</div>
+          <div class="card-desc">Manage AI prompt templates, coaching configuration, system settings, and agent roster. Full administrative control over AC Pathfinder.</div>
+          <div class="card-action" style="color:var(--muted)">
+            In Development
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</div><!-- /mainContent -->
+
+<!-- CHECK-IN MODAL -->
+<div id="checkinOverlay">
+  <div class="checkin-modal">
+    <div class="checkin-header">
+      <h2>Weekly Check-In</h2>
+      <p id="checkinSubtitle">A few quick questions about your week</p>
+      <button class="checkin-close" onclick="closeCheckin()">✕</button>
+    </div>
+
+    <div class="checkin-progress" id="progressDots"></div>
+
+    <div class="checkin-body">
+
+      <!-- Step 0: Mood -->
+      <div class="checkin-step active" data-step="0">
+        <div class="step-question">How's the week been overall?</div>
+        <div class="step-hint">Be honest — your coach uses this to understand the context of your numbers.</div>
+        <div class="mood-row">
+          <button class="mood-btn" data-mood="1" onclick="selectMood(1)">😩<span>Rough</span></button>
+          <button class="mood-btn" data-mood="2" onclick="selectMood(2)">😕<span>Slow</span></button>
+          <button class="mood-btn" data-mood="3" onclick="selectMood(3)">😐<span>Okay</span></button>
+          <button class="mood-btn" data-mood="4" onclick="selectMood(4)">🙂<span>Good</span></button>
+          <button class="mood-btn" data-mood="5" onclick="selectMood(5)">🚀<span>Great</span></button>
+        </div>
+        <div class="step-nav">
+          <button class="btn-next" id="moodNext" onclick="nextStep()" disabled>Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 1: SOI Calls -->
+      <div class="checkin-step" data-step="1">
+        <div class="step-question">How many sphere of influence calls did you make?</div>
+        <div class="step-hint">Personal outreach to past clients, friends, family, and referral partners.</div>
+        <input class="step-input" type="number" id="soiInput" min="0" placeholder="0" oninput="validateNumber(this)">
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Floor Time -->
+      <div class="checkin-step" data-step="2">
+        <div class="step-question">How many hours of floor time did you take?</div>
+        <div class="step-hint">Time spent at the office covering incoming buyer/seller inquiries.</div>
+        <input class="step-input" type="number" id="floorInput" min="0" placeholder="0" step="0.5" oninput="validateNumber(this)">
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Social Posts -->
+      <div class="checkin-step" data-step="3">
+        <div class="step-question">How many social media posts did you publish?</div>
+        <div class="step-hint">Via AC Social, your personal pages, or any other channel this week.</div>
+        <input class="step-input" type="number" id="socialInput" min="0" placeholder="0" oninput="validateNumber(this)">
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Appointments -->
+      <div class="checkin-step" data-step="4">
+        <div class="step-question">Any listing appointments or buyer prospects this week?</div>
+        <div class="step-hint">Enter 0 for either if none — every week counts.</div>
+        <div class="pair-inputs">
+          <div>
+            <div class="pair-label">Listing Appointments</div>
+            <input class="step-input" type="number" id="listingInput" min="0" placeholder="0" oninput="validateNumber(this)">
+          </div>
+          <div>
+            <div class="pair-label">Buyer Prospects</div>
+            <input class="step-input" type="number" id="buyerInput" min="0" placeholder="0" oninput="validateNumber(this)">
+          </div>
+        </div>
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Biggest Challenge -->
+      <div class="checkin-step" data-step="5">
+        <div class="step-question">What's been your biggest challenge this week?</div>
+        <div class="step-hint">No wrong answer — honesty is what makes coaching useful.</div>
+        <textarea class="step-input" id="challengeInput" placeholder="Share what's been hardest or most frustrating…"></textarea>
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 6: New Opportunities -->
+      <div class="checkin-step" data-step="6">
+        <div class="step-question">Any new opportunities or unexpected leads come up?</div>
+        <div class="step-hint">Referrals, signs calls, open house traffic — anything promising.</div>
+        <textarea class="step-input" id="opportunitiesInput" placeholder="Describe any bright spots or new leads…"></textarea>
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 7: Time Sink -->
+      <div class="checkin-step" data-step="7">
+        <div class="step-question">What felt like it should have been faster or easier?</div>
+        <div class="step-hint">Last one. Name one thing that ate more time than it should have.</div>
+        <textarea class="step-input" id="timesinkInput" placeholder="e.g. "Coordinating the inspection took all day…""></textarea>
+        <div class="step-nav">
+          <button class="btn-back" onclick="prevStep()">← Back</button>
+          <button class="btn-next gold" id="submitBtn" onclick="submitCheckin()">Submit Check-In ✓</button>
+        </div>
+      </div>
+
+    </div><!-- /checkin-body -->
+
+    <!-- Success state -->
+    <div id="checkinSuccess">
+      <div class="success-icon">🏡</div>
+      <h3>Check-in complete!</h3>
+      <p>Thanks for taking the time. Your coach will review your responses and your scorecard will be ready shortly.</p>
+      <br>
+      <button class="btn-next gold" style="width:100%;max-width:240px" onclick="closeCheckin()">Done</button>
+    </div>
+
+  </div><!-- /checkin-modal -->
+</div><!-- /checkinOverlay -->
+
+<footer>
+  <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--cream);font-weight:600;margin-bottom:.4rem">Adams, Cameron &amp; Co.</div>
+  AC Pathfinder Coaching Platform &nbsp;·&nbsp;
+  <a href="./terms.html">Terms</a> &nbsp;·&nbsp;
+  <a href="./privacy-policy.html">Privacy</a>
+</footer>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+const S = {
+  user:        null,   // { email, name, picture }
+  agentProfile: null,  // from /agent/profile
+  isCoach:     false,
+  isAdmin:     false,
+  mood:        null,
+  currentStep: 0,
+  totalSteps:  8,
+};
+
+// ── Google Auth ────────────────────────────────────────────────────────────────
+let tokenClient;
+const poll = setInterval(() => {
+  if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
+}, 100);
+
+function initOAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT,
+    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+    callback: async (resp) => {
+      if (resp.error) { console.error(resp); return; }
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${resp.access_token}` }
+      });
+      const user = await userRes.json();
+      S.user = { email: user.email, name: user.given_name || user.name, picture: user.picture };
+      onSignedIn();
+    }
+  });
+
+  google.accounts.id.initialize({
+    client_id: OAUTH_CLIENT,
+    callback: handleCredential,
+    auto_select: true,
+  });
+  google.accounts.id.prompt();
+}
+
+async function handleCredential(response) {
+  const payload = JSON.parse(atob(response.credential.split('.')[1]));
+  S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
+  onSignedIn();
+}
+
+function startSignIn() {
+  if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function signOut() {
+  google.accounts.id.disableAutoSelect();
+  S.user = null;
+  S.agentProfile = null;
+  document.getElementById('userChip').style.display = 'none';
+  document.getElementById('greeting').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('notFound').style.display = 'none';
+  document.getElementById('preAuth').style.opacity = '1';
+}
+
+// ── Post sign-in ───────────────────────────────────────────────────────────────
+async function onSignedIn() {
+  // Show user chip
+  document.getElementById('preAuth').style.display = 'none';
+  document.getElementById('userAvatar').src = S.user.picture || '';
+  document.getElementById('userName').textContent = S.user.name;
+  document.getElementById('userChip').style.display = 'flex';
+
+  // Show loading
+  document.getElementById('loadingState').style.display = 'block';
+
+  try {
+    // Check agent profile
+    const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email }
+    });
+    const profile = await profileRes.json();
+
+    // Check coach/staff access
+    const coachRes = await fetch(`${PROXY_BASE}/coach/dashboard`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email }
+    });
+    if (coachRes.ok) {
+      const coachData = await coachRes.json();
+      S.isCoach = true;
+      S.isAdmin = coachData.role === 'admin' || S.user.email === 'johnadams@adamscameron.com';
+    }
+
+    document.getElementById('loadingState').style.display = 'none';
+
+    if (!profile.found && !S.isCoach) {
+      document.getElementById('notFound').style.display = 'block';
+      return;
+    }
+
+    if (profile.found) {
+      S.agentProfile = profile;
+      showAgentSection(profile);
+    }
+
+    if (S.isCoach) {
+      showCoachSection();
+    }
+
+    document.getElementById('mainContent').style.display = 'block';
+
+  } catch (e) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('notFound').style.display = 'block';
+    console.error('Profile load failed:', e);
+  }
+}
+
+function showAgentSection(p) {
+  // Greeting bar
+  document.getElementById('greeting').style.display = 'block';
+  document.getElementById('greetName').textContent = p.first_name || S.user.name;
+
+  const office = p.office ? `🏢 ${p.office}` : '';
+  const coach  = p.coach_name ? `👤 Coach: ${p.coach_name}` : '';
+  const enroll = p.enrollment_status === 'active'
+    ? `<span class="dot dot-green"></span> Enrolled in coaching`
+    : p.enrollment_id
+      ? `<span class="dot dot-muted"></span> Coaching paused`
+      : `<span class="dot dot-gold"></span> Not yet enrolled`;
+
+  document.getElementById('greetOffice').textContent = office;
+  document.getElementById('greetCoach').textContent = coach;
+  document.getElementById('greetEnrollment').innerHTML = enroll;
+
+  // Check-in card: disable if not enrolled
+  if (p.enrollment_status !== 'active') {
+    const card = document.getElementById('checkinCard');
+    card.classList.add('locked');
+    card.onclick = null;
+    document.getElementById('checkinBadge').textContent = 'Enroll First';
+    document.getElementById('checkinBadge').className = 'card-badge badge-slate';
+  }
+
+  document.getElementById('agentSection').style.display = 'block';
+}
+
+function showCoachSection() {
+  document.getElementById('coachSection').style.display = 'block';
+  document.getElementById('coachDivider').style.display = 'block';
+
+  if (S.isAdmin) {
+    document.getElementById('coachSectionLabel').textContent = 'Administration';
+    document.getElementById('coachSectionTitle').textContent = 'Coaching & System Tools';
+    document.getElementById('adminCard').style.display = 'flex';
+  }
+}
+
+// ── Check-in modal ─────────────────────────────────────────────────────────────
+function buildProgressDots() {
+  const container = document.getElementById('progressDots');
+  container.innerHTML = '';
+  for (let i = 0; i < S.totalSteps; i++) {
+    const d = document.createElement('div');
+    d.className = 'progress-dot' + (i < S.currentStep ? ' done' : i === S.currentStep ? ' active' : '');
+    container.appendChild(d);
+  }
+}
+
+function openCheckin() {
+  S.currentStep = 0;
+  S.mood = null;
+  document.querySelectorAll('.checkin-step').forEach(s => s.classList.remove('active'));
+  document.querySelector('[data-step="0"]').classList.add('active');
+  document.getElementById('checkinSuccess').style.display = 'none';
+  document.querySelector('.checkin-body').style.display = 'block';
+  document.querySelector('.checkin-progress').style.display = 'flex';
+  document.getElementById('moodNext').disabled = true;
+  buildProgressDots();
+  document.getElementById('checkinOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCheckin() {
+  document.getElementById('checkinOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function selectMood(val) {
+  S.mood = val;
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`[data-mood="${val}"]`).classList.add('selected');
+  document.getElementById('moodNext').disabled = false;
+}
+
+function validateNumber(el) {
+  if (el.value === '' || parseInt(el.value) < 0) el.value = 0;
+}
+
+function nextStep() {
+  const steps = document.querySelectorAll('.checkin-step');
+  steps[S.currentStep].classList.remove('active');
+  S.currentStep++;
+  if (S.currentStep < S.totalSteps) {
+    steps[S.currentStep].classList.add('active');
+    buildProgressDots();
+    // Focus first input in new step
+    const inp = steps[S.currentStep].querySelector('input, textarea');
+    if (inp) setTimeout(() => inp.focus(), 50);
+  }
+}
+
+function prevStep() {
+  const steps = document.querySelectorAll('.checkin-step');
+  steps[S.currentStep].classList.remove('active');
+  S.currentStep--;
+  steps[S.currentStep].classList.add('active');
+  buildProgressDots();
+}
+
+async function submitCheckin() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const payload = {
+    agentEmail:     S.agentProfile?.email || S.user.email,
+    mood:           S.mood,
+    soiCalls:       parseInt(document.getElementById('soiInput').value)      || 0,
+    floorHours:     parseFloat(document.getElementById('floorInput').value)  || 0,
+    socialPosts:    parseInt(document.getElementById('socialInput').value)   || 0,
+    listingAppts:   parseInt(document.getElementById('listingInput').value)  || 0,
+    buyerProspects: parseInt(document.getElementById('buyerInput').value)    || 0,
+    challenge:      document.getElementById('challengeInput').value.trim()   || null,
+    opportunities:  document.getElementById('opportunitiesInput').value.trim() || null,
+    timeSink:       document.getElementById('timesinkInput').value.trim()    || null,
+    responses:      {},
+  };
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/checkin/flexible`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || `HTTP ${res.status}`);
+    }
+
+    // Show success
+    document.querySelector('.checkin-body').style.display = 'none';
+    document.querySelector('.checkin-progress').style.display = 'none';
+    document.getElementById('checkinSuccess').style.display = 'block';
+
+    // Mark check-in card as done for this session
+    document.getElementById('checkinBadge').textContent = 'Done ✓';
+    document.getElementById('checkinBadge').className = 'card-badge badge-green';
+
+  } catch (e) {
+    alert('Something went wrong: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Submit Check-In ✓';
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('checkinOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('checkinOverlay')) closeCheckin();
+});
+
+// Enter key advances steps
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeCheckin();
+});
+</script>
+</body>
+</html>
