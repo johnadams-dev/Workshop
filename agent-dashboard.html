@@ -677,6 +677,7 @@
       <div class="panel">
         <div class="panel-header">
           <div class="panel-title">Notifications</div>
+          <span id="prefSaving" style="font-size:.75rem;color:var(--muted);display:none">Saving…</span>
         </div>
         <div class="panel-body">
 
@@ -687,20 +688,20 @@
               <div class="pref-status" id="smsStatus"></div>
             </div>
             <label class="toggle">
-              <input type="checkbox" id="smsToggle" onchange="updateSmsPref(this.checked)">
+              <input type="checkbox" id="smsToggle" onchange="updatePref()">
               <div class="toggle-slider"></div>
             </label>
           </div>
 
           <div class="pref-row">
             <div class="pref-info">
-              <div class="pref-title">Coach Feedback Emails</div>
-              <div class="pref-desc">Get an email when your coach leaves feedback or coaching notes on your check-in.</div>
-              <div class="pref-status off">Coming soon</div>
+              <div class="pref-title">Weekly Email Check-In</div>
+              <div class="pref-desc">Receive a weekly email reminder to complete your check-in — useful if you prefer not to use SMS or want both.</div>
+              <div class="pref-status" id="emailStatus"></div>
             </div>
             <label class="toggle">
-              <input type="checkbox" disabled>
-              <div class="toggle-slider" style="opacity:.4;cursor:not-allowed"></div>
+              <input type="checkbox" id="emailToggle" onchange="updatePref()">
+              <div class="toggle-slider"></div>
             </label>
           </div>
 
@@ -738,7 +739,6 @@ const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
 let agentId = null;
-let smsOptedIn = false;
 
 // ── Google Auth ────────────────────────────────────────────────────────────────
 let tokenClient;
@@ -788,6 +788,7 @@ function signOut() {
 }
 
 async function onSignedIn(email, name, picture) {
+  currentEmail = email;
   // Show header user
   const av = document.getElementById('userAvatar');
   av.src = picture || '';
@@ -976,38 +977,58 @@ function populatePlan(p) {
 }
 
 // ── Preferences ───────────────────────────────────────────────────────────────
+let currentEmail = '';
+
 function populatePreferences(p) {
-  const toggle = document.getElementById('smsToggle');
-  toggle.checked = p.sms_opted_in || false;
-  smsOptedIn = p.sms_opted_in || false;
-  updateSmsStatus(p.sms_opted_in);
+  document.getElementById('smsToggle').checked   = p.sms_opted_in   || false;
+  document.getElementById('emailToggle').checked = p.email_opted_in || false;
+  updateStatusLabels(p.sms_opted_in, p.email_opted_in);
 }
 
-function updateSmsStatus(on) {
-  const el = document.getElementById('smsStatus');
-  el.textContent = on ? 'Currently receiving weekly SMS check-ins' : 'SMS check-ins are off';
-  el.className   = 'pref-status ' + (on ? 'on' : 'off');
+function updateStatusLabels(sms, email) {
+  const smsEl   = document.getElementById('smsStatus');
+  const emailEl = document.getElementById('emailStatus');
+  smsEl.textContent   = sms   ? 'Currently receiving weekly SMS check-ins'   : 'SMS check-ins are off';
+  emailEl.textContent = email ? 'Currently receiving weekly email reminders'  : 'Email reminders are off';
+  smsEl.className     = 'pref-status ' + (sms   ? 'on' : 'off');
+  emailEl.className   = 'pref-status ' + (email ? 'on' : 'off');
 }
 
-async function updateSmsPref(enabled) {
-  updateSmsStatus(enabled);
-  if (!agentId) return;
+let prefSaveTimer = null;
+async function updatePref() {
+  const smsOn   = document.getElementById('smsToggle').checked;
+  const emailOn = document.getElementById('emailToggle').checked;
+  updateStatusLabels(smsOn, emailOn);
 
-  try {
-    await fetch(`${PROXY_BASE}/agent/${agentId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-proxy-key': PROXY_KEY,
-      },
-      body: JSON.stringify({ smsOptedIn: enabled }),
-    });
-  } catch (e) {
-    console.error('Failed to update SMS preference:', e);
-    // Revert on failure
-    document.getElementById('smsToggle').checked = !enabled;
-    updateSmsStatus(!enabled);
-  }
+  // Debounce rapid toggling
+  clearTimeout(prefSaveTimer);
+  prefSaveTimer = setTimeout(async () => {
+    if (!agentId) return;
+    const saving = document.getElementById('prefSaving');
+    saving.style.display = 'inline';
+
+    try {
+      const res = await fetch(`${PROXY_BASE}/agent/${agentId}/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-proxy-key':  PROXY_KEY,
+          'x-user-email': currentEmail,
+        },
+        body: JSON.stringify({ smsOptedIn: smsOn, emailOptedIn: emailOn }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+    } catch (e) {
+      console.error('Failed to save preferences:', e);
+      // Revert both on failure
+      document.getElementById('smsToggle').checked   = !smsOn;
+      document.getElementById('emailToggle').checked = !emailOn;
+      updateStatusLabels(!smsOn, !emailOn);
+      alert('Could not save preferences. Please try again.');
+    } finally {
+      saving.style.display = 'none';
+    }
+  }, 600);
 }
 </script>
 </body>
