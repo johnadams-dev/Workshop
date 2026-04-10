@@ -10,223 +10,80 @@
   <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg: #0c0f16;
-      --surface: #121620;
-      --surface2: #181d2c;
-      --border: #242a3e;
-      --border2: #2e3655;
-      --gold: #c4a84f;
-      --gold2: #dfc278;
-      --gold-dim: #7a6428;
-      --gold-bg: rgba(196,168,79,0.07);
-      --text: #ede5d4;
-      --text2: #9a9080;
-      --text3: #545060;
-      --success: #3d8c58;
-      --error: #8c3d4a;
-      --radius: 10px;
-      --ease: 0.2s ease;
+      --bg: #0c0f16; --surface: #121620; --surface2: #181d2c;
+      --border: #242a3e; --border2: #2e3655;
+      --gold: #c4a84f; --gold2: #dfc278; --gold-dim: #7a6428; --gold-bg: rgba(196,168,79,0.07);
+      --text: #ede5d4; --text2: #9a9080; --text3: #545060;
+      --success: #3d8c58; --error: #8c3d4a; --radius: 10px; --ease: 0.2s ease;
     }
-
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.6;
-    }
-
-    /* ── HEADER ── */
-    .app-header {
-      padding: 1.1rem 2rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+    .app-header { padding: 1.1rem 2rem; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
     .brand { display: flex; align-items: center; gap: 0.8rem; }
-    .brand-icon {
-      width: 34px; height: 34px; border-radius: 7px;
-      background: linear-gradient(135deg, var(--gold), var(--gold-dim));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; flex-shrink: 0;
-    }
+    .brand-icon { width: 34px; height: 34px; border-radius: 7px; background: linear-gradient(135deg, var(--gold), var(--gold-dim)); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
     .brand-name { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; font-weight: 600; line-height: 1.2; }
     .brand-sub  { font-size: 0.68rem; color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase; }
     .hdr-right  { display: flex; align-items: center; gap: 0.5rem; }
-    .btn-icon {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text2);
-      padding: 0.38rem 0.75rem;
-      border-radius: 7px;
-      font-size: 0.78rem;
-      font-family: 'Outfit', sans-serif;
-      cursor: pointer;
-      transition: all var(--ease);
-      display: flex; align-items: center; gap: 0.35rem;
-    }
+    .btn-icon { background: transparent; border: 1px solid var(--border); color: var(--text2); padding: 0.38rem 0.75rem; border-radius: 7px; font-size: 0.78rem; font-family: 'Outfit', sans-serif; cursor: pointer; transition: all var(--ease); display: flex; align-items: center; gap: 0.35rem; }
     .btn-icon:hover { border-color: var(--gold); color: var(--gold); }
-
-    /* ── LAYOUT ── */
-    .app-main  { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
-
-    /* ── PROGRESS ── */
-    .progress {
-      display: flex; align-items: center; margin-bottom: 2.25rem;
-    }
+    .app-main { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .progress { display: flex; align-items: center; margin-bottom: 2.25rem; }
     .prog-step { display: flex; align-items: center; gap: 0.5rem; }
-    .prog-num {
-      width: 30px; height: 30px; border-radius: 50%;
-      border: 1.5px solid var(--border2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.78rem; font-weight: 500; color: var(--text3);
-      background: var(--surface); transition: all var(--ease); flex-shrink: 0;
-    }
+    .prog-num { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 500; color: var(--text3); background: var(--surface); transition: all var(--ease); flex-shrink: 0; }
     .prog-num.active { border-color: var(--gold); background: var(--gold); color: #0c0f16; font-weight: 700; }
     .prog-num.done   { border-color: var(--gold); color: var(--gold); font-size: 0.7rem; }
     .prog-label { font-size: 0.73rem; color: var(--text3); white-space: nowrap; transition: color var(--ease); }
     .prog-label.active { color: var(--text); }
-    .prog-line  { flex: 1; height: 1px; background: var(--border); margin: 0 0.7rem; }
-
-    /* ── CARD ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-    }
-    .card-head {
-      padding: 1.7rem 2rem 1.35rem;
-      border-bottom: 1px solid var(--border);
-    }
-    .section-tag {
-      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
-      color: var(--gold); margin-bottom: 0.35rem;
-    }
+    .prog-line { flex: 1; height: 1px; background: var(--border); margin: 0 0.7rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .card-head { padding: 1.7rem 2rem 1.35rem; border-bottom: 1px solid var(--border); }
+    .section-tag { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--gold); margin-bottom: 0.35rem; }
     .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 500; }
     .section-desc  { margin-top: 0.45rem; font-size: 0.83rem; color: var(--text2); line-height: 1.65; max-width: 580px; }
-    .card-body  { padding: 1.7rem 2rem; display: flex; flex-direction: column; gap: 1.4rem; }
-    .card-foot  {
-      padding: 1.1rem 2rem;
-      border-top: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: var(--surface2);
-    }
-
-    /* ── FIELDS ── */
+    .card-body { padding: 1.7rem 2rem; display: flex; flex-direction: column; gap: 1.4rem; }
+    .card-foot { padding: 1.1rem 2rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); }
     .field { display: flex; flex-direction: column; gap: 0.38rem; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
-    label {
-      font-size: 0.78rem; font-weight: 500; color: var(--text2); letter-spacing: 0.04em;
-    }
+    label { font-size: 0.78rem; font-weight: 500; color: var(--text2); letter-spacing: 0.04em; }
     label .req { color: var(--gold); margin-left: 2px; }
     label .opt { font-weight: 400; color: var(--text3); }
     .hint { font-size: 0.73rem; color: var(--text3); margin-top: 0.2rem; }
-
-    input[type="text"], input[type="email"], input[type="number"], textarea, select {
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-family: 'Outfit', sans-serif;
-      font-size: 0.88rem;
-      padding: 0.6rem 0.85rem;
-      transition: border-color var(--ease);
-      width: 100%;
-      outline: none;
-      -webkit-appearance: none;
-    }
+    input[type="text"], input[type="email"], input[type="number"], textarea, select { background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 0.88rem; padding: 0.6rem 0.85rem; transition: border-color var(--ease); width: 100%; outline: none; -webkit-appearance: none; }
     input:focus, textarea:focus, select:focus { border-color: var(--gold); }
     textarea { resize: vertical; min-height: 85px; line-height: 1.65; }
-    select option { background: var(--surface2); color: var(--text); }
-
     .input-wrap { position: relative; }
-    .input-pfx {
-      position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%);
-      color: var(--text3); font-size: 0.88rem; pointer-events: none;
-    }
+    .input-pfx { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 0.88rem; pointer-events: none; }
     .input-wrap input { padding-left: 1.6rem; }
-
-    /* range fields with labels */
     .range-field { display: flex; flex-direction: column; gap: 0.3rem; }
-    .range-labels {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.72rem; color: var(--text3);
-    }
-    .range-val {
-      background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: 5px; padding: 0.1rem 0.5rem;
-      font-size: 0.8rem; font-weight: 600; color: var(--gold); min-width: 36px; text-align: center;
-    }
-
-    /* sliders */
-    .slider-row { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; }
-    input[type="range"] {
-      -webkit-appearance: none; width: 100%; height: 4px;
-      background: var(--border2); border-radius: 2px;
-      border: none; padding: 0;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
-      background: var(--gold); cursor: pointer;
-    }
-    .slider-val { min-width: 46px; text-align: right; font-size: 0.9rem; font-weight: 600; color: var(--gold); }
-
-    /* ── BUTTONS ── */
-    .btn {
-      padding: 0.6rem 1.4rem; border-radius: 8px;
-      font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 500;
-      cursor: pointer; transition: all var(--ease); border: none;
-      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-    }
+    .range-labels { display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text3); }
+    .range-val { background: var(--surface2); border: 1px solid var(--border2); border-radius: 5px; padding: 0.1rem 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--gold); min-width: 36px; text-align: center; }
+    input[type="range"] { -webkit-appearance: none; width: 100%; height: 4px; background: var(--border2); border-radius: 2px; border: none; padding: 0; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%; background: var(--gold); cursor: pointer; }
+    .btn { padding: 0.6rem 1.4rem; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all var(--ease); border: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
-    .btn-ghost    { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+    .btn-ghost   { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
     .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
-    .btn-primary  { background: var(--gold); color: #0c0f16; font-weight: 600; }
+    .btn-primary { background: var(--gold); color: #0c0f16; font-weight: 600; }
     .btn-primary:hover { background: var(--gold2); }
-    .btn-subtle   { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); }
+    .btn-subtle  { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); }
     .btn-subtle:hover { border-color: var(--gold); color: var(--gold); }
-
-    /* ── LOADING ── */
     .loading-view { text-align: center; padding: 3.5rem 2rem; }
-    .spinner {
-      width: 46px; height: 46px; border: 3px solid var(--border2);
-      border-top-color: var(--gold); border-radius: 50%;
-      animation: spin 0.75s linear infinite; margin: 0 auto 1.4rem;
-    }
+    .spinner { width: 46px; height: 46px; border: 3px solid var(--border2); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.75s linear infinite; margin: 0 auto 1.4rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin-bottom: 0.4rem; }
     .loading-sub   { font-size: 0.83rem; color: var(--text2); }
-
-    /* ── RESULTS ── */
-    .results-head {
-      padding: 1.5rem 2rem;
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
-      flex-wrap: wrap;
-    }
+    .results-head { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
     .results-title { font-family: 'Cormorant Garamond', serif; font-size: 1.55rem; font-weight: 500; }
     .results-meta  { font-size: 0.78rem; color: var(--text2); margin-top: 0.2rem; }
     .results-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
     .results-body  { padding: 1.75rem 2rem; max-height: 62vh; overflow-y: auto; }
     .results-body::-webkit-scrollbar { width: 4px; }
-    .results-body::-webkit-scrollbar-track { background: transparent; }
     .results-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-    /* Plan formatting */
     .plan h1, .plan h2, .plan h3 { font-family: 'Cormorant Garamond', serif; line-height: 1.3; }
     .plan h1 { font-size: 1.55rem; color: var(--gold); margin: 1.6rem 0 0.65rem; }
     .plan h2 { font-size: 1.22rem; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 0.35rem; margin: 1.4rem 0 0.65rem; }
     .plan h3 { font-size: 1.05rem; color: var(--gold2); margin: 1.1rem 0 0.5rem; }
     .plan p  { font-size: 0.875rem; margin-bottom: 0.8rem; color: var(--text); }
-    .plan p:first-child { margin-top: 0; }
     .plan strong { color: var(--text); font-weight: 600; }
     .plan em     { color: var(--text2); font-style: italic; }
     .plan ul, .plan ol { padding-left: 1.4rem; margin-bottom: 0.8rem; }
@@ -235,73 +92,28 @@
     .plan th { background: var(--surface2); padding: 0.55rem 0.8rem; text-align: left; font-weight: 600; color: var(--gold); border: 1px solid var(--border2); }
     .plan td { padding: 0.5rem 0.8rem; border: 1px solid var(--border2); color: var(--text2); }
     .plan tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
-    .plan hr  { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
-
-    /* ── MODAL ── */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.72);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 100; padding: 1rem; backdrop-filter: blur(5px);
-    }
+    .plan hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; backdrop-filter: blur(5px); }
     .overlay.hidden { display: none; }
-    .modal {
-      background: var(--surface); border: 1px solid var(--border2);
-      border-radius: 14px; width: 100%; max-width: 510px;
-      max-height: 90vh; overflow-y: auto;
-    }
+    .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; width: 100%; max-width: 510px; max-height: 90vh; overflow-y: auto; }
     .modal-head { padding: 1.4rem 1.75rem 1rem; border-bottom: 1px solid var(--border); }
     .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; }
     .modal-sub   { font-size: 0.8rem; color: var(--text2); margin-top: 0.3rem; }
     .modal-body  { padding: 1.4rem 1.75rem; display: flex; flex-direction: column; gap: 1.2rem; }
     .modal-foot  { padding: 1rem 1.75rem 1.4rem; display: flex; justify-content: flex-end; gap: 0.45rem; }
-
-    .info-box {
-      background: var(--surface2); border: 1px solid var(--border2);
-      border-radius: 8px; padding: 1rem;
-    }
-    .info-box p   { font-size: 0.79rem; color: var(--text2); margin-bottom: 0.5rem; }
+    .info-box { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 1rem; }
+    .info-box p { font-size: 0.79rem; color: var(--text2); margin-bottom: 0.5rem; }
     .info-box p:last-child { margin-bottom: 0; }
-    .info-box ol  { padding-left: 1.2rem; }
-    .info-box li  { font-size: 0.77rem; color: var(--text3); margin-bottom: 0.3rem; }
-    .info-box a   { color: var(--gold); text-decoration: none; }
-    .info-box a:hover { text-decoration: underline; }
-    .info-box code { font-size: 0.74rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; color: var(--gold2); }
-
-    .key-status {
-      display: flex; align-items: center; gap: 0.4rem;
-      font-size: 0.74rem; margin-top: 0.25rem;
-    }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; }
-    .dot.ok { background: var(--success); }
-    .dot.warn { background: var(--gold); }
-
-    /* ── STEPS ── */
     .step { display: none; }
     .step.active { display: block; animation: fadeUp 0.22s ease; }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* ── TOAST ── */
-    .toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      background: var(--surface); border: 1px solid var(--border2);
-      border-radius: 9px; padding: 0.7rem 1rem;
-      font-size: 0.83rem; color: var(--text);
-      z-index: 200; transform: translateY(80px); opacity: 0;
-      transition: all 0.3s ease; max-width: 300px; line-height: 1.4;
-    }
-    .toast.show  { transform: translateY(0); opacity: 1; }
-    .toast.ok    { border-color: var(--success); }
-    .toast.err   { border-color: var(--error); }
-
-    /* ── INTRO BANNER ── */
-    .intro-banner {
-      background: var(--gold-bg); border: 1px solid rgba(196,168,79,0.18);
-      border-radius: 9px; padding: 0.9rem 1.1rem; margin-bottom: 1.35rem;
-      font-size: 0.8rem; color: var(--text2); line-height: 1.7;
-    }
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface); border: 1px solid var(--border2); border-radius: 9px; padding: 0.7rem 1rem; font-size: 0.83rem; color: var(--text); z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; max-width: 300px; line-height: 1.4; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.ok   { border-color: var(--success); }
+    .toast.err  { border-color: var(--error); }
+    .intro-banner { background: var(--gold-bg); border: 1px solid rgba(196,168,79,0.18); border-radius: 9px; padding: 0.9rem 1.1rem; margin-bottom: 1.35rem; font-size: 0.8rem; color: var(--text2); line-height: 1.7; }
     .intro-banner strong { color: var(--text); }
-
-    /* ── RESPONSIVE ── */
     @media (max-width: 600px) {
       .field-row { grid-template-columns: 1fr; }
       .card-head, .card-body, .card-foot { padding: 1.25rem; }
@@ -311,80 +123,44 @@
       .app-main { padding: 1.5rem 1rem 3rem; }
       .brand-sub { display: none; }
     }
-
-    /* ── Strategy cards ── */
-    .strategy-card {
-      background: var(--surface2);
-      border: 2px solid var(--border2);
-      border-radius: 10px;
-      padding: 0.9rem 1rem;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      position: relative;
-      user-select: none;
-    }
+    .strategy-card { background: var(--surface2); border: 2px solid var(--border2); border-radius: 10px; padding: 0.9rem 1rem; cursor: pointer; transition: all 0.15s ease; position: relative; user-select: none; }
     .strategy-card:hover { border-color: var(--border); background: #1e2438; }
     .strategy-card.selected { border-color: var(--gold); background: var(--gold-bg); }
     .strategy-card.primary  { border-color: var(--gold); background: var(--gold-bg); box-shadow: 0 0 0 1px var(--gold); }
     .strategy-card.disabled { opacity: 0.4; cursor: not-allowed; }
-    .strategy-card-icon   { font-size: 1.4rem; margin-bottom: 0.4rem; }
-    .strategy-card-name   { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
-    .strategy-card-desc   { font-size: 0.72rem; color: var(--text2); line-height: 1.5; }
-    .strategy-primary-badge {
-      position: absolute; top: 0.5rem; right: 0.5rem;
-      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--gold); font-weight: 600;
-      background: rgba(196,168,79,0.15); border-radius: 4px; padding: 0.1rem 0.4rem;
-    }
-    .strategy-check {
-      position: absolute; top: 0.5rem; left: 0.5rem;
-      width: 18px; height: 18px; border-radius: 50%;
-      background: var(--gold); display: flex; align-items: center; justify-content: center;
-      font-size: 0.65rem; color: var(--navy); font-weight: 700;
-      opacity: 0; transition: opacity 0.15s;
-    }
-    .strategy-card.selected .strategy-check,
-    .strategy-card.primary .strategy-check { opacity: 1; }
-
+    .strategy-card-icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+    .strategy-card-name { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
+    .strategy-card-desc { font-size: 0.72rem; color: var(--text2); line-height: 1.5; }
+    .strategy-primary-badge { position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); font-weight: 600; background: rgba(196,168,79,0.15); border-radius: 4px; padding: 0.1rem 0.4rem; }
+    .strategy-check { position: absolute; top: 0.5rem; left: 0.5rem; width: 18px; height: 18px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #0c0f16; font-weight: 700; opacity: 0; transition: opacity 0.15s; }
+    .strategy-card.selected .strategy-check, .strategy-card.primary .strategy-check { opacity: 1; }
   </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════
-     SETTINGS MODAL
-════════════════════════════════════════════ -->
+<!-- SETTINGS MODAL -->
 <div id="settingsModal" class="overlay hidden">
   <div class="modal">
-    <div class="modal-head">
-      <div class="modal-title">⚙ Configuration</div>
-      <div class="modal-sub">Settings are saved locally in your browser.</div>
-    </div>
+    <div class="modal-head"><div class="modal-title">⚙ Configuration</div><div class="modal-sub">Settings are saved locally in your browser.</div></div>
     <div class="modal-body">
-
-      <div class="info-box">
-        <p><strong style="color:var(--text)">Gmail &amp; Google Docs</strong> are enabled via Google OAuth. When you click Email or Save to Google Doc, you'll be prompted to sign in with your Google account — no configuration needed.</p>
-      </div>
-
+      <div class="info-box"><p><strong style="color:var(--text)">Gmail &amp; Google Docs</strong> are enabled via Google OAuth. When you click Email or Save to Google Doc, you'll be prompted to sign in with your Google account.</p></div>
       <div class="field" style="margin-top:0.5rem">
         <label style="display:flex;align-items:center;justify-content:space-between">
           <span>Admin Access <span class="opt">(prompt editor)</span></span>
           <button class="btn btn-ghost" style="padding:0.25rem 0.6rem;font-size:0.72rem" id="adminUnlockBtn" onclick="toggleAdminUnlock()">🔒 Unlock</button>
         </label>
         <div id="adminPwRow" style="display:flex;gap:0.5rem;margin-top:0.35rem">
-          <input type="password" id="cfgAdminPw" placeholder="Admin password…" autocomplete="off" style="flex:1"
-            onkeydown="if(event.key==='Enter')toggleAdminUnlock()">
+          <input type="password" id="cfgAdminPw" placeholder="Admin password…" autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')toggleAdminUnlock()">
         </div>
       </div>
-
       <div id="adminSection" style="display:none;border-top:1px solid var(--border);padding-top:1.2rem;margin-top:0.5rem">
         <div class="field">
           <label>AI Prompt Template <span class="opt">(admin only)</span></label>
-          <textarea id="cfgPrompt" rows="14" placeholder="Paste custom prompt here — use ${d.name}, ${d.why}, ${d.goals}, ${d.exp}, ${d.time}, ${d.budget}, ${d.soi}, ${d.earn}, ${d.price}, ${d.list} as variables." style="font-size:0.75rem;font-family:monospace;line-height:1.5"></textarea>
-          <div class="hint">Leave blank to use the default built-in prompt. Variables: <code style="color:var(--gold2);font-size:0.72rem">${d.name} ${d.why} ${d.goals} ${d.exp} ${d.time} ${d.budget} ${d.soi} ${d.earn} ${d.price} ${d.list}</code></div>
+          <textarea id="cfgPrompt" rows="14" placeholder="Paste custom prompt here…" style="font-size:0.75rem;font-family:monospace;line-height:1.5"></textarea>
+          <div class="hint">Leave blank to use the default built-in prompt.</div>
         </div>
         <button class="btn btn-ghost" style="margin-top:0.5rem;font-size:0.78rem" onclick="resetPrompt()">↩ Reset to Default Prompt</button>
       </div>
-
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
@@ -393,82 +169,46 @@
   </div>
 </div>
 
-
-<!-- ══════════════════════════════════════════
-     EMAIL MODAL
-════════════════════════════════════════════ -->
+<!-- EMAIL MODAL -->
 <div id="emailModal" class="overlay hidden">
   <div class="modal">
-    <div class="modal-head">
-      <div class="modal-title">✉️ Email Business Plan</div>
-      <div class="modal-sub">Send this plan to the agent, their manager, or any other recipients.</div>
-    </div>
+    <div class="modal-head"><div class="modal-title">✉️ Email Business Plan</div><div class="modal-sub">Send this plan to the agent, their manager, or any other recipients.</div></div>
     <div class="modal-body">
-      <div class="field">
-        <label>Recipients <span class="req">*</span></label>
-        <input type="text" id="emailTo" placeholder="manager@adamscameron.com, agent@adamscameron.com">
-        <div class="hint">Separate multiple addresses with a comma.</div>
-      </div>
-      <div class="field">
-        <label>Subject</label>
-        <input type="text" id="emailSubj" value="Your Business Plan — Adams, Cameron &amp; Co.">
-      </div>
-      <div class="field">
-        <label>Note <span class="opt">(optional)</span></label>
-        <textarea id="emailNote" placeholder="Add a personal message to include above the plan…" rows="2"></textarea>
-      </div>
-      <div class="info-box" id="emailMethodNote">
-        <p id="emailMethodText"></p>
-      </div>
+      <div class="field"><label>Recipients <span class="req">*</span></label><input type="text" id="emailTo" placeholder="manager@adamscameron.com, agent@adamscameron.com"><div class="hint">Separate multiple addresses with a comma.</div></div>
+      <div class="field"><label>Subject</label><input type="text" id="emailSubj" value="Your Business Plan — Adams, Cameron &amp; Co."></div>
+      <div class="field"><label>Note <span class="opt">(optional)</span></label><textarea id="emailNote" placeholder="Add a personal message to include above the plan…" rows="2"></textarea></div>
+      <div class="info-box" id="emailMethodNote"><p id="emailMethodText"></p></div>
     </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeEmailModal()">Cancel</button>
-      <button class="btn btn-primary" id="emailSendBtn" onclick="doEmail()">Send Email</button>
-    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" onclick="closeEmailModal()">Cancel</button><button class="btn btn-primary" id="emailSendBtn" onclick="doEmail()">Send Email</button></div>
   </div>
 </div>
 
-
-
-<!-- ══════════════════════════════════════════
-     ENROLLMENT MODAL
-════════════════════════════════════════════ -->
+<!-- ENROLLMENT MODAL -->
 <div id="enrollModal" class="overlay hidden">
   <div class="modal" style="max-width:560px">
-    <div class="modal-head">
-      <div class="modal-title">🤝 AC Pathfinder Coaching</div>
-      <div class="modal-sub">A voluntary coaching program built around your plan. You set the goals — your coach helps you follow through.</div>
-    </div>
+    <div class="modal-head"><div class="modal-title">🤝 AC Pathfinder Coaching</div><div class="modal-sub">A voluntary coaching program built around your plan. You set the goals — your coach helps you follow through.</div></div>
     <div class="modal-body">
-
       <div class="info-box">
         <p><strong style="color:var(--text)">Here's what you're agreeing to:</strong></p>
-        <p>✓ &nbsp;Check in weekly — about 5 minutes by text<br>
+        <p>✓ &nbsp;Check in weekly — about 5 minutes by text or web<br>
            ✓ &nbsp;Be honest about what's working and what isn't<br>
            ✓ &nbsp;Meet monthly with your coach to review and adjust<br>
            ✓ &nbsp;Reply STOP anytime to pause. Message &amp; data rates may apply.</p>
       </div>
-
-      <!-- Weekly commitments -->
       <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:1rem 1.25rem;">
         <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.6rem;font-weight:600">Your Weekly Commitments (from your plan)</div>
         <div id="commitmentList" style="font-size:0.84rem;color:var(--text2);line-height:2.1"></div>
       </div>
-
-      <!-- Coach selection -->
       <div class="field">
         <label>Choose Your Coach</label>
         <div class="hint" style="margin-bottom:0.6rem">Based on your office we've made a suggestion — but you can work with anyone.</div>
         <div id="coachOptions" style="display:flex;flex-direction:column;gap:0.55rem"></div>
       </div>
-
-      <!-- Personal reason -->
       <div class="field">
         <label>In your own words… <span class="opt">(optional but powerful)</span></label>
         <textarea id="enrollReason" rows="2" placeholder="The most important reason I'm doing this is…"></textarea>
         <div class="hint">Shared with your coach and shown at the top of every coaching session.</div>
       </div>
-
     </div>
     <div class="modal-foot" style="flex-direction:column;gap:0.5rem;align-items:stretch">
       <button class="btn btn-primary" id="enrollBtn" onclick="doEnroll()" style="padding:0.75rem;font-size:0.9rem">🤝 Yes, I'm in — Start My Coaching</button>
@@ -477,324 +217,180 @@
   </div>
 </div>
 
-
 <header class="app-header">
   <div class="brand">
     <div class="brand-icon">🏡</div>
-    <div>
-      <div class="brand-name">Adams, Cameron & Co.</div>
-      <div class="brand-sub">Business Plan Generator</div>
-    </div>
+    <div><div class="brand-name">Adams, Cameron & Co.</div><div class="brand-sub">Business Plan Generator</div></div>
   </div>
-  <div class="hdr-right">
-    <button class="btn-icon" onclick="openSettings()">⚙ Settings</button>
-  </div>
+  <div class="hdr-right"><button class="btn-icon" onclick="openSettings()">⚙ Settings</button></div>
 </header>
 
-
-<!-- ══════════════════════════════════════════
-     MAIN
-════════════════════════════════════════════ -->
 <main class="app-main">
-
-  <!-- Progress -->
   <div class="progress" id="progressBar">
-    <div class="prog-step">
-      <div class="prog-num active" id="pn1">1</div>
-      <div class="prog-label active" id="pl1">Contact</div>
-    </div>
+    <div class="prog-step"><div class="prog-num active" id="pn1">1</div><div class="prog-label active" id="pl1">Contact</div></div>
     <div class="prog-line"></div>
-    <div class="prog-step">
-      <div class="prog-num" id="pn2">2</div>
-      <div class="prog-label" id="pl2">Overview</div>
-    </div>
+    <div class="prog-step"><div class="prog-num" id="pn2">2</div><div class="prog-label" id="pl2">Overview</div></div>
     <div class="prog-line"></div>
-    <div class="prog-step">
-      <div class="prog-num" id="pn3">3</div>
-      <div class="prog-label" id="pl3">Strategy</div>
-    </div>
+    <div class="prog-step"><div class="prog-num" id="pn3">3</div><div class="prog-label" id="pl3">Strategy</div></div>
   </div>
 
-
-  <!-- ── STEP 1: Contact ── -->
+  <!-- STEP 1 -->
   <div class="step active" id="step1">
-    <div class="intro-banner">
-      <strong>Welcome.</strong> This tool uses Gemini AI to generate a personalized 12-month business plan based on your inputs.
-      It's a starting point — not a final document. Answer honestly, don't overthink it on the first pass, and you can always revise your assumptions.
-    </div>
+    <div class="intro-banner"><strong>Welcome.</strong> This tool uses Gemini AI to generate a personalized 12-month business plan. Answer honestly and you can always revise your assumptions later.</div>
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">Section 1 of 3</div>
-        <div class="section-title">Contact &amp; Market</div>
-        <div class="section-desc">Basic information so we can personalize your plan and deliver it to the right place.</div>
-      </div>
+      <div class="card-head"><div class="section-tag">Section 1 of 3</div><div class="section-title">Contact &amp; Market</div><div class="section-desc">Basic information so we can personalize your plan and deliver it to the right place.</div></div>
       <div class="card-body">
-        <div class="field">
-          <label>Email Address <span class="req">*</span></label>
-          <input type="email" id="f_email" placeholder="you@adamscameron.com">
-          <div class="hint">Used to save your plan and enroll in coaching. Must be your @adamscameron.com address.</div>
-        </div>
+        <div class="field"><label>Email Address <span class="req">*</span></label><input type="email" id="f_email" placeholder="you@adamscameron.com"><div class="hint">Used to save your plan and enroll in coaching. Must be your @adamscameron.com address.</div></div>
         <div class="field-row">
-          <div class="field">
-            <label>Full Name</label>
-            <input type="text" id="f_name" placeholder="First Last">
-          </div>
-          <div class="field">
-            <label>Office Location</label>
-            <input type="text" id="f_office" placeholder="e.g. Ormond Beach, Daytona…">
-          </div>
+          <div class="field"><label>Full Name</label><input type="text" id="f_name" placeholder="First Last"></div>
+          <div class="field"><label>Office Location</label><input type="text" id="f_office" placeholder="e.g. Ormond Beach, Daytona…"></div>
         </div>
-        <div class="field">
-          <label>Primary Market Focus</label>
-          <input type="text" id="f_market" placeholder="e.g. Volusia County, Palm Coast, State of Florida…">
-          <div class="hint">How targeted or broad is your geographic focus? Could be a neighborhood or an entire state.</div>
-        </div>
+        <div class="field"><label>Primary Market Focus</label><input type="text" id="f_market" placeholder="e.g. Volusia County, Palm Coast…"><div class="hint">How targeted or broad is your geographic focus?</div></div>
       </div>
-      <div class="card-foot">
-        <div></div>
-        <button class="btn btn-primary" onclick="goTo(2)">Continue →</button>
-      </div>
+      <div class="card-foot"><div></div><button class="btn btn-primary" onclick="goTo(2)">Continue →</button></div>
     </div>
   </div>
 
-
-  <!-- ── STEP 2: Overview ── -->
+  <!-- STEP 2 -->
   <div class="step" id="step2">
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">Section 2 of 3</div>
-        <div class="section-title">Overview &amp; Context</div>
-        <div class="section-desc">Your "why," goals, and constraints shape the entire strategy. Be honest — the more context you give, the more actionable your plan will be.</div>
-      </div>
+      <div class="card-head"><div class="section-tag">Section 2 of 3</div><div class="section-title">Overview &amp; Context</div><div class="section-desc">Your "why," goals, and constraints shape the entire strategy. Be honest — the more context you give, the more actionable your plan will be.</div></div>
       <div class="card-body">
-        <div class="field">
-          <label>Brief Description <span class="opt">(optional)</span></label>
-          <textarea id="f_desc" placeholder="A few words about your practice or current situation…" rows="2"></textarea>
-        </div>
-        <div class="field">
-          <label>Your "Why" <span class="req">*</span></label>
-          <textarea id="f_why" placeholder="Why do you want to be in real estate? What do you ultimately want to accomplish?" rows="3" required></textarea>
-        </div>
-        <div class="field">
-          <label>Goals <span class="req">*</span></label>
-          <textarea id="f_goals" placeholder="What are your goals? Consider personal financial needs, business objectives, and long-term vision." rows="3" required></textarea>
-        </div>
+        <div class="field"><label>Brief Description <span class="opt">(optional)</span></label><textarea id="f_desc" placeholder="A few words about your practice or current situation…" rows="2"></textarea></div>
+        <div class="field"><label>Your "Why" <span class="req">*</span></label><textarea id="f_why" placeholder="Why do you want to be in real estate? What do you ultimately want to accomplish?" rows="3" required></textarea></div>
+        <div class="field"><label>Goals <span class="req">*</span></label><textarea id="f_goals" placeholder="What are your goals? Consider personal financial needs, business objectives, and long-term vision." rows="3" required></textarea></div>
         <div class="field">
           <label>Time Commitment — Hours per Week</label>
           <div class="range-field">
             <div class="range-labels"><span>0 hrs</span><span class="range-val" id="f_timeV">0 hrs/wk</span><span>80 hrs/wk</span></div>
-            <input type="range" id="f_timeR" min="0" max="80" value="0" step="1"
-              oninput="document.getElementById('f_timeV').textContent=this.value+' hrs/wk';document.getElementById('f_time').value=this.value">
+            <input type="range" id="f_timeR" min="0" max="80" value="0" step="1" oninput="document.getElementById('f_timeV').textContent=this.value+' hrs/wk';document.getElementById('f_time').value=this.value">
             <input type="hidden" id="f_time" value="0">
           </div>
-          <div class="hint">How many hours per week can you dedicate to real estate? Consider other jobs or family commitments.</div>
           <textarea id="f_time_note" placeholder="Optional: explain your schedule in more detail…" rows="2" style="margin-top:0.5rem"></textarea>
         </div>
-
         <div class="field">
           <label>Budget / Cost Constraints</label>
           <div class="range-field">
             <div class="range-labels"><span>None</span><span class="range-val" id="f_budgetV">0</span><span>Unlimited</span></div>
-            <input type="range" id="f_budgetR" min="0" max="100" value="0" step="1"
-              oninput="document.getElementById('f_budgetV').textContent=this.value;document.getElementById('f_budget').value=this.value">
+            <input type="range" id="f_budgetR" min="0" max="100" value="0" step="1" oninput="document.getElementById('f_budgetV').textContent=this.value;document.getElementById('f_budget').value=this.value">
             <input type="hidden" id="f_budget" value="0">
           </div>
-          <div class="hint">How much can you invest in your business? Consider marketing, tools, and education.</div>
           <textarea id="f_budget_note" placeholder="Optional: describe your budget situation in more detail…" rows="2" style="margin-top:0.5rem"></textarea>
         </div>
-
         <div class="field">
           <label>Sphere of Influence — Number of Contacts</label>
           <div class="range-field">
             <div class="range-labels"><span>0</span><span class="range-val" id="f_soiV">0 contacts</span><span>1,000+</span></div>
-            <input type="range" id="f_soiR" min="0" max="1000" value="0" step="10"
-              oninput="document.getElementById('f_soiV').textContent=Number(this.value).toLocaleString()+' contacts';document.getElementById('f_soi').value=this.value">
+            <input type="range" id="f_soiR" min="0" max="1000" value="0" step="10" oninput="document.getElementById('f_soiV').textContent=Number(this.value).toLocaleString()+' contacts';document.getElementById('f_soi').value=this.value">
             <input type="hidden" id="f_soi" value="0">
           </div>
-          <div class="hint">How large is your personal network in this market? New to area vs. long-time community member.</div>
           <textarea id="f_soi_note" placeholder="Optional: long-time local, new to area, active in community…" rows="2" style="margin-top:0.5rem"></textarea>
         </div>
-
         <div class="field">
           <label>Real Estate Experience — Years</label>
           <div class="range-field">
             <div class="range-labels"><span>0 yrs</span><span class="range-val" id="f_expV">0 yrs</span><span>20 yrs</span></div>
-            <input type="range" id="f_expR" min="0" max="20" value="0" step="1"
-              oninput="document.getElementById('f_expV').textContent=this.value+' yrs';document.getElementById('f_exp').value=this.value">
+            <input type="range" id="f_expR" min="0" max="20" value="0" step="1" oninput="document.getElementById('f_expV').textContent=this.value+' yrs';document.getElementById('f_exp').value=this.value">
             <input type="hidden" id="f_exp" value="0">
           </div>
-          <div class="hint">How many years have you been practicing real estate? Just licensed vs. seasoned veteran.</div>
           <textarea id="f_exp_note" placeholder="Optional: transaction types, specialties, designations…" rows="2" style="margin-top:0.5rem"></textarea>
         </div>
       </div>
-      <div class="card-foot">
-        <button class="btn btn-ghost" onclick="goTo(1)">← Back</button>
-        <button class="btn btn-primary" onclick="goTo(3)">Continue →</button>
-      </div>
+      <div class="card-foot"><button class="btn btn-ghost" onclick="goTo(1)">← Back</button><button class="btn btn-primary" onclick="goTo(3)">Continue →</button></div>
     </div>
   </div>
 
-
-  <!-- ── STEP 3: Prospecting ── -->
+  <!-- STEP 3 -->
   <div class="step" id="step3">
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">Section 3 of 3</div>
-        <div class="section-title">Prospecting Strategy</div>
-        <div class="section-desc">Let's define the numbers. These inputs drive the quantitative Revenue Roadmap in your plan, including transaction goals and required prospecting activity.</div>
-      </div>
+      <div class="card-head"><div class="section-tag">Section 3 of 3</div><div class="section-title">Prospecting Strategy</div><div class="section-desc">Let's define the numbers. These inputs drive the quantitative Revenue Roadmap in your plan.</div></div>
       <div class="card-body">
-        <div class="field">
-          <label>Annual Earning Goal <span class="req">*</span></label>
-          <div class="input-wrap">
-            <span class="input-pfx">$</span>
-            <input type="number" id="f_earn" placeholder="100000" min="0" step="1000">
-          </div>
-          <div class="hint">Include business expenses, personal needs (rent/mortgage, etc.), and long-term savings targets.</div>
-        </div>
-        <div class="field">
-          <label>Average Sale Price</label>
-          <div class="input-wrap">
-            <span class="input-pfx">$</span>
-            <input type="number" id="f_price" placeholder="350000" min="0" step="5000">
-          </div>
-          <div class="hint">Reflects your market and strategy — investors &amp; first-time buyers differ from luxury markets.</div>
-        </div>
+        <div class="field"><label>Annual Earning Goal <span class="req">*</span></label><div class="input-wrap"><span class="input-pfx">$</span><input type="number" id="f_earn" placeholder="100000" min="0" step="1000"></div><div class="hint">Include business expenses, personal needs, and savings targets.</div></div>
+        <div class="field"><label>Average Sale Price</label><div class="input-wrap"><span class="input-pfx">$</span><input type="number" id="f_price" placeholder="350000" min="0" step="5000"></div><div class="hint">Reflects your market and strategy.</div></div>
         <div class="field">
           <label>Business Mix — Buyers vs. Sellers</label>
           <div class="range-field">
             <div class="range-labels"><span>100% Buyers</span><span class="range-val" id="f_listV">50% Sellers</span><span>100% Sellers</span></div>
-            <input type="range" id="f_listR" min="0" max="100" value="50" step="5"
-              oninput="document.getElementById('f_listV').textContent=this.value+'% Sellers';document.getElementById('f_list').value=this.value">
+            <input type="range" id="f_listR" min="0" max="100" value="50" step="5" oninput="document.getElementById('f_listV').textContent=this.value+'% Sellers';document.getElementById('f_list').value=this.value">
           </div>
           <input type="hidden" id="f_list" value="50">
-          <div class="hint">What share of your business will come from listings (sellers) vs. buyer representation?</div>
+          <div class="hint">What share of your business will come from listings vs. buyer representation?</div>
         </div>
       </div>
-      <div class="card-foot">
-        <button class="btn btn-ghost" onclick="goTo(2)">← Back</button>
-        <button class="btn btn-primary" id="genBtn" onclick="generatePlan()">✨ Generate My Plan</button>
-      </div>
+      <div class="card-foot"><button class="btn btn-ghost" onclick="goTo(2)">← Back</button><button class="btn btn-primary" id="genBtn" onclick="generatePlan()">✨ Generate My Plan</button></div>
     </div>
   </div>
 
-
-  <!-- ── LOADING ── -->
+  <!-- LOADING -->
   <div class="step" id="stepLoad">
-    <div class="card">
-      <div class="loading-view">
-        <div class="spinner"></div>
-        <div class="loading-title" id="loadingTitle">Crafting Your Business Plan…</div>
-        <div class="loading-sub" id="loadingSub">Gemini AI is analyzing your profile and building a personalized 12-month strategy.</div>
-      </div>
-    </div>
+    <div class="card"><div class="loading-view"><div class="spinner"></div><div class="loading-title" id="loadingTitle">Crafting Your Business Plan…</div><div class="loading-sub" id="loadingSub">Gemini AI is analyzing your profile and building a personalized 12-month strategy.</div></div></div>
   </div>
 
-
-  <!-- ── RESULTS ── -->
+  <!-- RESULTS -->
   <div class="step" id="stepResult">
     <div class="card">
       <div class="results-head">
-        <div>
-          <div class="results-title">Your Business Plan is Ready</div>
-          <div class="results-meta" id="resultsMeta">Adams, Cameron &amp; Co. · Generated by Gemini AI</div>
-        </div>
+        <div><div class="results-title">Your Business Plan is Ready</div><div class="results-meta" id="resultsMeta">Adams, Cameron &amp; Co. · Generated by Gemini AI</div></div>
         <div class="results-actions">
-          <button class="btn btn-ghost"   id="btnCopy"  onclick="doCopy()">📋 Copy</button>
-          <button class="btn btn-subtle"  id="btnEmail" onclick="openEmailModal()">✉️ Email</button>
-          <button class="btn btn-subtle"  id="btnDocs"  onclick="doDocs()">📄 Save to Google Doc</button>
+          <button class="btn btn-ghost"  id="btnCopy"  onclick="doCopy()">📋 Copy</button>
+          <button class="btn btn-subtle" id="btnEmail" onclick="openEmailModal()">✉️ Email</button>
+          <button class="btn btn-subtle" id="btnDocs"  onclick="doDocs()">📄 Save to Google Doc</button>
           <button class="btn btn-primary" onclick="doReset()">↩ Start Over</button>
         </div>
       </div>
-      <div class="results-body">
-        <div class="plan" id="planContent"></div>
-      </div>
+      <div class="results-body"><div class="plan" id="planContent"></div></div>
     </div>
   </div>
 
-  <!-- ── INFOGRAPHIC ── -->
+  <!-- INFOGRAPHIC -->
   <div id="infographicCard" style="display:none;margin-top:1.5rem">
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">Visual Summary</div>
-        <div class="section-title">Roadmap to Success</div>
-        <div class="section-desc">Key activities and milestones that will drive your results over the next 12 months.</div>
-      </div>
-      <div style="padding:1.5rem 2rem" id="infographicContent">
-        <div class="loading-view" style="padding:2rem 1rem">
-          <div class="spinner"></div>
-          <div class="loading-sub">Building your infographic…</div>
-        </div>
-      </div>
+      <div class="card-head"><div class="section-tag">Visual Summary</div><div class="section-title">Roadmap to Success</div><div class="section-desc">Key activities and milestones that will drive your results over the next 12 months.</div></div>
+      <div style="padding:1.5rem 2rem" id="infographicContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your infographic…</div></div></div>
     </div>
   </div>
 
-  <!-- ── DESK CARD ── -->
+  <!-- WEEKLY PLAYBOOK -->
   <div id="deskCard" style="display:none;margin-top:1.5rem">
     <div class="card">
       <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-        <div>
-          <div class="section-tag">Daily Reminder</div>
-          <div class="section-title">Your Weekly Playbook</div>
-          <div class="section-desc">Print this and put it somewhere you'll see it every day — desk, car, binder. One page. No excuses.</div>
-        </div>
+        <div><div class="section-tag">Daily Reminder</div><div class="section-title">Your Weekly Playbook</div><div class="section-desc">Print this and put it somewhere you'll see it every day. One page. No excuses.</div></div>
         <button class="btn btn-subtle" onclick="printDeskCard()" style="flex-shrink:0">🖨️ Print</button>
       </div>
-      <div style="padding:1.5rem 2rem" id="deskCardContent">
-        <div class="loading-view" style="padding:2rem 1rem">
-          <div class="spinner"></div>
-          <div class="loading-sub">Building your printable playbook…</div>
-        </div>
-      </div>
+      <div style="padding:1.5rem 2rem" id="deskCardContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your printable playbook…</div></div></div>
     </div>
   </div>
 
-  <!-- ── STRATEGY SELECTION ── -->
+  <!-- STRATEGY SELECTION -->
   <div id="strategyCard" style="display:none;margin-top:1.5rem">
     <div class="card">
-      <div class="card-head">
-        <div class="section-tag">Your Strategy</div>
-        <div class="section-title">How You'll Build Your Business</div>
-        <div class="section-desc">Based on your plan, we've suggested the strategies that best fit your market, time commitment, and goals. You can adjust these — but keep it focused. One primary strategy and up to four supporting ones.</div>
-      </div>
+      <div class="card-head"><div class="section-tag">Your Strategy</div><div class="section-title">How You'll Build Your Business</div><div class="section-desc">Based on your plan, we've suggested the strategies that best fit your profile. You can adjust — but keep it focused. One primary strategy and up to four supporting ones.</div></div>
       <div class="card-body">
-        <div id="strategyRationale" style="display:none;background:var(--gold-bg);border:1px solid rgba(196,168,79,0.2);border-radius:8px;padding:0.9rem 1rem;margin-bottom:1.25rem;font-size:0.84rem;color:var(--text2);line-height:1.65"></div>
+        <div id="strategyRationale" style="display:none;background:var(--gold-bg);border:1px solid rgba(196,168,79,0.2);border-radius:8px;padding:0.9rem 1rem;font-size:0.84rem;color:var(--text2);line-height:1.65"></div>
         <div id="strategyGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem"></div>
         <div id="strategyError" style="display:none;font-size:0.8rem;color:#c0392b;margin-top:0.5rem;text-align:center"></div>
       </div>
       <div class="card-foot">
-        <div style="font-size:0.75rem;color:var(--text3)">
-          <span id="strategyCount">0</span> selected · 1 primary required · max 5 total
-        </div>
-        <button class="btn btn-primary" id="strategyConfirmBtn" onclick="confirmStrategies()">
-          Confirm My Strategy →
-        </button>
+        <div style="font-size:0.75rem;color:var(--text3)"><span id="strategyCount">0</span> selected · 1 primary required · max 5 total</div>
+        <button class="btn btn-primary" id="strategyConfirmBtn" onclick="confirmStrategies()">Confirm My Strategy →</button>
       </div>
     </div>
   </div>
 
-  <!-- ── ENROLLMENT BUTTON ── -->
+  <!-- ENROLLMENT CTA -->
   <div id="enrollmentCard" style="display:none;margin-top:1.5rem">
     <div class="card">
       <div class="card-body" style="text-align:center;padding:2rem">
         <div style="font-size:2rem;margin-bottom:0.75rem">🤝</div>
         <div class="section-title" style="margin-bottom:0.5rem">Ready to take it further?</div>
-        <p style="color:var(--text2);font-size:0.88rem;max-width:480px;margin:0 auto 1.5rem">
-          The AC Pathfinder coaching program pairs you with a sales manager who helps you follow through on this plan — weekly check-ins by text, monthly sessions, and real accountability.
-        </p>
-        <button class="btn btn-primary" onclick="openEnrollModal()" style="padding:0.75rem 2rem;font-size:0.95rem">
-          Learn About Coaching →
-        </button>
-        <div style="margin-top:0.75rem">
-          <button class="btn btn-ghost" onclick="document.getElementById('enrollmentCard').style.display='none'" style="font-size:0.8rem">
-            Not right now
-          </button>
-        </div>
+        <p style="color:var(--text2);font-size:0.88rem;max-width:480px;margin:0 auto 1.5rem">The AC Pathfinder coaching program pairs you with a sales manager who helps you follow through on this plan — weekly check-ins, monthly sessions, and real accountability.</p>
+        <button class="btn btn-primary" onclick="openEnrollModal()" style="padding:0.75rem 2rem;font-size:0.95rem">Learn About Coaching →</button>
+        <div style="margin-top:0.75rem"><button class="btn btn-ghost" onclick="document.getElementById('enrollmentCard').style.display='none'" style="font-size:0.8rem">Not right now</button></div>
       </div>
     </div>
   </div>
 
-  <!-- ── ENROLLMENT SUCCESS ── -->
+  <!-- ENROLLMENT SUCCESS -->
   <div id="enrolledCard" style="display:none;margin-top:1.5rem">
     <div class="card">
       <div class="card-body" style="text-align:center;padding:2.5rem 2rem">
@@ -804,51 +400,37 @@
       </div>
     </div>
   </div>
-
 </main>
 
-<!-- Toast -->
 <div id="toast" class="toast"></div>
 
-
-<!-- ══════════════════════════════════════════
-     SCRIPT
-════════════════════════════════════════════ -->
 <script>
-
-/* ───────────────────────── CONSTANTS ───────────────────── */
+/* ── CONSTANTS ──────────────────────────────────────────────────── */
 const ADMIN_PW_DEFAULT = 'ac2025admin';
-const PROXY_BASE    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
-const PROXY_KEY     = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
-const OAUTH_CLIENT  = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-const CONFIG_URL    = './bizplan-config.json';
+// FIX 1: Updated to current Cloud Run service URL
+const PROXY_BASE   = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const CONFIG_URL   = './bizplan-config.json';
 
-/* ───────────────────────── STATE ───────────────────────── */
+/* ── STATE ──────────────────────────────────────────────────────── */
+// FIX 2: Added strategies, selectedStrategies, suggestedStrategies
+// — these were missing, causing JS errors throughout the strategy/enrollment flow
 const S = {
-  step: 1,
-  plan: '',
-  planHtml: '',
-  data: {},
-  accessToken: null,
-  tokenClient: null,
-  pendingAction: null,
+  step: 1, plan: '', planHtml: '', data: {},
+  accessToken: null, tokenClient: null, pendingAction: null,
   config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
-  deskCardHtml: '',
-  agentProfile: null,
-  userEmail: null,
-  planId: null,
-  enrollmentId: null,
-  coaches: []
+  deskCardHtml: '', agentProfile: null, userEmail: null,
+  planId: null, enrollmentId: null, coaches: [],
+  strategies: [], selectedStrategies: [], suggestedStrategies: [],
 };
 
-/* ───────────────────────── SETTINGS ───────────────────── */
-
-function cfg()  { return { prompt: ls('ac_prompt_draft') || S.config.prompt || '' }; }
+/* ── SETTINGS ────────────────────────────────────────────────────── */
+function cfg() { return { prompt: ls('ac_prompt_draft') || S.config.prompt || '' }; }
 function ls(k, v) { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }
 
 function openSettings() {
-  const c = cfg();
-  document.getElementById('cfgPrompt').value = c.prompt;
+  document.getElementById('cfgPrompt').value = cfg().prompt;
   document.getElementById('adminSection').style.display = 'none';
   document.getElementById('adminPwRow').style.display = 'flex';
   document.getElementById('adminUnlockBtn').textContent = '🔒 Unlock';
@@ -862,38 +444,24 @@ function toggleAdminUnlock() {
   const sec = document.getElementById('adminSection');
   const btn = document.getElementById('adminUnlockBtn');
   const row = document.getElementById('adminPwRow');
-  if (sec.style.display !== 'none') {
-    sec.style.display = 'none'; row.style.display = 'flex';
-    btn.textContent = '🔒 Unlock'; return;
-  }
+  if (sec.style.display !== 'none') { sec.style.display = 'none'; row.style.display = 'flex'; btn.textContent = '🔒 Unlock'; return; }
   if (pw !== S.config.adminPassword) { toast('Incorrect admin password.', 'err'); return; }
-  sec.style.display = 'block'; row.style.display = 'none';
-  btn.textContent = '🔓 Lock';
+  sec.style.display = 'block'; row.style.display = 'none'; btn.textContent = '🔓 Lock';
   document.getElementById('cfgPrompt').value = cfg().prompt;
 }
-
 function resetPrompt() {
   if (!confirm('Reset to the default built-in prompt?')) return;
   document.getElementById('cfgPrompt').value = '';
   ls('ac_prompt_draft', '');
   toast('Prompt reset to default.', 'ok');
 }
-
 function saveSettings() {
-  const prompt = document.getElementById('cfgPrompt').value.trim();
-  ls('ac_prompt_draft', prompt);
+  ls('ac_prompt_draft', document.getElementById('cfgPrompt').value.trim());
   closeSettings();
-  toast('Prompt saved as a local draft. To make it permanent for all users, update bizplan-config.json on GitHub.', 'ok');
+  toast('Prompt saved. To make it permanent for all users, update bizplan-config.json on GitHub.', 'ok');
 }
 
-
-function setDot(id, cls, msg) {
-  const el = document.getElementById(id);
-  el.querySelector('.dot').className = 'dot ' + cls;
-  el.querySelector('span').innerHTML = msg;
-}
-
-/* ───────────────────────── GOOGLE OAUTH ───────────────── */
+/* ── GOOGLE OAUTH ─────────────────────────────────────────────────── */
 function initOAuth() {
   if (!window.google?.accounts?.oauth2) return;
   S.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -902,76 +470,48 @@ function initOAuth() {
     callback: async (res) => {
       if (res.error) { toast('Google sign-in failed: ' + res.error, 'err'); return; }
       S.accessToken = res.access_token;
-      // Fetch Google user email
       try {
-        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${S.accessToken}` }
-        });
-        if (userRes.ok) {
-          const userInfo = await userRes.json();
-          if (userInfo.email) await loadAgentProfile(userInfo.email);
-        }
-      } catch(e) { console.warn('Could not fetch user info:', e.message); }
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${S.accessToken}` } });
+        if (userRes.ok) { const u = await userRes.json(); if (u.email) await loadAgentProfile(u.email); }
+      } catch(e) {}
       if (S.pendingAction === 'email') doEmail();
       if (S.pendingAction === 'docs')  doDocs();
       S.pendingAction = null;
     }
   });
-
-  // Silently try to get identity on load (prompt: 'none' won't show popup)
   try {
     google.accounts.id.initialize({
       client_id: OAUTH_CLIENT,
-      callback: async (credentialResponse) => {
-        // Decode JWT to get email
-        const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
-        if (payload.email) await loadAgentProfile(payload.email);
+      callback: async (cr) => {
+        const p = JSON.parse(atob(cr.credential.split('.')[1]));
+        if (p.email) await loadAgentProfile(p.email);
       }
     });
-    google.accounts.id.prompt(); // Shows One Tap if user is signed in
+    google.accounts.id.prompt();
   } catch(e) {}
 }
 
-function requestToken(action) {
-  if (!S.tokenClient) return false;
-  if (S.accessToken)  return true;
-  S.pendingAction = action;
-  S.tokenClient.requestAccessToken();
-  return false;
-}
-
-/* ───────────────────────── NAVIGATION ─────────────────── */
-function show(id) {
-  document.querySelectorAll('.step').forEach(e => e.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
+/* ── NAVIGATION ──────────────────────────────────────────────────── */
+function show(id) { document.querySelectorAll('.step').forEach(e => e.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 function setProgress(step) {
-  const inForm = step >= 1 && step <= 3;
-  document.getElementById('progressBar').style.display = inForm ? 'flex' : 'none';
+  document.getElementById('progressBar').style.display = (step >= 1 && step <= 3) ? 'flex' : 'none';
   for (let i = 1; i <= 3; i++) {
-    const n = document.getElementById('pn' + i);
-    const l = document.getElementById('pl' + i);
-    if (i < step)       { n.className = 'prog-num done';   n.textContent = '✓'; l.className = 'prog-label'; }
-    else if (i === step){ n.className = 'prog-num active';  n.textContent = i;   l.className = 'prog-label active'; }
-    else                { n.className = 'prog-num';         n.textContent = i;   l.className = 'prog-label'; }
+    const n = document.getElementById('pn' + i), l = document.getElementById('pl' + i);
+    if (i < step)        { n.className = 'prog-num done';   n.textContent = '✓'; l.className = 'prog-label'; }
+    else if (i === step) { n.className = 'prog-num active';  n.textContent = i;   l.className = 'prog-label active'; }
+    else                 { n.className = 'prog-num';         n.textContent = i;   l.className = 'prog-label'; }
   }
 }
-
 function goTo(step) {
   if (step === 2 && !v1()) return;
   if (step === 3 && !v2()) return;
-  S.step = step;
-  show('step' + step);
-  setProgress(step);
+  S.step = step; show('step' + step); setProgress(step);
   scrollTo({ top: 0, behavior: 'smooth' });
 }
-
 function v1() {
   const e = v('f_email');
   if (!e || !e.includes('@')) { toast('Please enter your email address.', 'err'); foc('f_email'); return false; }
   if (!v('f_name')) { toast('Please enter your name.', 'err'); foc('f_name'); return false; }
-  // Auto-load profile if email entered and not already loaded
   if (e !== S.userEmail) loadAgentProfile(e);
   return true;
 }
@@ -983,126 +523,67 @@ function v2() {
 function v(id) { return document.getElementById(id).value.trim(); }
 function foc(id) { document.getElementById(id).focus(); }
 
-/* ───────────────────────── FORM DATA ──────────────────── */
+/* ── FORM DATA ────────────────────────────────────────────────────── */
 function collect() {
-  const earn  = v('f_earn');
-  const price = v('f_price');
-
+  const earn = v('f_earn'), price = v('f_price');
   function withNote(rawVal, unit, noteId) {
     const note = document.getElementById(noteId).value.trim();
-    const label = unit === 'contacts'
-      ? Number(rawVal).toLocaleString() + ' contacts'
-      : rawVal + ' ' + unit;
+    const label = unit === 'contacts' ? Number(rawVal).toLocaleString() + ' contacts' : rawVal + ' ' + unit;
     return note ? `${label} — ${note}` : label;
   }
-
   return {
-    email:   v('f_email'),
-    name:    v('f_name')  || 'Agent',
-    office:  v('f_office')|| 'Adams, Cameron & Co.',
-    market:  v('f_market'),
-    desc:    v('f_desc'),
-    why:     v('f_why'),
-    goals:   v('f_goals'),
-    time:    withNote(document.getElementById('f_time').value, 'hours/week', 'f_time_note'),
-    budget:  (() => { const val = parseInt(document.getElementById('f_budget').value); const note = document.getElementById('f_budget_note').value.trim(); const label = val === 0 ? 'None' : val <= 25 ? `Low (${val}/100)` : val <= 50 ? `Moderate (${val}/100)` : val <= 75 ? `High (${val}/100)` : `Very high (${val}/100)`; return note ? `${label} — ${note}` : label; })(),
-    soi:     withNote(document.getElementById('f_soi').value, 'contacts', 'f_soi_note'),
-    exp:     withNote(document.getElementById('f_exp').value, 'years experience', 'f_exp_note'),
-    earn:    earn  ? '$' + Number(earn).toLocaleString()  : 'Not specified',
-    split:   '65%',
-    price:   price ? '$' + Number(price).toLocaleString() : 'Not specified',
-    list:    document.getElementById('f_list').value + '% sellers / ' + (100 - parseInt(document.getElementById('f_list').value)) + '% buyers',
+    email: v('f_email'), name: v('f_name') || 'Agent', office: v('f_office') || 'Adams, Cameron & Co.',
+    market: v('f_market'), desc: v('f_desc'), why: v('f_why'), goals: v('f_goals'),
+    time:   withNote(document.getElementById('f_time').value, 'hours/week', 'f_time_note'),
+    budget: (() => { const val = parseInt(document.getElementById('f_budget').value); const note = document.getElementById('f_budget_note').value.trim(); const label = val === 0 ? 'None' : val <= 25 ? `Low (${val}/100)` : val <= 50 ? `Moderate (${val}/100)` : val <= 75 ? `High (${val}/100)` : `Very high (${val}/100)`; return note ? `${label} — ${note}` : label; })(),
+    soi:   withNote(document.getElementById('f_soi').value, 'contacts', 'f_soi_note'),
+    exp:   withNote(document.getElementById('f_exp').value, 'years experience', 'f_exp_note'),
+    earn:  earn  ? '$' + Number(earn).toLocaleString()  : 'Not specified',
+    split: '65%',
+    price: price ? '$' + Number(price).toLocaleString() : 'Not specified',
+    list:  document.getElementById('f_list').value + '% sellers / ' + (100 - parseInt(document.getElementById('f_list').value)) + '% buyers',
   };
 }
 
-/* ───────────────────────── PROMPT ─────────────────────── */
+/* ── PROMPT ───────────────────────────────────────────────────────── */
 function buildPrompt(d) {
-  // Priority: local draft override → config.json prompt → built-in default
   const custom = ls('ac_prompt_draft') || S.config.prompt || '';
+  const ctx = S.config.context ? `### ADAMS, CAMERON & CO. TRAINING CONTEXT\n${S.config.context}\n\n---\n\n` : '';
+  if (custom) return ctx + custom.replace(/\$\{d\.(\w+)\}/g, (_, k) => d[k] || '');
+  return ctx + `Act as a Senior Real Estate Coach and Business Strategist. Generate a comprehensive, professional, highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
 
-  // Prepend company context if present in config
-  const contextBlock = S.config.context
-    ? `### ADAMS, CAMERON & CO. TRAINING CONTEXT\nUse the following company philosophy and framework when building this plan. Let it inform your strategy recommendations, language, and priorities throughout.\n\n${S.config.context}\n\n---\n\n`
-    : '';
+Format as a professional email to the agent, written in a supportive yet boss-mode encouraging tone. Use ## headings, **bold** for emphasis, and Markdown tables for numeric goals. No code blocks. No specific calendar year in the title. Sign off: "To your guaranteed success, — The Adams, Cameron & Co. Coaching Team"
 
-  if (custom) {
-    return contextBlock + custom.replace(/\$\{d\.(\w+)\}/g, (_, key) => d[key] || '');
-  }
-  return contextBlock + `Act as a Senior Real Estate Coach and Business Strategist. Your task is to generate a comprehensive, professional, and highly actionable Business Plan for a Realtor at Adams, Cameron & Co. for the next twelve months.
-
-The output must be formatted as a professional email intended for the agent, written in a supportive yet "boss-mode" encouraging tone. Use clear headings (##), bold text (**bold**) for emphasis, and Markdown tables for numeric goals. Avoid code blocks. Do not include a specific calendar year in the title. Sign off with "To your guaranteed success, — The Adams, Cameron & Co. Coaching Team" — do not use placeholders like [Your Name].
-
----
-
-### 1. AGENT PROFILE & CONTEXT
-- **Agent Name:** ${d.name}
-- **Office:** ${d.office}
-- **Primary Market Focus:** ${d.market || 'Not specified'}
-- **Motivation (The "Why"):** ${d.why}
-- **Primary Goals:** ${d.goals}
-- **Experience Level:** ${d.exp || 'Not specified'}
-- **Time Available:** ${d.time || 'Not specified'}
-- **Budgetary Constraints:** ${d.budget || 'Not specified'}
-- **Sphere of Influence (SOI):** ${d.soi || 'Not specified'}
+### 1. AGENT PROFILE
+- **Name:** ${d.name} | **Office:** ${d.office} | **Market:** ${d.market || 'Not specified'}
+- **Why:** ${d.why} | **Goals:** ${d.goals}
+- **Experience:** ${d.exp || 'Not specified'} | **Time:** ${d.time || 'Not specified'}
+- **Budget:** ${d.budget || 'Not specified'} | **SOI:** ${d.soi || 'Not specified'}
 - **Description:** ${d.desc || 'Not provided'}
 
-### 2. THE ADAMS, CAMERON & CO. ADVANTAGE
-Incorporate these specific value propositions into the plan:
-- Global reach via Leading Real Estate Companies of the World.
-- Full marketing suite: AC Social, automated open house/listing posts, and automated SOI newsletters.
-- Technology: Personal websites and multi-channel marketing tools (Online, Print, Direct Mail).
-- Office Perks: Floor time available 7 days a week in any office — emphasize this for lead gen and experience building.
+### 2. AC&CO ADVANTAGE
+Incorporate: Global reach via LeadingRE, AC Social automated marketing, personal websites, floor time 7 days/week in any office.
 
-### 3. QUANTITATIVE ANALYSIS (THE NUMBERS)
-Variables:
-- **Desired Net Take-Home:** ${d.earn}
-- **Commission Split:** Agent keeps ${d.split}
-- **Avg. Sale Price:** ${d.price}
-- **Avg. Commission per Side:** 3%
-- **Business Mix:** ${d.list}
+### 3. QUANTITATIVE ANALYSIS
+- Net Goal: ${d.earn} | Split: ${d.split} | Avg Sale: ${d.price} | Avg Commission/Side: 3% | Mix: ${d.list}
+- Calculate: GCI Required, Total Sides, Listing Appts (80% close rate), Buyer Prospects (3 per closed buyer side)
 
-Calculations required:
-1. **GCI Required:** Net Goal ÷ Split %
-2. **Total Sides Required:** GCI ÷ (Avg. Sale Price × 3%)
-3. **Listing Goals:** Listing appointments needed (assume 80% closing rate)
-4. **Buyer Goals:** Buyer prospects needed (assume 3 prospects per closed buyer side)
-
-### 4. REQUIRED OUTPUT STRUCTURE
-
-**Section I: Executive Overview**
-Verbose, inspiring summary of the agent's "Why" and goals. Connect personal motivation to Adams, Cameron & Co. resources. Be specific and personal.
-
-**Section II: The Revenue Roadmap (Table)**
-Create a formatted Markdown table: GCI Required, Total Sides, Listing Appointments Needed, Buyer Prospects Needed.
-
-**Section III: Strategic Action Plan**
-Based on Budget (${d.budget || 'unspecified'}) and Time (${d.time || 'unspecified'}), outline 3–4 specific lead generation pillars. Explicitly mention AC Social and the importance of floor time.
-
-**Section IV: Weekly & Monthly Execution**
-"Weekly Scoreboard" table of activities (SOI calls, social posts, floor time, follow-ups). Include a motivational note: "What gets measured gets managed." Track your time.
-
-**Section V: Mentorship Note**
-Brief closing paragraph the agent can share with their Sales Manager to establish accountability.`;
+### 4. OUTPUT STRUCTURE
+**Section I: Executive Overview** — Inspiring summary connecting their Why to AC&Co resources.
+**Section II: Revenue Roadmap (Table)** — GCI, Total Sides, Listing Appts, Buyer Prospects.
+**Section III: Strategic Action Plan** — 3-4 lead gen pillars based on budget/time. Mention AC Social and floor time.
+**Section IV: Weekly & Monthly Execution** — Scoreboard table. "What gets measured gets managed."
+**Section V: Mentorship Note** — Brief paragraph agent can share with their Sales Manager.`;
 }
 
-/* ───────────────────────── GEMINI API (via proxy) ──────── */
+/* ── GEMINI API ───────────────────────────────────────────────────── */
 async function geminiCall(prompt, maxTokens = 8192) {
   const res = await fetch(`${PROXY_BASE}/gemini`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-proxy-key':  PROXY_KEY
-    },
-    body: JSON.stringify({
-      model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens }
-    })
+    headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+    body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens } })
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `HTTP ${res.status}`);
-  }
+  if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error?.message || `HTTP ${res.status}`); }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Gemini returned an empty response.');
@@ -1111,52 +592,30 @@ async function geminiCall(prompt, maxTokens = 8192) {
 
 async function generatePlan() {
   if (!v('f_earn')) { toast('Please enter your annual earning goal.', 'err'); foc('f_earn'); return; }
-
   S.data = collect();
-
   document.getElementById('loadingTitle').textContent = 'Crafting Your Business Plan…';
   document.getElementById('loadingSub').textContent = 'Gemini AI is analyzing your profile and building a personalized 12-month strategy.';
-  show('stepLoad');
-  setProgress(99);
-
+  show('stepLoad'); setProgress(99);
   try {
-    // Step 1: Generate the business plan
-    S.plan     = await geminiCall(buildPrompt(S.data));
+    S.plan = await geminiCall(buildPrompt(S.data));
     S.planHtml = md2html(S.plan);
-
     document.getElementById('planContent').innerHTML = S.planHtml;
-    document.getElementById('resultsMeta').textContent =
-      `${S.data.name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-
-    show('stepResult');
-    setProgress(99);
-
-    // Step 2: Generate infographic and desk card independently
+    document.getElementById('resultsMeta').textContent = `${S.data.name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+    show('stepResult'); setProgress(99);
     document.getElementById('infographicCard').style.display = 'block';
     document.getElementById('deskCard').style.display = 'block';
-    generateInfographic().catch(e => console.error('[Infographic] Uncaught:', e));
-    generateDeskCard().catch(e => console.error('[DeskCard] Uncaught:', e));
-
-    // Step 3: Show strategy card (Gemini suggests, agent confirms)
-    // This feeds into enrollment — enrollment only shows after strategy is confirmed
-    if (!S.enrollmentId) {
-      setTimeout(() => showStrategyCard(), 2000);
-    }
-
+    generateInfographic().catch(e => console.error('[Infographic]', e));
+    generateDeskCard().catch(e => console.error('[DeskCard]', e));
+    if (!S.enrollmentId) setTimeout(() => showStrategyCard(), 2000);
   } catch (e) {
-    show('step3');
-    setProgress(3);
+    show('step3'); setProgress(3);
     toast('Generation failed: ' + e.message, 'err');
-    console.error(e);
   }
 }
 
-/* ───────────────────────── MARKDOWN → HTML ─────────────── */
+/* ── MARKDOWN → HTML ──────────────────────────────────────────────── */
 function md2html(src) {
-  let t = src
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  // Tables
+  let t = src.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   t = t.replace(/(\|[^\n]+\|\n?)+/g, m => {
     const rows = m.trim().split('\n').filter(r => r.trim());
     let html = '<table>', hdr = true;
@@ -1169,1012 +628,420 @@ function md2html(src) {
     }
     return html + '</table>';
   });
-
-  // Headings
-  t = t.replace(/^#### (.+)$/gm, '<h3>$1</h3>');
-  t = t.replace(/^### (.+)$/gm,  '<h3>$1</h3>');
-  t = t.replace(/^## (.+)$/gm,   '<h2>$1</h2>');
-  t = t.replace(/^# (.+)$/gm,    '<h1>$1</h1>');
-
-  // Bold / Italic
-  t = t.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  t = t.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
-  t = t.replace(/__(.+?)__/g,          '<strong>$1</strong>');
-  t = t.replace(/\*(.+?)\*/g,          '<em>$1</em>');
-
-  // HR
-  t = t.replace(/^---+$/gm, '<hr>');
-
-  // Lists (unordered)
-  t = t.replace(/((?:^[ \t]*[-*] .+\n?)+)/gm, m => {
-    const items = m.trim().split('\n').map(l => `<li>${l.replace(/^[ \t]*[-*] /, '')}</li>`);
-    return `<ul>${items.join('')}</ul>`;
-  });
-
-  // Lists (ordered)
-  t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, m => {
-    const items = m.trim().split('\n').map(l => `<li>${l.replace(/^[ \t]*\d+\. /, '')}</li>`);
-    return `<ol>${items.join('')}</ol>`;
-  });
-
-  // Paragraphs
-  t = t.replace(/\n\n+/g, '\n\n');
+  t = t.replace(/^#### (.+)$/gm,'<h3>$1</h3>').replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  t = t.replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/__(.+?)__/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+  t = t.replace(/^---+$/gm,'<hr>');
+  t = t.replace(/((?:^[ \t]*[-*] .+\n?)+)/gm, m => `<ul>${m.trim().split('\n').map(l=>`<li>${l.replace(/^[ \t]*[-*] /,'')}</li>`).join('')}</ul>`);
+  t = t.replace(/((?:^[ \t]*\d+\. .+\n?)+)/gm, m => `<ol>${m.trim().split('\n').map(l=>`<li>${l.replace(/^[ \t]*\d+\. /,'')}</li>`).join('')}</ol>`);
+  t = t.replace(/\n\n+/g,'\n\n');
   t = t.split('\n\n').map(block => {
     const trimmed = block.trim();
     if (!trimmed) return '';
     if (/^<[huo1-9]/.test(trimmed) || /^<table/.test(trimmed) || /^<hr/.test(trimmed)) return trimmed;
-    return `<p>${trimmed.replace(/\n/g, ' ')}</p>`;
+    return `<p>${trimmed.replace(/\n/g,' ')}</p>`;
   }).join('\n');
-
-  // Clean up
-  t = t.replace(/<p>\s*<\/p>/g, '');
-
-  return t;
+  return t.replace(/<p>\s*<\/p>/g,'');
 }
 
-/* ───────────────────────── IFRAME RENDERER ─────────────── */
+/* ── IFRAME RENDERER ──────────────────────────────────────────────── */
+// FIX 3: Use contentDocument.open/write/close instead of srcdoc.
+// srcdoc triggers the load event before content is written in some browsers,
+// causing height measurement to return 0 and the playbook to appear blank.
 function renderInIframe(containerId, html, theme = 'dark') {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
-
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = `width:100%;border:none;display:block;min-height:400px;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
+  iframe.style.cssText = `width:100%;border:none;display:block;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
   iframe.setAttribute('scrolling', 'no');
   container.appendChild(iframe);
-
-  // Write HTML directly into iframe document — most reliable cross-origin approach
-  iframe.addEventListener('load', () => {
+  // Write directly — bypasses the srcdoc load-event timing issue
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  // Multi-pass resize: catches late-loading fonts and images
+  const resize = () => {
     try {
-      const doc = iframe.contentDocument;
-      const h = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight);
-      if (h > 100) iframe.style.height = (h + 30) + 'px';
+      const h = Math.max(iframe.contentDocument.body.scrollHeight, iframe.contentDocument.documentElement.scrollHeight);
+      if (h > 100) iframe.style.height = (h + 40) + 'px';
     } catch(e) {}
-  });
-
-  // Use srcdoc — widely supported and works on GitHub Pages
-  iframe.srcdoc = html;
+  };
+  setTimeout(resize, 200); setTimeout(resize, 800); setTimeout(resize, 2000);
 }
 
-/* ───────────────────────── INFOGRAPHIC ─────────────────── */
+/* ── INFOGRAPHIC ──────────────────────────────────────────────────── */
 async function generateInfographic() {
   const d = S.data;
-  const infographicPrompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) that shows a "Roadmap to Success" visual for a real estate agent. The page should have a dark navy (#0c1524) background, gold (#c4a84f) accents, and white text. Include a vertical timeline with 5 phases: Foundation, Lead Generation, Momentum, Closing, Scale. Each phase has an emoji icon, a heading, and 2-3 bullet activities. At the top show the agent's key numbers. At the bottom show their personal "Why" as a motivational quote.
-
-Agent data:
-Name: ${d.name} | Market: ${d.market || 'Florida'} | Why: ${d.why} | Earning Goal: ${d.earn} | Avg Sale Price: ${d.price} | SOI: ${d.soi} | Hours/week: ${d.time} | Business Mix: ${d.list}
-
-Output the complete HTML document only. No explanation, no markdown fences.`;
-
+  const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) showing a "Roadmap to Success" visual for a real estate agent. Dark navy (#0c1524) background, gold (#c4a84f) accents, white text. Vertical timeline with 5 phases: Foundation, Lead Generation, Momentum, Closing, Scale. Each phase has emoji icon, heading, 2-3 bullet activities. Top shows key numbers, bottom shows their "Why" as motivational quote.
+Agent: Name: ${d.name} | Market: ${d.market||'Florida'} | Why: ${d.why} | Goal: ${d.earn} | Avg Price: ${d.price} | SOI: ${d.soi} | Hrs/wk: ${d.time} | Mix: ${d.list}
+Output complete HTML only. No explanation or markdown fences.`;
   try {
-    const html = await geminiCall(infographicPrompt, 8192);
-    const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-    if (!clean) throw new Error('Gemini returned empty content for infographic.');
-    console.log('[Infographic] HTML length:', clean.length);
-    console.log('[Infographic] Raw response:', clean.substring(0, 300));
+    const html = await geminiCall(prompt, 8192);
+    const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
+    if (!clean) throw new Error('Empty response');
     renderInIframe('infographicContent', clean, 'dark');
   } catch (e) {
-    console.error('[Infographic] Error:', e);
-    document.getElementById('infographicContent').innerHTML =
-      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem;font-family:sans-serif">
-        <strong>Infographic generation failed:</strong><br>${e.message}
-      </div>`;
+    document.getElementById('infographicContent').innerHTML = `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>Infographic failed:</strong><br>${e.message}</div>`;
   }
 }
 
-/* ───────────────────────── DESK CARD ───────────────────── */
+/* ── WEEKLY PLAYBOOK ──────────────────────────────────────────────── */
 async function generateDeskCard() {
   const d = S.data;
-
-  // Try Gemini first
   try {
-    const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page when printed.
-
-Include these sections:
-1. Header: Agent name large, "My Daily Playbook" subtitle, earning goal
-2. My Why: 1-2 personal sentences based on their motivation
-3. Goals at a Glance: compact table with GCI needed (${d.earn} ÷ 65%), transactions needed (GCI ÷ ${d.price} × 3%), monthly listing appts (80% close rate), monthly buyer prospects (3 per side), SOI size (${d.soi}), hours/week (${d.time})
-4. Weekly Non-Negotiables: 6-8 checkbox items (□) with specific numbers tailored to ${d.time} hours/week
-5. My Mantra: one powerful sentence tied to their Why
-6. Footer: "Adams, Cameron & Co. | What gets measured gets managed."
-
+    const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page.
+Sections: 1) Header: agent name, "My Daily Playbook", earning goal. 2) My Why. 3) Goals at a Glance table: GCI (${d.earn}÷65%), sides needed, monthly listing appts (80% close), monthly buyer prospects (3/side), SOI (${d.soi}), hours/week (${d.time}). 4) Weekly Non-Negotiables: 6-8 checkbox items with specific numbers. 5) My Mantra tied to their Why. 6) Footer: "Adams, Cameron & Co. | What gets measured gets managed."
 Agent: Name: ${d.name} | Office: ${d.office} | Why: ${d.why} | Goals: ${d.goals} | Earn: ${d.earn} | Price: ${d.price} | SOI: ${d.soi} | Time: ${d.time} | Mix: ${d.list}
-
-Output the complete HTML document only. No explanation, no markdown fences.`;
-
+Output complete HTML only. No explanation or markdown fences.`;
     const html = await geminiCall(prompt, 8192);
-    const clean = html.replace(/^```html?\n?/i, '').replace(/\n?```$/i, '').trim();
-    console.log('[DeskCard] HTML length:', clean.length);
-    console.log('[DeskCard] Raw response:', clean.substring(0, 300));
-
-    // Validate — must be a real HTML doc
+    const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
     if (clean.length > 1000 && (clean.toLowerCase().includes('<!doctype') || clean.toLowerCase().startsWith('<html'))) {
-      S.deskCardHtml = clean;
-      renderInIframe('deskCardContent', clean, 'light');
-      return;
+      S.deskCardHtml = clean; renderInIframe('deskCardContent', clean, 'light'); return;
     }
-    console.warn('[DeskCard] Response too short or not valid HTML — using built-in template.');
-  } catch (e) {
-    console.error('[DeskCard] Gemini error:', e);
-  }
-
-  // Fallback: generate the desk card ourselves from the agent data
+  } catch (e) { console.error('[DeskCard] Gemini error:', e); }
+  // Fallback
   const card = buildDeskCardHtml(d);
-  S.deskCardHtml = card;
-  renderInIframe('deskCardContent', card, 'light');
+  S.deskCardHtml = card; renderInIframe('deskCardContent', card, 'light');
 }
 
 function buildDeskCardHtml(d) {
-  // Calculate numbers
-  const earnNum   = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
-  const priceNum  = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
-  const gci       = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
-  const sides     = (gci > 0 && priceNum > 0) ? Math.ceil(gci / (priceNum * 0.03)) : 0;
-  const listPct   = parseFloat(d.list) / 100 || 0.5;
-  const listSides = Math.ceil(sides * listPct);
-  const buyeSides = sides - listSides;
-  const listAppts = Math.ceil((listSides / 12) / 0.8);
-  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
-  const hoursStr  = d.time || '0 hours/week';
-  const hoursNum  = parseInt(hoursStr) || 0;
-  const soiStr    = d.soi || '0 contacts';
-
-  // Weekly activity numbers based on hours
-  const soiCalls    = Math.max(5,  Math.round(hoursNum * 0.5));
-  const socialPosts = Math.max(3,  Math.round(hoursNum * 0.15));
-  const floorHrs    = Math.max(2,  Math.round(hoursNum * 0.15));
-  const followUps   = Math.max(5,  Math.round(hoursNum * 0.4));
-  const rprReports  = Math.max(2,  Math.round(hoursNum * 0.1));
-
-  const fmt = n => n > 0 ? '$' + n.toLocaleString() : '—';
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Georgia', serif; background: #fff; color: #1a1a1a; padding: 24px; max-width: 750px; margin: 0 auto; }
-  @media print {
-    body { padding: 0; }
-    @page { margin: 0.4in; size: letter portrait; }
-    .no-print { display: none; }
-  }
-  .header { background: #0c1524; color: #fff; padding: 16px 20px; border-radius: 8px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-  .header-left h1 { font-size: 1.6rem; color: #c4a84f; margin-bottom: 2px; }
-  .header-left p  { font-size: 0.8rem; color: #aaa; letter-spacing: 0.08em; text-transform: uppercase; }
-  .header-right   { text-align: right; }
-  .header-right .earn { font-size: 1.5rem; font-weight: bold; color: #c4a84f; }
-  .header-right .earn-label { font-size: 0.7rem; color: #aaa; text-transform: uppercase; }
-  .section { margin-bottom: 12px; }
-  .section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: #c4a84f; font-family: sans-serif; font-weight: 700; margin-bottom: 6px; border-bottom: 1px solid #c4a84f; padding-bottom: 3px; }
-  .why-text { font-style: italic; font-size: 0.92rem; color: #333; line-height: 1.5; background: #fdf8ee; padding: 10px 14px; border-left: 3px solid #c4a84f; border-radius: 0 4px 4px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  td { padding: 5px 8px; border: 1px solid #e0d0a8; }
-  td:first-child { font-weight: 600; color: #0c1524; background: #fdf8ee; width: 60%; }
-  td:last-child  { text-align: right; font-weight: 700; color: #c4a84f; }
-  .checklist { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-  .checklist li { font-size: 0.83rem; padding: 5px 8px; background: #f8f8f8; border: 1px solid #e8e8e8; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
-  .checklist li .box { width: 16px; height: 16px; border: 2px solid #0c1524; border-radius: 3px; flex-shrink: 0; }
-  .mantra { background: #0c1524; color: #c4a84f; padding: 12px 16px; border-radius: 6px; font-style: italic; font-size: 1rem; text-align: center; line-height: 1.5; margin-bottom: 10px; }
-  .footer { text-align: center; font-size: 0.68rem; color: #888; font-family: sans-serif; border-top: 1px solid #eee; padding-top: 8px; }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <h1>${d.name}</h1>
-      <p>My Daily Playbook &nbsp;·&nbsp; Adams, Cameron &amp; Co.</p>
-    </div>
-    <div class="header-right">
-      <div class="earn">${d.earn}</div>
-      <div class="earn-label">Annual Goal</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">My Why</div>
-    <div class="why-text">${d.why}</div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Goals at a Glance</div>
-    <table>
-      <tr><td>Annual Earning Goal</td><td>${d.earn}</td></tr>
-      <tr><td>GCI Required (÷ 65%)</td><td>${fmt(gci)}</td></tr>
-      <tr><td>Total Transactions Needed</td><td>${sides} sides</td></tr>
-      <tr><td>Listing Appointments / Month</td><td>${listAppts} appts</td></tr>
-      <tr><td>Buyer Prospects / Month</td><td>${buyProsp} prospects</td></tr>
-      <tr><td>Sphere of Influence</td><td>${soiStr}</td></tr>
-      <tr><td>Hours / Week Committed</td><td>${hoursStr}</td></tr>
-    </table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">My Weekly Non-Negotiables</div>
-    <ul class="checklist">
-      <li><span class="box"></span> Call ${soiCalls} SOI contacts</li>
-      <li><span class="box"></span> ${socialPosts} AC Social posts</li>
-      <li><span class="box"></span> ${floorHrs} hrs floor time</li>
-      <li><span class="box"></span> ${followUps} lead follow-ups</li>
-      <li><span class="box"></span> ${rprReports} RPR reports sent</li>
-      <li><span class="box"></span> Review pipeline &amp; CRM</li>
-      <li><span class="box"></span> Schedule next week's posts</li>
-      <li><span class="box"></span> 1 open house / showing</li>
-    </ul>
-  </div>
-
+  const earnNum = parseFloat((d.earn||'$0').replace(/[^0-9.]/g,''))||0, priceNum = parseFloat((d.price||'$0').replace(/[^0-9.]/g,''))||0;
+  const gci = earnNum>0 ? Math.ceil(earnNum/0.65) : 0, sides = (gci>0&&priceNum>0) ? Math.ceil(gci/(priceNum*0.03)) : 0;
+  const listPct = parseFloat(d.list)/100||0.5, listSides = Math.ceil(sides*listPct), buyeSides = sides-listSides;
+  const listAppts = Math.ceil((listSides/12)/0.8), buyProsp = Math.ceil((buyeSides/12)*3);
+  const hoursNum = parseInt(d.time)||0;
+  const soiCalls = Math.max(5,Math.round(hoursNum*0.5)), socialPosts = Math.max(3,Math.round(hoursNum*0.15)), floorHrs = Math.max(2,Math.round(hoursNum*0.15)), followUps = Math.max(5,Math.round(hoursNum*0.4)), rprReports = Math.max(2,Math.round(hoursNum*0.1));
+  const fmt = n => n>0 ? '$'+n.toLocaleString() : '—';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;background:#fff;color:#1a1a1a;padding:24px;max-width:750px;margin:0 auto}
+  @media print{body{padding:0}@page{margin:0.4in;size:letter portrait}}
+  .hdr{background:#0c1524;color:#fff;padding:16px 20px;border-radius:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .hdr h1{font-size:1.6rem;color:#c4a84f;margin-bottom:2px}.hdr p{font-size:0.8rem;color:#aaa;letter-spacing:0.08em;text-transform:uppercase}
+  .earn{font-size:1.5rem;font-weight:bold;color:#c4a84f}.earn-label{font-size:0.7rem;color:#aaa;text-transform:uppercase}
+  .sec{margin-bottom:12px}.sec-title{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:#c4a84f;font-family:sans-serif;font-weight:700;margin-bottom:6px;border-bottom:1px solid #c4a84f;padding-bottom:3px}
+  .why{font-style:italic;font-size:0.92rem;color:#333;line-height:1.5;background:#fdf8ee;padding:10px 14px;border-left:3px solid #c4a84f;border-radius:0 4px 4px 0}
+  table{width:100%;border-collapse:collapse;font-size:0.82rem}td{padding:5px 8px;border:1px solid #e0d0a8}td:first-child{font-weight:600;color:#0c1524;background:#fdf8ee;width:60%}td:last-child{text-align:right;font-weight:700;color:#c4a84f}
+  ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:5px}li{font-size:0.83rem;padding:5px 8px;background:#f8f8f8;border:1px solid #e8e8e8;border-radius:4px;display:flex;align-items:center;gap:6px}
+  .box{width:16px;height:16px;border:2px solid #0c1524;border-radius:3px;flex-shrink:0}
+  .mantra{background:#0c1524;color:#c4a84f;padding:12px 16px;border-radius:6px;font-style:italic;font-size:1rem;text-align:center;line-height:1.5;margin-bottom:10px}
+  .footer{text-align:center;font-size:0.68rem;color:#888;font-family:sans-serif;border-top:1px solid #eee;padding-top:8px}
+  </style></head><body>
+  <div class="hdr"><div><h1>${d.name}</h1><p>My Daily Playbook · Adams, Cameron &amp; Co.</p></div><div><div class="earn">${d.earn}</div><div class="earn-label">Annual Goal</div></div></div>
+  <div class="sec"><div class="sec-title">My Why</div><div class="why">${d.why}</div></div>
+  <div class="sec"><div class="sec-title">Goals at a Glance</div>
+  <table><tr><td>Annual Earning Goal</td><td>${d.earn}</td></tr><tr><td>GCI Required (÷ 65%)</td><td>${fmt(gci)}</td></tr><tr><td>Total Transactions Needed</td><td>${sides} sides</td></tr><tr><td>Listing Appointments / Month</td><td>${listAppts} appts</td></tr><tr><td>Buyer Prospects / Month</td><td>${buyProsp} prospects</td></tr><tr><td>Sphere of Influence</td><td>${d.soi}</td></tr><tr><td>Hours / Week Committed</td><td>${d.time}</td></tr></table></div>
+  <div class="sec"><div class="sec-title">My Weekly Non-Negotiables</div>
+  <ul><li><span class="box"></span>Call ${soiCalls} SOI contacts</li><li><span class="box"></span>${socialPosts} AC Social posts</li><li><span class="box"></span>${floorHrs} hrs floor time</li><li><span class="box"></span>${followUps} lead follow-ups</li><li><span class="box"></span>${rprReports} RPR reports sent</li><li><span class="box"></span>Review pipeline &amp; CRM</li><li><span class="box"></span>Schedule next week's posts</li><li><span class="box"></span>1 open house / showing</li></ul></div>
   <div class="mantra">"${d.why.split('.')[0].trim()}. This is my reason. This is my plan."</div>
-
   <div class="footer">Adams, Cameron &amp; Co. &nbsp;|&nbsp; What gets measured gets managed. &nbsp;|&nbsp; ${new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-</body>
-</html>`;
+  </body></html>`;
 }
 
 function printDeskCard() {
   if (!S.deskCardHtml) { toast('Playbook is still generating — try again in a moment.', 'err'); return; }
   const win = window.open('', '_blank');
-  win.document.write(`<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8">
-<title>Weekly Playbook — ${S.data.name}</title>
-<style>
-  @media print {
-    body { margin: 0; }
-    @page { margin: 0.5in; size: letter portrait; }
-  }
-  body { font-family: Georgia, serif; background: #fff; color: #1a1a1a; }
-</style>
-</head><body>
-${S.deskCardHtml}
-</body></html>`);
-  win.document.close();
-  win.focus();
+  win.document.write(S.deskCardHtml); win.document.close(); win.focus();
   setTimeout(() => win.print(), 400);
 }
 
-/* ───────────────────────── COPY ────────────────────────── */
+/* ── COPY ─────────────────────────────────────────────────────────── */
 async function doCopy() {
-  try {
-    await navigator.clipboard.writeText(S.plan);
-  } catch {
-    const el = Object.assign(document.createElement('textarea'), { value: S.plan });
-    document.body.appendChild(el); el.select(); document.execCommand('copy'); el.remove();
-  }
+  try { await navigator.clipboard.writeText(S.plan); }
+  catch { const el = Object.assign(document.createElement('textarea'), {value:S.plan}); document.body.appendChild(el); el.select(); document.execCommand('copy'); el.remove(); }
   toast('Copied to clipboard!', 'ok');
-  const b = document.getElementById('btnCopy');
-  b.textContent = '✓ Copied';
+  const b = document.getElementById('btnCopy'); b.textContent = '✓ Copied';
   setTimeout(() => b.textContent = '📋 Copy', 2200);
 }
 
-/* ───────────────────────── EMAIL MODAL ─────────────────── */
+/* ── EMAIL ────────────────────────────────────────────────────────── */
 function openEmailModal() {
-  const hasOAuth = !!S.tokenClient;
-  const note = document.getElementById('emailMethodText');
-  note.innerHTML = hasOAuth
-    ? '<strong style="color:var(--text)">Gmail API:</strong> Email will be sent directly via your connected Google account.'
-    : '<strong style="color:var(--text)">Google sign-in unavailable:</strong> Clicking Send will open your default email client with the plan pre-filled.';
-
-  // Pre-fill subject with agent name if available
+  document.getElementById('emailMethodText').innerHTML = S.tokenClient
+    ? '<strong style="color:var(--text)">Gmail API:</strong> Email will be sent via your connected Google account.'
+    : '<strong style="color:var(--text)">Google sign-in unavailable:</strong> Clicking Send will open your email client with the plan pre-filled.';
   const subj = document.getElementById('emailSubj');
-  if (S.data.name && S.data.name !== 'Agent') {
-    subj.value = `Business Plan — ${S.data.name} — Adams, Cameron & Co.`;
-  }
-
+  if (S.data.name && S.data.name !== 'Agent') subj.value = `Business Plan — ${S.data.name} — Adams, Cameron & Co.`;
   document.getElementById('emailModal').classList.remove('hidden');
   setTimeout(() => document.getElementById('emailTo').focus(), 100);
 }
+function closeEmailModal() { document.getElementById('emailModal').classList.add('hidden'); }
 
-function closeEmailModal() {
-  document.getElementById('emailModal').classList.add('hidden');
-}
-
-/* ───────────────────────── EMAIL SEND ──────────────────── */
 async function doEmail() {
-  const to   = document.getElementById('emailTo').value.trim();
-  const subj = document.getElementById('emailSubj').value.trim() || 'Your Business Plan — Adams, Cameron & Co.';
-  const note = document.getElementById('emailNote').value.trim();
-
+  const to = document.getElementById('emailTo').value.trim(), subj = document.getElementById('emailSubj').value.trim() || 'Your Business Plan — Adams, Cameron & Co.', note = document.getElementById('emailNote').value.trim();
   if (!to) { toast('Please enter at least one recipient.', 'err'); document.getElementById('emailTo').focus(); return; }
-
-  if (S.tokenClient) {
-    if (!S.accessToken) {
-      S.pendingAction = 'email';
-      closeEmailModal();
-      S.tokenClient.requestAccessToken();
-      return;
-    }
-    await gmailSend(to, subj, note);
-  } else {
-    mailtoFallback(to, subj, note);
-  }
+  if (S.tokenClient) { if (!S.accessToken) { S.pendingAction = 'email'; closeEmailModal(); S.tokenClient.requestAccessToken(); return; } await gmailSend(to, subj, note); }
+  else mailtoFallback(to, subj, note);
 }
 
 async function gmailSend(to, subj, note) {
-  const btn = document.getElementById('emailSendBtn');
-  btn.textContent = '⏳ Sending…';
-  btn.disabled = true;
-
-  const bodyHtml = buildEmailHtml(note);
-  const raw = buildRaw(to, subj, bodyHtml);
-
+  const btn = document.getElementById('emailSendBtn'); btn.textContent = '⏳ Sending…'; btn.disabled = true;
   try {
     const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${S.accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw })
+      method: 'POST', headers: { Authorization: `Bearer ${S.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw: buildRaw(to, subj, buildEmailHtml(note)) })
     });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      if (e.error?.code === 401) { S.accessToken = null; doEmail(); return; }
-      const msg = e.error?.message || 'Send failed';
-      if (msg.includes('Gmail API has not been used') || msg.includes('it is disabled')) {
-        const projectId = msg.match(/project (\d+)/)?.[1] || '';
-        const link = projectId
-          ? `https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=${projectId}`
-          : 'https://console.cloud.google.com/apis/library/gmail.googleapis.com';
-        toast(`Gmail API is not enabled. Click to fix →`, 'err');
-        setTimeout(() => window.open(link, '_blank'), 600);
-        throw new Error('Gmail API not enabled — opening Cloud Console to enable it.');
-      }
-      throw new Error(msg);
-    }
-    closeEmailModal();
-    toast(`Email sent to ${to}!`, 'ok');
-    const b = document.getElementById('btnEmail');
-    b.textContent = '✓ Sent!';
-    setTimeout(() => { b.textContent = '✉️ Email'; }, 3000);
-  } catch (e) {
-    toast('Email failed: ' + e.message, 'err');
-  } finally {
-    btn.textContent = 'Send Email';
-    btn.disabled = false;
-  }
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'Send failed'); }
+    closeEmailModal(); toast(`Email sent to ${to}!`, 'ok');
+    const b = document.getElementById('btnEmail'); b.textContent = '✓ Sent!'; setTimeout(() => b.textContent = '✉️ Email', 3000);
+  } catch (e) { toast('Email failed: ' + e.message, 'err'); }
+  finally { btn.textContent = 'Send Email'; btn.disabled = false; }
 }
 
 function mailtoFallback(to, subj, note) {
-  // mailto has a ~2000 char URL limit so send a plain-text excerpt + note
-  const intro = note ? `${note}\n\n---\n\n` : '';
-  const body  = intro + S.plan.slice(0, 1800) + (S.plan.length > 1800 ? '\n\n[Plan continues — see full version in Google Docs or copied text]' : '');
-  const url   = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-  window.location.href = url;
-  closeEmailModal();
-  toast('Opening your email client…', 'ok');
+  const body = (note ? note + '\n\n---\n\n' : '') + S.plan.slice(0, 1800);
+  window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  closeEmailModal(); toast('Opening your email client…', 'ok');
 }
 
 function buildRaw(to, subject, htmlBody) {
-  const msg = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    '',
-    htmlBody
-  ].join('\r\n');
-  return btoa(unescape(encodeURIComponent(msg)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const msg = [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0', 'Content-Type: text/html; charset=UTF-8', '', htmlBody].join('\r\n');
+  return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 
-/* ───────────────────────── GOOGLE DOCS ─────────────────── */
+/* ── GOOGLE DOCS ──────────────────────────────────────────────────── */
 async function doDocs() {
-
-  if (!S.tokenClient) {
-    downloadHtml();
-    toast('Google sign-in unavailable — downloading as HTML instead.', 'ok');
-    return;
-  }
-
+  if (!S.tokenClient) { downloadHtml(); toast('Downloading as HTML.', 'ok'); return; }
   if (!S.accessToken) { S.pendingAction = 'docs'; S.tokenClient.requestAccessToken(); return; }
-
-  const b = document.getElementById('btnDocs');
-  b.textContent = '⏳ Saving…';
-  b.disabled = true;
-
+  const b = document.getElementById('btnDocs'); b.textContent = '⏳ Saving…'; b.disabled = true;
   try {
-    const html = buildEmailHtml('');
-    const name = `Business Plan — ${S.data.name} — ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
-
     const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify({ name, mimeType: 'application/vnd.google-apps.document' })], { type: 'application/json' }));
-    form.append('file',     new Blob([html], { type: 'text/html' }));
-
-    const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
-      { method: 'POST', headers: { Authorization: `Bearer ${S.accessToken}` }, body: form }
-    );
-
-    if (!res.ok) {
-      const e = await res.json().catch(()=>({}));
-      if (e.error?.code === 401) { S.accessToken = null; doDocs(); return; }
-      if (e.error?.code === 403) {
-        const projectId = '205198562122';
-        const link = `https://console.cloud.google.com/apis/library/drive.googleapis.com?project=${projectId}`;
-        toast('Google Drive API not enabled — opening Cloud Console to fix →', 'err');
-        setTimeout(() => window.open(link, '_blank'), 600);
-        throw new Error('Google Drive API is not enabled for this project.');
-      }
-      throw new Error(e.error?.message || 'Upload failed');
-    }
-
-    const doc = await res.json();
-    toast('Saved to Google Docs!', 'ok');
-    b.textContent = '✓ Saved!';
-    if (doc.webViewLink) setTimeout(() => window.open(doc.webViewLink, '_blank'), 400);
+    const name = `Business Plan — ${S.data.name} — ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+    form.append('metadata', new Blob([JSON.stringify({name, mimeType:'application/vnd.google-apps.document'})], {type:'application/json'}));
+    form.append('file', new Blob([buildEmailHtml('')], {type:'text/html'}));
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {method:'POST',headers:{Authorization:`Bearer ${S.accessToken}`},body:form});
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || 'Upload failed'); }
+    const doc = await res.json(); toast('Saved to Google Docs!', 'ok'); b.textContent = '✓ Saved!';
+    if (doc.webViewLink) setTimeout(() => window.open(doc.webViewLink,'_blank'), 400);
     setTimeout(() => { b.textContent = '📄 Google Doc'; b.disabled = false; }, 3000);
-
-  } catch (e) {
-    toast('Save failed: ' + e.message, 'err');
-    b.textContent = '📄 Google Doc'; b.disabled = false;
-  }
+  } catch (e) { toast('Save failed: ' + e.message, 'err'); b.textContent = '📄 Google Doc'; b.disabled = false; }
 }
 
 function downloadHtml() {
-  const html = buildEmailHtml('');
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(new Blob([html], {type:'text/html'})),
-    download: `Business_Plan_${S.data.name.replace(/\s+/g,'_')}.html`
-  });
+  const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(new Blob([buildEmailHtml('')],{type:'text/html'})),download:`Business_Plan_${S.data.name.replace(/\s+/g,'_')}.html`});
   a.click(); URL.revokeObjectURL(a.href);
 }
 
 function buildEmailHtml(note) {
-  const noteBlock = note
-    ? `<div style="background:#f5e8c8;border-left:3px solid #c4a84f;padding:10px 14px;margin-bottom:24px;font-style:italic;color:#5a3a1a;">${note.replace(/\n/g,'<br>')}</div>`
-    : '';
-  return `<!DOCTYPE html><html><head>
-<meta charset="UTF-8">
-<style>
-  body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 20px;color:#1a1a1a;line-height:1.75;background:#fff;}
-  h1{font-size:1.6em;color:#8B5A1A;margin-top:1.5em;}
-  h2{font-size:1.25em;color:#5a3a1a;border-bottom:1px solid #e0c070;padding-bottom:6px;margin-top:1.8em;}
-  h3{font-size:1.05em;color:#7a5c2e;margin-top:1.2em;}
-  table{width:100%;border-collapse:collapse;margin:1em 0;font-size:0.9em;}
-  th{background:#f5e8c8;padding:8px 10px;text-align:left;border:1px solid #d4b875;font-weight:700;}
-  td{padding:7px 10px;border:1px solid #e0d0a8;}
-  tr:nth-child(even) td{background:#fdf8ee;}
-  strong{font-weight:700;}
-  ul,ol{padding-left:1.5em;margin-bottom:1em;}
-  li{margin-bottom:0.3em;}
-  hr{border:none;border-top:1px solid #e0d0a8;margin:1.5em 0;}
-  .footer{margin-top:3em;padding-top:1em;border-top:1px solid #e0d0a8;font-size:0.8em;color:#888;}
-</style>
-</head><body>
-${noteBlock}
-${S.planHtml}
-<div class="footer">Generated by Adams, Cameron &amp; Co. Business Plan Generator &mdash; ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div>
-</body></html>`;
+  const nb = note ? `<div style="background:#f5e8c8;border-left:3px solid #c4a84f;padding:10px 14px;margin-bottom:24px;font-style:italic;color:#5a3a1a;">${note.replace(/\n/g,'<br>')}</div>` : '';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 20px;color:#1a1a1a;line-height:1.75}h1{font-size:1.6em;color:#8B5A1A;margin-top:1.5em}h2{font-size:1.25em;color:#5a3a1a;border-bottom:1px solid #e0c070;padding-bottom:6px;margin-top:1.8em}h3{font-size:1.05em;color:#7a5c2e;margin-top:1.2em}table{width:100%;border-collapse:collapse;margin:1em 0;font-size:0.9em}th{background:#f5e8c8;padding:8px 10px;text-align:left;border:1px solid #d4b875;font-weight:700}td{padding:7px 10px;border:1px solid #e0d0a8}tr:nth-child(even) td{background:#fdf8ee}ul,ol{padding-left:1.5em;margin-bottom:1em}li{margin-bottom:0.3em}hr{border:none;border-top:1px solid #e0d0a8;margin:1.5em 0}.footer{margin-top:3em;padding-top:1em;border-top:1px solid #e0d0a8;font-size:0.8em;color:#888}</style></head><body>${nb}${S.planHtml}<div class="footer">Generated by Adams, Cameron &amp; Co. Business Plan Generator — ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</div></body></html>`;
 }
 
-/* ───────────────────────── RESET ───────────────────────── */
+/* ── RESET ────────────────────────────────────────────────────────── */
 function doReset() {
-  S.plan = ''; S.planHtml = ''; S.data = {};
-  document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea')
-    .forEach(el => el.value = '');
-
-  // Reset listing slider to 50%
-  document.getElementById('f_listR').value = 50;
-  document.getElementById('f_listV').textContent = '50% Sellers';
-  document.getElementById('f_list').value = 50;
-
-  // Reset constraint sliders to 0
-  document.getElementById('f_timeR').value = 0;
-  document.getElementById('f_timeV').textContent = '0 hrs/wk';
-  document.getElementById('f_time').value = 0;
-
-  document.getElementById('f_budgetR').value = 0;
-  document.getElementById('f_budgetV').textContent = '0';
-  document.getElementById('f_budget').value = 0;
-
-  document.getElementById('f_soiR').value = 0;
-  document.getElementById('f_soiV').textContent = '0 contacts';
-  document.getElementById('f_soi').value = 0;
-
-  document.getElementById('f_expR').value = 0;
-  document.getElementById('f_expV').textContent = '0 yrs';
-  document.getElementById('f_exp').value = 0;
-
-  // Hide infographic and desk card
-  document.getElementById('infographicCard').style.display = 'none';
-  document.getElementById('deskCard').style.display = 'none';
-  document.getElementById('infographicContent').innerHTML = `
-    <div class="loading-view" style="padding:2rem 1rem">
-      <div class="spinner"></div>
-      <div class="loading-sub">Building your infographic…</div>
-    </div>`;
-  document.getElementById('deskCardContent').innerHTML = `
-    <div class="loading-view" style="padding:2rem 1rem">
-      <div class="spinner"></div>
-      <div class="loading-sub">Building your printable playbook…</div>
-    </div>`;
-  S.deskCardHtml = '';
-  S.planId = null;
-  S.enrollmentId = null;
-  S.selectedStrategies = [];
-  S.suggestedStrategies = [];
-
-  // Hide enrollment and strategy cards
-  document.getElementById('strategyCard').style.display = 'none';
-  document.getElementById('enrollmentCard').style.display = 'none';
-  document.getElementById('enrolledCard').style.display = 'none';
-
+  S.plan = ''; S.planHtml = ''; S.data = {}; S.deskCardHtml = '';
+  S.strategies = []; S.selectedStrategies = []; S.suggestedStrategies = [];
+  S.planId = null; S.enrollmentId = null;
+  document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea').forEach(el => el.value = '');
+  [['f_listR',50,'f_listV','50% Sellers'],['f_timeR',0,'f_timeV','0 hrs/wk'],['f_budgetR',0,'f_budgetV','0'],['f_soiR',0,'f_soiV','0 contacts'],['f_expR',0,'f_expV','0 yrs']].forEach(([r,v,lbl,txt]) => { document.getElementById(r).value=v; document.getElementById(lbl).textContent=txt; if(document.getElementById(r.replace('R',''))){ document.getElementById(r.replace('R','')).value=v; } });
+  ['infographicCard','deskCard','strategyCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
   goTo(1);
 }
 
-/* ───────────────────────── TOAST ───────────────────────── */
-function toast(msg, cls = '') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast ${cls} show`;
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.className = 'toast', 3800);
+/* ── TOAST ────────────────────────────────────────────────────────── */
+function toast(msg, cls='') {
+  const t = document.getElementById('toast'); t.textContent = msg; t.className = `toast ${cls} show`;
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.className = 'toast', 3800);
 }
 
-/* ───────────────────────── INIT ────────────────────────── */
+/* ── INIT ─────────────────────────────────────────────────────────── */
 window.addEventListener('load', async () => {
-  // Load remote config first
   try {
     const res = await fetch(CONFIG_URL + '?v=' + Date.now());
-    if (res.ok) {
-      const remote = await res.json();
-      if (remote.adminPassword) S.config.adminPassword = remote.adminPassword;
-      if (remote.prompt)        S.config.prompt        = remote.prompt;
-      if (remote.context)       S.config.context       = remote.context;
-    }
-  } catch (e) {
-    console.warn('Could not load bizplan-config.json — using defaults.', e);
-  }
-
-  // Init Google OAuth
-  const poll = setInterval(() => {
-    if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
-  }, 200);
+    if (res.ok) { const r = await res.json(); if (r.adminPassword) S.config.adminPassword = r.adminPassword; if (r.prompt) S.config.prompt = r.prompt; if (r.context) S.config.context = r.context; }
+  } catch(e) { console.warn('Could not load bizplan-config.json'); }
+  const poll = setInterval(() => { if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); } }, 200);
 });
 
-/* ───────────────────────── AGENT PROFILE ───────────────── */
+/* ── AGENT PROFILE ────────────────────────────────────────────────── */
 async function loadAgentProfile(email) {
-  if (!email) return;
-  S.userEmail = email;
-
-  // Populate email field immediately — don't wait for the API call
+  if (!email) return; S.userEmail = email;
   const emailField = document.getElementById('f_email');
   if (emailField && !emailField.value) emailField.value = email;
-
   try {
-    const res = await fetch(`${PROXY_BASE}/agent/profile`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
-    });
-    if (!res.ok) return;
-    const profile = await res.json();
-    if (!profile.found) {
-      // Auto-register new agent
-      await fetch(`${PROXY_BASE}/agent/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
-        body: JSON.stringify({ email })
-      });
-      return;
-    }
+    const res = await fetch(`${PROXY_BASE}/agent/profile`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email } });
+    if (!res.ok) return; const profile = await res.json();
+    if (!profile.found) { await fetch(`${PROXY_BASE}/agent/register`, { method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY}, body:JSON.stringify({email}) }); return; }
     S.agentProfile = profile;
-
-    // Pre-populate name and office
-    if (profile.first_name || profile.last_name) {
-      const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
-      const nameField = document.getElementById('f_name');
-      if (nameField && !nameField.value) nameField.value = name;
-    }
-    if (profile.office) {
-      const officeField = document.getElementById('f_office');
-      if (officeField && !officeField.value) officeField.value = profile.office;
-    }
-    console.log('[Profile] Loaded:', profile.first_name, profile.last_name, profile.office);
-  } catch (e) {
-    console.warn('[Profile] Could not load agent profile:', e.message);
-  }
+    const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+    const nameField = document.getElementById('f_name'); if (nameField && !nameField.value && name) nameField.value = name;
+    const officeField = document.getElementById('f_office'); if (officeField && !officeField.value && profile.office) officeField.value = profile.office;
+  } catch(e) { console.warn('[Profile]', e.message); }
 }
 
-/* ───────────────────────── COACHES ─────────────────────── */
+/* ── COACHES ──────────────────────────────────────────────────────── */
 async function loadCoaches() {
   S.coaches = [
     { id: 3, name: 'Ashlee Selman',    title: 'Sales Manager', offices: 'Port Orange & Ormond Mainland' },
     { id: 4, name: 'Kristin Petersen', title: 'Sales Manager', offices: 'Beachside, Daytona & Flagler' },
     { id: 1, name: 'John Adams',       title: 'President',     offices: 'Ponce Inlet, West Volusia & Commercial' },
   ];
-
-  // Use the office the agent typed in the form (most current) or their profile office
   const officeRaw = (v('f_office') || S.agentProfile?.office || '').toLowerCase();
-  let suggestedId = 3; // default Ashlee
+  let suggestedId = 3;
   if (['ormond beachside','daytona beach','flagler'].some(o => officeRaw.includes(o))) suggestedId = 4;
   if (['ponce inlet','west volusia','deland','commercial'].some(o => officeRaw.includes(o))) suggestedId = 1;
-
-  const container = document.getElementById('coachOptions');
-  container.innerHTML = S.coaches.map(c => `
-    <label style="display:flex;align-items:flex-start;gap:0.75rem;background:var(--surface2);border:1px solid ${c.id === suggestedId ? 'var(--gold)' : 'var(--border2)'};border-radius:8px;padding:0.85rem 1rem;cursor:pointer">
-      <input type="radio" name="coachSelect" value="${c.id}" ${c.id === suggestedId ? 'checked' : ''} style="margin-top:3px;accent-color:var(--gold)">
-      <div>
-        <div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name}${c.id === suggestedId ? ' <span style="font-size:0.68rem;color:var(--gold);letter-spacing:0.08em;text-transform:uppercase">← suggested</span>' : ''}</div>
-        <div style="font-size:0.78rem;color:var(--text2)">${c.title} &nbsp;·&nbsp; ${c.offices}</div>
-      </div>
-    </label>
-  `).join('');
+  document.getElementById('coachOptions').innerHTML = S.coaches.map(c => `
+    <label style="display:flex;align-items:flex-start;gap:0.75rem;background:var(--surface2);border:1px solid ${c.id===suggestedId?'var(--gold)':'var(--border2)'};border-radius:8px;padding:0.85rem 1rem;cursor:pointer">
+      <input type="radio" name="coachSelect" value="${c.id}" ${c.id===suggestedId?'checked':''} style="margin-top:3px;accent-color:var(--gold)">
+      <div><div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name}${c.id===suggestedId?' <span style="font-size:0.68rem;color:var(--gold)">← suggested</span>':''}</div>
+      <div style="font-size:0.78rem;color:var(--text2)">${c.title} · ${c.offices}</div></div>
+    </label>`).join('');
 }
 
 function buildCommitmentList() {
-  const el = document.getElementById('commitmentList');
-  if (!el) return;
-
-  // If agent has selected strategies, show those commitments
+  const el = document.getElementById('commitmentList'); if (!el) return;
   if (S.selectedStrategies.length) {
     const items = [];
     const primary = S.selectedStrategies.find(s => s.isPrimary);
-    const all = [primary, ...S.selectedStrategies.filter(s => !s.isPrimary)].filter(Boolean);
-
-    all.forEach(sel => {
-      const strat = S.strategies.find(s => s.slug === sel.slug);
-      if (!strat) return;
-      // Show top 2 activities per strategy with their targets
-      strat.activities?.slice(0, 2).forEach(act => {
+    [primary, ...S.selectedStrategies.filter(s => !s.isPrimary)].filter(Boolean).forEach(sel => {
+      const strat = S.strategies.find(s => s.slug === sel.slug); if (!strat) return;
+      strat.activities?.slice(0,2).forEach(act => {
         const target = sel.commitments?.[act.slug] || act.default_weekly_target;
         if (!target && act.input_type !== 'boolean') return;
-        const freq = act.is_monthly_target ? '/month' : '/week';
-        const val  = act.input_type === 'boolean' ? 'Active' : `${target} ${act.unit}${freq}`;
-        items.push(`□ &nbsp;<strong>${val}</strong> — ${act.label}`);
+        items.push(`□ &nbsp;<strong>${act.input_type==='boolean'?'Active':`${target} ${act.unit}${act.is_monthly_target?'/month':'/week'}`}</strong> — ${act.label}`);
       });
     });
-
-    items.push('□ &nbsp;Weekly check-in (web or text, 5 minutes)');
-    items.push('□ &nbsp;Monthly coaching session with your coach');
-    el.innerHTML = items.join('<br>');
-    return;
+    items.push('□ &nbsp;Weekly check-in (web or text, 5 minutes)', '□ &nbsp;Monthly coaching session with your coach');
+    el.innerHTML = items.join('<br>'); return;
   }
-
-  // Fallback: calculate from plan numbers
-  const d = S.data;
-  if (!d || !d.earn) return;
-  const earnNum  = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
-  const priceNum = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
-  const gci      = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
-  const sides    = gci > 0 && priceNum > 0 ? Math.ceil(gci / (priceNum * 0.03)) : 0;
-  const listPct  = parseInt(d.list) / 100 || 0.5;
-  const listSides = Math.ceil(sides * listPct);
-  const buyeSides = sides - listSides;
-  const listAppts = Math.ceil((listSides / 12) / 0.8);
-  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
-  const hoursNum  = parseInt(d.time) || 0;
-  const soiCalls  = Math.max(5, Math.round(hoursNum * 0.5));
-  const socialPosts = Math.max(3, Math.round(hoursNum * 0.15));
-  const floorHrs  = Math.max(2, Math.round(hoursNum * 0.15));
-
-  el.innerHTML = [
-    `□ &nbsp;${soiCalls} SOI contacts per week`,
-    `□ &nbsp;${socialPosts} social posts via AC Social`,
-    `□ &nbsp;${floorHrs} hours of floor time`,
-    `□ &nbsp;${listAppts} listing appointments per month`,
-    `□ &nbsp;${buyProsp} buyer prospects per month`,
-    `□ &nbsp;Weekly check-in (web or text, 5 minutes)`,
-    `□ &nbsp;Monthly coaching session with your coach`,
-  ].join('<br>');
+  const d = S.data; if (!d || !d.earn) return;
+  const earnNum = parseFloat((d.earn||'$0').replace(/[^0-9.]/g,''))||0, priceNum = parseFloat((d.price||'$0').replace(/[^0-9.]/g,''))||0;
+  const gci = earnNum>0?Math.ceil(earnNum/0.65):0, sides = gci>0&&priceNum>0?Math.ceil(gci/(priceNum*0.03)):0;
+  const listPct = parseInt(d.list)/100||0.5, listSides = Math.ceil(sides*listPct), buyeSides = sides-listSides;
+  const h = parseInt(d.time)||0;
+  el.innerHTML = [`□ &nbsp;${Math.max(5,Math.round(h*0.5))} SOI contacts per week`,`□ &nbsp;${Math.max(3,Math.round(h*0.15))} social posts via AC Social`,`□ &nbsp;${Math.max(2,Math.round(h*0.15))} hours of floor time`,`□ &nbsp;${Math.ceil((listSides/12)/0.8)} listing appointments per month`,`□ &nbsp;${Math.ceil((buyeSides/12)*3)} buyer prospects per month`,'□ &nbsp;Weekly check-in (web or text, 5 minutes)','□ &nbsp;Monthly coaching session with your coach'].join('<br>');
 }
 
-/* ───────────────────────── STRATEGIES ──────────────────── */
-
-// Load full strategy library from server
+/* ── STRATEGIES ───────────────────────────────────────────────────── */
 async function loadStrategyLibrary() {
-  if (S.strategies.length) return; // already loaded
+  if (S.strategies.length) return;
   try {
-    const res = await fetch(`${PROXY_BASE}/strategies`, {
-      headers: { 'x-proxy-key': PROXY_KEY }
-    });
+    const res = await fetch(`${PROXY_BASE}/strategies`, { headers: {'x-proxy-key': PROXY_KEY} });
     if (res.ok) S.strategies = await res.json();
-  } catch(e) {
-    console.warn('[Strategies] Could not load library:', e.message);
-  }
+  } catch(e) { console.warn('[Strategies]', e.message); }
 }
 
-// Ask Gemini to suggest strategies based on the agent's plan
 async function suggestStrategies() {
   try {
     const res = await fetch(`${PROXY_BASE}/agent/suggest-strategies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
-      body: JSON.stringify({
-        planText: S.plan,
-        agentData: {
-          market:     S.data.market,
-          time:       S.data.time,
-          soi:        S.data.soi,
-          experience: S.data.exp,
-          list:       S.data.list,
-          why:        S.data.why,
-        }
-      })
+      method: 'POST', headers: {'Content-Type':'application/json','x-proxy-key':PROXY_KEY},
+      body: JSON.stringify({ planText: S.plan, agentData: { market:S.data.market, time:S.data.time, soi:S.data.soi, experience:S.data.exp, list:S.data.list, why:S.data.why } })
     });
-    if (!res.ok) throw new Error('Strategy suggestion failed');
-    const data = await res.json();
-    return data.suggestions;
+    if (!res.ok) throw new Error('Suggestion failed');
+    return await res.json().then(d => d.suggestions);
   } catch(e) {
-    console.warn('[Strategies] Suggestion failed, using defaults:', e.message);
-    return {
-      primary: 'soi',
-      secondary: ['open_house', 'social'],
-      rationale: 'Based on your plan, we\'ve suggested these core strategies as a starting point. Adjust to fit your preferred approach.',
-      commitments: { soi_contacts_weekly: 15, open_houses_held: 1, social_posts_weekly: 3 }
-    };
+    return { primary:'soi', secondary:['open_house','social'], rationale:"Based on your plan, we've suggested these core strategies as a starting point.", commitments:{soi_contacts_weekly:15,open_houses_held:1,social_posts_weekly:3} };
   }
 }
 
-// Show the strategy selection card after plan generates
 async function showStrategyCard() {
   await loadStrategyLibrary();
+  if (!S.strategies.length) { showEnrollmentCard(); return; }
   const suggestions = await suggestStrategies();
-  S.suggestedStrategies = suggestions;
-
-  // Build initial selection from suggestions
-  S.selectedStrategies = [];
-  const allSlugs = [suggestions.primary, ...(suggestions.secondary || [])].slice(0, 5);
-  allSlugs.forEach((slug, i) => {
-    const strat = S.strategies.find(s => s.slug === slug);
-    if (!strat) return;
-    S.selectedStrategies.push({
-      slug,
-      strategyId: strat.id,
-      isPrimary:  i === 0,
-      commitments: suggestions.commitments || {},
-      aiSuggested: true,
-    });
+  S.suggestedStrategies = suggestions; S.selectedStrategies = [];
+  [suggestions.primary, ...(suggestions.secondary||[])].slice(0,5).forEach((slug,i) => {
+    const strat = S.strategies.find(s => s.slug === slug); if (!strat) return;
+    S.selectedStrategies.push({ slug, strategyId:strat.id, isPrimary:i===0, commitments:suggestions.commitments||{}, aiSuggested:true });
   });
-
-  // Show rationale
-  if (suggestions.rationale) {
-    const el = document.getElementById('strategyRationale');
-    el.textContent = '💡 ' + suggestions.rationale;
-    el.style.display = 'block';
-  }
-
+  if (suggestions.rationale) { const el = document.getElementById('strategyRationale'); el.textContent = '💡 ' + suggestions.rationale; el.style.display = 'block'; }
   renderStrategyGrid();
   document.getElementById('strategyCard').style.display = 'block';
-  setTimeout(() => {
-    document.getElementById('strategyCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 300);
+  setTimeout(() => document.getElementById('strategyCard').scrollIntoView({behavior:'smooth',block:'start'}), 300);
 }
 
 function renderStrategyGrid() {
-  const grid = document.getElementById('strategyGrid');
-  const selectedSlugs = S.selectedStrategies.map(s => s.slug);
-  const primarySlug = S.selectedStrategies.find(s => s.isPrimary)?.slug;
-  const count = S.selectedStrategies.length;
-
-  grid.innerHTML = S.strategies.map(strat => {
-    const isSelected = selectedSlugs.includes(strat.slug);
-    const isPrimary  = strat.slug === primarySlug;
-    const isDisabled = !isSelected && count >= 5;
-
-    return `
-      <div class="strategy-card ${isPrimary ? 'primary' : isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}"
-           onclick="toggleStrategy('${strat.slug}')"
-           title="${isDisabled ? 'Maximum 5 strategies selected' : ''}">
-        <div class="strategy-check">✓</div>
-        ${isPrimary ? '<div class="strategy-primary-badge">Primary</div>' : ''}
-        <div class="strategy-card-icon">${strat.icon}</div>
-        <div class="strategy-card-name">${strat.name}</div>
-        <div class="strategy-card-desc">${strat.description}</div>
-      </div>`;
+  const selectedSlugs = S.selectedStrategies.map(s=>s.slug), primarySlug = S.selectedStrategies.find(s=>s.isPrimary)?.slug, count = S.selectedStrategies.length;
+  document.getElementById('strategyGrid').innerHTML = S.strategies.map(strat => {
+    const isSelected = selectedSlugs.includes(strat.slug), isPrimary = strat.slug === primarySlug, isDisabled = !isSelected && count >= 5;
+    return `<div class="strategy-card ${isPrimary?'primary':isSelected?'selected':''} ${isDisabled?'disabled':''}" onclick="toggleStrategy('${strat.slug}')">
+      <div class="strategy-check">✓</div>${isPrimary?'<div class="strategy-primary-badge">Primary</div>':''}
+      <div class="strategy-card-icon">${strat.icon}</div><div class="strategy-card-name">${strat.name}</div>
+      <div class="strategy-card-desc">${strat.description}</div></div>`;
   }).join('');
-
   document.getElementById('strategyCount').textContent = count;
-
-  // Clear error if valid
-  if (count > 0 && S.selectedStrategies.some(s => s.isPrimary)) {
-    document.getElementById('strategyError').style.display = 'none';
-  }
+  if (count > 0 && S.selectedStrategies.some(s=>s.isPrimary)) document.getElementById('strategyError').style.display = 'none';
 }
 
 function toggleStrategy(slug) {
-  const strat = S.strategies.find(s => s.slug === slug);
-  if (!strat) return;
-
+  const strat = S.strategies.find(s => s.slug === slug); if (!strat) return;
   const idx = S.selectedStrategies.findIndex(s => s.slug === slug);
-
   if (idx >= 0) {
-    // Already selected — deselect or make primary
-    const current = S.selectedStrategies[idx];
-    if (current.isPrimary) {
-      // If it's primary and there are others, can't deselect unless another becomes primary
-      if (S.selectedStrategies.length > 1) {
-        toast('Please select a different primary strategy first, then remove this one.', 'err');
-        return;
-      }
-      // Only one — just deselect it
+    if (S.selectedStrategies[idx].isPrimary) {
+      if (S.selectedStrategies.length > 1) { toast('Please select a different primary strategy first, then remove this one.', 'err'); return; }
       S.selectedStrategies.splice(idx, 1);
     } else {
-      // Not primary — make it primary (demote current primary to secondary)
-      S.selectedStrategies.forEach(s => s.isPrimary = false);
-      S.selectedStrategies[idx].isPrimary = true;
+      S.selectedStrategies.forEach(s => s.isPrimary = false); S.selectedStrategies[idx].isPrimary = true;
       toast(`${strat.name} is now your primary strategy.`, 'ok');
     }
   } else {
-    // Not selected — add it
-    if (S.selectedStrategies.length >= 5) {
-      document.getElementById('strategyError').textContent = 'Maximum 5 strategies. Tap an existing one to remove it.';
-      document.getElementById('strategyError').style.display = 'block';
-      return;
-    }
-    // If none selected yet, make it primary
-    const isPrimary = S.selectedStrategies.length === 0;
-    S.selectedStrategies.push({
-      slug,
-      strategyId: strat.id,
-      isPrimary,
-      commitments: S.suggestedStrategies?.commitments || {},
-      aiSuggested: false,
-    });
+    if (S.selectedStrategies.length >= 5) { document.getElementById('strategyError').textContent = 'Maximum 5 strategies. Tap an existing one to remove it.'; document.getElementById('strategyError').style.display = 'block'; return; }
+    S.selectedStrategies.push({ slug, strategyId:strat.id, isPrimary:S.selectedStrategies.length===0, commitments:S.suggestedStrategies?.commitments||{}, aiSuggested:false });
   }
-
   renderStrategyGrid();
 }
 
 async function confirmStrategies() {
-  if (!S.selectedStrategies.length) {
-    document.getElementById('strategyError').textContent = 'Please select at least one strategy.';
-    document.getElementById('strategyError').style.display = 'block';
-    return;
-  }
-  if (!S.selectedStrategies.some(s => s.isPrimary)) {
-    document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.';
-    document.getElementById('strategyError').style.display = 'block';
-    return;
-  }
-
-  const btn = document.getElementById('strategyConfirmBtn');
-  btn.textContent = '⏳ Saving…';
-  btn.disabled = true;
-
-  // Save strategies to server if we have an agent ID
+  if (!S.selectedStrategies.length) { document.getElementById('strategyError').textContent = 'Please select at least one strategy.'; document.getElementById('strategyError').style.display = 'block'; return; }
+  if (!S.selectedStrategies.some(s => s.isPrimary)) { document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.'; document.getElementById('strategyError').style.display = 'block'; return; }
+  const btn = document.getElementById('strategyConfirmBtn'); btn.textContent = '⏳ Saving…'; btn.disabled = true;
   try {
     const email = S.userEmail || S.data.email;
     if (email && S.planId) {
-      // Look up agent ID
-      const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
-        headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        if (profile.found && profile.id) {
-          await fetch(`${PROXY_BASE}/agent/${profile.id}/strategies`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
-            body: JSON.stringify({
-              planId: S.planId,
-              enrollmentId: S.enrollmentId,
-              strategies: S.selectedStrategies,
-            })
-          });
-        }
-      }
+      const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, { headers: {'x-proxy-key':PROXY_KEY,'x-user-email':email} });
+      if (profileRes.ok) { const p = await profileRes.json(); if (p.found && p.id) await fetch(`${PROXY_BASE}/agent/${p.id}/strategies`, { method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY}, body:JSON.stringify({planId:S.planId,enrollmentId:S.enrollmentId,strategies:S.selectedStrategies}) }); }
     }
-  } catch(e) {
-    console.warn('[Strategies] Could not save to server:', e.message);
-    // Continue anyway — strategies are stored in S.selectedStrategies locally
-  }
-
-  // Hide strategy card and show enrollment
+  } catch(e) { console.warn('[Strategies] Save failed:', e.message); }
   document.getElementById('strategyCard').style.display = 'none';
-  btn.textContent = 'Confirm My Strategy →';
-  btn.disabled = false;
+  btn.textContent = 'Confirm My Strategy →'; btn.disabled = false;
   showEnrollmentCard();
 }
 
 function showEnrollmentCard() {
   document.getElementById('enrollmentCard').style.display = 'block';
-  setTimeout(() => {
-    document.getElementById('enrollmentCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 400);
+  setTimeout(() => document.getElementById('enrollmentCard').scrollIntoView({behavior:'smooth',block:'start'}), 400);
 }
 
-function openEnrollModal() {
-  loadCoaches();
-  buildCommitmentList();
-  document.getElementById('enrollModal').classList.remove('hidden');
-}
+function openEnrollModal()  { loadCoaches(); buildCommitmentList(); document.getElementById('enrollModal').classList.remove('hidden'); }
+function closeEnrollModal() { document.getElementById('enrollModal').classList.add('hidden'); }
 
-function closeEnrollModal() {
-  document.getElementById('enrollModal').classList.add('hidden');
-}
-
-/* ───────────────────────── ENROLL ──────────────────────── */
+/* ── ENROLL ───────────────────────────────────────────────────────── */
 async function doEnroll() {
   const coachInput = document.querySelector('input[name="coachSelect"]:checked');
   if (!coachInput) { toast('Please select a coach.', 'err'); return; }
-  const coachId = parseInt(coachInput.value);
-  const reason  = document.getElementById('enrollReason').value.trim();
-  const d = S.data;
-
-  const btn = document.getElementById('enrollBtn');
-  btn.textContent = '⏳ Enrolling…';
-  btn.disabled = true;
-
+  const coachId = parseInt(coachInput.value), reason = document.getElementById('enrollReason').value.trim(), d = S.data;
+  const btn = document.getElementById('enrollBtn'); btn.textContent = '⏳ Enrolling…'; btn.disabled = true;
   try {
-    const earnNum  = parseFloat((d.earn || '$0').replace(/[^0-9.]/g, '')) || 0;
-    const priceNum = parseFloat((d.price || '$0').replace(/[^0-9.]/g, '')) || 0;
-    const gci      = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
-    const sides    = gci > 0 && priceNum > 0 ? Math.ceil(gci / (priceNum * 0.03)) : 0;
-    const listPct  = parseInt(d.list) / 100 || 0.5;
-    const listSides = Math.ceil(sides * listPct);
-    const buyeSides = sides - listSides;
-
+    const earnNum = parseFloat((d.earn||'$0').replace(/[^0-9.]/g,''))||0, priceNum = parseFloat((d.price||'$0').replace(/[^0-9.]/g,''))||0;
+    const gci = earnNum>0?Math.ceil(earnNum/0.65):0, sides = gci>0&&priceNum>0?Math.ceil(gci/(priceNum*0.03)):0;
+    const listPct = parseInt(d.list)/100||0.5, listSides = Math.ceil(sides*listPct), buyeSides = sides-listSides;
     const payload = {
-      agentEmail:            S.userEmail || S.data.email || '',
-      coachId,
-      agentReason:           reason || null,
-      earningGoal:           earnNum,
-      avgSalePrice:          priceNum,
-      listingPct:            parseInt(d.list) || 50,
-      timeCommitmentHrs:     parseInt(d.time) || 0,
-      budgetScore:           parseInt(document.getElementById('f_budget').value) || 0,
-      soiContacts:           parseInt(document.getElementById('f_soi').value) || 0,
-      experienceYrs:         parseInt(document.getElementById('f_exp').value) || 0,
-      marketFocus:           d.market || '',
-      whyText:               d.why || '',
-      goalsText:             d.goals || '',
-      descriptionText:       d.desc || '',
-      timeNotes:             document.getElementById('f_time_note').value.trim(),
-      budgetNotes:           document.getElementById('f_budget_note').value.trim(),
-      soiNotes:              document.getElementById('f_soi_note').value.trim(),
-      expNotes:              document.getElementById('f_exp_note').value.trim(),
-      gciRequired:           gci,
-      sidesRequired:         sides,
-      listingSides:          listSides,
-      buyerSides:            buyeSides,
-      listingApptsMonthly:   Math.ceil((listSides / 12) / 0.8),
-      buyerProspectsMonthly: Math.ceil((buyeSides / 12) * 3),
-      planText:              S.plan,
-      planHtml:              S.planHtml,
-      infographicHtml:       null,
-      deskcardHtml:          S.deskCardHtml || null,
+      agentEmail: S.userEmail||S.data.email||'', coachId, agentReason:reason||null,
+      earningGoal:earnNum, avgSalePrice:priceNum, listingPct:parseInt(d.list)||50,
+      timeCommitmentHrs:parseInt(d.time)||0, budgetScore:parseInt(document.getElementById('f_budget').value)||0,
+      soiContacts:parseInt(document.getElementById('f_soi').value)||0, experienceYrs:parseInt(document.getElementById('f_exp').value)||0,
+      marketFocus:d.market||'', whyText:d.why||'', goalsText:d.goals||'', descriptionText:d.desc||'',
+      timeNotes:document.getElementById('f_time_note').value.trim(), budgetNotes:document.getElementById('f_budget_note').value.trim(),
+      soiNotes:document.getElementById('f_soi_note').value.trim(), expNotes:document.getElementById('f_exp_note').value.trim(),
+      gciRequired:gci, sidesRequired:sides, listingSides:listSides, buyerSides:buyeSides,
+      listingApptsMonthly:Math.ceil((listSides/12)/0.8), buyerProspectsMonthly:Math.ceil((buyeSides/12)*3),
+      planText:S.plan, planHtml:S.planHtml, infographicHtml:null, deskcardHtml:S.deskCardHtml||null,
     };
-
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.userEmail || S.data.email || '' },
-      body: JSON.stringify(payload)
+      method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY,'x-user-email':S.userEmail||S.data.email||''},
+      body:JSON.stringify(payload)
     });
-
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(e.error || `HTTP ${res.status}`);
-    }
-
-    const result = await res.json();
-    S.planId      = result.planId;
-    S.enrollmentId = result.enrollmentId;
-
-    // Find coach name
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||`HTTP ${res.status}`); }
+    const result = await res.json(); S.planId = result.planId; S.enrollmentId = result.enrollmentId;
     const coach = S.coaches.find(c => c.id === coachId);
-    const firstCheckin = new Date();
-    firstCheckin.setDate(firstCheckin.getDate() + 7);
-    const checkinDate = firstCheckin.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-
-    // Show success
+    const firstCheckin = new Date(); firstCheckin.setDate(firstCheckin.getDate()+7);
+    const checkinDate = firstCheckin.toLocaleDateString('en-US',{month:'long',day:'numeric'});
     closeEnrollModal();
     document.getElementById('enrollmentCard').style.display = 'none';
     document.getElementById('enrolledCard').style.display = 'block';
-    document.getElementById('enrolledMsg').innerHTML = `
-      <strong style="color:var(--text)">Welcome to AC Pathfinder, ${d.name}!</strong><br><br>
-      Your coach is <strong style="color:var(--gold)">${coach?.name || 'your sales manager'}</strong>.
-      They've been notified and will be in touch soon.<br><br>
-      Your first check-in text arrives on <strong style="color:var(--text)">${checkinDate}</strong>.
-      It takes about 5 minutes to complete.<br><br>
-      <span style="font-size:0.8rem;opacity:0.7">Reply STOP to any message to pause check-ins. Message &amp; data rates may apply.</span>
-    `;
-    document.getElementById('enrolledCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('enrolledMsg').innerHTML = `<strong style="color:var(--text)">Welcome to AC Pathfinder, ${d.name}!</strong><br><br>Your coach is <strong style="color:var(--gold)">${coach?.name||'your sales manager'}</strong>. They've been notified and will be in touch soon.<br><br>Your first check-in text arrives on <strong style="color:var(--text)">${checkinDate}</strong>. It takes about 5 minutes to complete.<br><br><span style="font-size:0.8rem;opacity:0.7">Reply STOP to any message to pause check-ins. Message &amp; data rates may apply.</span>`;
+    document.getElementById('enrolledCard').scrollIntoView({behavior:'smooth',block:'start'});
     toast('Enrolled successfully! Your coaching journey starts now. 🏡', 'ok');
-
-  } catch (e) {
-    console.error('[Enroll]', e);
+  } catch(e) {
     toast('Enrollment failed: ' + e.message, 'err');
-    btn.textContent = '🤝 Yes, I\'m in — Start My Coaching';
-    btn.disabled = false;
+    btn.textContent = "🤝 Yes, I'm in — Start My Coaching"; btn.disabled = false;
   }
 }
-
 </script>
 </body>
 </html>
