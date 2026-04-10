@@ -448,7 +448,7 @@ const ADMIN_PW_DEFAULT = 'ac2025admin';
 const PROXY_BASE   = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY    = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-const CONFIG_URL   = './bizplan-config.json';
+const CONFIG_URL   = PROXY_BASE + '/config/public';
 
 /* ── STATE ──────────────────────────────────────────────────────── */
 // FIX 2: Added strategies, selectedStrategies, suggestedStrategies
@@ -846,9 +846,13 @@ function toast(msg, cls='') {
 /* ── INIT ─────────────────────────────────────────────────────────── */
 window.addEventListener('load', async () => {
   try {
-    const res = await fetch(CONFIG_URL + '?v=' + Date.now());
-    if (res.ok) { const r = await res.json(); if (r.adminPassword) S.config.adminPassword = r.adminPassword; if (r.prompt) S.config.prompt = r.prompt; if (r.context) S.config.context = r.context; }
-  } catch(e) { console.warn('Could not load bizplan-config.json'); }
+    const res = await fetch(CONFIG_URL);
+    if (res.ok) {
+      const r = await res.json();
+      if (r.prompt)  S.config.prompt  = r.prompt;
+      if (r.context) S.config.context = r.context;
+    }
+  } catch(e) { console.warn('[Config] Could not load server config — using built-in defaults.'); }
   const poll = setInterval(() => { if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); } }, 200);
 });
 

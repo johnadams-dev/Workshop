@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AC Pathfinder — Admin</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0d14;
+      --surface:  #111520;
+      --surface2: #171c2a;
+      --surface3: #1e2437;
+      --border:   #232a3d;
+      --border2:  #2c3550;
+      --gold:     #c4a84f;
+      --gold2:    #dfc278;
+      --gold-bg:  rgba(196,168,79,0.07);
+      --gold-dim: #7a6428;
+      --text:     #e8dfc8;
+      --text2:    #8a8070;
+      --text3:    #4a4860;
+      --green:    #3a8c56;
+      --green-bg: rgba(58,140,86,0.1);
+      --red:      #8c3a4a;
+      --red-bg:   rgba(140,58,74,0.1);
+      --amber:    #8c7030;
+      --amber-bg: rgba(196,168,79,0.12);
+      --ease:     0.18s ease;
+      --radius:   10px;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── SIGN-IN SCREEN ───────────────────────────────────── */
+    #signInScreen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      padding: 2rem;
+      background: radial-gradient(ellipse 80% 60% at 50% 80%, rgba(196,168,79,0.06) 0%, transparent 70%);
+    }
+    .signin-logo {
+      text-align: center;
+    }
+    .signin-icon {
+      width: 56px; height: 56px; border-radius: 13px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; margin: 0 auto 1rem;
+    }
+    .signin-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem; font-weight: 600;
+      color: var(--text); line-height: 1.2;
+    }
+    .signin-sub {
+      font-size: 0.82rem; color: var(--text2); margin-top: 0.4rem;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .signin-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem 2.5rem;
+      text-align: center;
+      width: 100%;
+      max-width: 380px;
+    }
+    .signin-card p {
+      font-size: 0.84rem; color: var(--text2); margin-bottom: 1.5rem; line-height: 1.65;
+    }
+    #signin-error {
+      margin-top: 1rem; font-size: 0.79rem; color: #e08080;
+      display: none; line-height: 1.5;
+    }
+
+    /* ── SHELL ────────────────────────────────────────────── */
+    #appShell { display: none; flex-direction: column; min-height: 100vh; }
+
+    /* ── HEADER ───────────────────────────────────────────── */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      position: sticky; top: 0; z-index: 50;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px;
+    }
+    .brand { display: flex; align-items: center; gap: 0.75rem; }
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 7px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .brand-text { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 600; }
+    .brand-badge {
+      font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em;
+      background: rgba(196,168,79,0.15); color: var(--gold);
+      border: 1px solid rgba(196,168,79,0.3); border-radius: 4px;
+      padding: 0.1rem 0.45rem; margin-left: 0.5rem; vertical-align: middle;
+    }
+    .hdr-user {
+      display: flex; align-items: center; gap: 0.75rem;
+      font-size: 0.8rem; color: var(--text2);
+    }
+    .hdr-user img {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: 1.5px solid var(--border2);
+    }
+    .hdr-user-name { color: var(--text); font-size: 0.82rem; }
+
+    /* ── TAB BAR ──────────────────────────────────────────── */
+    .tab-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 2rem;
+      gap: 0;
+      overflow-x: auto;
+    }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab {
+      padding: 0.85rem 1.25rem;
+      font-size: 0.82rem; font-weight: 500;
+      color: var(--text2);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all var(--ease);
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 0.45rem;
+      text-decoration: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-badge {
+      background: var(--red-bg); color: #e08080;
+      border-radius: 100px; font-size: 0.62rem;
+      padding: 0.1rem 0.45rem; font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .tab-badge.green { background: var(--green-bg); color: #60c88a; }
+
+    /* ── MAIN CONTENT ─────────────────────────────────────── */
+    .app-body {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* ── TAB PANELS ───────────────────────────────────────── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeUp 0.2s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── STAT CARDS ───────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .stat-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin-bottom: 0.5rem; }
+    .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 600; color: var(--gold); line-height: 1; }
+    .stat-sub   { font-size: 0.73rem; color: var(--text2); margin-top: 0.35rem; }
+
+    /* ── SECTION HEADER ───────────────────────────────────── */
+    .section-hdr {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;
+    }
+    .section-hdr h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.5rem; font-weight: 500;
+    }
+    .section-hdr p { font-size: 0.8rem; color: var(--text2); margin-top: 0.2rem; }
+
+    /* ── CARDS ────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .card-head {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    }
+    .card-head h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; }
+    .card-head p  { font-size: 0.78rem; color: var(--text2); margin-top: 0.2rem; line-height: 1.5; }
+    .card-body { padding: 1.5rem; }
+
+    /* ── FIELDS ───────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1.1rem; }
+    .field:last-child { margin-bottom: 0; }
+    label { font-size: 0.75rem; font-weight: 500; color: var(--text2); letter-spacing: 0.04em; }
+    label .hint-inline { font-weight: 400; color: var(--text3); margin-left: 0.3rem; }
+    textarea, input[type="text"], input[type="password"] {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      padding: 0.65rem 0.9rem;
+      transition: border-color var(--ease);
+      width: 100%;
+      outline: none;
+    }
+    textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+    textarea.mono { font-family: 'Fira Code', 'Courier New', monospace; font-size: 0.79rem; min-height: 260px; line-height: 1.55; }
+    textarea:focus, input:focus { border-color: var(--gold); }
+    .field-hint { font-size: 0.72rem; color: var(--text3); margin-top: 0.15rem; line-height: 1.5; }
+
+    /* ── BUTTONS ──────────────────────────────────────────── */
+    .btn {
+      padding: 0.55rem 1.2rem;
+      border-radius: 7px;
+      font-family: 'Outfit', sans-serif; font-size: 0.82rem; font-weight: 500;
+      cursor: pointer; transition: all var(--ease); border: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ghost   { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+    .btn-ghost:hover:not(:disabled) { border-color: var(--text2); color: var(--text); }
+    .btn-primary { background: var(--gold); color: #0a0d14; font-weight: 600; }
+    .btn-primary:hover:not(:disabled) { background: var(--gold2); }
+    .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.75rem; }
+
+    /* ── TABLE ────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead th {
+      text-align: left; padding: 0.65rem 1rem;
+      font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text3); font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background var(--ease); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 0.8rem 1rem; color: var(--text2); vertical-align: middle; }
+    tbody td strong { color: var(--text); font-weight: 500; }
+    tbody td.name-cell { white-space: nowrap; }
+
+    /* ── PILLS ────────────────────────────────────────────── */
+    .pill {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 0.18rem 0.6rem; border-radius: 100px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .pill-green  { background: var(--green-bg); color: #60c88a; }
+    .pill-red    { background: var(--red-bg);   color: #e08080; }
+    .pill-amber  { background: var(--amber-bg); color: var(--gold2); }
+    .pill-gray   { background: rgba(255,255,255,0.05); color: var(--text3); }
+    .pill-admin  { background: rgba(196,168,79,0.15); color: var(--gold); }
+
+    /* ── ATTENTION FLAG ───────────────────────────────────── */
+    .flag { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: #e08080; }
+
+    /* ── SAVE FEEDBACK ────────────────────────────────────── */
+    .save-status {
+      font-size: 0.75rem; transition: opacity 0.3s;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .save-status.ok   { color: #60c88a; }
+    .save-status.err  { color: #e08080; }
+    .save-status.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── EMPTY STATE ──────────────────────────────────────── */
+    .empty {
+      text-align: center; padding: 3rem 2rem;
+      color: var(--text3); font-size: 0.84rem;
+    }
+    .empty-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.5; }
+
+    /* ── LOADING ──────────────────────────────────────────── */
+    .spinner {
+      width: 36px; height: 36px; border: 2.5px solid var(--border2);
+      border-top-color: var(--gold); border-radius: 50%;
+      animation: spin 0.75s linear infinite; margin: 2rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-block { text-align: center; padding: 2rem; color: var(--text3); font-size: 0.82rem; }
+
+    /* ── TOAST ────────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--surface); border: 1px solid var(--border2);
+      border-radius: 9px; padding: 0.7rem 1rem;
+      font-size: 0.82rem; color: var(--text);
+      z-index: 999; transform: translateY(80px); opacity: 0;
+      transition: all 0.3s ease; max-width: 300px; line-height: 1.4;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.ok   { border-color: var(--green); }
+    .toast.err  { border-color: var(--red); }
+
+    /* ── CONFIG ROW ───────────────────────────────────────── */
+    .config-row {
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem;
+    }
+    .config-row:last-child { border-bottom: none; }
+    .config-row-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap;
+    }
+    .config-key-label { font-size: 0.88rem; font-weight: 500; color: var(--text); }
+    .config-key-code  { font-family: monospace; font-size: 0.72rem; color: var(--text3); margin-top: 0.15rem; }
+    .config-desc      { font-size: 0.77rem; color: var(--text2); margin-bottom: 0.65rem; line-height: 1.55; }
+    .config-actions   { display: flex; align-items: center; gap: 0.6rem; }
+
+    /* ── RESPONSIVE ───────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .app-body { padding: 1.25rem; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .card-body { padding: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     SIGN-IN SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="signInScreen">
+  <div class="signin-logo">
+    <div class="signin-icon">🧭</div>
+    <div class="signin-title">AC Pathfinder</div>
+    <div class="signin-sub">Admin Panel</div>
+  </div>
+  <div class="signin-card">
+    <p>Sign in with your Adams, Cameron & Co. Google account to access the administration panel. Admin access is required.</p>
+    <div id="g_id_onload"
+      data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+      data-context="signin"
+      data-ux_mode="popup"
+      data-callback="handleGoogleCredential"
+      data-auto_prompt="true">
+    </div>
+    <div class="g_id_signin"
+      data-type="standard"
+      data-shape="rectangular"
+      data-theme="filled_black"
+      data-text="sign_in_with"
+      data-size="large"
+      data-width="280">
+    </div>
+    <div id="signin-error"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════════════════ -->
+<div id="appShell" style="display:none;flex-direction:column;min-height:100vh">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">🧭</div>
+      <div class="brand-text">AC Pathfinder <span class="brand-badge">Admin</span></div>
+    </div>
+    <div class="hdr-user">
+      <img id="userAvatar" src="" alt="" style="display:none">
+      <span id="userName"></span>
+    </div>
+  </header>
+
+  <!-- Tab bar -->
+  <nav class="tab-bar">
+    <div class="tab active" data-tab="overview"       onclick="switchTab('overview')">📊 Overview</div>
+    <div class="tab"        data-tab="config"         onclick="switchTab('config')">⚙️ System Config</div>
+    <div class="tab"        data-tab="enrollments"    onclick="switchTab('enrollments')">🤝 Enrollments</div>
+    <div class="tab"        data-tab="agents"         onclick="switchTab('agents')">👤 Agents</div>
+    <div class="tab"        data-tab="staff"          onclick="switchTab('staff')">🏢 Staff</div>
+  </nav>
+
+  <!-- Body -->
+  <main class="app-body">
+
+    <!-- ── OVERVIEW ───────────────────────────────────────── -->
+    <div id="panel-overview" class="tab-panel active">
+      <div class="section-hdr">
+        <div><h2>System Overview</h2><p>Live snapshot of AC Pathfinder activity.</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadOverview()">↻ Refresh</button>
+      </div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="loading-block"><div class="spinner"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Agents Needing Attention</h3><p>Agents whose latest scorecard flagged coach follow-up, within the last 14 days.</p></div>
+        <div class="card-body" id="attentionList"><div class="loading-block"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── SYSTEM CONFIG ───────────────────────────────────── -->
+    <div id="panel-config" class="tab-panel">
+      <div class="section-hdr">
+        <div>
+          <h2>System Configuration</h2>
+          <p>These settings are stored in the database and applied system-wide. Changes take effect immediately — no redeploy needed.</p>
+        </div>
+      </div>
+      <div class="card" id="configCard">
+        <div class="loading-block"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- ── ENROLLMENTS ─────────────────────────────────────── -->
+    <div id="panel-enrollments" class="tab-panel">
+      <div class="section-hdr">
+        <div><h2>Active Enrollments</h2><p>Agents currently enrolled in AC Pathfinder coaching.</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadEnrollments()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="enrollmentsTable">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Office</th>
+                <th>Coach</th>
+                <th>Status</th>
+                <th>Enrolled</th>
+                <th>Check-ins</th>
+                <th>Last Check-in</th>
+                <th>Score</th>
+                <th>GCI Goal</th>
+                <th>Flag</th>
+              </tr>
+            </thead>
+            <tbody id="enrollmentsBody">
+              <tr><td colspan="10" class="loading-block"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AGENTS ──────────────────────────────────────────── -->
+    <div id="panel-agents" class="tab-panel">
+      <div class="section-hdr">
+        <div><h2>Agent Roster</h2><p>All agents in the system, active and inactive.</p></div>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <input type="text" id="agentSearch" placeholder="Search agents…" oninput="filterAgents()" style="width:220px;padding:0.38rem 0.7rem;font-size:0.8rem;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);outline:none">
+          <button class="btn btn-ghost btn-sm" onclick="loadAgents()">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="agentsTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Office</th>
+                <th>Status</th>
+                <th>Enrolled</th>
+                <th>Coach</th>
+                <th>Check-ins</th>
+                <th>Last Check-in</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="agentsBody">
+              <tr><td colspan="9" class="loading-block"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STAFF ───────────────────────────────────────────── -->
+    <div id="panel-staff" class="tab-panel">
+      <div class="section-hdr">
+        <div><h2>Staff Directory</h2><p>All staff members with their roles and office assignments.</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadStaff()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="staffTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Title</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Offices</th>
+                <th>Active</th>
+              </tr>
+            </thead>
+            <tbody id="staffBody">
+              <tr><td colspan="6" class="loading-block"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ── CONSTANTS ─────────────────────────────────────────── */
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+/* ── STATE ─────────────────────────────────────────────── */
+let userEmail = null;
+let allAgents = [];
+let currentTab = 'overview';
+
+/* ── GOOGLE SIGN-IN ────────────────────────────────────── */
+async function handleGoogleCredential(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    const email = payload.email;
+    if (!email) throw new Error('No email in credential');
+
+    // Verify admin access by calling a protected endpoint
+    const res = await fetch(`${PROXY_BASE}/admin/stats`, {
+      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+    });
+
+    if (res.status === 403) {
+      showSigninError('This account does not have admin access to AC Pathfinder. Contact the system administrator.');
+      return;
+    }
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+    userEmail = email;
+    document.getElementById('userName').textContent = payload.name || email;
+    if (payload.picture) {
+      const av = document.getElementById('userAvatar');
+      av.src = payload.picture; av.style.display = '';
+    }
+
+    // Show the app
+    document.getElementById('signInScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'flex';
+
+    // Load initial data
+    const stats = await res.json();
+    renderStats(stats);
+    loadOverview();
+    loadConfig();
+
+  } catch(e) {
+    showSigninError('Sign-in failed: ' + e.message);
+  }
+}
+
+function showSigninError(msg) {
+  const el = document.getElementById('signin-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+/* ── AUTH HEADER ───────────────────────────────────────── */
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-proxy-key':  PROXY_KEY,
+    'x-user-email': userEmail,
+  };
+}
+
+/* ── TABS ──────────────────────────────────────────────── */
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.toggle('active', el.id === 'panel-' + tab));
+
+  // Lazy-load
+  if (tab === 'staff')       loadStaff();
+  if (tab === 'agents')      loadAgents();
+  if (tab === 'enrollments') loadEnrollments();
+}
+
+/* ── OVERVIEW ──────────────────────────────────────────── */
+async function loadOverview() {
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/stats`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const stats = await res.json();
+    renderStats(stats);
+    await loadAttentionList();
+  } catch(e) { toast('Could not load overview: ' + e.message, 'err'); }
+}
+
+function renderStats(s) {
+  document.getElementById('statsGrid').innerHTML = [
+    ['Total Agents',       s.agents?.total        || 0, `${s.agents?.active || 0} active`],
+    ['Enrolled',           s.enrollments?.active  || 0, `${s.enrollments?.paused || 0} paused`],
+    ['Total Check-ins',    s.checkins?.total      || 0, `${s.checkins?.this_week || 0} this week`],
+    ['Need Attention',     s.attention?.count     || 0, 'flagged in last 14 days'],
+  ].map(([label, val, sub]) => `
+    <div class="stat-card">
+      <div class="stat-label">${label}</div>
+      <div class="stat-value">${val}</div>
+      <div class="stat-sub">${sub}</div>
+    </div>`).join('');
+}
+
+async function loadAttentionList() {
+  const el = document.getElementById('attentionList');
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/enrollments`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const enrollments = await res.json();
+    const flagged = enrollments.filter(e => e.coach_attention_needed);
+
+    if (!flagged.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div>No agents flagged for attention right now.</div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Agent</th><th>Office</th><th>Coach</th><th>Score</th><th>Reason</th></tr></thead>
+      <tbody>${flagged.map(e => `
+        <tr>
+          <td class="name-cell"><strong>${e.agent_name}</strong></td>
+          <td>${e.office || '—'}</td>
+          <td>${e.coach_name || '—'}</td>
+          <td>${e.commitment_score != null ? `<span class="pill ${scoreColor(e.commitment_score)}">${e.commitment_score}</span>` : '—'}</td>
+          <td style="font-size:0.77rem;max-width:320px">${e.attention_reason || '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="empty" style="color:#e08080">${e.message}</div>`;
+  }
+}
+
+/* ── CONFIG ────────────────────────────────────────────── */
+async function loadConfig() {
+  const card = document.getElementById('configCard');
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/config`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
+    renderConfig(rows);
+  } catch(e) {
+    card.innerHTML = `<div class="empty" style="color:#e08080">Could not load config: ${e.message}</div>`;
+  }
+}
+
+function renderConfig(rows) {
+  const card = document.getElementById('configCard');
+  card.innerHTML = rows.map(row => {
+    const isLong = row.key.includes('prompt') || row.key.includes('context') || row.key.includes('philosophy');
+    const inputHtml = isLong
+      ? `<textarea class="mono" id="cfg_${row.key}" rows="12" placeholder="Leave empty to use the built-in default…">${escHtml(row.value || '')}</textarea>`
+      : `<input type="text" id="cfg_${row.key}" value="${escHtml(row.value || '')}" placeholder="Leave empty for default…">`;
+
+    const updated = row.updated_at
+      ? `Last updated ${new Date(row.updated_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})}`
+      : 'Never updated';
+
+    return `
+      <div class="config-row">
+        <div class="config-row-head">
+          <div>
+            <div class="config-key-label">${escHtml(row.label || row.key)}</div>
+            <div class="config-key-code">${row.key}</div>
+          </div>
+          <div class="config-actions">
+            <span id="status_${row.key}" class="save-status hidden"></span>
+            <button class="btn btn-primary btn-sm" onclick="saveConfig('${row.key}')">Save</button>
+          </div>
+        </div>
+        <div class="config-desc">${escHtml(row.description || '')}</div>
+        ${inputHtml}
+        <div class="field-hint" style="margin-top:0.4rem">${updated}</div>
+      </div>`;
+  }).join('');
+}
+
+async function saveConfig(key) {
+  const el = document.getElementById('cfg_' + key);
+  const statusEl = document.getElementById('status_' + key);
+  const value = el.value;
+
+  statusEl.textContent = '⏳ Saving…'; statusEl.className = 'save-status amber';
+  statusEl.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/config/${key}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error || 'Save failed'); }
+    statusEl.textContent = '✓ Saved'; statusEl.className = 'save-status ok';
+    toast(`${key} saved successfully.`, 'ok');
+    setTimeout(() => statusEl.classList.add('hidden'), 3000);
+  } catch(e) {
+    statusEl.textContent = '✗ ' + e.message; statusEl.className = 'save-status err';
+    setTimeout(() => statusEl.classList.add('hidden'), 4000);
+  }
+}
+
+/* ── ENROLLMENTS ───────────────────────────────────────── */
+async function loadEnrollments() {
+  const tbody = document.getElementById('enrollmentsBody');
+  tbody.innerHTML = `<tr><td colspan="10" class="loading-block"><div class="spinner"></div></td></tr>`;
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/enrollments`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="10" class="empty">No active enrollments yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(e => `
+      <tr>
+        <td class="name-cell"><strong>${escHtml(e.agent_name)}</strong><br><span style="font-size:0.72rem">${escHtml(e.agent_email)}</span></td>
+        <td>${escHtml(e.office || '—')}</td>
+        <td>${escHtml(e.coach_name || '—')}</td>
+        <td>${statusPill(e.status)}</td>
+        <td>${fmtDate(e.enrolled_at)}</td>
+        <td>${e.checkin_count || 0}</td>
+        <td>${fmtDate(e.last_checkin)}</td>
+        <td>${e.commitment_score != null ? `<span class="pill ${scoreColor(e.commitment_score)}">${e.commitment_score}</span>` : '—'}</td>
+        <td>${e.earning_goal ? '$' + Number(e.earning_goal).toLocaleString() : '—'}</td>
+        <td>${e.coach_attention_needed ? '<span class="flag">⚠ Attention</span>' : ''}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty" style="color:#e08080">${e.message}</td></tr>`;
+  }
+}
+
+/* ── AGENTS ────────────────────────────────────────────── */
+async function loadAgents() {
+  const tbody = document.getElementById('agentsBody');
+  tbody.innerHTML = `<tr><td colspan="9" class="loading-block"><div class="spinner"></div></td></tr>`;
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/agents`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    allAgents = await res.json();
+    renderAgents(allAgents);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty" style="color:#e08080">${e.message}</td></tr>`;
+  }
+}
+
+function renderAgents(rows) {
+  const tbody = document.getElementById('agentsBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">No agents found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(a => `
+    <tr>
+      <td class="name-cell"><strong>${escHtml(a.first_name)} ${escHtml(a.last_name)}</strong></td>
+      <td style="font-size:0.77rem">${escHtml(a.email)}</td>
+      <td>${escHtml(a.office || '—')}</td>
+      <td>${a.active ? '<span class="pill pill-green">Active</span>' : '<span class="pill pill-red">Inactive</span>'}</td>
+      <td>${a.enrollment_status ? statusPill(a.enrollment_status) : '<span class="pill pill-gray">Not enrolled</span>'}</td>
+      <td>${escHtml(a.coach_name || '—')}</td>
+      <td>${a.total_checkins || 0}</td>
+      <td>${fmtDate(a.last_checkin_date)}</td>
+      <td>${a.commitment_score != null ? `<span class="pill ${scoreColor(a.commitment_score)}">${a.commitment_score}</span>` : '—'}</td>
+    </tr>`).join('');
+}
+
+function filterAgents() {
+  const q = document.getElementById('agentSearch').value.toLowerCase();
+  if (!q) { renderAgents(allAgents); return; }
+  renderAgents(allAgents.filter(a =>
+    `${a.first_name} ${a.last_name} ${a.email} ${a.office}`.toLowerCase().includes(q)
+  ));
+}
+
+/* ── STAFF ─────────────────────────────────────────────── */
+async function loadStaff() {
+  const tbody = document.getElementById('staffBody');
+  tbody.innerHTML = `<tr><td colspan="6" class="loading-block"><div class="spinner"></div></td></tr>`;
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/staff`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
+    tbody.innerHTML = rows.map(s => `
+      <tr>
+        <td class="name-cell">
+          ${s.photo_url ? `<img src="${escHtml(s.photo_url)}" style="width:28px;height:28px;border-radius:50%;vertical-align:middle;margin-right:0.5rem;object-fit:cover">` : ''}
+          <strong>${escHtml(s.first_name)} ${escHtml(s.last_name)}</strong>
+        </td>
+        <td style="font-size:0.77rem;max-width:200px">${escHtml(s.title || '—')}</td>
+        <td>${rolePill(s.role)}</td>
+        <td style="font-size:0.77rem">${escHtml(s.email)}</td>
+        <td style="font-size:0.77rem;max-width:220px">${(s.offices || []).join(', ') || '—'}</td>
+        <td>${s.active ? '<span class="pill pill-green">Active</span>' : '<span class="pill pill-red">Inactive</span>'}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty" style="color:#e08080">${e.message}</td></tr>`;
+  }
+}
+
+/* ── HELPERS ───────────────────────────────────────────── */
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function scoreColor(score) {
+  if (score == null) return 'pill-gray';
+  if (score >= 75) return 'pill-green';
+  if (score >= 50) return 'pill-amber';
+  return 'pill-red';
+}
+
+function statusPill(status) {
+  const map = {
+    active:  ['pill-green', 'Active'],
+    paused:  ['pill-amber', 'Paused'],
+    completed: ['pill-gray', 'Completed'],
+  };
+  const [cls, label] = map[status] || ['pill-gray', status];
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+function rolePill(role) {
+  const map = {
+    admin:       ['pill-admin', 'Admin'],
+    manager:     ['pill-amber', 'Manager'],
+    coordinator: ['pill-green', 'Coordinator'],
+    other:       ['pill-gray',  'Other'],
+  };
+  const [cls, label] = map[role] || ['pill-gray', role];
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+function toast(msg, cls = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${cls} show`;
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.className = 'toast', 3800);
+}
+</script>
+</body>
+</html>
