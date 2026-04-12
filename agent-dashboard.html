@@ -746,6 +746,20 @@ const poll = setInterval(() => {
   if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
 }, 100);
 
+/* ── SESSION AUTH (shared with all Pathfinder pages) ─── */
+const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+function saveCredential(c)  { try { sessionStorage.setItem(SESSION_CRED_KEY, c); } catch(_) {} }
+function clearCredential()  { try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {} }
+function loadSavedCredential() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(atob(raw.split('.')[1]));
+    if (p.exp && p.exp * 1000 < Date.now()) { sessionStorage.removeItem(SESSION_CRED_KEY); return null; }
+    return p;
+  } catch(_) { return null; }
+}
+
 function initOAuth() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: OAUTH_CLIENT,
@@ -763,12 +777,19 @@ function initOAuth() {
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
     callback: (resp) => {
+      saveCredential(resp.credential);
       const p = JSON.parse(atob(resp.credential.split('.')[1]));
       onSignedIn(p.email, p.given_name || p.name, p.picture);
     },
     auto_select: true,
   });
-  google.accounts.id.prompt();
+  // Check sessionStorage before showing Google prompt
+  const saved = loadSavedCredential();
+  if (saved) {
+    onSignedIn(saved.email, saved.given_name || saved.name, saved.picture);
+  } else {
+    google.accounts.id.prompt();
+  }
 
   // Give auto-select 1.5s, then show sign-in prompt if not signed in
   setTimeout(() => {
@@ -981,7 +1002,7 @@ let currentEmail = '';
 
 function populatePreferences(p) {
   document.getElementById('smsToggle').checked   = p.sms_opted_in   || false;
-  document.getElementById('emailToggle').checked = p.email_opted_in || false;
+  document.getElementById('emailToggle').checked = p.email_opted_in !== false; // default ON
   updateStatusLabels(p.sms_opted_in, p.email_opted_in);
 }
 

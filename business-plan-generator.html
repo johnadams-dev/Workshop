@@ -465,6 +465,20 @@ const S = {
 /* Settings removed — prompt config managed server-side via admin panel */
 
 /* ── GOOGLE OAUTH ─────────────────────────────────────────────────── */
+/* ── SESSION AUTH (shared with pathfinder, admin, coach-dashboard) ────── */
+const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+function saveCredential(c)  { try { sessionStorage.setItem(SESSION_CRED_KEY, c); } catch(_) {} }
+function clearCredential()  { try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {} }
+function loadSavedCredential() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(atob(raw.split('.')[1]));
+    if (p.exp && p.exp * 1000 < Date.now()) { sessionStorage.removeItem(SESSION_CRED_KEY); return null; }
+    return p;
+  } catch(_) { return null; }
+}
+
 function initOAuth() {
   if (!window.google?.accounts?.oauth2) return;
   S.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -486,11 +500,18 @@ function initOAuth() {
     google.accounts.id.initialize({
       client_id: OAUTH_CLIENT,
       callback: async (cr) => {
+        saveCredential(cr.credential);
         const p = JSON.parse(atob(cr.credential.split('.')[1]));
         if (p.email) await loadAgentProfile(p.email);
       }
     });
-    google.accounts.id.prompt();
+    // Check session before prompting Google
+    const saved = loadSavedCredential();
+    if (saved) {
+      loadAgentProfile(saved.email);
+    } else {
+      google.accounts.id.prompt();
+    }
   } catch(e) {}
 }
 
@@ -651,23 +672,32 @@ function md2html(src) {
 // srcdoc triggers the load event before content is written in some browsers,
 // causing height measurement to return 0 and the playbook to appear blank.
 function renderInIframe(containerId, html, theme = 'dark') {
+  // Render directly into a div — avoids all iframe height/CSP issues
+  // that were causing the Weekly Playbook to appear blank.
   const container = document.getElementById(containerId);
   container.innerHTML = '';
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = `width:100%;border:none;display:block;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
-  iframe.setAttribute('scrolling', 'no');
-  container.appendChild(iframe);
-  // Write directly — bypasses the srcdoc load-event timing issue
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-  // Multi-pass resize: catches late-loading fonts and images
-  const resize = () => {
-    try {
-      const h = Math.max(iframe.contentDocument.body.scrollHeight, iframe.contentDocument.documentElement.scrollHeight);
-      if (h > 100) iframe.style.height = (h + 40) + 'px';
-    } catch(e) {}
-  };
-  setTimeout(resize, 200); setTimeout(resize, 800); setTimeout(resize, 2000);
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'width:100%;overflow:auto;border-radius:8px;background:' +
+    (theme === 'dark' ? '#0c0f16' : '#fff') + ';';
+
+  // Extract <style> blocks and scope them
+  const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+  if (styleMatches.length) {
+    const styleEl = document.createElement('style');
+    styleEl.textContent = styleMatches.map(m => m[1])
+      .join('\n')
+      .replace(/@media\s+print[\s\S]*?(?=@|$)/g, ''); // strip print rules
+    wrapper.appendChild(styleEl);
+  }
+
+  // Extract <body> content (or use full html if no body tag)
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const content = document.createElement('div');
+  content.style.cssText = 'padding:1rem';
+  content.innerHTML = bodyMatch ? bodyMatch[1] : html;
+  wrapper.appendChild(content);
+  container.appendChild(wrapper);
 }
 
 /* ── INFOGRAPHIC ──────────────────────────────────────────────────── */
