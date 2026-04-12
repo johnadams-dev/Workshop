@@ -567,6 +567,7 @@
       <div class="user-avatar" id="userInitials">?</div>
       <span id="userName">Loading…</span>
     </div>
+    <button class="btn-sm btn-ghost" id="signOutBtn" onclick="signOut()" style="display:none">Sign Out</button>
     <button class="btn-sm btn-gold" id="signInBtn" onclick="requestSignIn()">Sign In with Google</button>
   </div>
 </header>
@@ -688,9 +689,24 @@
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY_BASE   = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY    = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+/* ───────── SESSION AUTH ──────── */
+// Shared key with pathfinder.html and admin.html
+const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+function saveCredential(c)  { try { sessionStorage.setItem(SESSION_CRED_KEY, c); } catch(_) {} }
+function clearCredential()  { try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {} }
+function loadSavedCredential() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(atob(raw.split('.')[1]));
+    if (p.exp && p.exp * 1000 < Date.now()) { sessionStorage.removeItem(SESSION_CRED_KEY); return null; }
+    return p;
+  } catch(_) { return null; }
+}
 
 /* ─────────────────────── STATE ──────────────────────── */
 const S = {
@@ -708,9 +724,18 @@ const S = {
 
 /* ─────────────────────── AUTH ───────────────────────── */
 function requestSignIn() {
-  if (S.tokenClient) {
-    S.tokenClient.requestAccessToken();
-  }
+  if (S.tokenClient) S.tokenClient.requestAccessToken();
+}
+
+function signOut() {
+  clearCredential();
+  S.email = null; S.name = null;
+  document.getElementById('userPill').style.display    = 'none';
+  document.getElementById('signOutBtn').style.display  = 'none';
+  document.getElementById('signInBtn').style.display   = 'block';
+  document.getElementById('dashApp').style.display     = 'none';
+  document.getElementById('authGate').style.display    = 'flex';
+  if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
 }
 
 window.addEventListener('load', () => {
@@ -734,6 +759,7 @@ window.addEventListener('load', () => {
       client_id: OAUTH_CLIENT,
       callback: async (credentialResponse) => {
         try {
+          saveCredential(credentialResponse.credential);
           const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
           S.email = payload.email;
           S.name  = payload.name || payload.email.split('@')[0];
@@ -743,7 +769,14 @@ window.addEventListener('load', () => {
         }
       }
     });
-    google.accounts.id.prompt();
+    const saved = loadSavedCredential();
+    if (saved) {
+      S.email = saved.email;
+      S.name  = saved.name || saved.email?.split('@')[0];
+      onSignedIn();
+    } else {
+      google.accounts.id.prompt();
+    }
   }, 200);
 });
 
@@ -778,7 +811,8 @@ function onSignedIn() {
   document.getElementById('userInitials').textContent = initials;
   document.getElementById('userName').textContent = S.name.split(' ')[0];
   document.getElementById('userPill').style.display = 'flex';
-  document.getElementById('signInBtn').style.display = 'none';
+  document.getElementById('signInBtn').style.display   = 'none';
+  document.getElementById('signOutBtn').style.display  = 'block';
 
   // Show dashboard
   document.getElementById('authGate').style.display = 'none';
