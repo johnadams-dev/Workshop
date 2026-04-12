@@ -542,41 +542,68 @@ let userEmail = null;
 let allAgents = [];
 let currentTab = 'overview';
 
+/* ── SHARED SESSION AUTH ───────────────────────────────── */
+const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+
+function saveCredential(credentialJwt) {
+  try { sessionStorage.setItem(SESSION_CRED_KEY, credentialJwt); } catch(_) {}
+}
+
+function clearCredential() {
+  try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {}
+}
+
+function loadSavedCredential() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    if (!raw) return null;
+    const payload = JSON.parse(atob(raw.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      sessionStorage.removeItem(SESSION_CRED_KEY);
+      return null;
+    }
+    return payload;
+  } catch(_) { return null; }
+}
+
 /* ── GOOGLE SIGN-IN ────────────────────────────────────── */
+async function completeSignIn(email, name, picture, credentialJwt) {
+  // Verify admin access
+  const res = await fetch(`${PROXY_BASE}/admin/stats`, {
+    headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+  });
+
+  if (res.status === 403) {
+    showSigninError('This account does not have admin access to AC Pathfinder.');
+    clearCredential();
+    return;
+  }
+  if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+  // Save credential for other pages
+  if (credentialJwt) saveCredential(credentialJwt);
+
+  userEmail = email;
+  document.getElementById('userName').textContent = name || email;
+  if (picture) {
+    const av = document.getElementById('userAvatar');
+    av.src = picture; av.style.display = '';
+  }
+
+  document.getElementById('signInScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+
+  const stats = await res.json();
+  renderStats(stats);
+  loadOverview();
+  loadConfig();
+}
+
 async function handleGoogleCredential(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    const email = payload.email;
-    if (!email) throw new Error('No email in credential');
-
-    // Verify admin access by calling a protected endpoint
-    const res = await fetch(`${PROXY_BASE}/admin/stats`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
-    });
-
-    if (res.status === 403) {
-      showSigninError('This account does not have admin access to AC Pathfinder. Contact the system administrator.');
-      return;
-    }
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-
-    userEmail = email;
-    document.getElementById('userName').textContent = payload.name || email;
-    if (payload.picture) {
-      const av = document.getElementById('userAvatar');
-      av.src = payload.picture; av.style.display = '';
-    }
-
-    // Show the app
-    document.getElementById('signInScreen').style.display = 'none';
-    document.getElementById('appShell').style.display = 'flex';
-
-    // Load initial data
-    const stats = await res.json();
-    renderStats(stats);
-    loadOverview();
-    loadConfig();
-
+    if (!payload.email) throw new Error('No email in credential');
+    await completeSignIn(payload.email, payload.name, payload.picture, response.credential);
   } catch(e) {
     showSigninError('Sign-in failed: ' + e.message);
   }
@@ -586,6 +613,17 @@ function showSigninError(msg) {
   const el = document.getElementById('signin-error');
   el.textContent = msg; el.style.display = 'block';
 }
+
+/* ── AUTO SIGN-IN FROM SESSION ─────────────────────────── */
+window.addEventListener('load', () => {
+  const saved = loadSavedCredential();
+  if (saved) {
+    completeSignIn(saved.email, saved.name, saved.picture, null).catch(e => {
+      console.warn('Session restore failed:', e.message);
+      clearCredential();
+    });
+  }
+});
 
 /* ── AUTH HEADER ───────────────────────────────────────── */
 function authHeaders() {
