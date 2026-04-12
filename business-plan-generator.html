@@ -472,17 +472,36 @@ const S = {
 /* Settings removed — prompt config managed server-side via admin panel */
 
 /* ── GOOGLE OAUTH ─────────────────────────────────────────────────── */
-/* ── SESSION AUTH (shared with pathfinder, admin, coach-dashboard) ────── */
-const SESSION_CRED_KEY = 'ac_pathfinder_credential';
-function saveCredential(c)  { try { sessionStorage.setItem(SESSION_CRED_KEY, c); } catch(_) {} }
-function clearCredential()  { try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {} }
-function loadSavedCredential() {
+/* ── SHARED SESSION AUTH ────────────────────────────────────────────
+   Uses localStorage so sign-in persists across tabs and page refreshes.
+   8-hour expiry — reasonable for a work day.
+   Same key on every page so signing in anywhere covers all pages.
+   ────────────────────────────────────────────────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
+
+function saveSession(email, name, picture) {
   try {
-    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
+      email, name, picture,
+      exp: Date.now() + 8 * 60 * 60 * 1000
+    }));
+  } catch(_) {}
+}
+
+function clearSession() {
+  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
     if (!raw) return null;
-    const p = JSON.parse(atob(raw.split('.')[1]));
-    if (p.exp && p.exp * 1000 < Date.now()) { sessionStorage.removeItem(SESSION_CRED_KEY); return null; }
-    return p;
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) {
+      localStorage.removeItem(AC_SESSION_KEY);
+      return null;
+    }
+    return s;
   } catch(_) { return null; }
 }
 
@@ -496,7 +515,13 @@ function initOAuth() {
       S.accessToken = res.access_token;
       try {
         const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${S.accessToken}` } });
-        if (userRes.ok) { const u = await userRes.json(); if (u.email) await loadAgentProfile(u.email); }
+        if (userRes.ok) {
+          const u = await userRes.json();
+          if (u.email) {
+            saveSession(u.email, u.name, u.picture);
+            await loadAgentProfile(u.email);
+          }
+        }
       } catch(e) {}
       if (S.pendingAction === 'email') doEmail();
       if (S.pendingAction === 'docs')  doDocs();
@@ -507,13 +532,15 @@ function initOAuth() {
     google.accounts.id.initialize({
       client_id: OAUTH_CLIENT,
       callback: async (cr) => {
-        saveCredential(cr.credential);
         const p = JSON.parse(atob(cr.credential.split('.')[1]));
-        if (p.email) await loadAgentProfile(p.email);
+        if (p.email) {
+          saveSession(p.email, p.given_name || p.name, p.picture);
+          await loadAgentProfile(p.email);
+        }
       }
     });
-    // Check session before prompting Google
-    const saved = loadSavedCredential();
+    // Check localStorage session before prompting Google
+    const saved = loadSession();
     if (saved) {
       loadAgentProfile(saved.email);
     } else {

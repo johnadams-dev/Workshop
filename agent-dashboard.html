@@ -746,17 +746,36 @@ const poll = setInterval(() => {
   if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
 }, 100);
 
-/* ── SESSION AUTH (shared with all Pathfinder pages) ─── */
-const SESSION_CRED_KEY = 'ac_pathfinder_credential';
-function saveCredential(c)  { try { sessionStorage.setItem(SESSION_CRED_KEY, c); } catch(_) {} }
-function clearCredential()  { try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {} }
-function loadSavedCredential() {
+/* ── SHARED SESSION AUTH ────────────────────────────────────────────
+   Uses localStorage so sign-in persists across tabs and page refreshes.
+   8-hour expiry — reasonable for a work day.
+   Same key on every page so signing in anywhere covers all pages.
+   ────────────────────────────────────────────────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
+
+function saveSession(email, name, picture) {
   try {
-    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
+      email, name, picture,
+      exp: Date.now() + 8 * 60 * 60 * 1000
+    }));
+  } catch(_) {}
+}
+
+function clearSession() {
+  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
     if (!raw) return null;
-    const p = JSON.parse(atob(raw.split('.')[1]));
-    if (p.exp && p.exp * 1000 < Date.now()) { sessionStorage.removeItem(SESSION_CRED_KEY); return null; }
-    return p;
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) {
+      localStorage.removeItem(AC_SESSION_KEY);
+      return null;
+    }
+    return s;
   } catch(_) { return null; }
 }
 
@@ -777,16 +796,16 @@ function initOAuth() {
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
     callback: (resp) => {
-      saveCredential(resp.credential);
       const p = JSON.parse(atob(resp.credential.split('.')[1]));
+      saveSession(p.email, p.given_name || p.name, p.picture);
       onSignedIn(p.email, p.given_name || p.name, p.picture);
     },
     auto_select: true,
   });
-  // Check sessionStorage before showing Google prompt
-  const saved = loadSavedCredential();
+  // Check localStorage session before showing Google prompt
+  const saved = loadSession();
   if (saved) {
-    onSignedIn(saved.email, saved.given_name || saved.name, saved.picture);
+    onSignedIn(saved.email, saved.name, null);
   } else {
     google.accounts.id.prompt();
   }
