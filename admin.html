@@ -542,32 +542,41 @@ let userEmail = null;
 let allAgents = [];
 let currentTab = 'overview';
 
-/* ── SHARED SESSION AUTH ───────────────────────────────── */
-const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+/* ── SHARED SESSION AUTH ────────────────────────────────────────────
+   Uses localStorage so sign-in persists across tabs and page refreshes.
+   8-hour expiry — reasonable for a work day.
+   Same key on every page so signing in anywhere covers all pages.
+   ────────────────────────────────────────────────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
 
-function saveCredential(credentialJwt) {
-  try { sessionStorage.setItem(SESSION_CRED_KEY, credentialJwt); } catch(_) {}
-}
-
-function clearCredential() {
-  try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {}
-}
-
-function loadSavedCredential() {
+function saveSession(email, name, picture) {
   try {
-    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
+      email, name, picture,
+      exp: Date.now() + 8 * 60 * 60 * 1000
+    }));
+  } catch(_) {}
+}
+
+function clearSession() {
+  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
     if (!raw) return null;
-    const payload = JSON.parse(atob(raw.split('.')[1]));
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      sessionStorage.removeItem(SESSION_CRED_KEY);
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) {
+      localStorage.removeItem(AC_SESSION_KEY);
       return null;
     }
-    return payload;
+    return s;
   } catch(_) { return null; }
 }
 
 /* ── GOOGLE SIGN-IN ────────────────────────────────────── */
-async function completeSignIn(email, name, picture, credentialJwt) {
+async function completeSignIn(email, name, picture) {
   // Verify admin access
   const res = await fetch(`${PROXY_BASE}/admin/stats`, {
     headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
@@ -575,13 +584,13 @@ async function completeSignIn(email, name, picture, credentialJwt) {
 
   if (res.status === 403) {
     showSigninError('This account does not have admin access to AC Pathfinder.');
-    clearCredential();
+    clearSession();
     return;
   }
   if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
-  // Save credential for other pages
-  if (credentialJwt) saveCredential(credentialJwt);
+  // Save session for all pages (localStorage, 8h expiry)
+  saveSession(email, name, picture);
 
   userEmail = email;
   document.getElementById('userName').textContent = name || email;
@@ -603,7 +612,8 @@ async function handleGoogleCredential(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     if (!payload.email) throw new Error('No email in credential');
-    await completeSignIn(payload.email, payload.name, payload.picture, response.credential);
+    saveSession(payload.email, payload.name, payload.picture);
+    await completeSignIn(payload.email, payload.name, payload.picture);
   } catch(e) {
     showSigninError('Sign-in failed: ' + e.message);
   }
@@ -620,7 +630,7 @@ window.addEventListener('load', () => {
   if (saved) {
     completeSignIn(saved.email, saved.name, saved.picture, null).catch(e => {
       console.warn('Session restore failed:', e.message);
-      clearCredential();
+      clearSession();
     });
   }
 });

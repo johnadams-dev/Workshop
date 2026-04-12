@@ -897,33 +897,38 @@ const S = {
 };
 
 // ── Shared session auth ────────────────────────────────────────────────────────
-// Credential is stored in sessionStorage so other pages (admin, etc.) can
-// skip the Google sign-in prompt if the user is already authenticated.
-const SESSION_CRED_KEY = 'ac_pathfinder_credential';
+/* ── SHARED SESSION AUTH ────────────────────────────────────────────
+   Uses localStorage so sign-in persists across tabs and page refreshes.
+   8-hour expiry — reasonable for a work day.
+   Same key on every page so signing in anywhere covers all pages.
+   ────────────────────────────────────────────────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
 
-function saveCredential(credentialJwt) {
-  try { sessionStorage.setItem(SESSION_CRED_KEY, credentialJwt); } catch(_) {}
-}
-
-function clearCredential() {
-  try { sessionStorage.removeItem(SESSION_CRED_KEY); } catch(_) {}
-}
-
-function loadSavedCredential() {
-  // Returns decoded payload if a valid, unexpired credential exists; null otherwise
+function saveSession(email, name, picture) {
   try {
-    const raw = sessionStorage.getItem(SESSION_CRED_KEY);
+    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
+      email, name, picture,
+      exp: Date.now() + 8 * 60 * 60 * 1000
+    }));
+  } catch(_) {}
+}
+
+function clearSession() {
+  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
     if (!raw) return null;
-    const payload = JSON.parse(atob(raw.split('.')[1]));
-    // Check expiry (exp is Unix seconds)
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      sessionStorage.removeItem(SESSION_CRED_KEY);
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) {
+      localStorage.removeItem(AC_SESSION_KEY);
       return null;
     }
-    return payload;
+    return s;
   } catch(_) { return null; }
 }
-
 // ── Google Auth ────────────────────────────────────────────────────────────────
 let tokenClient;
 const poll = setInterval(() => {
@@ -941,6 +946,7 @@ function initOAuth() {
       });
       const user = await userRes.json();
       S.user = { email: user.email, name: user.given_name || user.name, picture: user.picture };
+      saveSession(S.user.email, S.user.name, S.user.picture);
       onSignedIn();
     }
   });
@@ -951,10 +957,10 @@ function initOAuth() {
     auto_select: true,
   });
 
-  // Check for existing session before prompting Google
-  const saved = loadSavedCredential();
+  // Check localStorage session before prompting Google
+  const saved = loadSession();
   if (saved) {
-    S.user = { email: saved.email, name: saved.given_name || saved.name, picture: saved.picture };
+    S.user = { email: saved.email, name: saved.name, picture: saved.picture };
     onSignedIn();
   } else {
     google.accounts.id.prompt();
@@ -974,7 +980,7 @@ function startSignIn() {
 
 function signOut() {
   google.accounts.id.disableAutoSelect();
-  clearCredential();
+  clearSession();
   S.user = null;
   S.agentProfile = null;
   document.getElementById('userChip').style.display = 'none';
