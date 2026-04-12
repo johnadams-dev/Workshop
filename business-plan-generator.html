@@ -382,7 +382,14 @@
   <!-- INFOGRAPHIC -->
   <div id="infographicCard" style="display:none;margin-top:1.5rem">
     <div class="card">
-      <div class="card-head"><div class="section-tag">Visual Summary</div><div class="section-title">Roadmap to Success</div><div class="section-desc">Key activities and milestones that will drive your results over the next 12 months.</div></div>
+      <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+        <div>
+          <div class="section-tag">One-Page Summary</div>
+          <div class="section-title">Your Business Plan Infographic</div>
+          <div class="section-desc">A printable visual summary of your plan — goals, strategy, and weekly commitments on one page.</div>
+        </div>
+        <button class="btn btn-subtle" onclick="printInfographic()" style="flex-shrink:0">🖨️ Print</button>
+      </div>
       <div style="padding:1.5rem 2rem" id="infographicContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your infographic…</div></div></div>
     </div>
   </div>
@@ -457,7 +464,7 @@ const S = {
   step: 1, plan: '', planHtml: '', data: {},
   accessToken: null, tokenClient: null, pendingAction: null,
   config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
-  deskCardHtml: '', agentProfile: null, userEmail: null,
+  deskCardHtml: '', infographicHtml: '', agentProfile: null, userEmail: null,
   planId: null, enrollmentId: null, coaches: [],
   strategies: [], selectedStrategies: [], suggestedStrategies: [],
 };
@@ -672,49 +679,121 @@ function md2html(src) {
 // srcdoc triggers the load event before content is written in some browsers,
 // causing height measurement to return 0 and the playbook to appear blank.
 function renderInIframe(containerId, html, theme = 'dark') {
-  // Render directly into a div — avoids all iframe height/CSP issues
-  // that were causing the Weekly Playbook to appear blank.
+  // Use iframe to keep desk card / infographic CSS isolated from the main page.
+  // Fixed minimum height prevents blank rendering if dynamic resize fails.
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'width:100%;overflow:auto;border-radius:8px;background:' +
-    (theme === 'dark' ? '#0c0f16' : '#fff') + ';';
+  const iframe = document.createElement('iframe');
+  // Both light-theme outputs (infographic + desk card) are one-page letter format
+  const minH = theme === 'light' ? 1100 : 800;
+  iframe.style.cssText = `width:100%;border:none;display:block;height:${minH}px;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
+  iframe.setAttribute('scrolling', 'no');
+  container.appendChild(iframe);
 
-  // Extract <style> blocks and scope them
-  const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
-  if (styleMatches.length) {
-    const styleEl = document.createElement('style');
-    styleEl.textContent = styleMatches.map(m => m[1])
-      .join('\n')
-      .replace(/@media\s+print[\s\S]*?(?=@|$)/g, ''); // strip print rules
-    wrapper.appendChild(styleEl);
-  }
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
 
-  // Extract <body> content (or use full html if no body tag)
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  const content = document.createElement('div');
-  content.style.cssText = 'padding:1rem';
-  content.innerHTML = bodyMatch ? bodyMatch[1] : html;
-  wrapper.appendChild(content);
-  container.appendChild(wrapper);
+  // Try to auto-size to actual content height; min-height is the fallback
+  const resize = () => {
+    try {
+      const h = Math.max(
+        iframe.contentDocument.body.scrollHeight,
+        iframe.contentDocument.documentElement.scrollHeight
+      );
+      if (h > minH) iframe.style.height = h + 'px';
+    } catch(e) {}
+  };
+  setTimeout(resize, 400);
+  setTimeout(resize, 1200);
+  setTimeout(resize, 3000);
 }
 
 /* ── INFOGRAPHIC ──────────────────────────────────────────────────── */
 async function generateInfographic() {
   const d = S.data;
-  const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) showing a "Roadmap to Success" visual for a real estate agent. Dark navy (#0c1524) background, gold (#c4a84f) accents, white text. Vertical timeline with 5 phases: Foundation, Lead Generation, Momentum, Closing, Scale. Each phase has emoji icon, heading, 2-3 bullet activities. Top shows key numbers, bottom shows their "Why" as motivational quote.
-Agent: Name: ${d.name} | Market: ${d.market||'Florida'} | Why: ${d.why} | Goal: ${d.earn} | Avg Price: ${d.price} | SOI: ${d.soi} | Hrs/wk: ${d.time} | Mix: ${d.list}
-Output complete HTML only. No explanation or markdown fences.`;
+
+  // Calculate the key numbers to bake into the prompt
+  const earnNum  = parseFloat((d.earn  || '0').replace(/[^0-9.]/g, '')) || 0;
+  const priceNum = parseFloat((d.price || '0').replace(/[^0-9.]/g, '')) || 0;
+  const gci       = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
+  const sides     = (gci > 0 && priceNum > 0) ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+  const listPct   = parseInt(d.list) / 100 || 0.5;
+  const listSides = Math.ceil(sides * listPct);
+  const buyeSides = sides - listSides;
+  const listAppts = Math.ceil((listSides / 12) / 0.8);
+  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
+  const hoursNum  = parseInt(d.time) || 0;
+  const soiCalls  = Math.max(5, Math.round(hoursNum * 0.5));
+  const posts     = Math.max(3, Math.round(hoursNum * 0.15));
+  const floor     = Math.max(2, Math.round(hoursNum * 0.15));
+  const fmt = n => n > 0 ? '$' + n.toLocaleString() : '—';
+
+  const prompt = `You are a professional graphic designer creating a one-page printable business plan infographic for a real estate agent. Generate a complete HTML page (<!DOCTYPE html> through </html>).
+
+DESIGN REQUIREMENTS:
+- White background (#ffffff), navy (#0c1524) headers, gold (#c4a84f) accents
+- Clean, professional, modern — suitable for printing and framing at a desk
+- Must fit on one US letter page when printed (include @media print CSS with @page { margin: 0.4in; size: letter portrait; })
+- Use a grid/column layout — NOT a vertical timeline
+- Font: use system fonts (Georgia for headings, Arial/sans-serif for body)
+- NO external font imports, NO external image URLs
+
+PAGE STRUCTURE (4 sections in a 2x2 or stacked grid):
+
+1. HEADER (full width, navy background):
+   Agent name in large gold serif text | "12-Month Business Plan" subtitle
+   Office: ${d.office} | Market: ${d.market || 'Volusia County'}
+
+2. THE NUMBERS (2 columns, compact):
+   Left column — Revenue Targets:
+   • Annual Goal: ${d.earn}
+   • GCI Required: ${fmt(gci)}
+   • Total Sides Needed: ${sides}
+   • Listing Appts/Month: ${listAppts}
+   • Buyer Prospects/Month: ${buyProsp}
+   Right column — Weekly Activity Plan:
+   • Hours committed: ${hoursNum} hrs/week
+   • SOI contacts: ${soiCalls}/week
+   • Social posts: ${posts}/week
+   • Floor time: ${floor} hrs/week
+   • Business mix: ${d.list}
+
+3. MY WHY (gold accent box, full width or left column):
+   Large italic serif quote of their why statement: "${d.why}"
+
+4. MY STRATEGY (right column or full width):
+   Based on the agent's profile, list 3-4 specific lead generation strategies as bold headers with one-line descriptions. Reference AC Social, floor time, and SOI outreach. Tailor to their experience (${d.exp}) and budget (${d.budget}).
+
+5. FOOTER (full width, dark):
+   "Adams, Cameron & Co. | What gets measured gets managed. | ${new Date().getFullYear()}"
+
+IMPORTANT: The pre-calculated numbers above are final — use them exactly as provided. Output complete HTML only, no markdown fences, no explanation.`;
+
   try {
     const html = await geminiCall(prompt, 8192);
     const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
-    if (!clean) throw new Error('Empty response');
-    renderInIframe('infographicContent', clean, 'dark');
+    if (!clean || clean.length < 500) throw new Error('Response too short');
+    S.infographicHtml = clean;
+    renderInIframe('infographicContent', clean, 'light');
   } catch (e) {
-    document.getElementById('infographicContent').innerHTML = `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>Infographic failed:</strong><br>${e.message}</div>`;
+    document.getElementById('infographicContent').innerHTML =
+      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>Infographic failed:</strong><br>${e.message}</div>`;
   }
 }
+
+function printInfographic() {
+  if (!S.infographicHtml) { toast('Infographic is still generating — try again in a moment.', 'err'); return; }
+  const win = window.open('', '_blank');
+  win.document.write(S.infographicHtml);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+
 
 /* ── WEEKLY PLAYBOOK ──────────────────────────────────────────────── */
 async function generateDeskCard() {
@@ -858,7 +937,7 @@ function buildEmailHtml(note) {
 
 /* ── RESET ────────────────────────────────────────────────────────── */
 function doReset() {
-  S.plan = ''; S.planHtml = ''; S.data = {}; S.deskCardHtml = '';
+  S.plan = ''; S.planHtml = ''; S.data = {}; S.deskCardHtml = ''; S.infographicHtml = '';
   S.strategies = []; S.selectedStrategies = []; S.suggestedStrategies = [];
   S.planId = null; S.enrollmentId = null;
   document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea').forEach(el => el.value = '');
@@ -1150,7 +1229,7 @@ async function doEnroll() {
       soiNotes:document.getElementById('f_soi_note').value.trim(), expNotes:document.getElementById('f_exp_note').value.trim(),
       gciRequired:gci, sidesRequired:sides, listingSides:listSides, buyerSides:buyeSides,
       listingApptsMonthly:Math.ceil((listSides/12)/0.8), buyerProspectsMonthly:Math.ceil((buyeSides/12)*3),
-      planText:S.plan, planHtml:S.planHtml, infographicHtml:null, deskcardHtml:S.deskCardHtml||null,
+      planText:S.plan, planHtml:S.planHtml, infographicHtml:S.infographicHtml||null, deskcardHtml:S.deskCardHtml||null,
     };
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
       method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY,'x-user-email':S.userEmail||S.data.email||''},
