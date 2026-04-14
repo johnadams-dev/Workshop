@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FS API Test Tool</title>
+  <style>
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 24px; }
+    h2 { color: #c9a84c; }
+    input, textarea { background: #2d2d2d; border: 1px solid #555; color: #d4d4d4; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+    button { background: #c9a84c; color: #1e1e1e; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 8px; margin-bottom: 8px; }
+    button:hover { background: #e0b85c; }
+    pre { background: #2d2d2d; border: 1px solid #555; padding: 16px; border-radius: 4px; overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: 400px; margin-top: 12px; }
+    label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+    .section { margin-bottom: 24px; border: 1px solid #444; padding: 16px; border-radius: 8px; }
+    .ok { color: #4ec9b0; }
+    .err { color: #f48771; }
+  </style>
+</head>
+<body>
+  <h2>🔧 Form Simplicity API Test Tool</h2>
+  <p style="color:#888; margin-bottom:24px;">Deploy this alongside ACC Binder and open it at <code>/FSTest.html</code> to test FS endpoints directly.</p>
+
+  <div class="section">
+    <h3 style="color:#c9a84c; margin-top:0">Config</h3>
+    <label>Proxy Base URL</label>
+    <input id="base" value="https://accbinder-921b8.web.app/api/fs" />
+    <label>Transaction ID (from your FS account)</label>
+    <input id="transId" value="3mz07jr1P8" />
+  </div>
+
+  <div class="section">
+    <h3 style="color:#c9a84c; margin-top:0">1. List Files in Transaction</h3>
+    <p style="color:#888; font-size:13px">Lists all files already in this transaction — gives us fileID values for the download test.</p>
+    <button onclick="listFiles()">List Files</button>
+    <pre id="listResult">— click to run —</pre>
+  </div>
+
+  <div class="section">
+    <h3 style="color:#c9a84c; margin-top:0">2. Download File</h3>
+    <p style="color:#888; font-size:13px">Pass a fileID from the list above. Tells us the file_url format FS uses.</p>
+    <label>File ID (optional — leave blank to download all)</label>
+    <input id="fileId" placeholder="e.g. 12345" />
+    <button onclick="downloadFile()">Download File</button>
+    <pre id="downloadResult">— click to run —</pre>
+  </div>
+
+  <div class="section">
+    <h3 style="color:#c9a84c; margin-top:0">3. Upload Test (Minimal)</h3>
+    <p style="color:#888; font-size:13px">Upload a small test PDF with only the required fields to isolate the Oracle bind error.</p>
+    <label>Select a PDF to upload</label>
+    <input type="file" id="testFile" accept=".pdf" />
+    <br>
+    <label>Description</label>
+    <input id="uploadDesc" value="ACC Binder Test Upload" />
+    <label>Upload Format to Test</label>
+    <select id="uploadFormat" style="background:#2d2d2d;border:1px solid #555;color:#d4d4d4;padding:8px;border-radius:4px;width:100%;margin-bottom:8px;">
+      <option value="b64_filename">A: file_name=base64, all fields</option>
+      <option value="b64_minimal">B: file_name=base64, minimal (no optional fields)</option>
+      <option value="b64_file">C: file_name=filename string, file=base64</option>
+      <option value="b64_no_pages">D: file_name=base64, no no_of_pages</option>
+      <option value="url">E: file_name=public URL (no file upload needed)</option>
+    </select>
+    <label>Public File URL (for Format E)</label>
+    <input id="fileUrl" value="https://johnadams.org/FSTestFileOrmondBeachHOA.pdf" />
+    <button onclick="testUpload()">Test Upload</button>
+    <pre id="uploadResult">— select a PDF and click to run —</pre>
+  </div>
+
+  <script>
+    const base = () => document.getElementById("base").value.replace(/\/$/, "");
+    const transId = () => document.getElementById("transId").value;
+
+    async function call(endpoint, body, resultId) {
+      const el = document.getElementById(resultId);
+      el.textContent = "Loading...";
+      el.className = "";
+      try {
+        const resp = await fetch(`${base()}${endpoint}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const text = await resp.text();
+        let display;
+        try {
+          display = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          display = text;
+        }
+        el.textContent = `HTTP ${resp.status}\n\n${display}`;
+        el.className = resp.ok ? "ok" : "err";
+      } catch (err) {
+        el.textContent = "Error: " + err.message;
+        el.className = "err";
+      }
+    }
+
+    function listFiles() {
+      call("/listFiles", { transId: transId() }, "listResult");
+    }
+
+    function downloadFile() {
+      const fileId = document.getElementById("fileId").value.trim();
+      const filter = fileId ? `fileID=<${fileId}>` : undefined;
+      call("/downloadfiles", { transId: transId(), filter }, "downloadResult");
+    }
+
+    async function testUpload() {
+      const el = document.getElementById("uploadResult");
+      const fileInput = document.getElementById("testFile");
+      const desc = document.getElementById("uploadDesc").value;
+      const format = document.getElementById("uploadFormat").value;
+
+      el.textContent = "Uploading...";
+      el.className = "";
+
+      // Format E uses a URL — no file needed
+      let b64 = null;
+      if (format !== "url") {
+        if (!fileInput.files[0]) {
+          el.textContent = "Please select a PDF first (not needed for Format E).";
+          el.className = "err";
+          return;
+        }
+        const file = fileInput.files[0];
+        b64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
+
+      // Try different upload formats to find what FS actually expects
+      let body;
+      if (format === "b64_filename") {
+        // Format A: file_name = base64, all fields
+        body = { transId: transId(), file_name: b64, description: desc, sender: "Adams, Cameron & Co.", no_of_pages: "1" };
+      } else if (format === "b64_minimal") {
+        // Format B: only userId + transId + file_name (no optional fields)
+        body = { transId: transId(), file_name: b64 };
+      } else if (format === "b64_file") {
+        // Format C: file_name = actual filename, file = base64 content
+        body = { transId: transId(), file_name: "document.pdf", file: b64, description: desc };
+      } else if (format === "b64_no_pages") {
+        // Format D: no no_of_pages field
+        body = { transId: transId(), file_name: b64, description: desc, sender: "Adams, Cameron & Co." };
+      } else if (format === "url") {
+        // Format E: file_name = public URL — FS fetches the file themselves
+        const url = document.getElementById("fileUrl").value.trim();
+        body = { transId: transId(), file_name: url, description: desc, sender: "Adams, Cameron & Co.", no_of_pages: "1" };
+      }
+
+      try {
+        const resp = await fetch(`${base()}/uploadfiles`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const text = await resp.text();
+        let display;
+        try {
+          display = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          display = text;
+        }
+        el.textContent = `HTTP ${resp.status}\n\n${display}`;
+        el.className = resp.ok ? "ok" : "err";
+      } catch (err) {
+        el.textContent = "Error: " + err.message;
+        el.className = "err";
+      }
+    }
+  </script>
+</body>
+</html>
