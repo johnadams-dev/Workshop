@@ -421,6 +421,32 @@
     </div>
   </div>
 
+  <!-- COMMITMENTS REVIEW -->
+  <div id="commitmentsCard" style="display:none;margin-top:1.5rem">
+    <div class="card">
+      <div class="card-head">
+        <div class="section-tag">Your Commitments</div>
+        <div class="section-title">Review & Adjust Your Weekly Targets</div>
+        <div class="section-desc">These activity targets are what your coaching will be built around. We've pre-filled them based on your plan — adjust anything that doesn't fit your reality. You can also update these later from your dashboard.</div>
+      </div>
+      <div class="card-body">
+        <div id="commitmentsBody"></div>
+        <div id="commitmentsWarning" style="display:none;background:rgba(220,150,50,0.08);border:1px solid rgba(220,150,50,0.35);border-radius:10px;padding:1.1rem 1.25rem;margin-top:1.5rem">
+          <div style="font-size:0.9rem;font-weight:700;color:#c8882a;margin-bottom:0.35rem">⚠️ Heads up — your targets may not support your goal</div>
+          <div id="commitmentsWarningText" style="font-size:0.83rem;color:var(--text2);line-height:1.65"></div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="revisitBusinessPlan()">← Revisit My Business Plan</button>
+            <button class="btn btn-primary btn-sm" id="commitWarningContinueBtn" onclick="saveCommitmentsAndContinue()">Continue With These Targets →</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-foot" id="commitmentsFooter">
+        <div style="font-size:0.75rem;color:var(--text3)">Adjustable anytime from your agent dashboard</div>
+        <button class="btn btn-primary" id="commitmentsConfirmBtn" onclick="checkAndSaveCommitments()">These Look Good →</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ENROLLMENT CTA -->
   <div id="enrollmentCard" style="display:none;margin-top:1.5rem">
     <div class="card">
@@ -982,13 +1008,18 @@ function toast(msg, cls='') {
 /* ── INIT ─────────────────────────────────────────────────────────── */
 window.addEventListener('load', async () => {
   try {
-    const res = await fetch(CONFIG_URL);
+    const res = await fetch(CONFIG_URL, { mode: 'cors', cache: 'no-store' });
     if (res.ok) {
       const r = await res.json();
-      if (r.prompt)  S.config.prompt  = r.prompt;
-      if (r.context) S.config.context = r.context;
+      if (r.prompt)  { S.config.prompt  = r.prompt;  }
+      if (r.context) { S.config.context = r.context; }
     }
-  } catch(e) { console.warn('[Config] Could not load server config — using built-in defaults.'); }
+    // Silence is success — no log needed whether config is custom or default
+  } catch(e) {
+    // Network or CORS issue — built-in prompt and context will be used.
+    // Not critical: the BPG works fully with its built-in defaults.
+    console.log('[Config] Using built-in defaults.');
+  }
   const poll = setInterval(() => { if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); } }, 200);
 });
 
@@ -1215,17 +1246,163 @@ function toggleStrategy(slug) {
 async function confirmStrategies() {
   if (!S.selectedStrategies.length) { document.getElementById('strategyError').textContent = 'Please select at least one strategy.'; document.getElementById('strategyError').style.display = 'block'; return; }
   if (!S.selectedStrategies.some(s => s.isPrimary)) { document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.'; document.getElementById('strategyError').style.display = 'block'; return; }
-  const btn = document.getElementById('strategyConfirmBtn'); btn.textContent = '⏳ Saving…'; btn.disabled = true;
+  document.getElementById('strategyCard').style.display = 'none';
+  showCommitmentsCard();
+}
+
+/* ── COMMITMENTS ──────────────────────────────────────────────────── */
+function showCommitmentsCard() {
+  const body = document.getElementById('commitmentsBody');
+  document.getElementById('commitmentsWarning').style.display = 'none';
+  document.getElementById('commitmentsFooter').style.display = 'flex';
+
+  if (!S.selectedStrategies.length) { showEnrollmentCard(); return; }
+
+  // Flatten AI-suggested commitments for quick lookup
+  const suggested = S.suggestedStrategies?.commitments || {};
+
+  body.innerHTML = S.selectedStrategies.map((sel, si) => {
+    const strat = S.strategies.find(s => s.slug === sel.slug);
+    if (!strat) return '';
+    const activities = Array.isArray(strat.activities) ? strat.activities : [];
+    if (!activities.length) return '';
+
+    const actInputs = activities.map(act => {
+      // Agent's saved value → AI suggestion → activity default
+      const current = sel.commitments?.[act.slug] ?? suggested[act.slug] ?? act.default_weekly_target ?? 0;
+      const period = act.is_monthly_target ? 'per month' : 'per week';
+      const unit = act.unit || '';
+      const aiVal = suggested[act.slug] ?? act.default_weekly_target ?? 0;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.75rem 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text)">${act.label}</div>
+            ${act.hint ? `<div style="font-size:0.75rem;color:var(--text3);margin-top:0.15rem">${act.hint}</div>` : ''}
+            <div style="font-size:0.72rem;color:var(--text3);margin-top:0.1rem">AI suggested: <strong>${aiVal} ${unit}</strong> ${period}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0">
+            <input type="number" min="0" max="999" step="1"
+              id="commit_${si}_${act.slug}"
+              data-strategy="${si}"
+              data-activity="${act.slug}"
+              data-suggested="${aiVal}"
+              data-monthly="${act.is_monthly_target ? '1' : '0'}"
+              value="${current}"
+              style="width:70px;padding:0.4rem 0.5rem;text-align:center;font-size:0.95rem;font-weight:600;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);outline:none"
+              oninput="onCommitmentInput(this)">
+            <span style="font-size:0.75rem;color:var(--text3);min-width:60px">${unit} ${period}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    if (!actInputs.trim()) return '';
+
+    return `
+      <div style="margin-bottom:1.5rem">
+        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem">
+          <span style="font-size:1.25rem">${strat.icon || '📋'}</span>
+          <div>
+            <span style="font-size:0.9rem;font-weight:700;color:var(--text)">${strat.name}</span>
+            ${sel.isPrimary ? '<span style="margin-left:0.5rem;font-size:0.68rem;font-weight:600;color:var(--gold);text-transform:uppercase;letter-spacing:0.07em">Primary</span>' : ''}
+          </div>
+        </div>
+        ${actInputs}
+      </div>`;
+  }).join('');
+
+  if (!body.innerHTML.trim()) {
+    // No activities defined yet — skip straight to enrollment
+    showEnrollmentCard();
+    return;
+  }
+
+  document.getElementById('commitmentsCard').style.display = 'block';
+  setTimeout(() => document.getElementById('commitmentsCard').scrollIntoView({behavior:'smooth',block:'start'}), 300);
+}
+
+function onCommitmentInput(input) {
+  // Hide warning if they're actively editing
+  document.getElementById('commitmentsWarning').style.display = 'none';
+  document.getElementById('commitmentsFooter').style.display = 'flex';
+}
+
+function checkAndSaveCommitments() {
+  // Gather all current input values
+  const inputs = document.querySelectorAll('#commitmentsBody input[type=number]');
+  let lowTargets = [];
+
+  inputs.forEach(inp => {
+    const val = parseFloat(inp.value) || 0;
+    const suggested = parseFloat(inp.dataset.suggested) || 0;
+    const label = inp.closest('div[style*="border-bottom"]')?.querySelector('.font-weight-600')?.textContent
+      || inp.id.split('_').slice(2).join(' ');
+    // Warn if they've dropped more than 50% below the AI suggestion
+    if (suggested > 0 && val < suggested * 0.5) {
+      lowTargets.push(`• ${inp.closest('div[style*="border-bottom"]')?.querySelector('[style*="font-weight:600"]')?.textContent?.trim() || inp.dataset.activity}: set to ${val} vs suggested ${suggested}`);
+    }
+  });
+
+  if (lowTargets.length) {
+    const earningGoal = S.data.earn || 'your goal';
+    document.getElementById('commitmentsWarningText').innerHTML =
+      `Some of your targets are significantly below what your plan recommends to reach ${earningGoal}:<br><br>` +
+      lowTargets.join('<br>') +
+      `<br><br>You can continue with these targets or go back and revisit your business plan goals.`;
+    document.getElementById('commitmentsWarning').style.display = 'block';
+    document.getElementById('commitmentsFooter').style.display = 'none';
+    setTimeout(() => document.getElementById('commitmentsWarning').scrollIntoView({behavior:'smooth',block:'nearest'}), 200);
+  } else {
+    saveCommitmentsAndContinue();
+  }
+}
+
+async function saveCommitmentsAndContinue() {
+  const btn = document.getElementById('commitmentsConfirmBtn');
+  const btn2 = document.getElementById('commitWarningContinueBtn');
+  if (btn) { btn.textContent = '⏳ Saving…'; btn.disabled = true; }
+  if (btn2) { btn2.textContent = '⏳ Saving…'; btn2.disabled = true; }
+
+  // Read all inputs and update S.selectedStrategies commitments
+  const inputs = document.querySelectorAll('#commitmentsBody input[type=number]');
+  inputs.forEach(inp => {
+    const si = parseInt(inp.dataset.strategy);
+    const actSlug = inp.dataset.activity;
+    const val = parseFloat(inp.value) || 0;
+    if (S.selectedStrategies[si]) {
+      if (!S.selectedStrategies[si].commitments) S.selectedStrategies[si].commitments = {};
+      S.selectedStrategies[si].commitments[actSlug] = val;
+    }
+  });
+
+  // Save strategies with updated commitments
   try {
     const email = S.userEmail || S.data.email;
     if (email && S.planId) {
       const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, { headers: {'x-proxy-key':PROXY_KEY,'x-user-email':email} });
-      if (profileRes.ok) { const p = await profileRes.json(); if (p.found && p.id) await fetch(`${PROXY_BASE}/agent/${p.id}/strategies`, { method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY}, body:JSON.stringify({planId:S.planId,enrollmentId:S.enrollmentId,strategies:S.selectedStrategies}) }); }
+      if (profileRes.ok) {
+        const p = await profileRes.json();
+        if (p.found && p.id) {
+          await fetch(`${PROXY_BASE}/agent/${p.id}/strategies`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','x-proxy-key':PROXY_KEY},
+            body: JSON.stringify({planId:S.planId, enrollmentId:S.enrollmentId, strategies:S.selectedStrategies})
+          });
+        }
+      }
     }
-  } catch(e) { console.warn('[Strategies] Save failed:', e.message); }
-  document.getElementById('strategyCard').style.display = 'none';
-  btn.textContent = 'Confirm My Strategy →'; btn.disabled = false;
+  } catch(e) { console.warn('[Commitments] Save failed:', e.message); }
+
+  document.getElementById('commitmentsCard').style.display = 'none';
+  if (btn) { btn.textContent = 'These Look Good →'; btn.disabled = false; }
+  if (btn2) { btn2.textContent = 'Continue With These Targets →'; btn2.disabled = false; }
   showEnrollmentCard();
+}
+
+function revisitBusinessPlan() {
+  document.getElementById('commitmentsCard').style.display = 'none';
+  // Scroll back to the top and let them start over
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  toast('Take your time — your previous answers are still filled in below.', 'ok');
 }
 
 function showEnrollmentCard() {
