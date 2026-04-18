@@ -379,29 +379,18 @@
     </div>
   </div>
 
-  <!-- INFOGRAPHIC -->
-  <div id="infographicCard" style="display:none;margin-top:1.5rem">
+  <!-- ONE-PAGE PLAN -->
+  <div id="onePlanCard" style="display:none;margin-top:1.5rem">
     <div class="card">
       <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
         <div>
-          <div class="section-tag">One-Page Summary</div>
-          <div class="section-title">Your Business Plan Infographic</div>
-          <div class="section-desc">A printable visual summary of your plan — goals, strategy, and weekly commitments on one page.</div>
+          <div class="section-tag">Printable Reference</div>
+          <div class="section-title">Your One-Page Plan</div>
+          <div class="section-desc">A visual summary of your goals, strategy, and weekly commitments. Print it and put it somewhere you'll see it every day.</div>
         </div>
-        <button class="btn btn-subtle" onclick="printInfographic()" style="flex-shrink:0">🖨️ Print</button>
+        <button class="btn btn-subtle" onclick="printOnePlan()" style="flex-shrink:0">🖨️ Print</button>
       </div>
-      <div style="padding:1.5rem 2rem" id="infographicContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your infographic…</div></div></div>
-    </div>
-  </div>
-
-  <!-- WEEKLY PLAYBOOK -->
-  <div id="deskCard" style="display:none;margin-top:1.5rem">
-    <div class="card">
-      <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-        <div><div class="section-tag">Daily Reminder</div><div class="section-title">Your Weekly Playbook</div><div class="section-desc">Print this and put it somewhere you'll see it every day. One page. No excuses.</div></div>
-        <button class="btn btn-subtle" onclick="printDeskCard()" style="flex-shrink:0">🖨️ Print</button>
-      </div>
-      <div style="padding:1.5rem 2rem" id="deskCardContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your printable playbook…</div></div></div>
+      <div style="padding:1.5rem 2rem" id="onePlanContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your one-page plan…</div></div></div>
     </div>
   </div>
 
@@ -490,7 +479,7 @@ const S = {
   step: 1, plan: '', planHtml: '', data: {},
   accessToken: null, tokenClient: null, pendingAction: null,
   config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
-  deskCardHtml: '', infographicHtml: '', agentProfile: null, userEmail: null,
+  onePlanHtml: '', agentProfile: null, userEmail: null,
   planId: null, enrollmentId: null, coaches: [],
   strategies: [], selectedStrategies: [], suggestedStrategies: [],
 };
@@ -661,11 +650,11 @@ Incorporate: Global reach via LeadingRE, AC Social automated marketing, personal
 }
 
 /* ── GEMINI API ───────────────────────────────────────────────────── */
-async function geminiCall(prompt, maxTokens = 8192) {
+async function geminiCall(prompt, maxTokens = 8192, model = 'gemini-2.5-flash') {
   const res = await fetch(`${PROXY_BASE}/gemini`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
-    body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens } })
+    body: JSON.stringify({ model, contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens } })
   });
   if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error?.message || `HTTP ${res.status}`); }
   const data = await res.json();
@@ -686,10 +675,8 @@ async function generatePlan() {
     document.getElementById('planContent').innerHTML = S.planHtml;
     document.getElementById('resultsMeta').textContent = `${S.data.name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
     show('stepResult'); setProgress(99);
-    document.getElementById('infographicCard').style.display = 'block';
-    document.getElementById('deskCard').style.display = 'block';
-    generateInfographic().catch(e => console.error('[Infographic]', e));
-    generateDeskCard().catch(e => console.error('[DeskCard]', e));
+    // One-page plan generates after strategy confirmation
+    // One-page plan generates after strategy confirmation — nothing to fire here
     if (!S.enrollmentId) setTimeout(() => showGoalConfirmCard(), 1500);
   } catch (e) {
     show('step3'); setProgress(3);
@@ -765,14 +752,11 @@ function renderInIframe(containerId, html, theme = 'dark') {
 }
 
 /* ── INFOGRAPHIC ──────────────────────────────────────────────────── */
-async function generateInfographic() {
+async function generateOnePlan() {
   const d = S.data;
-
-  // Calculate the key numbers to bake into the prompt
   const earnNum  = parseFloat((d.earn  || '0').replace(/[^0-9.]/g, '')) || 0;
   const priceNum = parseFloat((d.price || '0').replace(/[^0-9.]/g, '')) || 0;
-  const gci       = earnNum > 0 ? Math.ceil(earnNum / 0.65) : 0;
-  const sides     = (gci > 0 && priceNum > 0) ? Math.ceil(gci / (priceNum * 0.03)) : 0;
+  const sides     = (earnNum > 0 && priceNum > 0) ? Math.ceil((earnNum / 0.65) / (priceNum * 0.03)) : 0;
   const listPct   = parseInt(d.list) / 100 || 0.5;
   const listSides = Math.ceil(sides * listPct);
   const buyeSides = sides - listSides;
@@ -780,132 +764,98 @@ async function generateInfographic() {
   const buyProsp  = Math.ceil((buyeSides / 12) * 3);
   const hoursNum  = parseInt(d.time) || 0;
   const soiCalls  = Math.max(5, Math.round(hoursNum * 0.5));
-  const posts     = Math.max(3, Math.round(hoursNum * 0.15));
-  const floor     = Math.max(2, Math.round(hoursNum * 0.15));
-  const fmt = n => n > 0 ? '$' + n.toLocaleString() : '—';
+  const socialPosts = Math.max(3, Math.round(hoursNum * 0.15));
+  const floorHrs  = Math.max(2, Math.round(hoursNum * 0.15));
+  const followUps = Math.max(5, Math.round(hoursNum * 0.4));
 
-  const prompt = `You are a professional graphic designer creating a one-page printable business plan infographic for a real estate agent. Generate a complete HTML page (<!DOCTYPE html> through </html>).
+  // Build strategy list from confirmed selections
+  const strategyLines = (S.selectedStrategies || []).map((sel, i) => {
+    const full = (S.strategies || []).find(s => s.slug === sel.slug);
+    const prefix = sel.isPrimary ? '★ PRIMARY' : `Supporting ${i}`;
+    return `${prefix}: ${full ? full.name : sel.slug}${full?.description ? ' — ' + full.description : ''}`;
+  }).join('\n') || 'Strategies not yet selected';
 
-DESIGN REQUIREMENTS:
-- White background (#ffffff), navy (#0c1524) headers, gold (#c4a84f) accents
-- Clean, professional, modern — suitable for printing and framing at a desk
-- Must fit on one US letter page when printed (include @media print CSS with @page { margin: 0.4in; size: letter portrait; })
-- Use a grid/column layout — NOT a vertical timeline
-- Font: use system fonts (Georgia for headings, Arial/sans-serif for body)
-- NO external font imports, NO external image URLs
+  const prompt = `You are a graphic designer creating a one-page printable business reference card for a real estate agent. Generate a complete HTML page (<!DOCTYPE html> through </html>).
 
-PAGE STRUCTURE (4 sections in a 2x2 or stacked grid):
+DESIGN PHILOSOPHY:
+- This is something the agent will print and pin to their wall or desk — make it worth keeping
+- Bold, graphic, visual — use large typography, strong color blocking, and decorative elements
+- White background (#ffffff), navy (#0c1524), gold (#c4a84f) — these are non-negotiable brand colors
+- Use CSS only — no external images, no external fonts (Georgia/serif for headings, system sans-serif for numbers)
+- Must fit one US letter page portrait when printed: include @page { margin: 0.35in; size: letter portrait; }
+- NO verbose paragraphs — every element should be a number, a label, an icon (unicode emoji ok), or a short phrase
 
-1. HEADER (full width, navy background):
-   Agent name: ${d.name} — display in large gold serif text | "12-Month Business Plan" subtitle
-   Office: ${d.office} | Market: ${d.market || 'Volusia County'}
+PAGE STRUCTURE:
 
-2. THE NUMBERS (2 columns, compact):
-   Left column — Revenue Targets:
-   • Annual Goal: ${d.earn}
-   • GCI Required: ${fmt(gci)}
-   • Total Sides Needed: ${sides}
+1. HEADER BAR (full width, navy background, gold text):
+   Large: ${d.name}
+   Small: Adams, Cameron & Co. · ${d.office || 'Volusia County'} · ${new Date().getFullYear()}
+
+2. NUMBERS GRID (2 or 3 columns, large bold numbers with labels below):
+   Use very large font size (3-4rem) for the numbers, small caps labels beneath.
+   Include ALL of these — design them as bold stat blocks:
+   • Transactions Needed: ${sides} sides
    • Listing Appts/Month: ${listAppts}
    • Buyer Prospects/Month: ${buyProsp}
-   Right column — Weekly Activity Plan:
-   • Hours committed: ${hoursNum} hrs/week
-   • SOI contacts: ${soiCalls}/week
-   • Social posts: ${posts}/week
-   • Floor time: ${floor} hrs/week
-   • Business mix: ${d.list}
+   • Hours/Week: ${hoursNum}
+   • SOI Contacts/Week: ${soiCalls}
+   • Social Posts/Week: ${socialPosts}
 
-3. MY WHY (gold accent box, full width or left column):
-   Large italic serif quote of their why statement: "${d.why}"
+3. MY WHY (the visual centerpiece — make this memorable):
+   This is the most important design section. The agent's why statement should feel personal and special.
+   Use a decorative treatment — options: ornamental border with corner flourishes using CSS/unicode, 
+   a bold italic serif in a gold-tinted box with a large decorative quotation mark, 
+   a navy background panel with gold text and a subtle radial gradient,
+   or a frame-like border with thin double lines.
+   Whatever you choose, make it feel designed — not like a text box.
+   The why: "${d.why}"
 
-4. MY STRATEGY (right column or full width):
-   Based on the agent's profile, list 3-4 specific lead generation strategies as bold headers with one-line descriptions. Reference AC Social, floor time, and SOI outreach. Tailor to their experience (${d.exp}) and budget (${d.budget}).
+4. MY STRATEGIES (compact — icon emoji + strategy name + one line):
+${strategyLines}
+   Display as a clean horizontal or 2-column list with a small colored dot or emoji prefix.
 
-5. FOOTER (full width, dark):
-   "Adams, Cameron & Co. | What gets measured gets managed. | ${new Date().getFullYear()}"
+5. WEEKLY NON-NEGOTIABLES (checkbox grid — 2 columns):
+   □ ${soiCalls} SOI contacts
+   □ ${socialPosts} AC Social posts
+   □ ${floorHrs} hrs floor time
+   □ ${followUps} lead follow-ups
+   □ Weekly check-in (5 min)
+   □ Review pipeline & CRM
+   □ Schedule next week's posts
+   □ Monthly coaching session
 
-IMPORTANT: The pre-calculated numbers above are final — use them exactly as provided. Output complete HTML only, no markdown fences, no explanation.`;
+6. FOOTER (slim, full width, navy):
+   "Adams, Cameron & Co. | What gets measured gets managed."
+
+CRITICAL RULES:
+- No GCI or dollar amounts anywhere on this page
+- Output complete HTML only — no markdown fences, no explanation
+- The why section must look designed, not default
+- Prioritize visual impact over completeness — if something needs to be abbreviated to fit, abbreviate it`;
+
+  document.getElementById('onePlanCard').style.display = 'block';
+  setTimeout(() => document.getElementById('onePlanCard').scrollIntoView({behavior:'smooth',block:'start'}), 300);
 
   try {
-    const html = await geminiCall(prompt, 8192);
+    const html = await geminiCall(prompt, 4096, 'gemini-2.0-flash');
     const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
     if (!clean || clean.length < 500) throw new Error('Response too short');
-    S.infographicHtml = clean;
-    renderInIframe('infographicContent', clean, 'light');
+    S.onePlanHtml = clean;
+    renderInIframe('onePlanContent', clean, 'light');
   } catch (e) {
-    document.getElementById('infographicContent').innerHTML =
-      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>Infographic failed:</strong><br>${e.message}</div>`;
+    document.getElementById('onePlanContent').innerHTML =
+      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>One-page plan failed:</strong><br>${e.message}<br><br>Try refreshing — Gemini occasionally times out on complex requests.</div>`;
   }
 }
 
-function printInfographic() {
-  if (!S.infographicHtml) { toast('Infographic is still generating — try again in a moment.', 'err'); return; }
+function printOnePlan() {
+  if (!S.onePlanHtml) { toast('Still generating — try again in a moment.', 'err'); return; }
   const win = window.open('', '_blank');
-  win.document.write(S.infographicHtml);
-  win.document.close();
-  win.focus();
+  win.document.write(S.onePlanHtml); win.document.close(); win.focus();
   setTimeout(() => win.print(), 400);
 }
 
-
-
-/* ── WEEKLY PLAYBOOK ──────────────────────────────────────────────── */
-async function generateDeskCard() {
-  const d = S.data;
-  try {
-    const prompt = `You are a web developer. Generate a complete HTML page (<!DOCTYPE html> through </html>) for a printable one-page daily reminder card for a real estate agent. White background, navy (#0c1524) headers, gold (#c4a84f) accents. Include @media print CSS. Must fit one letter-size page.
-Sections: 1) Header: agent name, "My Daily Playbook", earning goal. 2) My Why. 3) Goals at a Glance table: GCI (${d.earn}÷65%), sides needed, monthly listing appts (80% close), monthly buyer prospects (3/side), SOI (${d.soi}), hours/week (${d.time}). 4) Weekly Non-Negotiables: 6-8 checkbox items with specific numbers. 5) My Mantra tied to their Why. 6) Footer: "Adams, Cameron & Co. | What gets measured gets managed."
-Agent: Name: ${d.name} | Office: ${d.office} | Why: ${d.why} | Goals: ${d.goals} | Earn: ${d.earn} | Price: ${d.price} | SOI: ${d.soi} | Time: ${d.time} | Mix: ${d.list}
-Output complete HTML only. No explanation or markdown fences.`;
-    const html = await geminiCall(prompt, 8192);
-    const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
-    if (clean.length > 1000 && (clean.toLowerCase().includes('<!doctype') || clean.toLowerCase().startsWith('<html'))) {
-      S.deskCardHtml = clean; renderInIframe('deskCardContent', clean, 'light'); return;
-    }
-  } catch (e) { console.error('[DeskCard] Gemini error:', e); }
-  // Fallback
-  const card = buildDeskCardHtml(d);
-  S.deskCardHtml = card; renderInIframe('deskCardContent', card, 'light');
-}
-
-function buildDeskCardHtml(d) {
-  const earnNum = parseFloat((d.earn||'$0').replace(/[^0-9.]/g,''))||0, priceNum = parseFloat((d.price||'$0').replace(/[^0-9.]/g,''))||0;
-  const gci = earnNum>0 ? Math.ceil(earnNum/0.65) : 0, sides = (gci>0&&priceNum>0) ? Math.ceil(gci/(priceNum*0.03)) : 0;
-  const listPct = parseFloat(d.list)/100||0.5, listSides = Math.ceil(sides*listPct), buyeSides = sides-listSides;
-  const listAppts = Math.ceil((listSides/12)/0.8), buyProsp = Math.ceil((buyeSides/12)*3);
-  const hoursNum = parseInt(d.time)||0;
-  const soiCalls = Math.max(5,Math.round(hoursNum*0.5)), socialPosts = Math.max(3,Math.round(hoursNum*0.15)), floorHrs = Math.max(2,Math.round(hoursNum*0.15)), followUps = Math.max(5,Math.round(hoursNum*0.4)), rprReports = Math.max(2,Math.round(hoursNum*0.1));
-  const fmt = n => n>0 ? '$'+n.toLocaleString() : '—';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><style>
-  *{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;background:#fff;color:#1a1a1a;padding:24px;max-width:750px;margin:0 auto}
-  @media print{body{padding:0}@page{margin:0.4in;size:letter portrait}}
-  .hdr{background:#0c1524;color:#fff;padding:16px 20px;border-radius:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
-  .hdr h1{font-size:1.6rem;color:#c4a84f;margin-bottom:2px}.hdr p{font-size:0.8rem;color:#aaa;letter-spacing:0.08em;text-transform:uppercase}
-  .earn{font-size:1.5rem;font-weight:bold;color:#c4a84f}.earn-label{font-size:0.7rem;color:#aaa;text-transform:uppercase}
-  .sec{margin-bottom:12px}.sec-title{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:#c4a84f;font-family:sans-serif;font-weight:700;margin-bottom:6px;border-bottom:1px solid #c4a84f;padding-bottom:3px}
-  .why{font-style:italic;font-size:0.92rem;color:#333;line-height:1.5;background:#fdf8ee;padding:10px 14px;border-left:3px solid #c4a84f;border-radius:0 4px 4px 0}
-  table{width:100%;border-collapse:collapse;font-size:0.82rem}td{padding:5px 8px;border:1px solid #e0d0a8}td:first-child{font-weight:600;color:#0c1524;background:#fdf8ee;width:60%}td:last-child{text-align:right;font-weight:700;color:#c4a84f}
-  ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:5px}li{font-size:0.83rem;padding:5px 8px;background:#f8f8f8;border:1px solid #e8e8e8;border-radius:4px;display:flex;align-items:center;gap:6px}
-  .box{width:16px;height:16px;border:2px solid #0c1524;border-radius:3px;flex-shrink:0}
-  .mantra{background:#0c1524;color:#c4a84f;padding:12px 16px;border-radius:6px;font-style:italic;font-size:1rem;text-align:center;line-height:1.5;margin-bottom:10px}
-  .footer{text-align:center;font-size:0.68rem;color:#888;font-family:sans-serif;border-top:1px solid #eee;padding-top:8px}
-  </style></head><body>
-  <div class="hdr"><div><h1>${d.name}</h1><p>My Daily Playbook · Adams, Cameron &amp; Co.</p></div><div><div class="earn">${d.earn}</div><div class="earn-label">Annual Goal</div></div></div>
-  <div class="sec"><div class="sec-title">My Why</div><div class="why">${d.why}</div></div>
-  <div class="sec"><div class="sec-title">Goals at a Glance</div>
-  <table><tr><td>Annual Earning Goal</td><td>${d.earn}</td></tr><tr><td>GCI Required (÷ 65%)</td><td>${fmt(gci)}</td></tr><tr><td>Total Transactions Needed</td><td>${sides} sides</td></tr><tr><td>Listing Appointments / Month</td><td>${listAppts} appts</td></tr><tr><td>Buyer Prospects / Month</td><td>${buyProsp} prospects</td></tr><tr><td>Sphere of Influence</td><td>${d.soi}</td></tr><tr><td>Hours / Week Committed</td><td>${d.time}</td></tr></table></div>
-  <div class="sec"><div class="sec-title">My Weekly Non-Negotiables</div>
-  <ul><li><span class="box"></span>Call ${soiCalls} SOI contacts</li><li><span class="box"></span>${socialPosts} AC Social posts</li><li><span class="box"></span>${floorHrs} hrs floor time</li><li><span class="box"></span>${followUps} lead follow-ups</li><li><span class="box"></span>${rprReports} RPR reports sent</li><li><span class="box"></span>Review pipeline &amp; CRM</li><li><span class="box"></span>Schedule next week's posts</li><li><span class="box"></span>1 open house / showing</li></ul></div>
-  <div class="mantra">"${d.why.split('.')[0].trim()}. This is my reason. This is my plan."</div>
-  <div class="footer">Adams, Cameron &amp; Co. &nbsp;|&nbsp; What gets measured gets managed. &nbsp;|&nbsp; ${new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-  </body></html>`;
-}
-
-function printDeskCard() {
-  if (!S.deskCardHtml) { toast('Playbook is still generating — try again in a moment.', 'err'); return; }
-  const win = window.open('', '_blank');
-  win.document.write(S.deskCardHtml); win.document.close(); win.focus();
-  setTimeout(() => win.print(), 400);
-}
+/* ── COPY
 
 /* ── COPY ─────────────────────────────────────────────────────────── */
 async function doCopy() {
@@ -990,12 +940,12 @@ function buildEmailHtml(note) {
 
 /* ── RESET ────────────────────────────────────────────────────────── */
 function doReset() {
-  S.plan = ''; S.planHtml = ''; S.data = {}; S.deskCardHtml = ''; S.infographicHtml = '';
+  S.plan = ''; S.planHtml = ''; S.data = {}; S.onePlanHtml = '';
   S.strategies = []; S.selectedStrategies = []; S.suggestedStrategies = [];
   S.planId = null; S.enrollmentId = null;
   document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea').forEach(el => el.value = '');
   [['f_listR',50,'f_listV','50% Sellers'],['f_timeR',0,'f_timeV','0 hrs/wk'],['f_budgetR',0,'f_budgetV','0'],['f_soiR',0,'f_soiV','0 contacts'],['f_expR',0,'f_expV','0 yrs']].forEach(([r,v,lbl,txt]) => { document.getElementById(r).value=v; document.getElementById(lbl).textContent=txt; if(document.getElementById(r.replace('R',''))){ document.getElementById(r.replace('R','')).value=v; } });
-  ['infographicCard','deskCard','goalConfirmCard','strategyCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['onePlanCard','goalConfirmCard','strategyCard','commitmentsCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
   goTo(1);
 }
 
@@ -1233,7 +1183,7 @@ function toggleStrategy(slug) {
       if (S.selectedStrategies.length > 1) { toast('Please select a different primary strategy first, then remove this one.', 'err'); return; }
       S.selectedStrategies.splice(idx, 1);
     } else {
-      // Second click removes it
+      // Second click removes the strategy
       S.selectedStrategies.splice(idx, 1);
       toast(`${strat.name} removed.`, 'ok');
     }
@@ -1248,6 +1198,8 @@ async function confirmStrategies() {
   if (!S.selectedStrategies.length) { document.getElementById('strategyError').textContent = 'Please select at least one strategy.'; document.getElementById('strategyError').style.display = 'block'; return; }
   if (!S.selectedStrategies.some(s => s.isPrimary)) { document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.'; document.getElementById('strategyError').style.display = 'block'; return; }
   document.getElementById('strategyCard').style.display = 'none';
+  // Kick off one-page plan generation now that we have strategies — non-blocking
+  generateOnePlan().catch(e => console.error('[OnePlan]', e));
   showCommitmentsCard();
 }
 
@@ -1434,7 +1386,7 @@ async function doEnroll() {
       soiNotes:document.getElementById('f_soi_note').value.trim(), expNotes:document.getElementById('f_exp_note').value.trim(),
       gciRequired:gci, sidesRequired:sides, listingSides:listSides, buyerSides:buyeSides,
       listingApptsMonthly:Math.ceil((listSides/12)/0.8), buyerProspectsMonthly:Math.ceil((buyeSides/12)*3),
-      planText:S.plan, planHtml:S.planHtml, infographicHtml:S.infographicHtml||null, deskcardHtml:S.deskCardHtml||null,
+      planText:S.plan, planHtml:S.planHtml, infographicHtml:S.onePlanHtml||null, deskcardHtml:S.onePlanHtml||null,
     };
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
       method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY,'x-user-email':S.userEmail||S.data.email||''},
