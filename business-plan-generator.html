@@ -1233,8 +1233,9 @@ function toggleStrategy(slug) {
       if (S.selectedStrategies.length > 1) { toast('Please select a different primary strategy first, then remove this one.', 'err'); return; }
       S.selectedStrategies.splice(idx, 1);
     } else {
-      S.selectedStrategies.forEach(s => s.isPrimary = false); S.selectedStrategies[idx].isPrimary = true;
-      toast(`${strat.name} is now your primary strategy.`, 'ok');
+      // Second click removes it
+      S.selectedStrategies.splice(idx, 1);
+      toast(`${strat.name} removed.`, 'ok');
     }
   } else {
     if (S.selectedStrategies.length >= 5) { document.getElementById('strategyError').textContent = 'Maximum 5 strategies. Tap an existing one to remove it.'; document.getElementById('strategyError').style.display = 'block'; return; }
