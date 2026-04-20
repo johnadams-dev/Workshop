@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listing Video Generator — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a2e;
+    --ink-soft: #2d2d4a;
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --cream: #faf8f3;
+    --cream-dark: #f0ece0;
+    --slate: #5a5a78;
+    --muted: #8a8aa8;
+    --red: #c0392b;
+    --green: #27ae60;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 20px rgba(26,26,46,0.08);
+    --shadow-hover: 0 8px 40px rgba(26,26,46,0.15);
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--ink);
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.3);
+  }
+  .header-inner {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    height: 64px;
+  }
+  .back-link {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s;
+    white-space: nowrap;
+  }
+  .back-link:hover { color: var(--gold); }
+  .header-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255,255,255,0.1);
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--cream);
+  }
+  .logo span { color: var(--gold); }
+  .header-tool {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+  .header-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 3px 10px;
+    border-radius: 100px;
+    background: rgba(201,168,76,0.08);
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  /* ── PANEL CHROME ── */
+  .panel {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(26,26,46,0.06);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--cream-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .panel-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--ink);
+    flex: 1;
+  }
+
+  .panel-count {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: var(--cream-dark);
+    padding: 3px 8px;
+    border-radius: 100px;
+  }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--cream-dark);
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--cream);
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  .toolbar input[type="text"],
+  .toolbar select {
+    background: var(--card-bg);
+    border: 1px solid rgba(26,26,46,0.12);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  .search-wrap input { padding-left: 2rem; }
+
+  .toolbar input:focus,
+  .toolbar select:focus {
+    border-color: var(--gold);
+  }
+
+  .toolbar select {
+    min-width: 180px;
+    cursor: pointer;
+  }
+
+  .btn-refresh {
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .btn-refresh:hover { background: var(--ink-soft); }
+  .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── LISTINGS TABLE ── */
+  .listings-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 280px);
+  }
+
+  .listing-row {
+    display: grid;
+    grid-template-columns: 72px 1fr auto auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--cream-dark);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .listing-row:last-child { border-bottom: none; }
+  .listing-row:hover { background: var(--cream); }
+  .listing-row.selected { background: rgba(201,168,76,0.07); }
+
+  .listing-thumb {
+    width: 72px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--cream-dark);
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .listing-info h3 {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 2px;
+    line-height: 1.3;
+  }
+
+  .listing-meta {
+    font-size: 0.75rem;
+    color: var(--slate);
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .listing-agent {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .listing-mls {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    background: var(--cream-dark);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .video-pill {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .has-video {
+    background: rgba(39,174,96,0.1);
+    color: #1a7a42;
+    border: 1px solid rgba(39,174,96,0.25);
+  }
+  .no-video {
+    background: rgba(26,26,46,0.06);
+    color: var(--muted);
+    border: 1px solid rgba(26,26,46,0.1);
+  }
+
+  .btn-select {
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .btn-select:hover { background: var(--gold-light); }
+
+  /* ── EMPTY / LOADING ── */
+  .state-msg {
+    padding: 4rem 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+  .state-msg .icon { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
+
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--cream-dark);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RIGHT PANEL: Generator ── */
+  .gen-panel {
+    position: sticky;
+    top: 84px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* Selected listing preview */
+  .selected-preview {
+    display: none;
+  }
+  .selected-preview.visible { display: block; }
+
+  .preview-photo {
+    width: 100%;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    display: block;
+    background: var(--cream-dark);
+    border-radius: 10px 10px 0 0;
+  }
+
+  .preview-body {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .preview-address {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+
+  .preview-city {
+    font-size: 0.8rem;
+    color: var(--slate);
+    margin-bottom: 1rem;
+  }
+
+  .preview-stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .pstat-val {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .pstat-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .preview-photo-count {
+    font-size: 0.75rem;
+    color: var(--muted);
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--cream-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .preview-photo-count strong { color: var(--slate); }
+
+  /* Generator controls */
+  .gen-controls {
+    padding: 1.5rem;
+  }
+
+  .btn-generate {
+    width: 100%;
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    padding: 0.9rem 1.5rem;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    letter-spacing: 0.01em;
+  }
+  .btn-generate:hover:not(:disabled) {
+    background: var(--ink-soft);
+    transform: translateY(-1px);
+  }
+  .btn-generate:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-generate.active {
+    background: #b8860b;
+  }
+
+  /* Log */
+  .log-wrap {
+    background: #0f1117;
+    border-radius: 8px;
+    overflow: hidden;
+    display: none;
+  }
+  .log-wrap.visible { display: block; }
+
+  .log-bar {
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .log-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #444;
+    transition: background 0.3s;
+  }
+  .log-dot.running {
+    background: #c9a84c;
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .log-dot.done { background: #27ae60; }
+  .log-dot.err  { background: #c0392b; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .log-status {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #666;
+  }
+
+  .log-progress {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: #666;
+  }
+
+  .log-body {
+    padding: 12px 14px;
+    max-height: 180px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    line-height: 1.9;
+  }
+
+  .log-line { display: flex; gap: 10px; }
+  .log-t { color: #444; flex-shrink: 0; }
+  .log-line.info .log-m { color: #7a8a7a; }
+  .log-line.ok   .log-m { color: #6aaa6a; }
+  .log-line.warn .log-m { color: #c9a84c; }
+  .log-line.err  .log-m { color: #c07070; }
+
+  .log-track {
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+  }
+  .log-fill {
+    height: 100%;
+    background: var(--gold);
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  /* Video result */
+  .video-result {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(26,26,46,0.08);
+    display: none;
+  }
+  .video-result.visible { display: block; }
+
+  .video-result video {
+    width: 100%;
+    display: block;
+  }
+
+  .video-actions {
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.75rem;
+    background: var(--ink);
+    align-items: center;
+  }
+
+  .btn-dl {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.3);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .btn-dl:hover { background: rgba(201,168,76,0.1); }
+
+  .video-gen-time {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: #666;
+  }
+
+  /* Config */
+  .config-section {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--cream-dark);
+  }
+
+  .config-toggle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    user-select: none;
+    margin-bottom: 0;
+    transition: color 0.15s;
+  }
+  .config-toggle:hover { color: var(--slate); }
+
+  .config-fields {
+    display: none;
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .config-field label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .config-field input {
+    width: 100%;
+    border: 1px solid rgba(26,26,46,0.12);
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 7px 10px;
+    border-radius: 6px;
+    outline: none;
+  }
+  .config-field input:focus { border-color: var(--gold); }
+
+  /* MLS quick-entry fallback */
+  .mls-fallback {
+    padding: 1.5rem;
+    border-top: 1px solid var(--cream-dark);
+  }
+  .mls-fallback label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .mls-row {
+    display: flex;
+    gap: 0;
+  }
+  .mls-row input {
+    flex: 1;
+    border: 1px solid rgba(26,26,46,0.12);
+    border-right: none;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    padding: 8px 12px;
+    border-radius: 7px 0 0 7px;
+    outline: none;
+  }
+  .mls-row input:focus { border-color: var(--gold); }
+  .mls-row button {
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 0 7px 7px 0;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .mls-row button:hover { background: var(--gold-light); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 960px) {
+    .app { grid-template-columns: 1fr; padding: 1rem; }
+    .gen-panel { position: static; }
+    .listings-body { max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="./index.html" class="back-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      All Tools
+    </a>
+    <div class="header-divider"></div>
+    <div class="logo">John <span>Adams</span></div>
+    <span class="header-tool">/ Listing Video Generator</span>
+    <span class="header-badge">In Development</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ── LEFT: Listing Browser ── -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">Active Residential Listings</div>
+      <div class="panel-count" id="listingCount">—</div>
+      <button class="btn-refresh" id="refreshBtn" onclick="loadListings()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="Search address or city..." oninput="applyFilters()">
+      </div>
+      <select id="agentFilter" onchange="applyFilters()">
+        <option value="">All Agents</option>
+      </select>
+      <select id="videoFilter" onchange="applyFilters()">
+        <option value="">All Listings</option>
+        <option value="no-video">Needs Video</option>
+        <option value="has-video">Has Video</option>
+      </select>
+    </div>
+
+    <div class="listings-body" id="listingsBody">
+      <div class="state-msg">
+        <div class="spinner"></div>
+        Loading listings from DeltaNet…
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Generator Panel ── -->
+  <div class="gen-panel">
+
+    <!-- Selected listing preview -->
+    <div class="panel selected-preview" id="selectedPreview">
+      <img class="preview-photo" id="previewPhoto" src="" alt="">
+      <div class="preview-body">
+        <div class="preview-address" id="previewAddress">—</div>
+        <div class="preview-city" id="previewCity">—</div>
+        <div class="preview-stats">
+          <div>
+            <div class="pstat-val" id="previewBeds">—</div>
+            <div class="pstat-lbl">Beds</div>
+          </div>
+          <div>
+            <div class="pstat-val" id="previewBaths">—</div>
+            <div class="pstat-lbl">Baths</div>
+          </div>
+          <div>
+            <div class="pstat-val" id="previewSqft">—</div>
+            <div class="pstat-lbl">Sq Ft</div>
+          </div>
+          <div>
+            <div class="pstat-val" id="previewPhotos">—</div>
+            <div class="pstat-lbl">Photos</div>
+          </div>
+        </div>
+        <div class="preview-photo-count" id="previewAgent"></div>
+      </div>
+    </div>
+
+    <!-- Empty state when nothing selected -->
+    <div class="panel" id="emptyState">
+      <div class="state-msg" style="padding: 2.5rem 1.5rem;">
+        <span class="icon">🎬</span>
+        Select a listing from the left to generate its video tour.
+      </div>
+    </div>
+
+    <!-- Generate button + log -->
+    <div class="panel" id="genPanel" style="display:none;">
+      <div class="gen-controls">
+        <button class="btn-generate" id="generateBtn" onclick="startGeneration()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Generate Video Tour
+        </button>
+      </div>
+
+      <!-- Log output -->
+      <div class="log-wrap" id="logWrap">
+        <div class="log-bar">
+          <div class="log-dot" id="logDot"></div>
+          <div class="log-status" id="logStatus">Ready</div>
+          <div class="log-progress" id="logProgress"></div>
+        </div>
+        <div class="log-body" id="logBody"></div>
+        <div class="log-track"><div class="log-fill" id="logFill"></div></div>
+      </div>
+
+      <!-- Video result -->
+      <div class="video-result" id="videoResult">
+        <video id="videoPlayer" controls></video>
+        <div class="video-actions">
+          <a class="btn-dl" id="downloadLink" href="#" download>⬇ Download</a>
+          <button class="btn-dl" onclick="copyVideoUrl()">⧉ Copy URL</button>
+          <div class="video-gen-time" id="genTime"></div>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div class="config-section">
+        <div class="config-fields">
+          <div class="config-field">
+            <label>Cloud Run URL</label>
+            <input type="text" id="serviceUrl"
+              value="https://listing-video-generator-143028259585.us-east1.run.app"
+              onchange="saveConfig()">
+          </div>
+          <div class="config-field">
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="Service API key" onchange="saveConfig()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MLS direct entry fallback -->
+    <div class="panel">
+      <div class="mls-fallback">
+        <label>Or enter MLS ID directly</label>
+        <div class="mls-row">
+          <input type="text" id="mlsDirect" placeholder="e.g. 1225064" onkeydown="if(event.key==='Enter') selectByMls()">
+          <button onclick="selectByMls()">Look Up</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Config persistence ──
+function loadConfig() {
+  const url = localStorage.getItem('ac_service_url');
+  const key = localStorage.getItem('ac_api_key');
+  if (url) document.getElementById('serviceUrl').value = url;
+  if (key) document.getElementById('apiKey').value = key;
+}
+function saveConfig() {
+  localStorage.setItem('ac_service_url', document.getElementById('serviceUrl').value);
+  localStorage.setItem('ac_api_key', document.getElementById('apiKey').value);
+}
+loadConfig();
+
+function serviceUrl() { return document.getElementById('serviceUrl').value.replace(/\/$/, ''); }
+function apiKey() { return document.getElementById('apiKey').value; }
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (apiKey()) h['X-API-Key'] = apiKey();
+  return h;
+}
+
+// ── State ──
+let allListings = [];
+let filteredListings = [];
+let selectedListing = null;
+let pollTimer = null;
+let generatedVideos = {}; // mlsId → url (session cache)
+
+// ── Load listings ──
+async function loadListings() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;display:inline-block;vertical-align:middle;"></div> Loading…`;
+
+  document.getElementById('listingsBody').innerHTML = `
+    <div class="state-msg"><div class="spinner"></div>Fetching from DeltaNet API…</div>`;
+
+  try {
+    const resp = await fetch(`${serviceUrl()}/listings`, { headers: authHeaders() });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    allListings = data.listings || [];
+    populateAgentFilter();
+    applyFilters();
+  } catch (e) {
+    document.getElementById('listingsBody').innerHTML = `
+      <div class="state-msg">
+        <span class="icon">⚠️</span>
+        Could not load listings.<br>
+        <small style="color:#c0392b">${e.message}</small><br><br>
+        <small>Make sure the Cloud Run URL and API key are set in configuration.</small>
+      </div>`;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh`;
+}
+
+function populateAgentFilter() {
+  const agents = [...new Set(allListings.map(l => l.listing_agent).filter(Boolean))].sort();
+  const sel = document.getElementById('agentFilter');
+  sel.innerHTML = '<option value="">All Agents</option>' +
+    agents.map(a => `<option value="${a}">${a}</option>`).join('');
+}
+
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const agent  = document.getElementById('agentFilter').value;
+  const vf     = document.getElementById('videoFilter').value;
+
+  filteredListings = allListings.filter(l => {
+    const addr = `${l.address} ${l.city}`.toLowerCase();
+    if (search && !addr.includes(search)) return false;
+    if (agent && l.listing_agent !== agent) return false;
+    const hasVid = !!generatedVideos[l.mls_id];
+    if (vf === 'has-video' && !hasVid) return false;
+    if (vf === 'no-video' && hasVid) return false;
+    return true;
+  });
+
+  renderListings();
+}
+
+function renderListings() {
+  document.getElementById('listingCount').textContent = `${filteredListings.length} listing${filteredListings.length !== 1 ? 's' : ''}`;
+
+  if (filteredListings.length === 0) {
+    document.getElementById('listingsBody').innerHTML = `
+      <div class="state-msg"><span class="icon">🔍</span>No listings match your filters.</div>`;
+    return;
+  }
+
+  document.getElementById('listingsBody').innerHTML = filteredListings.map(l => {
+    const hasVid = !!generatedVideos[l.mls_id];
+    const isSelected = selectedListing && selectedListing.mls_id === l.mls_id;
+    const baths = l.bathrooms_partial > 0
+      ? `${l.bathrooms_full}/${l.bathrooms_partial}`
+      : l.bathrooms_full;
+
+    return `
+    <div class="listing-row${isSelected ? ' selected' : ''}"
+         onclick="selectListing('${l.mls_id}')">
+      <img class="listing-thumb"
+           src="${l.primary_photo_url || ''}"
+           onerror="this.style.background='var(--cream-dark)'; this.removeAttribute('src')"
+           alt="">
+      <div class="listing-info">
+        <h3>${l.address}</h3>
+        <div class="listing-meta">
+          <span>${l.city}, ${l.state}</span>
+          <span>·</span>
+          <span>${l.bedrooms} bd</span>
+          <span>${baths} ba</span>
+          <span>${Number(l.home_size || 0).toLocaleString()} sqft</span>
+        </div>
+        <div class="listing-agent">${l.listing_agent || '—'}</div>
+      </div>
+      <span class="listing-mls">${l.mls_id}</span>
+      <span class="video-pill ${hasVid ? 'has-video' : 'no-video'}">
+        ${hasVid ? '✓ Video' : 'No Video'}
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// ── Select listing ──
+async function selectListing(mlsId) {
+  const listing = allListings.find(l => l.mls_id === mlsId);
+  if (!listing) return;
+
+  selectedListing = listing;
+  renderListings(); // re-render to show selected state
+
+  // Show panels
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('genPanel').style.display = 'block';
+  document.getElementById('selectedPreview').classList.add('visible');
+
+  // Populate preview
+  const baths = parseInt(listing.bathrooms_partial || 0) > 0
+    ? `${listing.bathrooms_full}/${listing.bathrooms_partial}`
+    : listing.bathrooms_full;
+
+  document.getElementById('previewAddress').textContent = listing.address;
+  document.getElementById('previewCity').textContent = `${listing.city}, ${listing.state} ${listing.zip_code}`;
+  document.getElementById('previewBeds').textContent = listing.bedrooms || '—';
+  document.getElementById('previewBaths').textContent = baths || '—';
+  document.getElementById('previewSqft').textContent = Number(listing.home_size || 0).toLocaleString() || '—';
+  document.getElementById('previewPhotos').textContent = listing.image_count || '—';
+  document.getElementById('previewAgent').textContent = `Agent: ${listing.listing_agent || '—'}`;
+
+  if (listing.primary_photo_url) {
+    document.getElementById('previewPhoto').src = listing.primary_photo_url;
+  }
+
+  // Reset log & video
+  resetLog();
+  document.getElementById('videoResult').classList.remove('visible');
+
+  // If we have a cached video, show it
+  if (generatedVideos[mlsId]) {
+    showVideo(generatedVideos[mlsId], mlsId);
+  }
+
+  // Scroll into view on mobile
+  document.getElementById('genPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function selectByMls() {
+  const mlsId = document.getElementById('mlsDirect').value.trim();
+  if (!mlsId) return;
+
+  // Check if already in list
+  const found = allListings.find(l => l.mls_id === mlsId);
+  if (found) {
+    selectListing(mlsId);
+    return;
+  }
+
+  // Lookup via API
+  try {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('genPanel').style.display = 'block';
+    document.getElementById('selectedPreview').classList.add('visible');
+    document.getElementById('previewAddress').textContent = 'Looking up MLS ' + mlsId + '…';
+
+    const resp = await fetch(`${serviceUrl()}/listing_info`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ mls_id: mlsId })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const info = await resp.json();
+
+    selectedListing = { mls_id: mlsId, ...info };
+    document.getElementById('previewAddress').textContent = info.address || mlsId;
+    document.getElementById('previewCity').textContent = info.city_state || '';
+    document.getElementById('previewBeds').textContent = info.beds || '—';
+    document.getElementById('previewBaths').textContent = info.baths || '—';
+    document.getElementById('previewSqft').textContent = info.sqft || '—';
+    document.getElementById('previewPhotos').textContent = info.usable_photo_count ?? '—';
+    if (info.primary_photo_url) document.getElementById('previewPhoto').src = info.primary_photo_url;
+    resetLog();
+  } catch (e) {
+    alert('Could not find listing: ' + e.message);
+  }
+}
+
+// ── Log helpers ──
+function resetLog() {
+  document.getElementById('logWrap').classList.remove('visible');
+  document.getElementById('logBody').innerHTML = '';
+  document.getElementById('logDot').className = 'log-dot';
+  document.getElementById('logStatus').textContent = 'Ready';
+  document.getElementById('logFill').style.width = '0%';
+  document.getElementById('logProgress').textContent = '';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('generateBtn').classList.remove('active');
+  document.getElementById('generateBtn').innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    Generate Video Tour`;
+}
+
+function now() {
+  return new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function log(msg, type = 'info') {
+  const body = document.getElementById('logBody');
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.innerHTML = `<span class="log-t">${now()}</span><span class="log-m">${msg}</span>`;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+}
+
+function setProgress(pct) {
+  document.getElementById('logFill').style.width = pct + '%';
+  document.getElementById('logProgress').textContent = pct + '%';
+}
+
+// ── Video output ──
+function showVideo(url, mlsId) {
+  const result = document.getElementById('videoResult');
+  document.getElementById('videoPlayer').src = url;
+  document.getElementById('downloadLink').href = url;
+  document.getElementById('downloadLink').download = `listing-${mlsId}.mp4`;
+  document.getElementById('genTime').textContent = new Date().toLocaleString();
+  result.classList.add('visible');
+}
+
+function copyVideoUrl() {
+  navigator.clipboard.writeText(document.getElementById('videoPlayer').src)
+    .then(() => log('Video URL copied to clipboard', 'ok'));
+}
+
+// ── Generation ──
+async function startGeneration() {
+  if (!selectedListing) return;
+
+  const mlsId = selectedListing.mls_id;
+  document.getElementById('logWrap').classList.add('visible');
+  document.getElementById('videoResult').classList.remove('visible');
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('generateBtn').classList.add('active');
+  document.getElementById('generateBtn').innerHTML = `
+    <div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;display:inline-block;vertical-align:middle;"></div>
+    Generating…`;
+  document.getElementById('logDot').className = 'log-dot running';
+  document.getElementById('logStatus').textContent = 'Processing';
+
+  const startTime = Date.now();
+
+  log(`Resolving MLS ${mlsId} via DeltaNet API…`);
+  setProgress(5);
+
+  try {
+    const resp = await fetch(`${serviceUrl()}/generate`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ mls_id: mlsId })
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${txt}`);
+    }
+
+    const data = await resp.json();
+    log(`Job accepted`, 'ok');
+    setProgress(20);
+
+    if (data.video_url) {
+      // Synchronous
+      finishGeneration(data.video_url, mlsId, startTime);
+    } else if (data.job_id) {
+      log(`Rendering in progress — this takes 2–4 minutes…`, 'info');
+      startPolling(data.job_id, mlsId, startTime);
+    } else {
+      throw new Error('Unexpected response from generator');
+    }
+
+  } catch (e) {
+    log(`Error: ${e.message}`, 'err');
+    document.getElementById('logDot').className = 'log-dot err';
+    document.getElementById('logStatus').textContent = 'Failed';
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateBtn').classList.remove('active');
+    document.getElementById('generateBtn').innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Retry Generation`;
+  }
+}
+
+function startPolling(jobId, mlsId, startTime) {
+  if (pollTimer) clearInterval(pollTimer);
+
+  const steps = [
+    [30, 'Fetching photos from DeltaNet…'],
+    [45, 'AI is curating best photos…'],
+    [60, 'Rendering Ken Burns video…'],
+    [80, 'Adding music and transitions…'],
+    [90, 'Finalizing and uploading…'],
+  ];
+  let stepIdx = 0;
+
+  pollTimer = setInterval(async () => {
+    // Animate progress hints between polls
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (stepIdx < steps.length && elapsed > stepIdx * 30 + 15) {
+      const [pct, msg] = steps[stepIdx++];
+      setProgress(pct);
+      log(msg, 'info');
+    }
+
+    try {
+      const headers = {};
+      if (apiKey()) headers['X-API-Key'] = apiKey();
+      const resp = await fetch(`${serviceUrl()}/status/${jobId}`, { headers });
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      if (data.progress) setProgress(data.progress);
+      if (data.log) {
+        data.log.forEach(e => log(e.msg, e.type || 'info'));
+      }
+
+      if (data.status === 'complete' && data.video_url) {
+        clearInterval(pollTimer);
+        finishGeneration(data.video_url, mlsId, startTime);
+      }
+      if (['failed', 'error'].includes(data.status)) {
+        clearInterval(pollTimer);
+        log(data.error || 'Generation failed', 'err');
+        document.getElementById('logDot').className = 'log-dot err';
+        document.getElementById('logStatus').textContent = 'Failed';
+        document.getElementById('generateBtn').disabled = false;
+        document.getElementById('generateBtn').classList.remove('active');
+      }
+    } catch {}
+  }, 3000);
+}
+
+function finishGeneration(videoUrl, mlsId, startTime) {
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+  setProgress(100);
+  log(`Video ready in ${timeStr}`, 'ok');
+  document.getElementById('logDot').className = 'log-dot done';
+  document.getElementById('logStatus').textContent = 'Complete';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('generateBtn').classList.remove('active');
+  document.getElementById('generateBtn').innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    Regenerate Video`;
+
+  generatedVideos[mlsId] = videoUrl;
+  showVideo(videoUrl, mlsId);
+  renderListings(); // update video pill
+}
+
+// ── Init ──
+loadListings();
+</script>
+
+</body>
+</html>
