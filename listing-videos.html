@@ -283,16 +283,6 @@
     color: #1a7a42;
     border: 1px solid rgba(39,174,96,0.25);
   }
-  .has-tour {
-    background: rgba(201,168,76,0.1);
-    color: #7a5a10;
-    border: 1px solid rgba(201,168,76,0.35);
-  }
-  .broken-tour {
-    background: rgba(192,57,43,0.08);
-    color: #8a2020;
-    border: 1px solid rgba(192,57,43,0.25);
-  }
   .no-video {
     background: rgba(26,26,46,0.06);
     color: var(--muted);
@@ -407,8 +397,6 @@
   }
 
   .preview-photo-count strong { color: var(--slate); }
-  .preview-photo-count a { color: var(--gold); text-decoration: none; font-weight: 500; }
-  .preview-photo-count a:hover { text-decoration: underline; }
 
   /* Generator controls */
   .gen-controls {
@@ -481,12 +469,7 @@
     color: #666;
   }
 
-  .log-progress {
-    margin-left: auto;
-    font-family: var(--mono);
-    font-size: 0.65rem;
-    color: #666;
-  }
+  .log-progress { display: none; }
 
   .log-body {
     padding: 12px 14px;
@@ -505,14 +488,44 @@
   .log-line.err  .log-m { color: #c07070; }
 
   .log-track {
-    height: 2px;
-    background: rgba(255,255,255,0.06);
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    margin: 0 14px 12px;
+    overflow: hidden;
   }
   .log-fill {
     height: 100%;
-    background: var(--gold);
+    background: linear-gradient(90deg, #c9a84c, #e8c96a);
     width: 0%;
-    transition: width 0.5s ease;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .log-pct-display {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 14px 4px;
+  }
+  .log-pct-number {
+    font-family: var(--mono);
+    font-size: 2rem;
+    font-weight: 500;
+    color: #c9a84c;
+    line-height: 1;
+    min-width: 3.5rem;
+  }
+  .log-pct-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: #666;
+    letter-spacing: 0.08em;
+  }
+  .log-eta {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: #555;
+    padding: 0 14px 8px;
   }
 
   /* Video result */
@@ -699,17 +712,16 @@
       </select>
       <select id="videoFilter" onchange="applyFilters()">
         <option value="">All Listings</option>
-        <option value="no-tour">No Tour At All</option>
-        <option value="has-external">Has External Tour</option>
-        <option value="broken-tour">Broken Tour URL</option>
-        <option value="has-our-video">Has Our Video</option>
+        <option value="no-video">Needs Video</option>
+        <option value="has-video">Has Video</option>
       </select>
     </div>
 
     <div class="listings-body" id="listingsBody">
       <div class="state-msg">
-        <div class="spinner"></div>
-        Loading listings from DeltaNet…
+        <span class="icon">🏠</span>
+        <strong style="color:var(--ink);font-size:0.95rem;">Browse Active Listings</strong>
+        <p style="margin-top:0.5rem;font-size:0.8rem;">Click <strong>Load Listings</strong> to fetch all active residential listings, or enter an MLS ID directly on the right.</p>
       </div>
     </div>
   </div>
@@ -742,7 +754,6 @@
           </div>
         </div>
         <div class="preview-photo-count" id="previewAgent"></div>
-        <div class="preview-photo-count" id="previewTour" style="display:none;margin-top:6px;gap:0.4rem;"></div>
       </div>
     </div>
 
@@ -770,8 +781,15 @@
           <div class="log-status" id="logStatus">Ready</div>
           <div class="log-progress" id="logProgress"></div>
         </div>
-        <div class="log-body" id="logBody"></div>
+        <div class="log-pct-display" id="logPctDisplay" style="display:none">
+          <div class="log-pct-number" id="logPctNumber">0%</div>
+          <div class="log-pct-label" id="logPctLabel">Starting…</div>
+        </div>
+        <div class="log-eta" id="logEta" style="display:none">
+          Videos typically take 5–10 minutes to render.
+        </div>
         <div class="log-track"><div class="log-fill" id="logFill"></div></div>
+        <div class="log-body" id="logBody"></div>
       </div>
 
       <!-- Video result -->
@@ -781,6 +799,22 @@
           <a class="btn-dl" id="downloadLink" href="#" download>⬇ Download</a>
           <button class="btn-dl" onclick="copyVideoUrl()">⧉ Copy URL</button>
           <div class="video-gen-time" id="genTime"></div>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div class="config-section">
+        <div class="config-fields">
+          <div class="config-field">
+            <label>Cloud Run URL</label>
+            <input type="text" id="serviceUrl"
+              value="https://listing-video-generator-143028259585.us-east1.run.app"
+              onchange="saveConfig()">
+          </div>
+          <div class="config-field">
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="Service API key" onchange="saveConfig()">
+          </div>
         </div>
       </div>
     </div>
@@ -800,19 +834,25 @@
 </div>
 
 <script>
-// ── Config ──
-const SERVICE_URL = 'https://listing-video-generator-143028259585.us-east1.run.app';
-function serviceUrl() { return SERVICE_URL; }
-function apiKey() { return ''; }
-function authHeaders() { return { 'Content-Type': 'application/json' }; }
+// ── Config persistence ──
+function loadConfig() {
+  const url = localStorage.getItem('ac_service_url');
+  const key = localStorage.getItem('ac_api_key');
+  if (url) document.getElementById('serviceUrl').value = url;
+  if (key) document.getElementById('apiKey').value = key;
+}
+function saveConfig() {
+  localStorage.setItem('ac_service_url', document.getElementById('serviceUrl').value);
+  localStorage.setItem('ac_api_key', document.getElementById('apiKey').value);
+}
+loadConfig();
 
-// ── Domain extractor ──
-function extractDomain(url) {
-  if (!url || !url.trim()) return null;
-  try {
-    const host = new URL(url.trim()).hostname;
-    return host.replace(/^www\./, '');
-  } catch { return null; }
+function serviceUrl() { return document.getElementById('serviceUrl').value.replace(/\/$/, ''); }
+function apiKey() { return document.getElementById('apiKey').value; }
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (apiKey()) h['X-API-Key'] = apiKey();
+  return h;
 }
 
 // ── State ──
@@ -844,7 +884,7 @@ async function loadListings() {
         <span class="icon">⚠️</span>
         Could not load listings.<br>
         <small style="color:#c0392b">${e.message}</small><br><br>
-        <small>Check that the video service is running.</small>
+        <small>Make sure the Cloud Run URL and API key are set in configuration.</small>
       </div>`;
   }
 
@@ -868,14 +908,9 @@ function applyFilters() {
     const addr = `${l.address} ${l.city}`.toLowerCase();
     if (search && !addr.includes(search)) return false;
     if (agent && l.listing_agent !== agent) return false;
-    const hasOurVid = !!generatedVideos[l.mls_id];
-    const vtourDomain = extractDomain(l.vtour_url);
-    const hasExternal = !!vtourDomain;
-    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
-    if (vf === 'has-our-video' && !hasOurVid) return false;
-    if (vf === 'has-external' && !hasExternal) return false;
-    if (vf === 'broken-tour' && !brokenTour) return false;
-    if (vf === 'no-tour' && (hasOurVid || hasExternal || brokenTour)) return false;
+    const hasVid = !!generatedVideos[l.mls_id];
+    if (vf === 'has-video' && !hasVid) return false;
+    if (vf === 'no-video' && hasVid) return false;
     return true;
   });
 
@@ -892,9 +927,7 @@ function renderListings() {
   }
 
   document.getElementById('listingsBody').innerHTML = filteredListings.map(l => {
-    const hasOurVid = !!generatedVideos[l.mls_id];
-    const vtourDomain = extractDomain(l.vtour_url);
-    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
+    const hasVid = !!generatedVideos[l.mls_id];
     const isSelected = selectedListing && selectedListing.mls_id === l.mls_id;
     const baths = l.bathrooms_partial > 0
       ? `${l.bathrooms_full}/${l.bathrooms_partial}`
@@ -903,7 +936,7 @@ function renderListings() {
     return `
     <div class="listing-row${isSelected ? ' selected' : ''}"
          onclick="selectListing('${l.mls_id}')">
-      <div class="listing-thumb" style="background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏠</div>
+      <div class="listing-thumb" style="background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--muted);">🏠</div>
       <div class="listing-info">
         <h3>${l.address}</h3>
         <div class="listing-meta">
@@ -916,14 +949,9 @@ function renderListings() {
         <div class="listing-agent">${l.listing_agent || '—'}</div>
       </div>
       <span class="listing-mls">${l.mls_id}</span>
-      ${hasOurVid
-        ? '<span class="video-pill has-video">✓ Our Video</span>'
-        : vtourDomain
-          ? `<span class="video-pill has-tour" title="${l.vtour_url || ''}">${vtourDomain}</span>`
-          : brokenTour
-            ? '<span class="video-pill broken-tour">⚠ Bad URL</span>'
-            : '<span class="video-pill no-video">No Tour</span>'
-      }
+      <span class="video-pill ${hasVid ? 'has-video' : 'no-video'}">
+        ${hasVid ? '✓ Video' : 'No Video'}
+      </span>
     </div>`;
   }).join('');
 }
@@ -953,19 +981,6 @@ async function selectListing(mlsId) {
   document.getElementById('previewSqft').textContent = Number(listing.home_size || 0).toLocaleString() || '—';
   document.getElementById('previewPhotos').textContent = listing.image_count || '—';
   document.getElementById('previewAgent').textContent = `Agent: ${listing.listing_agent || '—'}`;
-
-  // Show existing tour info
-  const tourEl = document.getElementById('previewTour');
-  const vtourDomain = extractDomain(listing.vtour_url);
-  if (vtourDomain) {
-    tourEl.innerHTML = `Existing tour: <a href="${listing.vtour_url}" target="_blank">${vtourDomain}</a>`;
-    tourEl.style.display = 'flex';
-  } else if (listing.vtour_url && listing.vtour_url.trim()) {
-    tourEl.innerHTML = `<span style="color:var(--red)">⚠ Broken tour URL</span>`;
-    tourEl.style.display = 'flex';
-  } else {
-    tourEl.style.display = 'none';
-  }
 
   if (listing.primary_photo_url) {
     document.getElementById('previewPhoto').src = listing.primary_photo_url;
@@ -1031,6 +1046,9 @@ function resetLog() {
   document.getElementById('logDot').className = 'log-dot';
   document.getElementById('logStatus').textContent = 'Ready';
   document.getElementById('logFill').style.width = '0%';
+  document.getElementById('logPctDisplay').style.display = 'none';
+  document.getElementById('logEta').style.display = 'none';
+  document.getElementById('logPctNumber').textContent = '0%';
   document.getElementById('logProgress').textContent = '';
   document.getElementById('generateBtn').disabled = false;
   document.getElementById('generateBtn').classList.remove('active');
@@ -1052,9 +1070,16 @@ function log(msg, type = 'info') {
   body.scrollTop = body.scrollHeight;
 }
 
-function setProgress(pct) {
+function setProgress(pct, label) {
   document.getElementById('logFill').style.width = pct + '%';
   document.getElementById('logProgress').textContent = pct + '%';
+  document.getElementById('logPctNumber').textContent = pct + '%';
+  if (label) document.getElementById('logPctLabel').textContent = label;
+  // Show big display once we have progress
+  if (pct > 0) {
+    document.getElementById('logPctDisplay').style.display = 'flex';
+    document.getElementById('logEta').style.display = 'block';
+  }
 }
 
 // ── Video output ──
@@ -1077,14 +1102,6 @@ async function startGeneration() {
   if (!selectedListing) return;
 
   const mlsId = selectedListing.mls_id;
-
-  // Warn if listing already has an external tour
-  const existingDomain = extractDomain(selectedListing.vtour_url);
-  if (existingDomain && !generatedVideos[mlsId]) {
-    const ok = confirm(`This listing already has a virtual tour from ${existingDomain}.\n\nGenerate a replacement video anyway?`);
-    if (!ok) return;
-  }
-
   document.getElementById('logWrap').classList.add('visible');
   document.getElementById('videoResult').classList.remove('visible');
   document.getElementById('generateBtn').disabled = true;
@@ -1141,39 +1158,45 @@ async function startGeneration() {
 function startPolling(jobId, mlsId, startTime) {
   if (pollTimer) clearInterval(pollTimer);
 
-  // Real progress messages timed to actual pipeline stages
   const steps = [
-    [20,  30,  'Fetching photos from DeltaNet…'],
-    [35,  60,  'AI is curating best photos…'],
-    [50,  90,  'Rendering video — this takes a few minutes…'],
-    [60,  150, 'Ken Burns effects rendering…'],
-    [70,  210, 'Still rendering — almost halfway…'],
-    [78,  270, 'Crossfade transitions processing…'],
-    [84,  330, 'Adding music track…'],
-    [90,  390, 'Finalizing and uploading to storage…'],
-    [94,  450, 'Wrapping up…'],
+    [20,  45,  'Fetching & filtering photos…'],
+    [35,  90,  'AI selecting best photos…'],
+    [50,  135, 'Video render started…'],
+    [60,  180, 'Ken Burns effects processing…'],
+    [70,  240, 'Still rendering…'],
+    [78,  300, 'Transitions and crossfades…'],
+    [85,  360, 'Adding music…'],
+    [91,  420, 'Uploading to storage…'],
+    [95,  480, 'Almost done…'],
   ];
   let stepIdx = 0;
-
-  // Live elapsed timer
-  const timerInterval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const m = Math.floor(elapsed / 60), s = elapsed % 60;
-    document.getElementById('logStatus').textContent =
-      `Processing — ${m}:${s.toString().padStart(2,'0')} elapsed`;
-  }, 1000);
 
   pollTimer = setInterval(async () => {
     const elapsed = (Date.now() - startTime) / 1000;
     if (stepIdx < steps.length && elapsed >= steps[stepIdx][1]) {
       const [pct, , msg] = steps[stepIdx++];
-      setProgress(pct);
+      setProgress(pct, msg);
       log(msg, 'info');
     }
 
     try {
       const resp = await fetch(`${serviceUrl()}/status/${jobId}`);
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        consecutiveErrors = (consecutiveErrors || 0) + 1;
+        if (consecutiveErrors >= 3) {
+          clearInterval(pollTimer);
+          clearInterval(timerInterval);
+          setLogState('err');
+          log('Job lost — the render server restarted mid-render. Please try again.', 'err');
+          document.getElementById('generateBtn').disabled = false;
+          document.getElementById('generateBtn').classList.remove('active');
+          document.getElementById('generateBtn').innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Retry Generation`;
+        }
+        return;
+      }
+      consecutiveErrors = 0;
       const data = await resp.json();
 
       if (data.progress) setProgress(data.progress);
@@ -1198,7 +1221,6 @@ function startPolling(jobId, mlsId, startTime) {
 }
 
 function finishGeneration(videoUrl, mlsId, startTime) {
-  if (typeof timerInterval !== 'undefined') clearInterval(timerInterval);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
@@ -1216,11 +1238,10 @@ function finishGeneration(videoUrl, mlsId, startTime) {
 
   generatedVideos[mlsId] = videoUrl;
   showVideo(videoUrl, mlsId);
-  renderListings();
+  renderListings(); // update video pill
 }
 
-// ── Init ──
-loadListings();
+// ── Init ── (listings load on demand via Load button)
 </script>
 
 </body>
