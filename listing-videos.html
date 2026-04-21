@@ -288,6 +288,11 @@
     color: #7a5a10;
     border: 1px solid rgba(201,168,76,0.35);
   }
+  .broken-tour {
+    background: rgba(192,57,43,0.08);
+    color: #8a2020;
+    border: 1px solid rgba(192,57,43,0.25);
+  }
   .no-video {
     background: rgba(26,26,46,0.06);
     color: var(--muted);
@@ -696,6 +701,7 @@
         <option value="">All Listings</option>
         <option value="no-tour">No Tour At All</option>
         <option value="has-external">Has External Tour</option>
+        <option value="broken-tour">Broken Tour URL</option>
         <option value="has-our-video">Has Our Video</option>
       </select>
     </div>
@@ -736,8 +742,7 @@
           </div>
         </div>
         <div class="preview-photo-count" id="previewAgent"></div>
-        <div class="preview-photo-count" id="previewTour" style="display:none; margin-top:6px; gap:0.4rem;">
-        </div>
+        <div class="preview-photo-count" id="previewTour" style="display:none;margin-top:6px;gap:0.4rem;"></div>
       </div>
     </div>
 
@@ -778,7 +783,6 @@
           <div class="video-gen-time" id="genTime"></div>
         </div>
       </div>
-
     </div>
 
     <!-- MLS direct entry fallback -->
@@ -796,24 +800,19 @@
 </div>
 
 <script>
-// ── Helpers ──
-function extractDomain(url) {
-  try {
-    const host = new URL(url).hostname;
-    // Strip www. and return just the domain
-    return host.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
 // ── Config ──
-const SERVICE_URL = "https://listing-video-generator-mhzvi2hwxa-ue.a.run.app";
-
+const SERVICE_URL = 'https://listing-video-generator-143028259585.us-east1.run.app';
 function serviceUrl() { return SERVICE_URL; }
-function apiKey() { return ""; }
-function authHeaders() {
-  return { "Content-Type": "application/json" };
+function apiKey() { return ''; }
+function authHeaders() { return { 'Content-Type': 'application/json' }; }
+
+// ── Domain extractor ──
+function extractDomain(url) {
+  if (!url || !url.trim()) return null;
+  try {
+    const host = new URL(url.trim()).hostname;
+    return host.replace(/^www\./, '');
+  } catch { return null; }
 }
 
 // ── State ──
@@ -870,10 +869,13 @@ function applyFilters() {
     if (search && !addr.includes(search)) return false;
     if (agent && l.listing_agent !== agent) return false;
     const hasOurVid = !!generatedVideos[l.mls_id];
-    const hasExternal = !!(l.vtour_url && l.vtour_url.trim());
+    const vtourDomain = extractDomain(l.vtour_url);
+    const hasExternal = !!vtourDomain;
+    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
     if (vf === 'has-our-video' && !hasOurVid) return false;
     if (vf === 'has-external' && !hasExternal) return false;
-    if (vf === 'no-tour' && (hasOurVid || hasExternal)) return false;
+    if (vf === 'broken-tour' && !brokenTour) return false;
+    if (vf === 'no-tour' && (hasOurVid || hasExternal || brokenTour)) return false;
     return true;
   });
 
@@ -891,7 +893,8 @@ function renderListings() {
 
   document.getElementById('listingsBody').innerHTML = filteredListings.map(l => {
     const hasOurVid = !!generatedVideos[l.mls_id];
-    const vtourDomain = l.vtour_url ? extractDomain(l.vtour_url) : null;
+    const vtourDomain = extractDomain(l.vtour_url);
+    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
     const isSelected = selectedListing && selectedListing.mls_id === l.mls_id;
     const baths = l.bathrooms_partial > 0
       ? `${l.bathrooms_full}/${l.bathrooms_partial}`
@@ -900,10 +903,7 @@ function renderListings() {
     return `
     <div class="listing-row${isSelected ? ' selected' : ''}"
          onclick="selectListing('${l.mls_id}')">
-      <img class="listing-thumb"
-           src="${l.primary_photo_url || ''}"
-           onerror="this.style.background='var(--cream-dark)'; this.removeAttribute('src')"
-           alt="">
+      <div class="listing-thumb" style="background:var(--cream-dark);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏠</div>
       <div class="listing-info">
         <h3>${l.address}</h3>
         <div class="listing-meta">
@@ -919,8 +919,10 @@ function renderListings() {
       ${hasOurVid
         ? '<span class="video-pill has-video">✓ Our Video</span>'
         : vtourDomain
-          ? `<span class="video-pill has-tour" title="${l.vtour_url}">${vtourDomain}</span>`
-          : '<span class="video-pill no-video">No Tour</span>'
+          ? `<span class="video-pill has-tour" title="${l.vtour_url || ''}">${vtourDomain}</span>`
+          : brokenTour
+            ? '<span class="video-pill broken-tour">⚠ Bad URL</span>'
+            : '<span class="video-pill no-video">No Tour</span>'
       }
     </div>`;
   }).join('');
@@ -952,11 +954,14 @@ async function selectListing(mlsId) {
   document.getElementById('previewPhotos').textContent = listing.image_count || '—';
   document.getElementById('previewAgent').textContent = `Agent: ${listing.listing_agent || '—'}`;
 
-  // Show existing tour if present
+  // Show existing tour info
   const tourEl = document.getElementById('previewTour');
-  if (listing.vtour_url) {
-    const domain = extractDomain(listing.vtour_url) || 'existing tour';
-    tourEl.innerHTML = `Existing tour: <a href="${listing.vtour_url}" target="_blank">${domain}</a>`;
+  const vtourDomain = extractDomain(listing.vtour_url);
+  if (vtourDomain) {
+    tourEl.innerHTML = `Existing tour: <a href="${listing.vtour_url}" target="_blank">${vtourDomain}</a>`;
+    tourEl.style.display = 'flex';
+  } else if (listing.vtour_url && listing.vtour_url.trim()) {
+    tourEl.innerHTML = `<span style="color:var(--red)">⚠ Broken tour URL</span>`;
     tourEl.style.display = 'flex';
   } else {
     tourEl.style.display = 'none';
@@ -1074,13 +1079,10 @@ async function startGeneration() {
   const mlsId = selectedListing.mls_id;
 
   // Warn if listing already has an external tour
-  const existingTour = selectedListing.vtour_url;
-  if (existingTour && !generatedVideos[mlsId]) {
-    const domain = extractDomain(existingTour) || existingTour;
-    const proceed = confirm(
-      `This listing already has a virtual tour from ${domain}.\n\nGenerate a new video anyway?`
-    );
-    if (!proceed) return;
+  const existingDomain = extractDomain(selectedListing.vtour_url);
+  if (existingDomain && !generatedVideos[mlsId]) {
+    const ok = confirm(`This listing already has a virtual tour from ${existingDomain}.\n\nGenerate a replacement video anyway?`);
+    if (!ok) return;
   }
 
   document.getElementById('logWrap').classList.add('visible');
@@ -1139,27 +1141,38 @@ async function startGeneration() {
 function startPolling(jobId, mlsId, startTime) {
   if (pollTimer) clearInterval(pollTimer);
 
+  // Real progress messages timed to actual pipeline stages
   const steps = [
-    [30, 'Fetching photos from DeltaNet…'],
-    [45, 'AI is curating best photos…'],
-    [60, 'Rendering Ken Burns video…'],
-    [80, 'Adding music and transitions…'],
-    [90, 'Finalizing and uploading…'],
+    [20,  30,  'Fetching photos from DeltaNet…'],
+    [35,  60,  'AI is curating best photos…'],
+    [50,  90,  'Rendering video — this takes a few minutes…'],
+    [60,  150, 'Ken Burns effects rendering…'],
+    [70,  210, 'Still rendering — almost halfway…'],
+    [78,  270, 'Crossfade transitions processing…'],
+    [84,  330, 'Adding music track…'],
+    [90,  390, 'Finalizing and uploading to storage…'],
+    [94,  450, 'Wrapping up…'],
   ];
   let stepIdx = 0;
 
+  // Live elapsed timer
+  const timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(elapsed / 60), s = elapsed % 60;
+    document.getElementById('logStatus').textContent =
+      `Processing — ${m}:${s.toString().padStart(2,'0')} elapsed`;
+  }, 1000);
+
   pollTimer = setInterval(async () => {
-    // Animate progress hints between polls
     const elapsed = (Date.now() - startTime) / 1000;
-    if (stepIdx < steps.length && elapsed > stepIdx * 30 + 15) {
-      const [pct, msg] = steps[stepIdx++];
+    if (stepIdx < steps.length && elapsed >= steps[stepIdx][1]) {
+      const [pct, , msg] = steps[stepIdx++];
       setProgress(pct);
       log(msg, 'info');
     }
 
     try {
-      const headers = {};
-      const resp = await fetch(`${serviceUrl()}/status/${jobId}`, { headers });
+      const resp = await fetch(`${serviceUrl()}/status/${jobId}`);
       if (!resp.ok) return;
       const data = await resp.json();
 
@@ -1185,6 +1198,7 @@ function startPolling(jobId, mlsId, startTime) {
 }
 
 function finishGeneration(videoUrl, mlsId, startTime) {
+  if (typeof timerInterval !== 'undefined') clearInterval(timerInterval);
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
@@ -1202,7 +1216,7 @@ function finishGeneration(videoUrl, mlsId, startTime) {
 
   generatedVideos[mlsId] = videoUrl;
   showVideo(videoUrl, mlsId);
-  renderListings(); // update video pill
+  renderListings();
 }
 
 // ── Init ──
