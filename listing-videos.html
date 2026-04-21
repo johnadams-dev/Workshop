@@ -283,6 +283,11 @@
     color: #1a7a42;
     border: 1px solid rgba(39,174,96,0.25);
   }
+  .has-tour {
+    background: rgba(201,168,76,0.1);
+    color: #7a5a10;
+    border: 1px solid rgba(201,168,76,0.35);
+  }
   .no-video {
     background: rgba(26,26,46,0.06);
     color: var(--muted);
@@ -397,6 +402,8 @@
   }
 
   .preview-photo-count strong { color: var(--slate); }
+  .preview-photo-count a { color: var(--gold); text-decoration: none; font-weight: 500; }
+  .preview-photo-count a:hover { text-decoration: underline; }
 
   /* Generator controls */
   .gen-controls {
@@ -687,8 +694,9 @@
       </select>
       <select id="videoFilter" onchange="applyFilters()">
         <option value="">All Listings</option>
-        <option value="no-video">Needs Video</option>
-        <option value="has-video">Has Video</option>
+        <option value="no-tour">No Tour At All</option>
+        <option value="has-external">Has External Tour</option>
+        <option value="has-our-video">Has Our Video</option>
       </select>
     </div>
 
@@ -728,6 +736,8 @@
           </div>
         </div>
         <div class="preview-photo-count" id="previewAgent"></div>
+        <div class="preview-photo-count" id="previewTour" style="display:none; margin-top:6px; gap:0.4rem;">
+        </div>
       </div>
     </div>
 
@@ -769,21 +779,6 @@
         </div>
       </div>
 
-      <!-- Config -->
-      <div class="config-section">
-        <div class="config-fields">
-          <div class="config-field">
-            <label>Cloud Run URL</label>
-            <input type="text" id="serviceUrl"
-              value="https://listing-video-generator-mhzvi2hwxa-ue.a.run.app"
-              onchange="saveConfig()">
-          </div>
-          <div class="config-field">
-            <label>API Key</label>
-            <input type="password" id="apiKey" placeholder="Service API key" onchange="saveConfig()">
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- MLS direct entry fallback -->
@@ -801,25 +796,24 @@
 </div>
 
 <script>
-// ── Config persistence ──
-function loadConfig() {
-  const url = localStorage.getItem('ac_service_url');
-  const key = localStorage.getItem('ac_api_key');
-  if (url) document.getElementById('serviceUrl').value = url;
-  if (key) document.getElementById('apiKey').value = key;
+// ── Helpers ──
+function extractDomain(url) {
+  try {
+    const host = new URL(url).hostname;
+    // Strip www. and return just the domain
+    return host.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }
-function saveConfig() {
-  localStorage.setItem('ac_service_url', document.getElementById('serviceUrl').value);
-  localStorage.setItem('ac_api_key', document.getElementById('apiKey').value);
-}
-loadConfig();
 
-function serviceUrl() { return document.getElementById('serviceUrl').value.replace(/\/$/, ''); }
-function apiKey() { return document.getElementById('apiKey').value; }
+// ── Config ──
+const SERVICE_URL = "https://listing-video-generator-mhzvi2hwxa-ue.a.run.app";
+
+function serviceUrl() { return SERVICE_URL; }
+function apiKey() { return ""; }
 function authHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  if (apiKey()) h['X-API-Key'] = apiKey();
-  return h;
+  return { "Content-Type": "application/json" };
 }
 
 // ── State ──
@@ -851,7 +845,7 @@ async function loadListings() {
         <span class="icon">⚠️</span>
         Could not load listings.<br>
         <small style="color:#c0392b">${e.message}</small><br><br>
-        <small>Make sure the Cloud Run URL and API key are set in configuration.</small>
+        <small>Check that the video service is running.</small>
       </div>`;
   }
 
@@ -875,9 +869,11 @@ function applyFilters() {
     const addr = `${l.address} ${l.city}`.toLowerCase();
     if (search && !addr.includes(search)) return false;
     if (agent && l.listing_agent !== agent) return false;
-    const hasVid = !!generatedVideos[l.mls_id];
-    if (vf === 'has-video' && !hasVid) return false;
-    if (vf === 'no-video' && hasVid) return false;
+    const hasOurVid = !!generatedVideos[l.mls_id];
+    const hasExternal = !!(l.vtour_url && l.vtour_url.trim());
+    if (vf === 'has-our-video' && !hasOurVid) return false;
+    if (vf === 'has-external' && !hasExternal) return false;
+    if (vf === 'no-tour' && (hasOurVid || hasExternal)) return false;
     return true;
   });
 
@@ -894,7 +890,8 @@ function renderListings() {
   }
 
   document.getElementById('listingsBody').innerHTML = filteredListings.map(l => {
-    const hasVid = !!generatedVideos[l.mls_id];
+    const hasOurVid = !!generatedVideos[l.mls_id];
+    const vtourDomain = l.vtour_url ? extractDomain(l.vtour_url) : null;
     const isSelected = selectedListing && selectedListing.mls_id === l.mls_id;
     const baths = l.bathrooms_partial > 0
       ? `${l.bathrooms_full}/${l.bathrooms_partial}`
@@ -919,9 +916,12 @@ function renderListings() {
         <div class="listing-agent">${l.listing_agent || '—'}</div>
       </div>
       <span class="listing-mls">${l.mls_id}</span>
-      <span class="video-pill ${hasVid ? 'has-video' : 'no-video'}">
-        ${hasVid ? '✓ Video' : 'No Video'}
-      </span>
+      ${hasOurVid
+        ? '<span class="video-pill has-video">✓ Our Video</span>'
+        : vtourDomain
+          ? `<span class="video-pill has-tour" title="${l.vtour_url}">${vtourDomain}</span>`
+          : '<span class="video-pill no-video">No Tour</span>'
+      }
     </div>`;
   }).join('');
 }
@@ -951,6 +951,16 @@ async function selectListing(mlsId) {
   document.getElementById('previewSqft').textContent = Number(listing.home_size || 0).toLocaleString() || '—';
   document.getElementById('previewPhotos').textContent = listing.image_count || '—';
   document.getElementById('previewAgent').textContent = `Agent: ${listing.listing_agent || '—'}`;
+
+  // Show existing tour if present
+  const tourEl = document.getElementById('previewTour');
+  if (listing.vtour_url) {
+    const domain = extractDomain(listing.vtour_url) || 'existing tour';
+    tourEl.innerHTML = `Existing tour: <a href="${listing.vtour_url}" target="_blank">${domain}</a>`;
+    tourEl.style.display = 'flex';
+  } else {
+    tourEl.style.display = 'none';
+  }
 
   if (listing.primary_photo_url) {
     document.getElementById('previewPhoto').src = listing.primary_photo_url;
@@ -1062,6 +1072,17 @@ async function startGeneration() {
   if (!selectedListing) return;
 
   const mlsId = selectedListing.mls_id;
+
+  // Warn if listing already has an external tour
+  const existingTour = selectedListing.vtour_url;
+  if (existingTour && !generatedVideos[mlsId]) {
+    const domain = extractDomain(existingTour) || existingTour;
+    const proceed = confirm(
+      `This listing already has a virtual tour from ${domain}.\n\nGenerate a new video anyway?`
+    );
+    if (!proceed) return;
+  }
+
   document.getElementById('logWrap').classList.add('visible');
   document.getElementById('videoResult').classList.remove('visible');
   document.getElementById('generateBtn').disabled = true;
@@ -1138,7 +1159,6 @@ function startPolling(jobId, mlsId, startTime) {
 
     try {
       const headers = {};
-      if (apiKey()) headers['X-API-Key'] = apiKey();
       const resp = await fetch(`${serviceUrl()}/status/${jobId}`, { headers });
       if (!resp.ok) return;
       const data = await resp.json();
