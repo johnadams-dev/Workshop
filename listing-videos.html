@@ -283,6 +283,16 @@
     color: #1a7a42;
     border: 1px solid rgba(39,174,96,0.25);
   }
+  .has-tour {
+    background: rgba(201,168,76,0.1);
+    color: #7a5a10;
+    border: 1px solid rgba(201,168,76,0.35);
+  }
+  .broken-tour {
+    background: rgba(192,57,43,0.08);
+    color: #8a2020;
+    border: 1px solid rgba(192,57,43,0.25);
+  }
   .no-video {
     background: rgba(26,26,46,0.06);
     color: var(--muted);
@@ -397,6 +407,8 @@
   }
 
   .preview-photo-count strong { color: var(--slate); }
+  .preview-photo-count a { color: var(--gold); text-decoration: none; font-weight:500; }
+  .preview-photo-count a:hover { text-decoration: underline; }
 
   /* Generator controls */
   .gen-controls {
@@ -573,55 +585,6 @@
     color: #666;
   }
 
-  /* Config */
-  .config-section {
-    padding: 1.25rem 1.5rem;
-    border-top: 1px solid var(--cream-dark);
-  }
-
-  .config-toggle {
-    font-size: 0.78rem;
-    color: var(--muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    user-select: none;
-    margin-bottom: 0;
-    transition: color 0.15s;
-  }
-  .config-toggle:hover { color: var(--slate); }
-
-  .config-fields {
-    display: none;
-    margin-top: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .config-field label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  .config-field input {
-    width: 100%;
-    border: 1px solid rgba(26,26,46,0.12);
-    background: var(--cream);
-    color: var(--ink);
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    padding: 7px 10px;
-    border-radius: 6px;
-    outline: none;
-  }
-  .config-field input:focus { border-color: var(--gold); }
-
   /* MLS quick-entry fallback */
   .mls-fallback {
     padding: 1.5rem;
@@ -712,8 +675,10 @@
       </select>
       <select id="videoFilter" onchange="applyFilters()">
         <option value="">All Listings</option>
-        <option value="no-video">Needs Video</option>
-        <option value="has-video">Has Video</option>
+        <option value="no-tour">No Tour At All</option>
+        <option value="has-external">Has External Tour</option>
+        <option value="broken-tour">Broken Tour URL</option>
+        <option value="has-our-video">Has Our Video</option>
       </select>
     </div>
 
@@ -754,6 +719,7 @@
           </div>
         </div>
         <div class="preview-photo-count" id="previewAgent"></div>
+        <div class="preview-photo-count" id="previewTour" style="display:none;margin-top:6px;gap:0.4rem;"></div>
       </div>
     </div>
 
@@ -801,23 +767,7 @@
           <div class="video-gen-time" id="genTime"></div>
         </div>
       </div>
-
-      <!-- Config -->
-      <div class="config-section">
-        <div class="config-fields">
-          <div class="config-field">
-            <label>Cloud Run URL</label>
-            <input type="text" id="serviceUrl"
-              value="https://listing-video-generator-143028259585.us-east1.run.app"
-              onchange="saveConfig()">
-          </div>
-          <div class="config-field">
-            <label>API Key</label>
-            <input type="password" id="apiKey" placeholder="Service API key" onchange="saveConfig()">
-          </div>
-        </div>
-      </div>
-    </div>
+</div>
 
     <!-- MLS direct entry fallback -->
     <div class="panel">
@@ -835,22 +785,20 @@
 
 <script>
 // ── Config persistence ──
-function loadConfig() {
-  const url = localStorage.getItem('ac_service_url');
-  const key = localStorage.getItem('ac_api_key');
-  if (url) document.getElementById('serviceUrl').value = url;
-  if (key) document.getElementById('apiKey').value = key;
-}
-function saveConfig() {
-  localStorage.setItem('ac_service_url', document.getElementById('serviceUrl').value);
-  localStorage.setItem('ac_api_key', document.getElementById('apiKey').value);
-}
-loadConfig();
+// ── Config ──
+const SERVICE_URL = 'https://listing-video-generator-143028259585.us-east1.run.app';
+function serviceUrl() { return SERVICE_URL; }
+function apiKey() { return ''; }
+function authHeaders() { return { 'Content-Type': 'application/json' }; }
 
-function serviceUrl() { return document.getElementById('serviceUrl').value.replace(/\/$/, ''); }
-function apiKey() { return document.getElementById('apiKey').value; }
-function authHeaders() {
-  const h = { 'Content-Type': 'application/json' };
+// ── Domain extractor ──
+function extractDomain(url) {
+  if (!url || !url.trim()) return null;
+  try {
+    const host = new URL(url.trim()).hostname;
+    return host.replace(/^www\./, '');
+  } catch { return null; }
+};
   if (apiKey()) h['X-API-Key'] = apiKey();
   return h;
 }
@@ -884,7 +832,7 @@ async function loadListings() {
         <span class="icon">⚠️</span>
         Could not load listings.<br>
         <small style="color:#c0392b">${e.message}</small><br><br>
-        <small>Make sure the Cloud Run URL and API key are set in configuration.</small>
+        <small>Check that the video service is running.</small>
       </div>`;
   }
 
@@ -908,9 +856,14 @@ function applyFilters() {
     const addr = `${l.address} ${l.city}`.toLowerCase();
     if (search && !addr.includes(search)) return false;
     if (agent && l.listing_agent !== agent) return false;
-    const hasVid = !!generatedVideos[l.mls_id];
-    if (vf === 'has-video' && !hasVid) return false;
-    if (vf === 'no-video' && hasVid) return false;
+    const hasOurVid = !!generatedVideos[l.mls_id];
+    const vtourDomain = extractDomain(l.vtour_url);
+    const hasExternal = !!vtourDomain;
+    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
+    if (vf === 'has-our-video' && !hasOurVid) return false;
+    if (vf === 'has-external' && !hasExternal) return false;
+    if (vf === 'broken-tour' && !brokenTour) return false;
+    if (vf === 'no-tour' && (hasOurVid || hasExternal || brokenTour)) return false;
     return true;
   });
 
@@ -927,7 +880,9 @@ function renderListings() {
   }
 
   document.getElementById('listingsBody').innerHTML = filteredListings.map(l => {
-    const hasVid = !!generatedVideos[l.mls_id];
+    const hasOurVid = !!generatedVideos[l.mls_id];
+    const vtourDomain = extractDomain(l.vtour_url);
+    const brokenTour = !!(l.vtour_url && l.vtour_url.trim() && !vtourDomain);
     const isSelected = selectedListing && selectedListing.mls_id === l.mls_id;
     const baths = l.bathrooms_partial > 0
       ? `${l.bathrooms_full}/${l.bathrooms_partial}`
@@ -949,9 +904,14 @@ function renderListings() {
         <div class="listing-agent">${l.listing_agent || '—'}</div>
       </div>
       <span class="listing-mls">${l.mls_id}</span>
-      <span class="video-pill ${hasVid ? 'has-video' : 'no-video'}">
-        ${hasVid ? '✓ Video' : 'No Video'}
-      </span>
+      ${hasOurVid
+        ? '<span class="video-pill has-video">✓ Our Video</span>'
+        : vtourDomain
+          ? `<span class="video-pill has-tour" title="${l.vtour_url || ''}">${vtourDomain}</span>`
+          : brokenTour
+            ? '<span class="video-pill broken-tour">⚠ Bad URL</span>'
+            : '<span class="video-pill no-video">No Tour</span>'
+      }
     </div>`;
   }).join('');
 }
@@ -981,6 +941,19 @@ async function selectListing(mlsId) {
   document.getElementById('previewSqft').textContent = Number(listing.home_size || 0).toLocaleString() || '—';
   document.getElementById('previewPhotos').textContent = listing.image_count || '—';
   document.getElementById('previewAgent').textContent = `Agent: ${listing.listing_agent || '—'}`;
+
+  // Show existing tour info
+  const tourEl = document.getElementById('previewTour');
+  const vtDomain = extractDomain(listing.vtour_url);
+  if (vtDomain) {
+    tourEl.innerHTML = `Existing tour: <a href="${listing.vtour_url}" target="_blank">${vtDomain}</a>`;
+    tourEl.style.display = 'flex';
+  } else if (listing.vtour_url && listing.vtour_url.trim()) {
+    tourEl.innerHTML = '<span style="color:var(--red)">⚠ Broken tour URL</span>';
+    tourEl.style.display = 'flex';
+  } else {
+    tourEl.style.display = 'none';
+  }
 
   if (listing.primary_photo_url) {
     document.getElementById('previewPhoto').src = listing.primary_photo_url;
@@ -1102,6 +1075,14 @@ async function startGeneration() {
   if (!selectedListing) return;
 
   const mlsId = selectedListing.mls_id;
+
+  // Warn if listing already has an external tour
+  const existingDomain = extractDomain(selectedListing.vtour_url);
+  if (existingDomain && !generatedVideos[mlsId]) {
+    const ok = confirm(`This listing already has a virtual tour from ${existingDomain}.\n\nGenerate a replacement video anyway?`);
+    if (!ok) return;
+  }
+
   document.getElementById('logWrap').classList.add('visible');
   document.getElementById('videoResult').classList.remove('visible');
   document.getElementById('generateBtn').disabled = true;
