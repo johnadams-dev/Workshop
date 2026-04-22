@@ -277,7 +277,7 @@ textarea.fi.tall{min-height:130px}
     <div>
       <div class="flbl">DBAR or Stellar MLS ID</div>
       <div class="mls-bar">
-        <input type="text" id="mlsSearchInput" placeholder="MLS# (e.g. O6218734) or address…" onkeydown="if(event.key==='Enter')mlsSearch('desc')">
+        <input type="text" id="mlsSearchInput" placeholder="MLS# (e.g. O6218734)…" onkeydown="if(event.key==='Enter')mlsSearch('desc')">
         <button class="mls-search-btn" id="mlsSearchBtn" onclick="mlsSearch('desc')">🔍 Look Up</button>
       </div>
       <div id="mlsSearchStatus" style="display:none"></div>
@@ -384,7 +384,7 @@ textarea.fi.tall{min-height:130px}
     <div class="photo-left">
       <div class="flbl">Stellar MLS ID</div>
       <div class="mls-bar">
-        <input type="text" id="mlsPhotoSearchInput" placeholder="MLS# or address…" onkeydown="if(event.key==='Enter')mlsSearch('photo')">
+        <input type="text" id="mlsPhotoSearchInput" placeholder="MLS#…" onkeydown="if(event.key==='Enter')mlsSearch('photo')">
         <button class="mls-search-btn" id="mlsPhotoSearchBtn" onclick="mlsSearch('photo')">🔍</button>
       </div>
       <div id="mlsPhotoSearchStatus" style="display:none"></div>
@@ -484,7 +484,7 @@ textarea.fi.tall{min-height:130px}
     <div>
       <div class="flbl">Find Existing Listing</div>
       <div class="mls-bar">
-        <input type="text" id="mlsSearchInputB" placeholder="MLS# or address…" onkeydown="if(event.key==='Enter')mlsSearchB()">
+        <input type="text" id="mlsSearchInputB" placeholder="MLS#…" onkeydown="if(event.key==='Enter')mlsSearchB()">
         <button class="mls-search-btn" id="mlsSearchBtnB" onclick="mlsSearchB()">🔍 Look Up</button>
       </div>
       <div id="mlsSearchStatusB" style="display:none"></div>
@@ -602,8 +602,6 @@ const GEMINI_PROXY_URL = 'https://mls-proxy-975684028597.us-east1.run.app/gemini
 const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 let mlsProxyUrl    = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
 let mlsProxySecret = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
-let mlsBridgeToken = sessionStorage.getItem('mls_bridge_token') || 'd2fd250f9a6f0874635c32af9c880563';
-let mlsSparkToken  = sessionStorage.getItem('mls_spark_token')  || '5ervnco2dabb3w5apqxo4as1i';
 let photoType = 'exterior';
 let selectedOpts = new Set();
 let photoFile = null;
@@ -1228,35 +1226,79 @@ function initSlider() {
   window.addEventListener('touchend',  () => drag = false);
 }
 
-// ── MLS LOOKUP ───────────────────────────────────────────────────
+// ── MLS LOOKUP (DeltaNet) ────────────────────────────────────────
 
-// Proxy helpers
-function mlsHeaders(bearerToken) {
-  const h = { 'Accept': 'application/json', 'x-proxy-key': mlsProxySecret };
-  if (bearerToken) h['Authorization'] = 'Bearer ' + bearerToken;
-  return h;
+// Standard auth headers for the proxy
+function mlsHeaders() {
+  return { 'Accept': 'application/json', 'x-proxy-key': mlsProxySecret };
 }
 
-// Detect if input looks like an MLS ID (alphanumeric, no spaces) or address
+// Detect if input looks like an MLS number (digits only, or short alphanumeric, no spaces)
 function looksLikeMlsId(q) {
-  return /^[A-Za-z0-9]{5,12}$/.test(q.trim());
+  return /^[A-Za-z0-9]{4,15}$/.test(q.trim());
 }
 
-// Build a human-readable address from a RESO listing object
-function resoAddress(l) {
-  const parts = [l.StreetNumber, l.StreetDirPrefix, l.StreetName, l.StreetSuffix, l.StreetDirSuffix].filter(Boolean).join(' ');
-  const unit  = l.UnitNumber ? ' #' + l.UnitNumber : '';
-  const city  = [l.City, l.StateOrProvince, l.PostalCode].filter(Boolean).join(', ');
-  return (parts + unit + (city ? ', ' + city : '')).trim();
+// Build a human-readable address from discrete fields if unparsed_address is absent
+function buildAddress(l) {
+  const street = [
+    l.address_number || l.street_number,
+    l.address_direction || l.street_direction,
+    l.address_street || l.street_name,
+    l.address_street_type || l.street_suffix,
+    l.address_unit ? '#' + l.address_unit : null
+  ].filter(Boolean).join(' ');
+  const region = [l.city, l.state || l.state_code, l.zip || l.postal_code].filter(Boolean).join(', ');
+  return [street, region].filter(Boolean).join(', ').trim();
 }
 
-// Core search — returns { listing, source } or throws a descriptive error
-// Helper: fetch with automatic retry for transient errors (ECONNRESET, 502, 503)
+// Normalize a raw DeltaNet listing to the field names renderMLSCard expects
+function normalizeDeltanetListing(l) {
+  console.log('[DeltaNet] raw listing keys:', Object.keys(l));
+
+  // Property type — DeltaNet uses "1"/"0" or true/false boolean-ish strings
+  const truthy = v => v === true || v === 'true' || v === 1 || v === '1';
+  const propType =
+    truthy(l.property_type_condo)      ? 'Condo / Townhouse'  :
+    truthy(l.property_type_townhouse)  ? 'Condo / Townhouse'  :
+    truthy(l.property_category_multi)  ? 'Multi-Family'       :
+    truthy(l.property_category_land)   ? 'Land'               :
+    truthy(l.property_category_commercial) ? 'Commercial'     :
+    truthy(l.property_category_residential) ? 'Residential'   : '';
+
+  // Full address — DeltaNet provides address, city, state, zip_code as separate fields
+  const street  = [l.address, l.address2, l.unit_number ? '#' + l.unit_number : null].filter(Boolean).join(' ');
+  const region  = [l.city, l.state, l.zip_code].filter(Boolean).join(', ');
+  const fullAddr = l.unparsed_address || [street, region].filter(Boolean).join(', ');
+
+  // Photos — populated by Step 2 detail call; photo_data is the authoritative array
+  const rawPhotos = l.photo_data || l.photos || [];
+
+  return {
+    // Display fields
+    UnparsedAddress: fullAddr,
+    ListPrice:       l.price_asking  || l.list_price  || l.price,
+    BedroomsTotal:   l.bedrooms,
+    BathroomsFull:   l.bathrooms_full || l.bathrooms,
+    LivingArea:      l.home_size     || l.square_feet || l.sqft,
+    ListingId:       l.mls_id        || l.custom_listing_id || l.delta_listing_id,
+    StandardStatus:  l.status_display_text || l.status,
+    // Remarks — DeltaNet stores in 'comments'; fall back to feature_comments or additional_comments
+    PublicRemarks:   l.comments      || l.feature_comments || l.additional_comments || l.public_remarks || l.remarks,
+    PropertyType:    propType,
+    // Photos — extractPhotos() reads _deltanetPhotos
+    _deltanetPhotos: rawPhotos,
+    // MLS source label for the card badge
+    _mlsSource:      l.mls_source_name || 'DeltaNet',
+    // Raw data for debugging (logged to console)
+    _raw:            l,
+  };
+}
+
+// fetch with automatic retry for transient errors
 async function fetchWithRetry(url, options, retries = 2, delayMs = 800) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(url, options);
-      // Retry on 502/503 (transient upstream errors like ECONNRESET)
       if ((res.status === 502 || res.status === 503) && attempt < retries) {
         console.warn(`[fetchWithRetry] ${res.status} on attempt ${attempt + 1}, retrying in ${delayMs}ms…`);
         await new Promise(r => setTimeout(r, delayMs));
@@ -1265,7 +1307,7 @@ async function fetchWithRetry(url, options, retries = 2, delayMs = 800) {
       return res;
     } catch (e) {
       if (attempt < retries) {
-        console.warn(`[fetchWithRetry] fetch error on attempt ${attempt + 1}: ${e.message}, retrying…`);
+        console.warn(`[fetchWithRetry] fetch error attempt ${attempt + 1}: ${e.message}, retrying…`);
         await new Promise(r => setTimeout(r, delayMs));
       } else {
         throw e;
@@ -1274,90 +1316,45 @@ async function fetchWithRetry(url, options, retries = 2, delayMs = 800) {
   }
 }
 
+// Core search — calls DeltaNet API, returns { listing, source } or throws
 async function mlsDoSearch(query) {
+  query = query.trim();
   const isId = looksLikeMlsId(query);
-  let bridgeErr = '', sparkErr = '';
 
-  // ── Try Bridge / Stellar first (with retry for transient errors) ─────────
-  try {
-    const filter = isId
-      ? `ListingId eq '${query}'`
-      : `contains(UnparsedAddress,'${query}') or contains(StreetName,'${query.split(/\s+/).slice(0,2).join(' ')}')`;
-    const url = `${mlsProxyUrl}/bridge/stellar/Properties?$filter=${encodeURIComponent(filter)}&$top=5&access_token=${mlsBridgeToken}`;
-    console.log('[Bridge] GET', url);
-    const res  = await fetchWithRetry(url, { headers: mlsHeaders() });
-    const body = await res.json().catch(() => ({}));
-    console.log('[Bridge] status', res.status, body);
-    if (res.ok) {
-      const hits = body?.value || [];
-      if (hits.length > 0) {
-        const listing = hits[0];
-        const mediaCount = Array.isArray(listing.Media) ? listing.Media.length : 0;
-        console.log('[Bridge Media] inline count:', mediaCount, '| PhotosCount:', listing.PhotosCount);
-        return { listing, source: 'Stellar MLS' };
-      }
-      bridgeErr = 'Not found in Stellar MLS';
-    } else {
-      // 502/ECONNRESET after all retries — note as connection issue, not "not found"
-      const detail = body?.detail || body?.error?.message || body?.message || '';
-      const isConnErr = res.status === 502 || detail.includes('ECONNRESET') || detail.includes('connect');
-      bridgeErr = isConnErr
-        ? `Stellar connection error (${res.status}) — listing may still exist in Stellar`
-        : `Stellar ${res.status}: ${JSON.stringify(body).slice(0, 120)}`;
-    }
-  } catch (e) {
-    bridgeErr = 'Stellar connection error — listing may still exist in Stellar';
-    console.error('[Bridge]', e);
+  if (!isId) {
+    // DeltaNet's /v2/listings endpoint searches by mls_ids only.
+    // Address search is not yet supported — guide the agent to use the MLS number.
+    throw new Error(
+      'Address search is not supported with DeltaNet. Please enter the listing\'s MLS # instead. ' +
+      '(You can find it in the MLS portal or on the listing sheet.)'
+    );
   }
 
-  // ── Fall back to Spark / DBAR ─────────────────────────────────────────────
-  try {
-    const filter = isId
-      ? `ListingId eq '${query}'`
-      : `contains(StreetName,'${query.split(/\s+/).slice(0,2).join(' ')}')`;
-    const url = `${mlsProxyUrl}/spark/Property?$filter=${encodeURIComponent(filter)}&$top=5`;
-    console.log('[Spark] GET', url);
-    const res  = await fetchWithRetry(url, { headers: mlsHeaders(mlsSparkToken) });
-    const body = await res.json().catch(() => ({}));
-    console.log('[Spark] status', res.status, body);
-    if (res.ok) {
-      const hits = body?.value || body?.D?.Results || [];
-      if (hits.length > 0) {
-        const listing = hits[0];
-        const listingKey = listing.ListingKey || listing.Id || listing.ListingId;
-        if (listingKey) {
-          try {
-            const photoUrl = `${mlsProxyUrl}/spark/listings/${listingKey}/photos`;
-            console.log('[Spark Photos] GET', photoUrl);
-            const pr = await fetchWithRetry(photoUrl, { headers: mlsHeaders(mlsSparkToken) });
-            const pb = await pr.json().catch(() => ({}));
-            console.log('[Spark Photos] status', pr.status, pb);
-            if (pr.ok) {
-              const results = pb?.D?.Results || pb?.value || [];
-              if (results.length > 0) listing._sparkPhotos = results;
-            }
-          } catch (pe) {
-            console.warn('[Spark Photos] fetch failed:', pe.message);
-          }
-        }
-        return { listing, source: 'DBAR' };
-      }
-      sparkErr = 'Not found in DBAR';
-    } else {
-      sparkErr = `DBAR ${res.status}: ${(body?.error?.message || body?.message || JSON.stringify(body)).slice(0, 120)}`;
-    }
-  } catch (e) {
-    sparkErr = 'DBAR connection error: ' + e.message;
-    console.error('[Spark]', e);
+  const params = new URLSearchParams({
+    mls_id: query,
+    status: '0,1,2,3,4',  // search all statuses so off-market / recent listings are found
+    limit:  '5',
+  });
+  const url = `${mlsProxyUrl}/deltanet/listings?${params}`;
+  console.log('[DeltaNet] GET', url);
+
+  const res  = await fetchWithRetry(url, { headers: mlsHeaders() });
+  const body = await res.json().catch(() => ({}));
+  console.log('[DeltaNet] status', res.status, body);
+
+  if (!res.ok) {
+    const detail = body?.error || JSON.stringify(body).slice(0, 200);
+    throw new Error('DeltaNet ' + res.status + ': ' + detail);
   }
 
-  // Both failed — give the most actionable error message
-  const bothConnErr = bridgeErr.includes('connection error') && sparkErr.includes('connection error');
-  if (bothConnErr) throw new Error('MLS connection error — please try again in a moment.');
-  if (bridgeErr.includes('connection error') && sparkErr.includes('Not found')) {
-    throw new Error('Listing not found in DBAR. Stellar MLS had a connection error — this listing may be in Stellar. Please try again.');
+  // API returns { listings: [...] } — normalise top result
+  const hits = body?.listings || body?.data || body?.results || [];
+  if (!hits.length) {
+    throw new Error('MLS# ' + query + ' not found in DeltaNet. Double-check the number and try again.');
   }
-  throw new Error([bridgeErr, sparkErr].filter(Boolean).join(' | '));
+
+  const listing = normalizeDeltanetListing(hits[0]);
+  return { listing, source: listing._mlsSource };
 }
 
 // Search Bridge (Stellar) then fall back to Spark (DBAR)
@@ -1375,7 +1372,7 @@ async function mlsSearch(context) {
   const btnEl    = document.getElementById(btnId);
 
   statusEl.style.display = 'block';
-  statusEl.innerHTML = '<div class="mls-loading"><div class="mls-spinner"></div>Searching MLS…</div>';
+  statusEl.innerHTML = '<div class="mls-loading"><div class="mls-spinner"></div>Searching DeltaNet…</div>';
   resultEl.style.display = 'none';
   resultEl.innerHTML = '';
   btnEl.disabled = true;
@@ -1393,9 +1390,18 @@ async function mlsSearch(context) {
   }
 }
 
-// Pull photo URLs from Bridge or Spark Media array (populated via $expand=Media or sub-resource)
+// Pull photo URLs from the listing object — handles DeltaNet and legacy Bridge/Spark formats
 function extractPhotos(listing) {
-  // Bridge & Spark RESO: inline Media array via $expand=Media
+  // DeltaNet: photo_data array from /listings/{deltaId}/ detail endpoint
+  // Each element: { id, url, mls_sourced, last_modified, checksum, title, width, height }
+  if (Array.isArray(listing._deltanetPhotos) && listing._deltanetPhotos.length > 0) {
+    const urls = listing._deltanetPhotos
+      .map(p => p.url || p.large_url || p.full_url || p.medium_url || p.thumbnail_url || p.MediaURL)
+      .filter(Boolean);
+    console.log('[extractPhotos] DeltaNet photos →', urls.length, 'URLs. First:', urls[0] || 'none');
+    return urls;
+  }
+  // Bridge / RESO: inline Media array via $expand=Media
   if (Array.isArray(listing.Media) && listing.Media.length > 0) {
     const urls = listing.Media
       .filter(m => m.MediaURL || m.Uri1280 || m.Uri800 || m.Uri)
@@ -1429,7 +1435,7 @@ function extractPhotos(listing) {
 const MLS_CARD_DATA = {};
 
 function renderMLSCard(listing, source, context, container) {
-  const addr    = listing.UnparsedAddress || resoAddress(listing);
+  const addr    = listing.UnparsedAddress || '';
   const price   = listing.ListPrice ? '$' + Number(listing.ListPrice).toLocaleString() : '';
   const beds    = listing.BedroomsTotal || '';
   const baths   = listing.BathroomsFull || '';
@@ -1609,7 +1615,7 @@ function mlsSearchB() {
   const btnEl    = document.getElementById('mlsSearchBtnB');
 
   statusEl.style.display = 'block';
-  statusEl.innerHTML = '<div class="mls-loading"><div class="mls-spinner"></div>Searching MLS…</div>';
+  statusEl.innerHTML = '<div class="mls-loading"><div class="mls-spinner"></div>Searching DeltaNet…</div>';
   resultEl.style.display = 'none';
   btnEl.disabled = true;
 
