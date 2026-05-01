@@ -1218,22 +1218,52 @@ function renderDetail() {
             </ul>
           </div>` : ''}
 
-        <div class="section-label">Add Coaching Note</div>
+        <div class="section-label" style="margin-top:0">
+          Shared Note
+          <span style="font-size:0.72rem;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px;">— emailed to agent</span>
+        </div>
         <div class="feedback-form">
-          <textarea id="feedbackText" placeholder="What did you discuss? What commitments did the agent make? What follow-up is needed?"></textarea>
+          <textarea id="sharedNoteText" placeholder="Encouragement, feedback, or action items to share with the agent…" style="min-height:90px"></textarea>
           <div class="btn-row">
-            <button class="btn-primary" onclick="submitFeedback()">Save Note</button>
-            <button class="btn-outline" onclick="document.getElementById('feedbackText').value=''">Clear</button>
+            <button class="btn-primary" onclick="submitNote(false)">Save &amp; Email to Agent</button>
+            <button class="btn-outline" onclick="document.getElementById('sharedNoteText').value=''">Clear</button>
           </div>
         </div>
 
-        ${d.feedback?.length ? `
-          <div class="section-label" style="margin-top:1.25rem">Previous Notes</div>
-          ${d.feedback.map(f => `
-            <div class="feedback-history-item">
-              <div class="feedback-meta">${f.coach_name} · ${new Date(f.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
-              <div class="feedback-text">${f.feedback_text}</div>
-            </div>`).join('')}` : ''}
+        <div class="section-label" style="margin-top:1.25rem">
+          Private Note
+          <span style="font-size:0.72rem;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px;">— coach only, not shared</span>
+        </div>
+        <div class="feedback-form">
+          <textarea id="privateNoteText" placeholder="Internal observations, concerns, or reminders for your own reference…" style="min-height:90px"></textarea>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="submitNote(true)">Save Private Note</button>
+            <button class="btn-outline" onclick="document.getElementById('privateNoteText').value=''">Clear</button>
+          </div>
+        </div>
+
+        ${d.feedback?.length ? (() => {
+          const shared  = d.feedback.filter(f => !f.is_private);
+          const private_ = d.feedback.filter(f => f.is_private);
+          return `
+            ${shared.length ? `
+              <div class="section-label" style="margin-top:1.5rem">Shared Notes <span style="font-size:0.72rem;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(sent to agent)</span></div>
+              ${shared.map(f => `
+                <div class="feedback-history-item">
+                  <div class="feedback-meta">${f.coach_name} · ${new Date(f.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+                  <div class="feedback-text">${f.feedback_text}</div>
+                </div>`).join('')}` : ''}
+            ${private_.length ? `
+              <div class="section-label" style="margin-top:1.25rem">
+                Private Notes
+                <span style="font-size:0.72rem;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:4px;">🔒 coach only</span>
+              </div>
+              ${private_.map(f => `
+                <div class="feedback-history-item" style="border-left:3px solid var(--amber);background:var(--amber-bg)">
+                  <div class="feedback-meta">${f.coach_name} · ${new Date(f.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+                  <div class="feedback-text">${f.feedback_text}</div>
+                </div>`).join('')}` : ''}`;
+        })() : ''}
       </div>
 
       <!-- PLAN TAB -->
@@ -1316,9 +1346,10 @@ function renderDetail() {
   `;
 }
 
-/* ─────────────────────── FEEDBACK ───────────────────── */
-async function submitFeedback() {
-  const text = document.getElementById('feedbackText')?.value.trim();
+/* ─────────────────────── NOTES ──────────────────────── */
+async function submitNote(isPrivate) {
+  const textId = isPrivate ? 'privateNoteText' : 'sharedNoteText';
+  const text = document.getElementById(textId)?.value.trim();
   if (!text) { toast('Please enter a note first.', 'err'); return; }
   if (!S.activeDetail) return;
 
@@ -1333,13 +1364,12 @@ async function submitFeedback() {
       body: JSON.stringify({
         agentId:      S.activeDetail.agent.id,
         feedbackText: text,
-        isPrivate:    false,
+        isPrivate,
       })
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    toast('Note saved successfully.', 'ok');
-    document.getElementById('feedbackText').value = '';
-    // Reload detail to show new note
+    toast(isPrivate ? 'Private note saved.' : 'Note saved and emailed to agent.', 'ok');
+    document.getElementById(textId).value = '';
     openDetail(S.activeDetail.agent.id);
   } catch(e) {
     toast('Could not save note: ' + e.message, 'err');
