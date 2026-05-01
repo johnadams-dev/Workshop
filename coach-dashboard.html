@@ -1224,21 +1224,17 @@ function renderDetail() {
         </div>
         <div class="feedback-form">
           <textarea id="sharedNoteText" placeholder="Encouragement, feedback, or action items to share with the agent…" style="min-height:90px"></textarea>
-          <div class="btn-row">
-            <button class="btn-primary" onclick="submitNote(false)">Save &amp; Email to Agent</button>
-            <button class="btn-outline" onclick="document.getElementById('sharedNoteText').value=''">Clear</button>
-          </div>
         </div>
 
-        <div class="section-label" style="margin-top:1.25rem">
+        <div class="section-label" style="margin-top:1rem">
           Private Note
           <span style="font-size:0.72rem;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px;">— coach only, not shared</span>
         </div>
         <div class="feedback-form">
           <textarea id="privateNoteText" placeholder="Internal observations, concerns, or reminders for your own reference…" style="min-height:90px"></textarea>
-          <div class="btn-row">
-            <button class="btn-primary" onclick="submitNote(true)">Save Private Note</button>
-            <button class="btn-outline" onclick="document.getElementById('privateNoteText').value=''">Clear</button>
+          <div class="btn-row" style="margin-top:0.75rem">
+            <button class="btn-primary" onclick="submitNotes()">Save Notes &amp; Email Shared to Agent</button>
+            <button class="btn-outline" onclick="document.getElementById('sharedNoteText').value='';document.getElementById('privateNoteText').value=''">Clear Both</button>
           </div>
         </div>
 
@@ -1347,32 +1343,38 @@ function renderDetail() {
 }
 
 /* ─────────────────────── NOTES ──────────────────────── */
-async function submitNote(isPrivate) {
-  const textId = isPrivate ? 'privateNoteText' : 'sharedNoteText';
-  const text = document.getElementById(textId)?.value.trim();
-  if (!text) { toast('Please enter a note first.', 'err'); return; }
+async function submitNotes() {
+  const sharedText  = document.getElementById('sharedNoteText')?.value.trim();
+  const privateText = document.getElementById('privateNoteText')?.value.trim();
+  if (!sharedText && !privateText) { toast('Please enter at least one note.', 'err'); return; }
   if (!S.activeDetail) return;
 
+  const saves = [];
+  if (sharedText)  saves.push({ feedbackText: sharedText,  isPrivate: false });
+  if (privateText) saves.push({ feedbackText: privateText, isPrivate: true  });
+
   try {
-    const res = await fetch(`${PROXY_BASE}/coach/feedback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-proxy-key': PROXY_KEY,
-        'x-user-email': S.email,
-      },
-      body: JSON.stringify({
-        agentId:      S.activeDetail.agent.id,
-        feedbackText: text,
-        isPrivate,
-      })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    toast(isPrivate ? 'Private note saved.' : 'Note saved and emailed to agent.', 'ok');
-    document.getElementById(textId).value = '';
+    await Promise.all(saves.map(payload =>
+      fetch(`${PROXY_BASE}/coach/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-proxy-key': PROXY_KEY,
+          'x-user-email': S.email,
+        },
+        body: JSON.stringify({ agentId: S.activeDetail.agent.id, ...payload })
+      }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+    ));
+
+    const msg = sharedText && privateText ? 'Notes saved — shared note emailed to agent.'
+              : sharedText                ? 'Note saved and emailed to agent.'
+              :                            'Private note saved.';
+    toast(msg, 'ok');
+    document.getElementById('sharedNoteText').value  = '';
+    document.getElementById('privateNoteText').value = '';
     openDetail(S.activeDetail.agent.id);
   } catch(e) {
-    toast('Could not save note: ' + e.message, 'err');
+    toast('Could not save notes: ' + e.message, 'err');
   }
 }
 
