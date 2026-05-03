@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - John Broke It Again!</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #fcfcfc;
+            color: #333;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 900px;
+            padding: 20px;
+        }
+
+        /* The main image containing you, the logo, and the joke */
+        .hero-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            margin-bottom: 40px;
+        }
+
+        /* The Runaway Button Styles */
+        #runaway-wrap {
+            height: 100px; /* Space for the button to jump around */
+            position: relative;
+            width: 100%;
+        }
+
+        .btn-for-sale {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 35px;
+            background-color: #b32025; /* Adams Cameron Red */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(179, 32, 37, 0.4);
+            transition: top 0.2s ease, left 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .footer-text {
+            margin-top: 50px;
+            font-size: 0.9rem;
+            color: #bdc3c7;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <img src="john_broke_it.jpg" alt="John Broke It - 404 Error" class="hero-image">
+
+    <h1>Wait, where's the page?</h1>
+    <p class="tagline">Looks like John listed this URL for sale and it's already off the market.</p>
+
+    <div id="runaway-wrap">
+        <button id="runaway" class="btn-for-sale">🏠 Click here to escape John's mess</button>
+    </div>
+
+    <p class="footer-text">Adams Cameron & Co. | Real Estate & Occasional 404 Errors</p>
+</div>
+
+<script>
+    const btn = document.getElementById('runaway');
+    const wrap = document.getElementById('runaway-wrap');
+    
+    // Function to move the button to a random spot within the wrapper
+    const moveButton = () => {
+        // We limit the movement to keep it visible but annoying
+        const x = Math.random() * (window.innerWidth - 200);
+        const y = (Math.random() * 200) - 100; // Jumps up or down
+        
+        btn.style.position = 'fixed';
+        btn.style.left = `${x}px`;
+        btn.style.top = `${Math.max(100, Math.min(y + window.innerHeight/2, window.innerHeight - 100))}px`;
+    };
+
+    // When the mouse gets close, it jumps!
+    btn.addEventListener('mouseover', moveButton);
+
+    // If they actually click it
+    btn.addEventListener('click', () => {
+        alert("You caught it! Let's get you back to the homepage.");
+        window.location.href = '/'; 
+    });
+</script>
+
+</body>
+</html>
