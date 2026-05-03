@@ -509,6 +509,21 @@ const PROXY_BASE = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-pr
 const PROXY_KEY  = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
+/* ─────────────────────── SESSION ────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
+function saveSession(email, name, picture) {
+  try { localStorage.setItem(AC_SESSION_KEY, JSON.stringify({ email, name, picture, exp: Date.now() + 8 * 60 * 60 * 1000 })); } catch(_) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) { localStorage.removeItem(AC_SESSION_KEY); return null; }
+    return s;
+  } catch(_) { return null; }
+}
+
 /* ─────────────────────── STATE ──────────────────────── */
 const S = {
   email:        null,
@@ -531,6 +546,8 @@ const S = {
 /* ─────────────────────── INIT ───────────────────────── */
 window.addEventListener('load', () => {
   setWeekLabel();
+  const saved = loadSession();
+  if (saved) { S.email = saved.email; loadAgent(); return; }
   const poll = setInterval(() => {
     if (!window.google?.accounts) return;
     clearInterval(poll);
@@ -559,7 +576,7 @@ function initAuth() {
           headers: { Authorization: `Bearer ${res.access_token}` }
         });
         const info = await res.ok ? r.json() : null;
-        if (info?.email) { S.email = info.email; await loadAgent(); }
+        if (info?.email) { S.email = info.email; saveSession(info.email, info.name, info.picture); await loadAgent(); }
         else showAuthError();
       } catch(e) { showAuthError(); }
     }
@@ -571,7 +588,7 @@ function initAuth() {
     callback: async (cred) => {
       try {
         const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-        if (payload.email) { S.email = payload.email; await loadAgent(); }
+        if (payload.email) { S.email = payload.email; saveSession(payload.email, payload.name || '', payload.picture || ''); await loadAgent(); }
       } catch(e) { showSignIn(); }
     }
   });
@@ -1156,6 +1173,8 @@ function showConfirmation(scorecard) {
         Your coach will review your responses. Keep the momentum going.
       </div>
       <div class="confirm-next">Next check-in: ${nextFmt}</div>
+      <a href="pathfinder.html" style="margin-top:0.5rem;display:inline-block;padding:0.6rem 1.4rem;background:var(--gold);color:#1a1008;border-radius:8px;font-weight:600;font-size:0.85rem;text-decoration:none">Go to My Dashboard →</a>
+      <div style="font-size:0.75rem;color:var(--text3)">or close this tab</div>
     </div>`;
   document.getElementById('screens').appendChild(el);
   setTimeout(() => existing?.remove(), 300);
