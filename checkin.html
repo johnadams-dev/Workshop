@@ -708,30 +708,29 @@ function buildCheckin() {
   // Cap: max 2 activities per strategy, max 6 total activity questions
   if (S.strategies.length) {
     const sorted = [...S.strategies].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
-    let totalActivities = 0;
     sorted.forEach(strat => {
-      if (totalActivities >= 6) return;
-      const activities = (Array.isArray(strat.activities) ? strat.activities : [])
-        .filter(a => a.input_type !== 'boolean') // skip yes/no in main flow
-        .slice(0, strat.is_primary ? 2 : 1);    // 2 for primary, 1 for secondary
-      activities.forEach(act => {
-        if (totalActivities >= 6) return;
-        S.screens.push({
-          type:        'question',
-          activityId:  act.id,
-          slug:        act.slug,
-          question:    act.question,
-          label:       act.label,
-          hint:        act.hint,
-          unit:        act.unit,
-          inputType:   act.input_type,
-          target:      act.agent_target,
-          stratName:   strat.name,
-          stratIcon:   strat.icon,
-          isPrimary:   strat.is_primary,
+      (Array.isArray(strat.activities) ? strat.activities : [])
+        .filter(a =>
+          a.input_type !== 'boolean'    // yes/no handled separately if needed
+          && a.agent_target !== null
+          && a.agent_target !== undefined
+        )
+        .forEach(act => {
+          S.screens.push({
+            type:        'question',
+            activityId:  act.id,
+            slug:        act.slug,
+            question:    act.question,
+            label:       act.label,
+            hint:        act.hint,
+            unit:        act.unit,
+            inputType:   act.input_type,
+            target:      act.agent_target,
+            stratName:   strat.name,
+            stratIcon:   strat.icon,
+            isPrimary:   strat.is_primary,
+          });
         });
-        totalActivities++;
-      });
     });
   } else {
     // No strategies — use 5 universal defaults
