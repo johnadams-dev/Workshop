@@ -1048,13 +1048,10 @@ function populateHistory(rows) {
       ? new Date(c.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : (c.check_in_year && c.week_number ? `Wk ${c.week_number}` : '—');
 
-    const pills = [];
-    if (c.soi_calls)       pills.push(`${c.soi_calls} calls`);
-    if (c.floor_hours)     pills.push(`${c.floor_hours}h floor`);
-    if (c.social_posts)    pills.push(`${c.social_posts} posts`);
-    if (c.listing_appts)   pills.push(`${c.listing_appts} listing appts`);
-    if (c.buyer_prospects) pills.push(`${c.buyer_prospects} buyers`);
-    if (!pills.length)     pills.push('Completed');
+    const pills = (c.activity_responses || [])
+      .filter(a => a.value !== null && a.value > 0)
+      .map(a => `${a.value}${a.unit ? ' ' + a.unit : ''} — ${a.label}`);
+    if (!pills.length) pills.push('Completed');
 
     const score = c.commitment_score;
     let scoreClass = 'none', scoreDisplay = '—';
