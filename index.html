@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -436,16 +437,16 @@
     </a>
 
     <!-- Hotsheet -->
-    <a href="https://mls-proxy-975684028597.us-east1.run.app/hotsheet/report" target="_blank" class="card">
+    <div class="card" onclick="openHotsheet()" style="cursor:pointer">
       <div class="card-icon">🔥</div>
       <span class="card-status status-beta">Beta</span>
       <h2>Adams Cameron Hotsheet</h2>
       <p>Daily activity report showing new listings, contracts, closings, price changes, open houses, and buyer needs across Adams Cameron offices — updated every morning.</p>
-      <div class="card-arrow">
+      <div class="card-arrow" id="hotsheetArrow">
         Open Hotsheet
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </div>
-    </a>
+    </div>
 
   </div>
 </section>
@@ -488,4 +489,56 @@
 
 <footer>
   <div class="footer-name">John Adams</div>
-  <p>Questions or bug reports? Email <a href="/cdn-cgi/l/email-protection#81ebeee9efaae0f1f1f2c1e0e5e0ecf2e2e0ece4f3eeefafe2eeec"><span class=
+  <p>Questions or bug reports? Email <a href="mailto:johnadams@adamscameron.com">johnadams@adamscameron.com</a></p>
+</footer>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const HOTSHEET_URL = PROXY_BASE + '/hotsheet/report';
+const SESSION_KEY  = 'ac_proxy_key';
+
+function openHotsheet() {
+  // Use cached key if available
+  const cached = sessionStorage.getItem(SESSION_KEY);
+  if (cached) { window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(cached), '_blank'); return; }
+
+  const arrow = document.getElementById('hotsheetArrow');
+  if (arrow) arrow.textContent = 'Signing in…';
+
+  // Wait for Google SDK then trigger One Tap
+  const ready = () => {
+    google.accounts.id.initialize({
+      client_id: OAUTH_CLIENT,
+      callback: async (cred) => {
+        try {
+          const r = await fetch(PROXY_BASE + '/config/init', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: cred.credential }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Auth failed');
+          sessionStorage.setItem(SESSION_KEY, data.proxyKey);
+          window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(data.proxyKey), '_blank');
+        } catch(e) {
+          alert('Could not open Hotsheet: ' + e.message);
+        } finally {
+          if (arrow) { arrow.innerHTML = 'Open Hotsheet <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'; }
+        }
+      },
+    });
+    google.accounts.id.prompt((n) => {
+      // If One Tap can't display (blocked, dismissed), fall back to a button flow
+      if (n.isNotDisplayed() || n.isSkippedMoment()) {
+        if (arrow) arrow.textContent = 'Sign in required — check Google popup';
+      }
+    });
+  };
+
+  if (window.google?.accounts?.id) { ready(); }
+  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); ready(); } }, 100); }
+}
+</script>
+</body>
+</html>
