@@ -732,12 +732,9 @@ function renderInIframe(containerId, html, theme = 'dark') {
   const minH = theme === 'light' ? 1100 : 800;
   iframe.style.cssText = `width:100%;border:none;display:block;height:${minH}px;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
   iframe.setAttribute('scrolling', 'no');
+  // srcdoc avoids the doc.write allow-scripts+allow-same-origin sandbox warning
+  iframe.srcdoc = html;
   container.appendChild(iframe);
-
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
 
   // Try to auto-size to actual content height; min-height is the fallback
   const resize = () => {
