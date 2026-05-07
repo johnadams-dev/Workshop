@@ -1177,23 +1177,8 @@ async function saveCommitmentsAndContinue() {
     }
   });
 
-  // Save strategies with updated commitments
-  try {
-    const email = S.userEmail || S.data.email;
-    if (email && S.planId) {
-      const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, { headers: {'x-proxy-key':PROXY_KEY,'x-user-email':email} });
-      if (profileRes.ok) {
-        const p = await profileRes.json();
-        if (p.found && p.id) {
-          await fetch(`${PROXY_BASE}/agent/${p.id}/strategies`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json','x-proxy-key':PROXY_KEY},
-            body: JSON.stringify({planId:S.planId, enrollmentId:S.enrollmentId, strategies:S.selectedStrategies})
-          });
-        }
-      }
-    }
-  } catch(e) { console.warn('[Commitments] Save failed:', e.message); }
+  // S.planId doesn't exist yet (enrollment hasn't happened) — strategies are
+  // saved for real in doEnroll() once planId is available.
 
   document.getElementById('commitmentsCard').style.display = 'none';
   if (btn) { btn.textContent = 'These Look Good →'; btn.disabled = false; }
@@ -1244,6 +1229,27 @@ async function doEnroll() {
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||`HTTP ${res.status}`); }
     const result = await res.json(); S.planId = result.planId; S.enrollmentId = result.enrollmentId;
+
+    // Save strategies now that planId exists
+    if (S.selectedStrategies?.length && S.planId) {
+      try {
+        const email = S.userEmail || S.data.email;
+        const profileRes2 = await fetch(`${PROXY_BASE}/agent/profile`, {
+          headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+        });
+        if (profileRes2.ok) {
+          const p2 = await profileRes2.json();
+          if (p2.found && p2.id) {
+            await fetch(`${PROXY_BASE}/agent/${p2.id}/strategies`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+              body: JSON.stringify({ planId: S.planId, enrollmentId: S.enrollmentId, strategies: S.selectedStrategies })
+            });
+          }
+        }
+      } catch(e) { console.warn('[Enroll] Strategy save failed:', e.message); }
+    }
+
     const coach = S.coaches.find(c => c.id === coachId);
     const firstCheckin = new Date(); firstCheckin.setDate(firstCheckin.getDate()+7);
     const checkinDate = firstCheckin.toLocaleDateString('en-US',{month:'long',day:'numeric'});
