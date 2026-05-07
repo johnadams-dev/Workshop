@@ -303,7 +303,8 @@
       border: 1px solid rgba(26,26,46,.06);
       transition: border-color .2s;
     }
-    .checkin-row:hover { border-color: rgba(201,168,76,.3); }
+    .checkin-row { cursor: pointer; }
+    .checkin-row:hover { border-color: rgba(201,168,76,.3); background: #fdf9f0; }
     .checkin-date {
       font-size: .78rem;
       font-weight: 500;
@@ -406,6 +407,94 @@
       margin-bottom: .4rem;
     }
     .attention-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
+
+    /* ── CHECKIN DETAIL MODAL ── */
+    .detail-overlay {
+      position: fixed; inset: 0; background: rgba(26,26,46,.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200; padding: 1rem; opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    .detail-overlay.open { opacity: 1; pointer-events: all; }
+    .detail-modal {
+      background: white; border-radius: 16px; width: 100%; max-width: 560px;
+      max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow-lg);
+      transform: translateY(12px); transition: transform .2s;
+    }
+    .detail-overlay.open .detail-modal { transform: translateY(0); }
+    .detail-header {
+      padding: 1.25rem 1.5rem 1rem;
+      border-bottom: 1px solid rgba(26,26,46,.07);
+      display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .detail-title { font-size: 1rem; font-weight: 600; color: var(--ink); }
+    .detail-meta  { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
+    .detail-close {
+      background: none; border: none; font-size: 1.1rem; color: var(--muted);
+      cursor: pointer; padding: .2rem .4rem; line-height: 1;
+    }
+    .detail-close:hover { color: var(--ink); }
+    .detail-section {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(26,26,46,.06);
+    }
+    .detail-section:last-child { border-bottom: none; }
+    .detail-section-label {
+      font-size: .65rem; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: .75rem;
+    }
+    .detail-activities {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+    }
+    .detail-activity {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--cream); border-radius: 8px; padding: .5rem .75rem;
+      font-size: .82rem;
+    }
+    .detail-activity-label { color: var(--slate); }
+    .detail-activity-val   { font-weight: 600; color: var(--ink); }
+    .detail-activity-pct   { font-size: .7rem; color: var(--muted); margin-left: .3rem; }
+    .detail-words {
+      display: flex; flex-direction: column; gap: .65rem;
+    }
+    .detail-words-row label {
+      font-size: .72rem; color: var(--muted); display: block; margin-bottom: .2rem;
+    }
+    .detail-words-row p {
+      font-size: .85rem; color: var(--ink-soft); line-height: 1.5; margin: 0;
+    }
+    .detail-narrative {
+      font-size: .85rem; color: var(--ink-soft); line-height: 1.55;
+    }
+    .detail-trend-badge {
+      display: inline-block; font-size: .7rem; font-weight: 600;
+      padding: .2rem .6rem; border-radius: 100px; margin-bottom: .6rem;
+    }
+    .detail-trend-badge.improving { background: var(--green-soft); color: #27ae60; }
+    .detail-trend-badge.declining { background: var(--red-soft); color: var(--red); }
+    .detail-trend-badge.stable    { background: rgba(201,168,76,.12); color: var(--gold); }
+    .detail-trend-badge.new       { background: rgba(26,26,46,.06); color: var(--slate); }
+
+    /* ── COACH NOTES PANEL ── */
+    .coach-note {
+      padding: .9rem 0;
+      border-bottom: 1px solid rgba(26,26,46,.07);
+    }
+    .coach-note:last-child { border-bottom: none; padding-bottom: 0; }
+    .coach-note-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: .45rem;
+    }
+    .coach-note-who  { font-size: .78rem; font-weight: 600; color: var(--ink); }
+    .coach-note-date { font-size: .72rem; color: var(--muted); }
+    .coach-note-text { font-size: .84rem; color: var(--ink-soft); line-height: 1.55; }
+    .coach-note-training {
+      margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .35rem;
+    }
+    .training-tag {
+      font-size: .7rem; padding: .18rem .5rem; border-radius: 100px;
+      background: rgba(201,168,76,.12); color: var(--gold); font-weight: 500;
+    }
 
     /* ── PLAN PANEL ── */
     .plan-targets {
@@ -773,6 +862,16 @@
         </div>
       </div>
 
+      <!-- Coach Notes -->
+      <div class="panel" id="coachNotesPanel" style="display:none">
+        <div class="panel-header">
+          <div class="panel-title">Coach Notes</div>
+        </div>
+        <div class="panel-body" style="padding-top:.25rem;padding-bottom:.25rem">
+          <div id="coachNotesList"></div>
+        </div>
+      </div>
+
       <!-- Communication Preferences -->
       <div class="panel">
         <div class="panel-header">
@@ -859,6 +958,20 @@
       <div style="font-size:0.75rem;color:var(--muted)">Changes take effect on your next check-in</div>
       <button class="btn-save" id="commitSaveBtn" onclick="checkAndSaveModalCommitments()">Save Commitments</button>
     </div>
+  </div>
+</div>
+
+<!-- CHECKIN DETAIL MODAL -->
+<div class="detail-overlay" id="checkinDetailOverlay" onclick="handleDetailOverlayClick(event)">
+  <div class="detail-modal" id="checkinDetailModal">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title" id="detailTitle">Check-In Detail</div>
+        <div class="detail-meta" id="detailMeta"></div>
+      </div>
+      <button class="detail-close" onclick="closeCheckinDetail()">✕</button>
+    </div>
+    <div id="detailBody"></div>
   </div>
 </div>
 
@@ -984,13 +1097,20 @@ async function onSignedIn(email, name, picture) {
 
     populateProfile(profile, picture);
 
-    // Load check-in history in parallel
-    const histRes = await fetch(`${PROXY_BASE}/checkin/history/${agentId}`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
-    });
-    const history = histRes.ok ? await histRes.json() : [];
+    // Load check-in history and shared coach notes in parallel
+    const [histRes, notesRes] = await Promise.all([
+      fetch(`${PROXY_BASE}/checkin/history/${agentId}`, {
+        headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+      }),
+      fetch(`${PROXY_BASE}/agent/${agentId}/shared-feedback`, {
+        headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+      }),
+    ]);
+    const history = histRes.ok  ? await histRes.json()  : [];
+    const notes   = notesRes.ok ? await notesRes.json() : [];
 
     populateHistory(history);
+    populateCoachNotes(notes);
     populatePlan(profile);
     populatePreferences(profile);
 
@@ -1038,9 +1158,13 @@ function populateProfile(p, picture) {
 }
 
 // ── Check-in History ───────────────────────────────────────────────────────────
+let _checkinData = [];   // full dataset for detail modal lookups
+let _sharedNotes = [];   // coach notes keyed by checkin_id
+
 function populateHistory(rows) {
   const list = document.getElementById('checkinList');
   const completed = rows.filter(r => r.completed);
+  _checkinData = completed;
 
   document.getElementById('statCheckins').textContent = completed.length;
 
@@ -1048,7 +1172,6 @@ function populateHistory(rows) {
 
   document.getElementById('historyCount').textContent = `${Math.min(completed.length, 8)} weeks`;
 
-  // Show scorecard panel if any scores exist
   const withScores = completed.filter(r => r.commitment_score != null);
   if (withScores.length) populateScorecard(withScores);
 
@@ -1072,7 +1195,7 @@ function populateHistory(rows) {
     const channel = c.channel === 'web' ? '🌐' : '📱';
 
     return `
-      <div class="checkin-row">
+      <div class="checkin-row" onclick="openCheckinDetail(${c.id})">
         <div class="checkin-date">${channel} ${date}</div>
         <div class="checkin-activities">
           ${pills.slice(0, 3).map(p => `<span class="activity-pill">${p}</span>`).join('')}
@@ -1085,6 +1208,118 @@ function populateHistory(rows) {
       </div>
     `;
   }).join('');
+}
+
+// ── Checkin Detail Modal ────────────────────────────────────────────────────────
+function openCheckinDetail(id) {
+  const c = _checkinData.find(r => r.id === id);
+  if (!c) return;
+
+  const date = c.completed_at
+    ? new Date(c.completed_at).toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })
+    : (c.week_number ? `Week ${c.week_number}, ${c.check_in_year}` : '—');
+
+  document.getElementById('detailTitle').textContent = `Check-In — ${date}`;
+
+  const moodEmoji = ['', '😔', '😐', '🙂', '😊', '🤩'];
+  const mood = c.mood_score ? `${moodEmoji[c.mood_score] || ''} Mood ${c.mood_score}/5` : null;
+  const channel = c.channel === 'sms' ? 'SMS check-in' : 'Web check-in';
+  document.getElementById('detailMeta').textContent = [channel, mood].filter(Boolean).join(' · ');
+
+  const activities = (c.activity_responses || []).filter(a => a.value !== null && a.value > 0);
+  const words = [
+    { label: 'Biggest Challenge', val: c.biggest_challenge },
+    { label: 'New Opportunities', val: c.new_opportunities },
+    { label: 'Time Sink',         val: c.time_sink },
+  ].filter(w => w.val);
+
+  const notes = _sharedNotes.filter(n => n.checkin_id === id);
+
+  let html = '';
+
+  if (activities.length) {
+    html += `<div class="detail-section">
+      <div class="detail-section-label">Activity This Week</div>
+      <div class="detail-activities">
+        ${activities.map(a => {
+          const pct = a.pct != null ? `<span class="detail-activity-pct">${Math.round(a.pct)}%</span>` : '';
+          const val = a.value + (a.unit ? ' ' + a.unit : '');
+          return `<div class="detail-activity">
+            <span class="detail-activity-label">${a.label}</span>
+            <span class="detail-activity-val">${val}${pct}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (words.length) {
+    html += `<div class="detail-section">
+      <div class="detail-section-label">In Your Own Words</div>
+      <div class="detail-words">
+        ${words.map(w => `
+          <div class="detail-words-row">
+            <label>${w.label}</label>
+            <p>${w.val}</p>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (c.wins_narrative || c.challenges_narrative) {
+    const trendLabel = { improving:'Improving', declining:'Declining', stable:'Stable', new:'First check-in' };
+    const trend = c.trend ? `<span class="detail-trend-badge ${c.trend}">${trendLabel[c.trend] || c.trend}</span>` : '';
+    html += `<div class="detail-section">
+      <div class="detail-section-label">Performance Insights</div>
+      ${trend}
+      ${c.wins_narrative ? `<p class="detail-narrative" style="margin-bottom:.65rem"><strong>Wins:</strong> ${c.wins_narrative}</p>` : ''}
+      ${c.challenges_narrative ? `<p class="detail-narrative"><strong>Working through:</strong> ${c.challenges_narrative}</p>` : ''}
+    </div>`;
+  }
+
+  if (notes.length) {
+    html += `<div class="detail-section">
+      <div class="detail-section-label">Coach Notes</div>
+      ${notes.map(n => renderCoachNote(n)).join('')}
+    </div>`;
+  }
+
+  if (!html) html = `<div class="detail-section" style="color:var(--muted);font-size:.85rem">No detail available for this check-in.</div>`;
+
+  document.getElementById('detailBody').innerHTML = html;
+  document.getElementById('checkinDetailOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCheckinDetail() {
+  document.getElementById('checkinDetailOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function handleDetailOverlayClick(e) {
+  if (e.target === document.getElementById('checkinDetailOverlay')) closeCheckinDetail();
+}
+
+// ── Coach Notes ─────────────────────────────────────────────────────────────────
+function renderCoachNote(n) {
+  const date = new Date(n.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  const items = Array.isArray(n.training_items) ? n.training_items : (n.training_items ? JSON.parse(n.training_items) : []);
+  return `<div class="coach-note">
+    <div class="coach-note-meta">
+      <span class="coach-note-who">${n.coach_name}</span>
+      <span class="coach-note-date">${date}</span>
+    </div>
+    <div class="coach-note-text">${n.feedback_text}</div>
+    ${items.length ? `<div class="coach-note-training">${items.map(t => `<span class="training-tag">${t}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function populateCoachNotes(notes) {
+  _sharedNotes = notes;
+  const freeNotes = notes.filter(n => !n.checkin_id);
+  if (!freeNotes.length) return;
+  document.getElementById('coachNotesPanel').style.display = 'block';
+  document.getElementById('coachNotesList').innerHTML = freeNotes.map(renderCoachNote).join('');
 }
 
 // ── Scorecard ─────────────────────────────────────────────────────────────────
