@@ -391,21 +391,6 @@
     </div>
   </div>
 
-  <!-- ONE-PAGE PLAN -->
-  <div id="onePlanCard" style="display:none;margin-top:1.5rem">
-    <div class="card">
-      <div class="card-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
-        <div>
-          <div class="section-tag">Printable Reference</div>
-          <div class="section-title">Your One-Page Plan</div>
-          <div class="section-desc">A visual summary of your goals, strategy, and weekly commitments. Print it and put it somewhere you'll see it every day.</div>
-        </div>
-        <button class="btn btn-subtle" onclick="printOnePlan()" style="flex-shrink:0">🖨️ Print</button>
-      </div>
-      <div style="padding:1.5rem 2rem" id="onePlanContent"><div class="loading-view" style="padding:2rem 1rem"><div class="spinner"></div><div class="loading-sub">Building your one-page plan…</div></div></div>
-    </div>
-  </div>
-
   <!-- STRATEGY SELECTION -->
   <div id="strategyCard" style="display:none;margin-top:1.5rem">
     <div class="card">
@@ -491,7 +476,7 @@ const S = {
   step: 1, plan: '', planHtml: '', data: {},
   accessToken: null, tokenClient: null, pendingAction: null,
   config: { adminPassword: ADMIN_PW_DEFAULT, prompt: '', context: '' },
-  onePlanHtml: '', agentProfile: null, userEmail: null,
+  agentProfile: null, userEmail: null,
   planId: null, enrollmentId: null, coaches: [],
   strategies: [], selectedStrategies: [], suggestedStrategies: [],
 };
@@ -687,8 +672,6 @@ async function generatePlan() {
     document.getElementById('planContent').innerHTML = S.planHtml;
     document.getElementById('resultsMeta').textContent = `${S.data.name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
     show('stepResult'); setProgress(99);
-    // One-page plan generates after strategy confirmation
-    // One-page plan generates after strategy confirmation — nothing to fire here
     if (!S.enrollmentId) setTimeout(() => showGoalConfirmCard(), 1500);
   } catch (e) {
     show('step3'); setProgress(3);
@@ -725,146 +708,6 @@ function md2html(src) {
   }).join('\n');
   return t.replace(/<p>\s*<\/p>/g,'');
 }
-
-/* ── IFRAME RENDERER ──────────────────────────────────────────────── */
-// FIX 3: Use contentDocument.open/write/close instead of srcdoc.
-// srcdoc triggers the load event before content is written in some browsers,
-// causing height measurement to return 0 and the playbook to appear blank.
-function renderInIframe(containerId, html, theme = 'dark') {
-  // Use iframe to keep desk card / infographic CSS isolated from the main page.
-  // Fixed minimum height prevents blank rendering if dynamic resize fails.
-  const container = document.getElementById(containerId);
-  container.innerHTML = '';
-
-  const iframe = document.createElement('iframe');
-  // Both light-theme outputs (infographic + desk card) are one-page letter format
-  const minH = theme === 'light' ? 1100 : 800;
-  iframe.style.cssText = `width:100%;border:none;display:block;height:${minH}px;background:${theme === 'dark' ? '#0c0f16' : '#fff'};`;
-  iframe.setAttribute('scrolling', 'no');
-  // srcdoc avoids the doc.write allow-scripts+allow-same-origin sandbox warning
-  iframe.srcdoc = html;
-  container.appendChild(iframe);
-
-  // Try to auto-size to actual content height; min-height is the fallback
-  const resize = () => {
-    try {
-      const h = Math.max(
-        iframe.contentDocument.body.scrollHeight,
-        iframe.contentDocument.documentElement.scrollHeight
-      );
-      if (h > minH) iframe.style.height = h + 'px';
-    } catch(e) {}
-  };
-  setTimeout(resize, 400);
-  setTimeout(resize, 1200);
-  setTimeout(resize, 3000);
-}
-
-/* ── INFOGRAPHIC ──────────────────────────────────────────────────── */
-async function generateOnePlan() {
-  const d = S.data;
-  const earnNum  = parseFloat((d.earn  || '0').replace(/[^0-9.]/g, '')) || 0;
-  const priceNum = parseFloat((d.price || '0').replace(/[^0-9.]/g, '')) || 0;
-  const sides     = (earnNum > 0 && priceNum > 0) ? Math.ceil((earnNum / 0.65) / (priceNum * 0.03)) : 0;
-  const listPct   = parseInt(d.list) / 100 || 0.5;
-  const listSides = Math.ceil(sides * listPct);
-  const buyeSides = sides - listSides;
-  const listAppts = Math.ceil((listSides / 12) / 0.8);
-  const buyProsp  = Math.ceil((buyeSides / 12) * 3);
-  const hoursNum  = parseInt(d.time) || 0;
-  const soiCalls  = Math.max(5, Math.round(hoursNum * 0.5));
-  const socialPosts = Math.max(3, Math.round(hoursNum * 0.15));
-  const floorHrs  = Math.max(2, Math.round(hoursNum * 0.15));
-  const followUps = Math.max(5, Math.round(hoursNum * 0.4));
-
-  // Build strategy list from confirmed selections
-  const strategyLines = (S.selectedStrategies || []).map((sel, i) => {
-    const full = (S.strategies || []).find(s => s.slug === sel.slug);
-    const prefix = sel.isPrimary ? '★ PRIMARY' : `Supporting ${i}`;
-    return `${prefix}: ${full ? full.name : sel.slug}${full?.description ? ' — ' + full.description : ''}`;
-  }).join('\n') || 'Strategies not yet selected';
-
-  const prompt = `You are a graphic designer creating a one-page printable business reference card for a real estate agent. Generate a complete HTML page (<!DOCTYPE html> through </html>).
-
-DESIGN PHILOSOPHY:
-- This is something the agent will print and pin to their wall or desk — make it worth keeping
-- Bold, graphic, visual — use large typography, strong color blocking, and decorative elements
-- White background (#ffffff), navy (#0c1524), gold (#c4a84f) — these are non-negotiable brand colors
-- Use CSS only — no external images, no external fonts (Georgia/serif for headings, system sans-serif for numbers)
-- Must fit one US letter page portrait when printed: include @page { margin: 0.35in; size: letter portrait; }
-- NO verbose paragraphs — every element should be a number, a label, an icon (unicode emoji ok), or a short phrase
-
-PAGE STRUCTURE:
-
-1. HEADER BAR (full width, navy background, gold text):
-   Large: ${d.name}
-   Small: Adams, Cameron & Co. · ${d.office || 'Volusia County'} · ${new Date().getFullYear()}
-
-2. NUMBERS GRID (2 or 3 columns, large bold numbers with labels below):
-   Use very large font size (3-4rem) for the numbers, small caps labels beneath.
-   Include ALL of these — design them as bold stat blocks:
-   • Transactions Needed: ${sides} sides
-   • Listing Appts/Month: ${listAppts}
-   • Buyer Prospects/Month: ${buyProsp}
-   • Hours/Week: ${hoursNum}
-   • SOI Contacts/Week: ${soiCalls}
-   • Social Posts/Week: ${socialPosts}
-
-3. MY WHY (the visual centerpiece — make this memorable):
-   This is the most important design section. The agent's why statement should feel personal and special.
-   Use a decorative treatment — options: ornamental border with corner flourishes using CSS/unicode, 
-   a bold italic serif in a gold-tinted box with a large decorative quotation mark, 
-   a navy background panel with gold text and a subtle radial gradient,
-   or a frame-like border with thin double lines.
-   Whatever you choose, make it feel designed — not like a text box.
-   The why: "${d.why}"
-
-4. MY STRATEGIES (compact — icon emoji + strategy name + one line):
-${strategyLines}
-   Display as a clean horizontal or 2-column list with a small colored dot or emoji prefix.
-
-5. WEEKLY NON-NEGOTIABLES (checkbox grid — 2 columns):
-   □ ${soiCalls} SOI contacts
-   □ ${socialPosts} AC Social posts
-   □ ${floorHrs} hrs floor time
-   □ ${followUps} lead follow-ups
-   □ Weekly check-in (5 min)
-   □ Review pipeline & CRM
-   □ Schedule next week's posts
-   □ Monthly coaching session
-
-6. FOOTER (slim, full width, navy):
-   "Adams, Cameron & Co. | What gets measured gets managed."
-
-CRITICAL RULES:
-- No GCI or dollar amounts anywhere on this page
-- Output complete HTML only — no markdown fences, no explanation
-- The why section must look designed, not default
-- Prioritize visual impact over completeness — if something needs to be abbreviated to fit, abbreviate it`;
-
-  document.getElementById('onePlanCard').style.display = 'block';
-  setTimeout(() => document.getElementById('onePlanCard').scrollIntoView({behavior:'smooth',block:'start'}), 300);
-
-  try {
-    const html = await geminiCall(prompt, 4096, 'gemini-2.5-flash');
-    const clean = html.replace(/^```html?\n?/i,'').replace(/\n?```$/i,'').trim();
-    if (!clean || clean.length < 500) throw new Error('Response too short');
-    S.onePlanHtml = clean;
-    renderInIframe('onePlanContent', clean, 'light');
-  } catch (e) {
-    document.getElementById('onePlanContent').innerHTML =
-      `<div style="padding:1.5rem;background:#1a0a0a;border:1px solid #8c3d4a;border-radius:8px;color:#e8a0a8;font-size:0.85rem"><strong>One-page plan failed:</strong><br>${e.message}<br><br>Try refreshing — Gemini occasionally times out on complex requests.</div>`;
-  }
-}
-
-function printOnePlan() {
-  if (!S.onePlanHtml) { toast('Still generating — try again in a moment.', 'err'); return; }
-  const win = window.open('', '_blank');
-  win.document.write(S.onePlanHtml); win.document.close(); win.focus();
-  setTimeout(() => win.print(), 400);
-}
-
-/* ── COPY
 
 /* ── COPY ─────────────────────────────────────────────────────────── */
 async function doCopy() {
@@ -949,12 +792,12 @@ function buildEmailHtml(note) {
 
 /* ── RESET ────────────────────────────────────────────────────────── */
 function doReset() {
-  S.plan = ''; S.planHtml = ''; S.data = {}; S.onePlanHtml = '';
+  S.plan = ''; S.planHtml = ''; S.data = {};
   S.strategies = []; S.selectedStrategies = []; S.suggestedStrategies = [];
   S.planId = null; S.enrollmentId = null;
   document.querySelectorAll('input[type=text],input[type=email],input[type=number],textarea').forEach(el => el.value = '');
   [['f_listR',50,'f_listV','50% Sellers'],['f_timeR',0,'f_timeV','0 hrs/wk'],['f_budgetR',0,'f_budgetV','0'],['f_soiR',0,'f_soiV','0 contacts'],['f_expR',0,'f_expV','0 yrs']].forEach(([r,v,lbl,txt]) => { document.getElementById(r).value=v; document.getElementById(lbl).textContent=txt; if(document.getElementById(r.replace('R',''))){ document.getElementById(r.replace('R','')).value=v; } });
-  ['onePlanCard','goalConfirmCard','strategyCard','commitmentsCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['goalConfirmCard','strategyCard','commitmentsCard','enrollmentCard','enrolledCard'].forEach(id => document.getElementById(id).style.display = 'none');
   goTo(1);
 }
 
@@ -1207,8 +1050,6 @@ async function confirmStrategies() {
   if (!S.selectedStrategies.length) { document.getElementById('strategyError').textContent = 'Please select at least one strategy.'; document.getElementById('strategyError').style.display = 'block'; return; }
   if (!S.selectedStrategies.some(s => s.isPrimary)) { document.getElementById('strategyError').textContent = 'Please tap a strategy to set it as your primary focus.'; document.getElementById('strategyError').style.display = 'block'; return; }
   document.getElementById('strategyCard').style.display = 'none';
-  // Kick off one-page plan generation now that we have strategies — non-blocking
-  generateOnePlan().catch(e => console.error('[OnePlan]', e));
   showCommitmentsCard();
 }
 
@@ -1395,7 +1236,7 @@ async function doEnroll() {
       soiNotes:document.getElementById('f_soi_note').value.trim(), expNotes:document.getElementById('f_exp_note').value.trim(),
       gciRequired:gci, sidesRequired:sides, listingSides:listSides, buyerSides:buyeSides,
       listingApptsMonthly:Math.ceil((listSides/12)/0.8), buyerProspectsMonthly:Math.ceil((buyeSides/12)*3),
-      planText:S.plan, planHtml:S.planHtml, infographicHtml:S.onePlanHtml||null, deskcardHtml:S.onePlanHtml||null,
+      planText:S.plan, planHtml:S.planHtml,
     };
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
       method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY,'x-user-email':S.userEmail||S.data.email||''},
