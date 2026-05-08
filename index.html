@@ -496,6 +496,22 @@
   </div>
 </section>
 
+<!-- Manager-only tools — hidden until sign-in confirms manager status -->
+<section id="managerSection" style="display:none">
+  <div class="section-label" style="max-width:1100px;margin:0 auto;padding:2rem 2rem 0;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted,#888)">Management</div>
+  <div class="cards" style="max-width:1100px;margin:0 auto;padding:1rem 2rem 3rem">
+    <a href="./scorecard-entry.html" class="card">
+      <div class="card-icon">📊</div>
+      <h2>Scorecard Data Entry</h2>
+      <p>Enter monthly manual metrics for the company scorecard — advertising spend, Facebook reviews, social advocacy data, and eBusiness statistics.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+  </div>
+</section>
+
 <footer>
   <div class="footer-name">John Adams</div>
   <p>Questions or bug reports? Email <a href="mailto:johnadams@adamscameron.com">johnadams@adamscameron.com</a></p>
@@ -507,47 +523,76 @@ const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleu
 const HOTSHEET_URL = PROXY_BASE + '/hotsheet/report';
 const SESSION_KEY  = 'ac_proxy_key';
 
+let _pendingHotsheet = false;
+
+async function handleCredential(cred) {
+  // Always check manager status on sign-in
+  try {
+    const r = await fetch(PROXY_BASE + '/auth/is-manager', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (data.isManager) document.getElementById('managerSection').style.display = '';
+  } catch (_) {}
+
+  // If triggered by hotsheet click, also fetch the proxy key
+  if (_pendingHotsheet) {
+    _pendingHotsheet = false;
+    const arrow = document.getElementById('hotsheetArrow');
+    try {
+      const r = await fetch(PROXY_BASE + '/config/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: cred.credential }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Auth failed');
+      sessionStorage.setItem(SESSION_KEY, data.proxyKey);
+      window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(data.proxyKey), '_blank');
+    } catch(e) {
+      alert('Could not open Hotsheet: ' + e.message);
+    } finally {
+      if (arrow) { arrow.innerHTML = 'Open Hotsheet <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'; }
+    }
+  }
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({
+    client_id: OAUTH_CLIENT,
+    callback: handleCredential,
+    auto_select: true,   // silently sign in if only one account is available
+  });
+  // Silent prompt — auto-selects if signed in, no visible UI for non-managers
+  google.accounts.id.prompt();
+}
+
 function openHotsheet() {
-  // Use cached key if available
   const cached = sessionStorage.getItem(SESSION_KEY);
   if (cached) { window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(cached), '_blank'); return; }
 
   const arrow = document.getElementById('hotsheetArrow');
   if (arrow) arrow.textContent = 'Signing in…';
+  _pendingHotsheet = true;
 
-  // Wait for Google SDK then trigger One Tap
-  const ready = () => {
-    google.accounts.id.initialize({
-      client_id: OAUTH_CLIENT,
-      callback: async (cred) => {
-        try {
-          const r = await fetch(PROXY_BASE + '/config/init', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken: cred.credential }),
-          });
-          const data = await r.json();
-          if (!r.ok) throw new Error(data.error || 'Auth failed');
-          sessionStorage.setItem(SESSION_KEY, data.proxyKey);
-          window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(data.proxyKey), '_blank');
-        } catch(e) {
-          alert('Could not open Hotsheet: ' + e.message);
-        } finally {
-          if (arrow) { arrow.innerHTML = 'Open Hotsheet <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'; }
-        }
-      },
-    });
+  const doPrompt = () => {
     google.accounts.id.prompt((n) => {
-      // If One Tap can't display (blocked, dismissed), fall back to a button flow
       if (n.isNotDisplayed() || n.isSkippedMoment()) {
+        _pendingHotsheet = false;
         if (arrow) arrow.textContent = 'Sign in required — check Google popup';
       }
     });
   };
 
-  if (window.google?.accounts?.id) { ready(); }
-  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); ready(); } }, 100); }
+  if (window.google?.accounts?.id) { doPrompt(); }
+  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); doPrompt(); } }, 100); }
 }
+
+// Initialize as soon as the Google SDK loads
+if (window.google?.accounts?.id) { initGoogleSignIn(); }
+else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
 </script>
 </body>
 </html>
