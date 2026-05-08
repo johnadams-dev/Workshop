@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scorecard Entry | Adams Cameron</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink:        #1a1a2e;
+      --ink-soft:   #2d2d4a;
+      --gold:       #c9a84c;
+      --gold-light: #e8c96a;
+      --cream:      #faf8f3;
+      --cream-dark: #f0ece0;
+      --slate:      #5a5a78;
+      --muted:      #8a8aa8;
+      --green:      #2ecc71;
+      --red:        #e74c3c;
+      --shadow:     0 2px 20px rgba(26,26,46,.08);
+      --shadow-lg:  0 8px 40px rgba(26,26,46,.14);
+    }
+    body { font-family: 'Outfit', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+
+    /* ── HEADER ── */
+    header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 24px rgba(0,0,0,.3); }
+    .header-inner { max-width: 860px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 600; color: var(--cream); text-decoration: none; }
+    .logo span { color: var(--gold); }
+    .user-badge { font-size: .75rem; color: var(--muted); text-align: right; }
+    .user-badge strong { display: block; color: var(--cream); font-size: .8rem; }
+
+    /* ── STATES ── */
+    .state { display: none; }
+    .state.active { display: block; }
+    .loading-wrap { text-align: center; padding: 5rem 2rem; }
+    .spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid rgba(201,168,76,.3); border-top-color: var(--gold); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sign-in-wrap { max-width: 400px; margin: 5rem auto; text-align: center; padding: 2rem; background: white; border-radius: 16px; box-shadow: var(--shadow-lg); }
+    .sign-in-wrap h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; margin-bottom: .5rem; }
+    .sign-in-wrap p { font-size: .88rem; color: var(--slate); margin-bottom: 1.5rem; line-height: 1.55; }
+
+    /* ── DASHBOARD ── */
+    .dashboard { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+    /* ── PERIOD SELECTOR ── */
+    .period-bar {
+      background: white; border-radius: 12px; padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      box-shadow: var(--shadow); margin-bottom: 1.5rem;
+    }
+    .period-bar label { font-size: .8rem; font-weight: 600; color: var(--slate); white-space: nowrap; }
+    .period-bar select {
+      border: 1px solid rgba(26,26,46,.15); border-radius: 8px; padding: .45rem .75rem;
+      font-size: .88rem; font-family: inherit; color: var(--ink); background: var(--cream); cursor: pointer;
+    }
+    .period-notice {
+      font-size: .78rem; color: var(--gold); font-weight: 500; background: rgba(201,168,76,.1);
+      border: 1px solid rgba(201,168,76,.25); border-radius: 6px; padding: .35rem .7rem;
+      display: none;
+    }
+    .period-notice.show { display: inline-block; }
+
+    /* ── TABS ── */
+    .tab-nav { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+    .tab-btn {
+      flex: 1; padding: .7rem 1rem; border: 2px solid rgba(26,26,46,.1);
+      border-radius: 10px; background: white; font-family: inherit; font-size: .85rem;
+      font-weight: 500; color: var(--slate); cursor: pointer; transition: all .2s; text-align: center;
+    }
+    .tab-btn:hover { border-color: rgba(201,168,76,.4); color: var(--ink); }
+    .tab-btn.active { background: var(--ink); color: var(--gold); border-color: var(--ink); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── PANEL CARD ── */
+    .panel { background: white; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 1rem; }
+    .panel-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(26,26,46,.07); }
+    .panel-title { font-size: 1rem; font-weight: 600; }
+    .panel-desc { font-size: .8rem; color: var(--slate); margin-top: .25rem; }
+
+    /* ── METRIC FIELDS ── */
+    .metric-list { padding: .5rem 0; }
+    .metric-field {
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: start; gap: .75rem 1.25rem;
+      padding: 1.1rem 1.5rem; border-bottom: 1px solid rgba(26,26,46,.05);
+    }
+    .metric-field:last-child { border-bottom: none; }
+    .metric-label { font-size: .9rem; font-weight: 600; color: var(--ink); margin-bottom: .2rem; }
+    .metric-help { font-size: .77rem; color: var(--slate); line-height: 1.5; margin-bottom: .4rem; }
+    .metric-history { font-size: .72rem; color: var(--muted); }
+    .metric-history .hist-val { color: var(--ink-soft); font-weight: 500; }
+    .metric-history .hist-dot { margin: 0 .3rem; color: var(--muted); }
+
+    .input-wrap { display: flex; align-items: center; gap: .35rem; }
+    .input-prefix { font-size: .85rem; color: var(--muted); font-weight: 500; }
+    .metric-input {
+      width: 120px; padding: .55rem .75rem; border: 1.5px solid rgba(26,26,46,.15);
+      border-radius: 8px; font-size: .88rem; font-family: inherit; color: var(--ink);
+      text-align: right; transition: border-color .2s;
+    }
+    .metric-input:focus { outline: none; border-color: var(--gold); }
+    .metric-input.has-value { border-color: rgba(46,204,113,.5); background: rgba(46,204,113,.04); }
+    .metric-input.existing { border-color: rgba(201,168,76,.6); background: rgba(201,168,76,.06); }
+
+    /* ── SUBMIT ── */
+    .submit-bar { padding: 1.25rem 1.5rem; background: var(--cream); border-top: 1px solid rgba(26,26,46,.07); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .submit-info { font-size: .78rem; color: var(--muted); }
+    .btn-submit {
+      background: var(--ink); color: var(--gold); border: none; border-radius: 8px;
+      padding: .65rem 1.5rem; font-size: .88rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-submit:hover { background: var(--ink-soft); }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--ink);
+      color: white; border-radius: 10px; padding: .85rem 1.25rem;
+      font-size: .85rem; font-weight: 500; z-index: 999;
+      transform: translateY(80px); opacity: 0; transition: all .3s;
+      max-width: 320px; line-height: 1.4;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.ok  { border-left: 4px solid var(--green); }
+    .toast.err { border-left: 4px solid var(--red); }
+    .toast.warn { border-left: 4px solid var(--gold); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .tab-nav { flex-direction: column; }
+      .metric-field { grid-template-columns: 1fr; }
+      .metric-input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="./index.html">Adams <span>Cameron</span></a>
+    <div class="user-badge" id="userBadge" style="display:none">
+      <strong id="userName"></strong>
+      <span id="userEmail"></span>
+    </div>
+  </div>
+</header>
+
+<!-- Loading -->
+<div class="state active" id="loadingState">
+  <div class="loading-wrap"><div class="spinner"></div></div>
+</div>
+
+<!-- Sign In -->
+<div class="state" id="signInState">
+  <div class="sign-in-wrap">
+    <h2>Scorecard Entry</h2>
+    <p>Sign in with your Adams Cameron Google account to enter monthly scorecard data.</p>
+    <div id="googleSignIn"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="state" id="dashboard">
+  <div class="dashboard">
+
+    <!-- Period selector -->
+    <div class="period-bar">
+      <label>Reporting Period:</label>
+      <select id="selMonth">
+        <option value="01">January</option><option value="02">February</option>
+        <option value="03">March</option><option value="04">April</option>
+        <option value="05">May</option><option value="06">June</option>
+        <option value="07">July</option><option value="08">August</option>
+        <option value="09">September</option><option value="10">October</option>
+        <option value="11">November</option><option value="12">December</option>
+      </select>
+      <select id="selYear"></select>
+      <span class="period-notice" id="existingNotice">⚠ Some fields already have data for this period</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('marketing')">Marketing</button>
+      <button class="tab-btn" onclick="switchTab('social')">Social &amp; Advocacy</button>
+      <button class="tab-btn" onclick="switchTab('ebusiness')">eBusiness</button>
+    </div>
+
+    <!-- Marketing panel -->
+    <div class="tab-panel active" id="tab-marketing">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Marketing Metrics</div>
+          <div class="panel-desc">Entered by the Marketing team · Sources: Accounting, Facebook, DeltaNet</div>
+        </div>
+        <div class="metric-list" id="fields-marketing"></div>
+        <div class="submit-bar">
+          <span class="submit-info" id="info-marketing">Fill in any fields you have and click Save.</span>
+          <button class="btn-submit" onclick="submitTab('marketing')">Save Marketing Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Social panel -->
+    <div class="tab-panel" id="tab-social">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Social &amp; Advocacy Metrics</div>
+          <div class="panel-desc">Entered by Marketing · Source: Sprout Advocacy → Analytics</div>
+        </div>
+        <div class="metric-list" id="fields-social"></div>
+        <div class="submit-bar">
+          <span class="submit-info" id="info-social">Fill in any fields you have and click Save.</span>
+          <button class="btn-submit" onclick="submitTab('social')">Save Social Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- eBusiness panel -->
+    <div class="tab-panel" id="tab-ebusiness">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">eBusiness Metrics</div>
+          <div class="panel-desc">Entered by the Referral Coordinator · Source: Referral log &amp; Accounting</div>
+        </div>
+        <div class="metric-list" id="fields-ebusiness"></div>
+        <div class="submit-bar">
+          <span class="submit-info" id="info-ebusiness">Fill in any fields you have and click Save.</span>
+          <button class="btn-submit" onclick="submitTab('ebusiness')">Save eBusiness Data</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let S = { email: null, name: null, accessToken: null, history: {}, metrics: [] };
+
+// ── Period helpers ─────────────────────────────────────────────────────────────
+function getPeriod() {
+  return `${document.getElementById('selYear').value}-${document.getElementById('selMonth').value}`;
+}
+
+function initPeriod() {
+  const now  = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const yr   = document.getElementById('selYear');
+  for (let y = prev.getFullYear() - 2; y <= prev.getFullYear() + 1; y++) {
+    const o = document.createElement('option');
+    o.value = String(y); o.textContent = String(y);
+    yr.appendChild(o);
+  }
+  document.getElementById('selMonth').value = String(prev.getMonth() + 1).padStart(2, '0');
+  yr.value = String(prev.getFullYear());
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function initAuth() {
+  if (typeof google === 'undefined') { setTimeout(initAuth, 300); return; }
+  google.accounts.id.initialize({
+    client_id: OAUTH_CLIENT,
+    callback: onCredential,
+  });
+  google.accounts.id.renderButton(document.getElementById('googleSignIn'), {
+    theme: 'outline', size: 'large', text: 'signin_with',
+  });
+  google.accounts.id.prompt(n => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) setState('signInState');
+  });
+}
+
+function onCredential(cr) {
+  const p = JSON.parse(atob(cr.credential.split('.')[1]));
+  if (!p.email.endsWith('@adamscameron.com')) {
+    setState('signInState');
+    toast('Access restricted to Adams Cameron accounts.', 'err');
+    return;
+  }
+  S.email = p.email;
+  S.name  = p.name || p.given_name || p.email.split('@')[0];
+  document.getElementById('userName').textContent  = S.name;
+  document.getElementById('userEmail').textContent = S.email;
+  document.getElementById('userBadge').style.display = 'block';
+  onSignedIn();
+}
+
+async function onSignedIn() {
+  initPeriod();
+  await loadMetricsAndHistory();
+  setState('dashboard');
+}
+
+// ── Data loading ──────────────────────────────────────────────────────────────
+async function loadMetricsAndHistory() {
+  try {
+    const r = await fetch(`${PROXY_BASE}/admin/scorecard-history`, {
+      headers: { 'x-proxy-key': PROXY_KEY }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    S.history = d.history || {};
+    S.metrics = d.metrics || [];
+    renderAllFields();
+  } catch (e) {
+    toast('Could not load history — fields will be blank.', 'warn');
+    S.metrics = [];
+    renderAllFields();
+  }
+}
+
+// ── Field rendering ───────────────────────────────────────────────────────────
+function formatHistVal(val, prefix) {
+  if (val === undefined || val === '') return '—';
+  const n = Number(val);
+  if (isNaN(n)) return val;
+  return prefix === '$' ? '$' + n.toLocaleString() : n.toLocaleString();
+}
+
+function formatHistDate(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function renderAllFields() {
+  ['marketing', 'social', 'ebusiness'].forEach(tab => {
+    const el  = document.getElementById(`fields-${tab}`);
+    const defs = S.metrics.filter(m => m.tab === tab);
+    el.innerHTML = defs.map(m => {
+      const hist    = S.history[m.name] || [];
+      const histHtml = hist.length
+        ? 'Recent: ' + hist.slice(0, 3).map((h, i) =>
+            `<span class="hist-val">${formatHistDate(h.date)}: ${formatHistVal(h.value, m.prefix)}</span>${i < Math.min(hist.length, 3) - 1 ? '<span class="hist-dot">·</span>' : ''}`
+          ).join('')
+        : 'No previous entries';
+
+      return `
+        <div class="metric-field">
+          <div>
+            <div class="metric-label">${m.label}</div>
+            <div class="metric-help">${m.help}</div>
+            <div class="metric-history">${histHtml}</div>
+          </div>
+          <div class="input-wrap">
+            ${m.prefix ? `<span class="input-prefix">${m.prefix}</span>` : ''}
+            <input class="metric-input" type="number" min="0" step="${m.isPercent ? '0.1' : '1'}"
+              data-tab="${tab}" data-group="${m.group}" data-name="${m.name}"
+              placeholder="—"
+              oninput="this.classList.toggle('has-value', this.value !== '')">
+          </div>
+        </div>`;
+    }).join('');
+  });
+  checkExistingForPeriod();
+}
+
+// ── Period change ─────────────────────────────────────────────────────────────
+function onPeriodChange() {
+  clearAllInputs();
+  checkExistingForPeriod();
+}
+
+function clearAllInputs() {
+  document.querySelectorAll('.metric-input').forEach(el => {
+    el.value = '';
+    el.classList.remove('has-value', 'existing');
+  });
+}
+
+function checkExistingForPeriod() {
+  if (!S.metrics.length) return;
+  const period    = getPeriod();
+  const dateStr   = `${period}-01 0:00:00`;
+  let   hasExisting = false;
+
+  document.querySelectorAll('.metric-input').forEach(el => {
+    const name = el.dataset.name;
+    const hist = S.history[name] || [];
+    const existing = hist.find(h => h.date === dateStr);
+    if (existing) {
+      hasExisting = true;
+      el.placeholder = existing.value;
+      el.classList.add('existing');
+    } else {
+      el.placeholder = '—';
+      el.classList.remove('existing');
+    }
+  });
+
+  document.getElementById('existingNotice').classList.toggle('show', hasExisting);
+}
+
+document.getElementById('selMonth').addEventListener('change', onPeriodChange);
+document.getElementById('selYear').addEventListener('change', onPeriodChange);
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['marketing','social','ebusiness'][i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────────
+async function submitTab(tab) {
+  const period  = getPeriod();
+  const inputs  = [...document.querySelectorAll(`.metric-input[data-tab="${tab}"]`)];
+  const metrics = inputs
+    .filter(el => el.value !== '')
+    .map(el => ({ group: el.dataset.group, name: el.dataset.name, value: el.value }));
+
+  if (!metrics.length) { toast('No values entered — fill in at least one field.', 'warn'); return; }
+
+  // Check for existing data on this period
+  const dateStr = `${period}-01 0:00:00`;
+  const hasExisting = metrics.some(m => (S.history[m.name] || []).some(h => h.date === dateStr));
+  if (hasExisting && !confirm(`Some of these metrics already have data for ${period}. Submitting will add duplicate entries.\n\nContinue?`)) return;
+
+  const btn = document.querySelector(`#tab-${tab} .btn-submit`);
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const r = await fetch(`${PROXY_BASE}/admin/scorecard-entry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+      body: JSON.stringify({ period, metrics, submittedBy: S.email }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    toast(`✓ ${d.saved} metric${d.saved !== 1 ? 's' : ''} saved for ${period}.`, 'ok');
+    await loadMetricsAndHistory();
+  } catch (e) {
+    toast('Save failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = { marketing: 'Save Marketing Data', social: 'Save Social Data', ebusiness: 'Save eBusiness Data' }[tab];
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setState(id) {
+  ['loadingState','signInState','dashboard'].forEach(s => {
+    document.getElementById(s).classList.toggle('active', s === id);
+  });
+}
+
+let toastTimer;
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', initAuth);
+</script>
+</body>
+</html>
