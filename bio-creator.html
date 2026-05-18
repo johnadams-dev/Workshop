@@ -329,6 +329,23 @@
           </div>
         </div>
 
+        <!-- Manual DMGID link — shown only when DeltaNet lookup fails -->
+        <div id="link-dmgid-wrap" style="display:none;margin-top:20px;padding:18px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;">
+          <div style="font-size:13px;font-weight:700;color:#78350f;margin-bottom:6px;">Link your DeltaNet account manually</div>
+          <p style="font-size:13px;color:#92400e;margin-bottom:12px;line-height:1.5;">Your email wasn't found automatically in DeltaNet. Enter your DeltaNet User ID (DMGID) below to link your account — your administrator can look this up for you.</p>
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+              <label style="font-size:12px;font-weight:700;color:#78350f;display:block;margin-bottom:4px;">DeltaNet User ID (DMGID)</label>
+              <input type="text" id="dmgid-input" placeholder="e.g. 081500251" style="border-color:#f59e0b;">
+            </div>
+            <button class="btn btn-gold" id="btn-link-dmgid" onclick="linkDmgId()">
+              <div class="spinner"></div>
+              <span class="btn-label">Link Account</span>
+            </button>
+          </div>
+          <div class="alert" id="link-dmgid-msg" style="margin-top:10px;"></div>
+        </div>
+
         <div class="btn-row">
           <button class="btn btn-navy" onclick="goToStep(2)">
             Continue to Biography Questions →
@@ -659,9 +676,12 @@ async function loadProfile() {
     const pf = data.pathfinder || {};
     const dn = data.deltanet   || {};
 
-    // Warning banner
+    // Warning banner + manual link panel when DeltaNet lookup failed
     if (data.warning) {
       showAlert("profile-warning", "warn", data.warning);
+      if (!data.dmgId) {
+        document.getElementById("link-dmgid-wrap").style.display = "block";
+      }
     }
 
     // Build profile summary card
@@ -876,6 +896,34 @@ function triggerDownload(html, filename) {
   a.download = filename || "biography.html";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Manual DMGID link
+// ═══════════════════════════════════════════════════════════════
+async function linkDmgId() {
+  const dmgId = document.getElementById("dmgid-input").value.trim();
+  if (!dmgId) return showAlert("link-dmgid-msg", "error", "Please enter your DeltaNet User ID.");
+
+  const btn = document.getElementById("btn-link-dmgid");
+  btn.disabled = true; btn.classList.add("loading");
+  hideAlert("link-dmgid-msg");
+
+  try {
+    const result = await api("POST", "/bio/link-dmgid", { dmgId });
+    agentDmgId = result.dmgId;
+    showAlert("link-dmgid-msg", "success",
+      `Linked to ${result.firstName} ${result.lastName} (ID: ${result.dmgId}). Reloading your profile…`);
+    // Hide the link panel and reload the full profile now that the ID is saved
+    setTimeout(() => {
+      document.getElementById("link-dmgid-wrap").style.display = "none";
+      hideAlert("profile-warning");
+      loadProfile();
+    }, 1500);
+  } catch (e) {
+    showAlert("link-dmgid-msg", "error", e.message);
+    btn.disabled = false; btn.classList.remove("loading");
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
