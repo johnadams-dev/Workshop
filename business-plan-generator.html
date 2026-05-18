@@ -239,6 +239,7 @@
     <div class="card">
       <div class="card-head"><div class="section-tag">Section 2 of 3</div><div class="section-title">Overview &amp; Context</div><div class="section-desc">Your "why," goals, and constraints shape the entire strategy. Be honest — the more context you give, the more actionable your plan will be.</div></div>
       <div class="card-body">
+        <div class="field"><label>About Me <span class="opt">(optional)</span></label><textarea id="f_bio" placeholder="Your professional bio from DeltaNet will appear here when you sign in…" rows="3"></textarea><div class="hint">Pre-loaded from DeltaNet when available. Edit freely — used to personalize your plan.</div></div>
         <div class="field"><label>Brief Description <span class="opt">(optional)</span></label><textarea id="f_desc" placeholder="A few words about your practice or current situation…" rows="2"></textarea></div>
         <div class="field"><label>Your "Why" <span class="req">*</span></label><textarea id="f_why" placeholder="Why do you want to be in real estate? What do you ultimately want to accomplish?" rows="3" required></textarea></div>
         <div class="field"><label>Goals <span class="req">*</span></label><textarea id="f_goals" placeholder="What are your goals? Consider personal financial needs, business objectives, and long-term vision." rows="3" required></textarea></div>
@@ -603,7 +604,7 @@ function collect() {
   }
   return {
     email: v('f_email'), name: v('f_name') || 'Agent', office: v('f_office') || 'Adams, Cameron & Co.',
-    market: v('f_market'), desc: v('f_desc'), why: v('f_why'), goals: v('f_goals'),
+    market: v('f_market'), bio: v('f_bio'), desc: v('f_desc'), why: v('f_why'), goals: v('f_goals'),
     time:   withNote(document.getElementById('f_time').value, 'hours/week', 'f_time_note'),
     budget: (() => { const val = parseInt(document.getElementById('f_budget').value); const note = document.getElementById('f_budget_note').value.trim(); const label = val === 0 ? 'None' : val <= 25 ? `Low (${val}/100)` : val <= 50 ? `Moderate (${val}/100)` : val <= 75 ? `High (${val}/100)` : `Very high (${val}/100)`; return note ? `${label} — ${note}` : label; })(),
     soi:   withNote(document.getElementById('f_soi').value, 'contacts', 'f_soi_note'),
@@ -626,6 +627,7 @@ Format as a professional email to the agent, written in a supportive yet boss-mo
 
 ### 1. AGENT PROFILE
 - **Name:** ${d.name} | **Office:** ${d.office} | **Market:** ${d.market || 'Not specified'}
+- **Bio:** ${d.bio || 'Not provided'}
 - **Why:** ${d.why} | **Goals:** ${d.goals}
 - **Experience:** ${d.exp || 'Not specified'} | **Time:** ${d.time || 'Not specified'}
 - **Budget:** ${d.budget || 'Not specified'} | **SOI:** ${d.soi || 'Not specified'}
@@ -838,6 +840,16 @@ async function loadAgentProfile(email) {
     const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
     const nameField = document.getElementById('f_name'); if (nameField && !nameField.value && name) nameField.value = name;
     const officeField = document.getElementById('f_office'); if (officeField && !officeField.value && profile.office) officeField.value = profile.office;
+    if (profile.dmg_id) {
+      try {
+        const bioRes = await fetch(`${PROXY_BASE}/agent/deltanet-bio?dmg_id=${encodeURIComponent(profile.dmg_id)}`, { headers: { 'x-proxy-key': PROXY_KEY } });
+        if (bioRes.ok) {
+          const bioData = await bioRes.json();
+          const bioField = document.getElementById('f_bio');
+          if (bioField && !bioField.value && bioData.bio) bioField.value = bioData.bio;
+        }
+      } catch(e) { console.warn('[Bio]', e.message); }
+    }
   } catch(e) { console.warn('[Profile]', e.message); }
 }
 

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bio Creator — Adams, Cameron & Co.</title>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* ── Reset ───────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: #f5f3ee;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Sign-in Gate ────────────────────────────────────────────────────────── */
+    #auth-gate {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+    }
+    .auth-card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      text-align: center;
+      width: 360px;
+      box-shadow: 0 8px 48px rgba(0,0,0,.4);
+    }
+    .auth-logo {
+      width: 64px;
+      height: 64px;
+      background: #c9a84c;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: #1a1a2e;
+      font-size: 22px;
+      margin: 0 auto 20px;
+    }
+    .auth-brand { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #c9a84c; }
+    .auth-title { font-size: 22px; font-weight: 700; color: #1a1a2e; margin: 8px 0 6px; }
+    .auth-sub   { font-size: 14px; color: #6b7280; margin-bottom: 28px; line-height: 1.5; }
+    #g-signin-btn { display: flex; justify-content: center; }
+    .auth-note  { font-size: 12px; color: #9ca3af; margin-top: 20px; }
+
+    /* ── App Shell (hidden until signed in) ──────────────────────────────────── */
+    #app { display: none; }
+
+    /* ── Header ──────────────────────────────────────────────────────────────── */
+    .header {
+      background: #1a1a2e;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,.3);
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-logo {
+      width: 36px; height: 36px; background: #c9a84c; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; color: #1a1a2e; font-size: 14px; flex-shrink: 0;
+    }
+    .header-brand { color: #c9a84c; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .header-title { color: #fff; font-size: 17px; font-weight: 300; }
+    .header-user  { font-size: 13px; color: #9a9ab8; }
+
+    /* ── Step Bar ────────────────────────────────────────────────────────────── */
+    .step-bar {
+      background: white;
+      border-bottom: 1px solid #e8e4dc;
+      padding: 0 28px;
+      display: flex;
+    }
+    .step-tab {
+      display: flex; align-items: center; gap: 9px;
+      padding: 14px 22px 12px;
+      font-size: 13px; font-weight: 600; color: #9a9ab8;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+    }
+    .step-tab.active { color: #1a1a2e; border-bottom-color: #c9a84c; }
+    .step-tab.done   { color: #c9a84c; }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #e8e4dc; color: #9a9ab8;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-tab.active .step-num { background: #c9a84c; color: white; }
+    .step-tab.done   .step-num { background: #1a1a2e; color: #c9a84c; }
+
+    /* ── Layout ──────────────────────────────────────────────────────────────── */
+    .container { max-width: 840px; margin: 28px auto; padding: 0 20px 60px; }
+
+    /* ── Cards ───────────────────────────────────────────────────────────────── */
+    .card {
+      background: white; border-radius: 14px; padding: 30px;
+      margin-bottom: 18px; box-shadow: 0 2px 14px rgba(0,0,0,.06);
+    }
+    .card-title { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
+    .card-sub   { font-size: 13px; color: #6b7280; margin-bottom: 22px; line-height: 1.5; }
+
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: #c9a84c; margin: 26px 0 14px; padding-bottom: 7px;
+      border-bottom: 1px solid #f0ece4;
+    }
+    .section-label:first-of-type { margin-top: 4px; }
+
+    /* ── Forms ───────────────────────────────────────────────────────────────── */
+    .form-row          { display: grid; gap: 14px; margin-bottom: 14px; }
+    .form-row.cols-2   { grid-template-columns: 1fr 1fr; }
+    .form-row.cols-3   { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group        { display: flex; flex-direction: column; gap: 5px; }
+    label              { font-size: 13px; font-weight: 600; color: #374151; }
+    label .opt         { font-weight: 400; color: #9ca3af; font-size: 12px; margin-left: 3px; }
+    input, select, textarea {
+      width: 100%; border: 1.5px solid #e0ddd6; border-radius: 8px;
+      padding: 9px 13px; font-size: 14px; font-family: inherit;
+      color: #1a1a2e; background: #fdfcfb;
+      transition: border-color .18s, box-shadow .18s; resize: vertical;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: #c9a84c;
+      box-shadow: 0 0 0 3px rgba(201,168,76,.12);
+    }
+    textarea           { min-height: 78px; }
+    textarea.tall      { min-height: 108px; }
+
+    /* ── Existing bio panel ──────────────────────────────────────────────────── */
+    .existing-bio-panel {
+      border: 1.5px solid #e8e4dc; border-radius: 10px;
+      background: #fdfcfb; overflow: hidden; margin-bottom: 22px;
+    }
+    .existing-bio-header {
+      background: #f5f3ee; padding: 10px 16px;
+      font-size: 12px; font-weight: 700; color: #6b7280;
+      letter-spacing: .06em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .existing-bio-body { padding: 16px; font-size: 13px; color: #4a4a6a; line-height: 1.7; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; border: none; transition: all .18s; text-decoration: none;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-gold  { background: #c9a84c; color: white; }
+    .btn-gold:hover:not(:disabled)  { background: #b8973b; }
+    .btn-navy  { background: #1a1a2e; color: white; }
+    .btn-navy:hover:not(:disabled)  { background: #0f0f1a; }
+    .btn-ghost { background: white; color: #1a1a2e; border: 1.5px solid #e0ddd6; }
+    .btn-ghost:hover:not(:disabled) { border-color: #c9a84c; color: #c9a84c; }
+    .btn-green { background: #16a34a; color: white; }
+    .btn-green:hover:not(:disabled) { background: #15803d; }
+    .btn-row   { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────────── */
+    .spinner {
+      display: none; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.35); border-top-color: white;
+      border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    .spinner.dark { border-color: rgba(26,26,46,.18); border-top-color: #1a1a2e; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading .spinner    { display: block; }
+    .loading .btn-label  { display: none; }
+
+    /* ── Alerts ──────────────────────────────────────────────────────────────── */
+    .alert {
+      display: none; align-items: flex-start; gap: 9px;
+      padding: 12px 15px; border-radius: 8px; font-size: 14px; line-height: 1.5;
+    }
+    .alert.on        { display: flex; }
+    .alert-success   { background: #d1fae5; color: #065f46; }
+    .alert-error     { background: #fee2e2; color: #7f1d1d; }
+    .alert-info      { background: #dbeafe; color: #1e3a5f; }
+    .alert-warn      { background: #fef3c7; color: #78350f; }
+
+    /* ── Preview (Step 3) ────────────────────────────────────────────────────── */
+    .preview-tabs { display: flex; border-bottom: 1.5px solid #e0ddd6; margin-bottom: 18px; }
+    .ptab {
+      padding: 9px 18px; font-size: 13px; font-weight: 600; color: #6b7280;
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1.5px;
+    }
+    .ptab.active { color: #1a1a2e; border-bottom-color: #c9a84c; }
+    .preview-box {
+      border: 1.5px solid #e0ddd6; border-radius: 8px; padding: 24px;
+      min-height: 300px; background: white; overflow: auto;
+    }
+    #html-editor { font-family: 'Courier New', monospace; font-size: 12.5px; min-height: 300px; line-height: 1.65; }
+
+    /* ── Save bar ────────────────────────────────────────────────────────────── */
+    .save-bar {
+      background: white; border-radius: 14px; padding: 22px 28px;
+      box-shadow: 0 2px 14px rgba(0,0,0,.06);
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .save-bar-title { font-weight: 700; font-size: 15px; flex: 1; min-width: 120px; }
+    .divider { height: 1px; background: #f0ece4; margin: 18px 0; }
+
+    /* ── Step panels ─────────────────────────────────────────────────────────── */
+    .step-panel         { display: none; }
+    .step-panel.active  { display: block; }
+
+    /* ── Loading overlay (initial profile load) ──────────────────────────────── */
+    #loading-overlay {
+      position: fixed; inset: 0; background: rgba(26,26,46,.7);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 999; color: white; font-size: 15px;
+    }
+    .big-spinner {
+      width: 44px; height: 44px;
+      border: 4px solid rgba(255,255,255,.25); border-top-color: #c9a84c;
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    #loading-overlay.hidden { display: none; }
+
+    @media (max-width: 600px) {
+      .form-row.cols-2, .form-row.cols-3 { grid-template-columns: 1fr; }
+      .container { padding: 0 12px 60px; }
+      .card { padding: 18px; }
+      .step-tab .step-text { display: none; }
+      .save-bar { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ SIGN-IN GATE ═══════════════════════════════════════════════════════════ -->
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo">AC</div>
+    <div class="auth-brand">Adams, Cameron &amp; Co.</div>
+    <h1 class="auth-title">Agent Bio Creator</h1>
+    <p class="auth-sub">Sign in with your Adams Cameron Google account to get started.</p>
+    <div id="g-signin-btn"></div>
+    <p class="auth-note">Access restricted to @adamscameron.com accounts.</p>
+  </div>
+</div>
+
+<!-- ══ APP (hidden until auth) ════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Loading overlay shown while fetching profile after sign-in -->
+  <div id="loading-overlay">
+    <div class="big-spinner"></div>
+    <span>Loading your profile…</span>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="header-logo">AC</div>
+      <div>
+        <div class="header-brand">Adams, Cameron &amp; Co.</div>
+        <div class="header-title">Agent Biography Creator</div>
+      </div>
+    </div>
+    <div class="header-user" id="header-user-email"></div>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="step-bar">
+    <div class="step-tab active" id="tab-1">
+      <div class="step-num">1</div>
+      <span class="step-text">Your Profile</span>
+    </div>
+    <div class="step-tab" id="tab-2">
+      <div class="step-num">2</div>
+      <span class="step-text">Your Story</span>
+    </div>
+    <div class="step-tab" id="tab-3">
+      <div class="step-num">3</div>
+      <span class="step-text">Review &amp; Save</span>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- ══ STEP 1: Profile confirmation ════════════════════════════════════════ -->
+    <div class="step-panel active" id="panel-1">
+      <div class="card">
+        <div class="card-title">Your Profile</div>
+        <div class="card-sub">
+          We've loaded your information from Pathfinder and DeltaNet.
+          Review it below, then continue to fill in your biography details.
+        </div>
+
+        <div class="alert alert-warn" id="profile-warning"></div>
+        <div class="alert alert-error" id="profile-error"></div>
+
+        <!-- Profile summary card -->
+        <div id="profile-summary" style="display:none;">
+          <div style="display:flex;align-items:center;gap:18px;padding:18px;background:#f9f7f2;border:1.5px solid #e8e4dc;border-radius:10px;">
+            <div id="profile-avatar" style="width:56px;height:56px;border-radius:50%;background:#1a1a2e;color:#c9a84c;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;"></div>
+            <div>
+              <div style="font-size:16px;font-weight:700;" id="profile-name"></div>
+              <div style="font-size:13px;color:#6b7280;margin-top:2px;" id="profile-detail"></div>
+              <div style="font-size:12px;margin-top:6px;" id="profile-bio-badge"></div>
+            </div>
+          </div>
+
+          <!-- Existing bio, if any -->
+          <div id="existing-bio-wrap" style="display:none;margin-top:16px;">
+            <div class="existing-bio-panel">
+              <div class="existing-bio-header">
+                <span>📄</span> Current bio on file in DeltaNet (for reference)
+              </div>
+              <div class="existing-bio-body" id="existing-bio-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-navy" onclick="goToStep(2)">
+            Continue to Biography Questions →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ STEP 2: Interview / questionnaire ═══════════════════════════════════ -->
+    <div class="step-panel" id="panel-2">
+      <div class="card">
+        <div class="card-title">Your Story</div>
+        <div class="card-sub">
+          We've pre-filled what we have on file. Fill in or update any field —
+          the more detail you share, the better your biography will be.
+        </div>
+
+        <!-- Basic Info -->
+        <div class="section-label">Basic Information</div>
+        <div class="form-row cols-3">
+          <div class="form-group">
+            <label for="f-name">Full Name</label>
+            <input type="text" id="f-name" placeholder="Jane Smith">
+          </div>
+          <div class="form-group">
+            <label for="f-office">Office</label>
+            <input type="text" id="f-office" placeholder="Ormond Beach">
+          </div>
+          <div class="form-group">
+            <label for="f-gender">Preferred Pronouns</label>
+            <select id="f-gender">
+              <option value="">Select…</option>
+              <option value="She/Her">She / Her</option>
+              <option value="He/Him">He / Him</option>
+              <option value="They/Them">They / Them</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-email">Email</label>
+            <input type="email" id="f-email" placeholder="you@adamscameron.com">
+          </div>
+          <div class="form-group">
+            <label for="f-phone">Phone</label>
+            <input type="tel" id="f-phone" placeholder="(386) 555-0100">
+          </div>
+        </div>
+
+        <!-- Personal Background -->
+        <div class="section-label">Personal Background</div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-hometown">Where are you originally from?</label>
+            <input type="text" id="f-hometown" placeholder="e.g., Daytona Beach, FL">
+          </div>
+          <div class="form-group">
+            <label for="f-community-length">How long have you lived here &amp; what do you love most about it?</label>
+            <input type="text" id="f-community-length" placeholder="e.g., 20 years — love the beaches and community">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-career">Career &amp; educational background</label>
+            <textarea id="f-career" placeholder="Previous careers, degrees, industries you worked in…"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-involvement">Community involvement <span class="opt">optional</span></label>
+            <textarea id="f-involvement" placeholder="Organizations, boards, volunteer work, civic roles…"></textarea>
+          </div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-hobbies">Hobbies &amp; interests outside real estate <span class="opt">optional</span></label>
+            <textarea id="f-hobbies" placeholder="Boating, cooking, golf, travel…"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="f-skills">Special skills or talents <span class="opt">optional</span></label>
+            <textarea id="f-skills" placeholder="Something most people don't know about you…"></textarea>
+          </div>
+        </div>
+
+        <!-- Personality -->
+        <div class="section-label">Personality &amp; Values</div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-best-trait">Your single best trait</label>
+            <input type="text" id="f-best-trait" placeholder="e.g., Honesty, tenacity, attention to detail…">
+          </div>
+          <div class="form-group">
+            <label for="f-three-words">Three words that describe you</label>
+            <input type="text" id="f-three-words" placeholder="e.g., Driven, Caring, Creative">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-quote">Personal quote or motto <span class="opt">optional</span></label>
+            <input type="text" id="f-quote" placeholder="A quote or belief that guides your work…">
+          </div>
+        </div>
+
+        <!-- Real Estate Career -->
+        <div class="section-label">Real Estate Career</div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-re-start">How &amp; when did you start in real estate?</label>
+            <textarea id="f-re-start" placeholder="e.g., Licensed in 2015 after a decade in banking…"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="f-enjoy">What do you enjoy most about your work?</label>
+            <textarea id="f-enjoy" placeholder="e.g., Helping first-time buyers find their perfect home…"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-specialty">Specialty or focus areas</label>
+            <textarea id="f-specialty" placeholder="Luxury homes, waterfront, 55+ communities, specific neighborhoods…"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-why">Why should a client work with you?</label>
+            <textarea class="tall" id="f-why" placeholder="What sets you apart from other agents? Your unique value…"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-awards">Awards, designations &amp; accomplishments <span class="opt">optional</span></label>
+            <textarea id="f-awards" placeholder="GRI, CRS, ABR, top-producer awards…"></textarea>
+          </div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group">
+            <label for="f-prev-acc">Have you personally used an ACC agent? <span class="opt">optional</span></label>
+            <select id="f-prev-acc">
+              <option value="">Select…</option>
+              <option value="Yes — I have personally bought or sold with an ACC agent">Yes — I've bought or sold with an ACC agent</option>
+              <option value="No">No</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="f-instructions">Style &amp; length preferences <span class="opt">optional</span></label>
+            <textarea id="f-instructions" placeholder="e.g., Keep it under 300 words, friendly and conversational tone…"></textarea>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goToStep(1)">← Back</button>
+          <button class="btn btn-gold" id="btn-generate" onclick="generateBio()">
+            <div class="spinner"></div>
+            <span class="btn-label">✨ Generate My Biography →</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ STEP 3: Preview & Save ═══════════════════════════════════════════════ -->
+    <div class="step-panel" id="panel-3">
+      <div class="card">
+        <div class="card-title">Review Your Biography</div>
+        <div class="card-sub">
+          This is AI-generated — review it carefully. Switch to the HTML tab to edit directly.
+          Changes you make here are what gets saved.
+        </div>
+
+        <div class="preview-tabs">
+          <div class="ptab active" onclick="switchTab('preview')">Preview</div>
+          <div class="ptab"        onclick="switchTab('html')">Edit HTML</div>
+        </div>
+
+        <div id="tab-preview">
+          <div class="preview-box" id="bio-preview"></div>
+        </div>
+        <div id="tab-html" style="display:none;">
+          <textarea class="preview-box" id="html-editor" spellcheck="false"></textarea>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goToStep(2)">← Edit Answers</button>
+          <button class="btn btn-gold" id="btn-regen" onclick="generateBio()">
+            <div class="spinner"></div>
+            <span class="btn-label">↻ Regenerate</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Save actions -->
+      <div class="save-bar">
+        <div class="save-bar-title">Ready to save?</div>
+        <button class="btn btn-green" id="btn-save-dn" onclick="saveToDeltaNet()">
+          <div class="spinner"></div>
+          <span class="btn-label">💾 Save to DeltaNet</span>
+        </button>
+        <button class="btn btn-navy" id="btn-save-drive" onclick="saveToGoogleDrive()">
+          <div class="spinner"></div>
+          <span class="btn-label">📄 Save to Google Drive</span>
+        </button>
+      </div>
+
+      <!-- Status messages -->
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">
+        <div class="alert" id="save-dn-msg"></div>
+        <div class="alert" id="save-drive-msg"></div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Configuration
+// ═══════════════════════════════════════════════════════════════
+const PROXY           = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+let userEmail   = "";
+let proxyKey    = "";
+let agentDmgId  = null;
+let profileData = {};   // combined { pathfinder, deltanet }
+let currentStep = 1;
+
+// ═══════════════════════════════════════════════════════════════
+// Google Sign-In
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:         GOOGLE_CLIENT_ID,
+    callback:          handleGoogleSignIn,
+    auto_select:       true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  // Prompt for One Tap if a session already exists
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  const idToken = response.credential;
+  // Decode email from JWT payload (no signature verification needed client-side)
+  try {
+    const payload = JSON.parse(atob(idToken.split(".")[1]));
+    userEmail = payload.email || "";
+  } catch { userEmail = ""; }
+
+  try {
+    // Exchange Google token for proxy key
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+
+    // Show app, hide gate
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display        = "block";
+    document.getElementById("header-user-email").textContent = userEmail;
+
+    // Load agent profile
+    await loadProfile();
+
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API helper
+// ═══════════════════════════════════════════════════════════════
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-proxy-key":  proxyKey,
+      "x-user-email": userEmail,
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(`${PROXY}${path}`, opts);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step navigation
+// ═══════════════════════════════════════════════════════════════
+function goToStep(n) {
+  document.querySelectorAll(".step-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".step-tab").forEach(t => { t.classList.remove("active"); });
+  document.getElementById(`panel-${n}`).classList.add("active");
+  document.getElementById(`tab-${n}`).classList.add("active");
+  for (let i = 1; i < n; i++) document.getElementById(`tab-${i}`).classList.add("done");
+  currentStep = n;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 1 — Load profile
+// ═══════════════════════════════════════════════════════════════
+async function loadProfile() {
+  const overlay = document.getElementById("loading-overlay");
+  overlay.classList.remove("hidden");
+
+  try {
+    const data = await api("GET", "/bio/profile");
+    profileData  = data;
+    agentDmgId   = data.dmgId || null;
+
+    const pf = data.pathfinder || {};
+    const dn = data.deltanet   || {};
+
+    // Warning banner
+    if (data.warning) {
+      showAlert("profile-warning", "warn", data.warning);
+    }
+
+    // Build profile summary card
+    const firstName = pf.first_name || dn.FirstName || "";
+    const lastName  = pf.last_name  || dn.LastName  || "";
+    const fullName  = `${firstName} ${lastName}`.trim() || userEmail;
+    const office    = pf.office     || (dn.Offices?.[0] ? `Office ${dn.Offices[0].OfficeId}` : "");
+    const initials  = ((firstName[0] || "?") + (lastName[0] || "?")).toUpperCase();
+
+    const avatarEl = document.getElementById("profile-avatar");
+    const photoUrl = pf.photo_url || dn.PhotoURL || "";
+    if (photoUrl) {
+      avatarEl.innerHTML = `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.textContent='${initials}'">`;
+    } else {
+      avatarEl.textContent = initials;
+    }
+
+    document.getElementById("profile-name").textContent   = fullName;
+    document.getElementById("profile-detail").textContent =
+      [office, `DeltaNet ID: ${agentDmgId || "Not linked"}`, userEmail]
+        .filter(Boolean).join(" · ");
+
+    const badge     = document.getElementById("profile-bio-badge");
+    const hasBio    = !!(dn.Bio && dn.Bio.trim());
+    badge.className = hasBio
+      ? "bio-status" : "bio-status";
+    badge.innerHTML = hasBio
+      ? `<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">✓ Bio on file in DeltaNet</span>`
+      : `<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700;">⚡ No bio yet — let's create one</span>`;
+
+    // Show existing bio for reference
+    if (hasBio) {
+      document.getElementById("existing-bio-text").innerHTML = dn.Bio;
+      document.getElementById("existing-bio-wrap").style.display = "block";
+    }
+
+    document.getElementById("profile-summary").style.display = "block";
+
+    // Pre-fill the interview form
+    prefillForm(pf, dn);
+
+  } catch (e) {
+    showAlert("profile-error", "error", "Could not load profile: " + e.message);
+    document.getElementById("profile-summary").style.display = "block"; // let them continue
+  } finally {
+    overlay.classList.add("hidden");
+  }
+}
+
+function prefillForm(pf, dn) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+
+  // Name — combine parts from Pathfinder DB
+  const name = [pf.first_name, pf.last_name].filter(Boolean).join(" ")
+    || [dn.FirstName, dn.LastName].filter(Boolean).join(" ");
+  set("f-name",   name);
+  set("f-email",  userEmail);   // always the authenticated email
+  set("f-phone",  pf.cell_raw || pf.cell_e164 || dn.CellPhone || dn.OfficePhone || "");
+  set("f-office", pf.office   || dn.Subtitle  || "");
+
+  // Designations → awards field
+  const desigs = pf.designations || dn.Designation || "";
+  set("f-awards", desigs);
+
+  // Languages → useful context
+  // (not a form field here, but can be added if desired)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 2 → 3 — Generate bio
+// ═══════════════════════════════════════════════════════════════
+async function generateBio() {
+  // Validate minimums
+  const checks = [
+    ["f-name",       "Full Name"],
+    ["f-office",     "Office"],
+    ["f-specialty",  "Specialty"],
+    ["f-why",        "Why a client should work with you"],
+  ];
+  for (const [id, label] of checks) {
+    if (!document.getElementById(id)?.value?.trim()) {
+      if (currentStep !== 2) goToStep(2);
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById(id)?.focus();
+      setTimeout(() => alert(`Please fill in: ${label}`), 200);
+      return;
+    }
+  }
+
+  const genBtn = document.getElementById("btn-generate");
+  const regenBtn = document.getElementById("btn-regen");
+  if (genBtn)   { genBtn.disabled  = true;  genBtn.classList.add("loading"); }
+  if (regenBtn) { regenBtn.disabled = true; regenBtn.classList.add("loading"); }
+
+  try {
+    const payload = {
+      name:                 document.getElementById("f-name").value.trim(),
+      office:               document.getElementById("f-office").value.trim(),
+      gender:               document.getElementById("f-gender").value,
+      email:                document.getElementById("f-email").value.trim(),
+      phone:                document.getElementById("f-phone").value.trim(),
+      hometown:             document.getElementById("f-hometown").value.trim(),
+      careerBackground:     document.getElementById("f-career").value.trim(),
+      communityLength:      document.getElementById("f-community-length").value.trim(),
+      communityInvolvement: document.getElementById("f-involvement").value.trim(),
+      hobbies:              document.getElementById("f-hobbies").value.trim(),
+      skills:               document.getElementById("f-skills").value.trim(),
+      bestTrait:            document.getElementById("f-best-trait").value.trim(),
+      threeWords:           document.getElementById("f-three-words").value.trim(),
+      personalQuote:        document.getElementById("f-quote").value.trim(),
+      realEstateStart:      document.getElementById("f-re-start").value.trim(),
+      enjoyMost:            document.getElementById("f-enjoy").value.trim(),
+      specialty:            document.getElementById("f-specialty").value.trim(),
+      whyWork:              document.getElementById("f-why").value.trim(),
+      awards:               document.getElementById("f-awards").value.trim(),
+      previousACC:          document.getElementById("f-prev-acc").value,
+      specialInstructions:  document.getElementById("f-instructions").value.trim(),
+    };
+
+    const { html } = await api("POST", "/bio/generate", payload);
+    document.getElementById("bio-preview").innerHTML = html;
+    document.getElementById("html-editor").value     = html;
+    goToStep(3);
+    switchTab("preview");
+
+  } catch (e) {
+    alert("Generation failed: " + e.message);
+  } finally {
+    if (genBtn)   { genBtn.disabled  = false;  genBtn.classList.remove("loading"); }
+    if (regenBtn) { regenBtn.disabled = false; regenBtn.classList.remove("loading"); }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 3 — Preview tabs
+// ═══════════════════════════════════════════════════════════════
+function switchTab(which) {
+  const isPreview = (which === "preview");
+  document.getElementById("tab-preview").style.display = isPreview ? "block" : "none";
+  document.getElementById("tab-html").style.display    = isPreview ? "none"  : "block";
+  document.querySelectorAll(".ptab").forEach((t, i) => {
+    t.classList.toggle("active", i === (isPreview ? 0 : 1));
+  });
+  if (isPreview) {
+    // Sync editor → preview when switching back to preview tab
+    document.getElementById("bio-preview").innerHTML =
+      document.getElementById("html-editor").value;
+  }
+}
+
+function getCurrentHtml() {
+  return document.getElementById("html-editor").value;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 3 — Save to DeltaNet
+// ═══════════════════════════════════════════════════════════════
+async function saveToDeltaNet() {
+  const bio = getCurrentHtml();
+  if (!bio.trim()) return showAlert("save-dn-msg", "error", "Bio is empty — generate one first.");
+
+  hideAlert("save-dn-msg");
+  const btn = document.getElementById("btn-save-dn");
+  btn.disabled = true; btn.classList.add("loading");
+
+  try {
+    const result = await api("POST", "/bio/save", { bio });
+    showAlert("save-dn-msg", "success",
+      result.message || "Biography saved to DeltaNet! Pathfinder will reflect it immediately.");
+  } catch (e) {
+    showAlert("save-dn-msg", "error", "Save failed: " + e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove("loading");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 3 — Save to Google Drive
+// ═══════════════════════════════════════════════════════════════
+async function saveToGoogleDrive() {
+  const bio       = getCurrentHtml();
+  const agentName = document.getElementById("f-name").value.trim() || "Agent";
+  if (!bio.trim()) return showAlert("save-drive-msg", "error", "Bio is empty — generate one first.");
+
+  hideAlert("save-drive-msg");
+  const btn = document.getElementById("btn-save-drive");
+  btn.disabled = true; btn.classList.add("loading");
+
+  try {
+    const result = await api("POST", "/bio/save-drive", { bio, agentName });
+    if (result.ok) {
+      showAlert("save-drive-msg", "success",
+        `${result.message} <a href="${result.url}" target="_blank" style="color:inherit;font-weight:700;">Open Doc →</a>`);
+    } else if (result.fallback) {
+      // Server not configured for Drive — download locally
+      showAlert("save-drive-msg", "warn",
+        "Google Drive is not yet configured on the server. Downloading as an HTML file instead…");
+      triggerDownload(result.html, result.filename);
+    }
+  } catch (e) {
+    showAlert("save-drive-msg", "error", "Drive save failed: " + e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove("loading");
+  }
+}
+
+function triggerDownload(html, filename) {
+  const full = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Biography</title></head><body style="padding:32px;font-family:sans-serif;">${html}</body></html>`;
+  const blob = new Blob([full], { type: "text/html" });
+  const a    = document.createElement("a");
+  a.href     = URL.createObjectURL(blob);
+  a.download = filename || "biography.html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Alert helpers
+// ═══════════════════════════════════════════════════════════════
+const icons = { success: "✅", error: "⚠", info: "💡", warn: "⚠" };
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `alert alert-${type} on`;
+  el.innerHTML = `<span>${icons[type] || ""}</span><span>${msg}</span>`;
+}
+function hideAlert(id) {
+  const el = document.getElementById(id);
+  if (el) el.className = "alert";
+}
+</script>
+</body>
+</html>
