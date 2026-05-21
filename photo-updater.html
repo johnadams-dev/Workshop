@@ -309,8 +309,14 @@
           <h2 id="profile-name">Loading…</h2>
           <div class="office" id="profile-office"></div>
           <div class="note" id="profile-note">Your photo is sourced from DeltaNet and appears on your Pathfinder profile and public listings.</div>
+          <button class="btn btn-gold" id="btn-use-existing" onclick="useExistingPhoto()" style="display:none; margin-top:14px;">
+            <span class="spinner"></span>
+            <span class="btn-label">✨ Edit This Photo with AI</span>
+          </button>
         </div>
       </div>
+
+      <div class="alert" id="current-photo-msg"></div>
 
       <!-- DeltaNet not linked warning + manual link -->
       <div id="link-dmgid-panel">
@@ -331,8 +337,8 @@
 
     <!-- ── Upload / Choose Photo ────────────────────────────────────────────── -->
     <div class="card">
-      <div class="card-title">Choose a New Photo</div>
-      <div class="card-sub">Upload a photo from your device. JPG or PNG, recommended minimum 400×400 px.</div>
+      <div class="card-title">Or Upload a New Photo</div>
+      <div class="card-sub">Don't want to use your current photo? Upload a different one from your device. JPG or PNG, recommended minimum 400×400 px.</div>
 
       <!-- Drop zone -->
       <div class="drop-zone" id="drop-zone"
@@ -375,23 +381,23 @@
       <div class="section-label">Choose an Enhancement</div>
 
       <div class="enhance-opts">
-        <label class="enhance-opt selected" id="opt-polish">
-          <input type="radio" name="enhance-type" value="polish" checked>
-          <div class="enhance-opt-icon">✨</div>
-          <div class="enhance-opt-title">Professional Polish</div>
-          <div class="enhance-opt-desc">Improve lighting, color balance, and sharpness for a polished, professional look.</div>
+        <label class="enhance-opt selected" id="opt-professional">
+          <input type="radio" name="enhance-type" value="professional" checked>
+          <div class="enhance-opt-icon">👔</div>
+          <div class="enhance-opt-title">Professional Photo <span style="font-size:10px;background:#c9a84c;color:white;padding:2px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;">Recommended</span></div>
+          <div class="enhance-opt-desc">Polished headshot with great lighting, natural skin tones, and a clean backdrop.</div>
         </label>
-        <label class="enhance-opt" id="opt-background">
-          <input type="radio" name="enhance-type" value="background">
-          <div class="enhance-opt-icon">🏙️</div>
-          <div class="enhance-opt-title">Clean Background</div>
-          <div class="enhance-opt-desc">Replace the background with a soft, neutral professional backdrop.</div>
+        <label class="enhance-opt" id="opt-beach">
+          <input type="radio" name="enhance-type" value="beach">
+          <div class="enhance-opt-icon">🏖️</div>
+          <div class="enhance-opt-title">Beach Scene</div>
+          <div class="enhance-opt-desc">Place yourself against a beautiful Florida beach backdrop — sky, ocean, and sand.</div>
         </label>
-        <label class="enhance-opt" id="opt-full">
-          <input type="radio" name="enhance-type" value="full">
-          <div class="enhance-opt-icon">🌟</div>
-          <div class="enhance-opt-title">Full Headshot</div>
-          <div class="enhance-opt-desc">Comprehensive professional headshot treatment — lighting, background, and presentation.</div>
+        <label class="enhance-opt" id="opt-caricature">
+          <input type="radio" name="enhance-type" value="caricature">
+          <div class="enhance-opt-icon">🎨</div>
+          <div class="enhance-opt-title">Caricature</div>
+          <div class="enhance-opt-desc">A fun, friendly illustrated version of your photo — charming and recognizable.</div>
         </label>
       </div>
 
@@ -543,6 +549,7 @@ async function loadProfile() {
     const wrap = document.getElementById("current-photo-wrap");
     if (currentPhotoUrl) {
       wrap.innerHTML = `<img src="${currentPhotoUrl}" onerror="this.parentNode.innerHTML='${initials}'" alt="Current profile photo">`;
+      document.getElementById("btn-use-existing").style.display = "inline-flex";
     } else {
       document.getElementById("current-initials").textContent = initials;
     }
@@ -561,6 +568,36 @@ async function loadProfile() {
   } finally {
     document.getElementById("loading-overlay").classList.add("hidden");
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Use existing photo
+// ═══════════════════════════════════════════════════════════════════════════════
+function useExistingPhoto() {
+  if (!currentPhotoUrl) return;
+
+  const btn = document.getElementById("btn-use-existing");
+  btn.disabled = true;
+  btn.classList.add("loading");
+  clearAlert("current-photo-msg");
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    compressAndSetPhoto(img, "image/jpeg");
+    btn.disabled = false;
+    btn.classList.remove("loading");
+    document.querySelector("#btn-use-existing .btn-label").textContent = "✓ Using current photo";
+    document.getElementById("preview-section").scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  img.onerror = () => {
+    btn.disabled = false;
+    btn.classList.remove("loading");
+    showAlert("current-photo-msg", "warn",
+      "Could not load your photo directly due to browser security restrictions. " +
+      "Right-click your photo above, save it to your device, then upload it using the section below.");
+  };
+  img.src = currentPhotoUrl;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -646,14 +683,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function getEnhancePrompt(type) {
-  const base = "This is a professional headshot for a real estate agent's profile photo on their brokerage website. ";
+  const base = "This is a real estate agent's profile photo for their brokerage website. ";
   switch (type) {
-    case "background":
-      return base + "Keep the person exactly as they are, but replace the background with a clean, soft, neutral professional backdrop (soft warm gray or off-white gradient). Ensure the person is clearly separated from the background and the result looks natural and professional.";
-    case "full":
-      return base + "Apply comprehensive professional headshot treatment: improve lighting and color balance, replace the background with a clean neutral backdrop, and ensure the overall presentation is polished and professional. Keep the person's appearance natural and true-to-life — do not alter facial features or dramatically change their look. The result should look like a professionally photographed and edited headshot.";
-    default: // polish
-      return base + "Improve the overall quality of this photo: enhance lighting, improve color balance and saturation, sharpen details, and ensure skin tones look natural and flattering. Keep the background as-is. The enhancement should be subtle and natural — the goal is a polished version of the original, not a dramatic transformation. Do not alter the person's facial features.";
+    case "beach":
+      return base + "Keep the person exactly as they appear but replace the background with a beautiful Florida beach scene — bright blue sky, ocean water, and sandy beach. The lighting on the person should match the warm outdoor setting. Make the composite look natural and professional, as if the photo was actually taken at the beach.";
+    case "caricature":
+      return base + "Transform this photo into a friendly, professional caricature illustration. Gently exaggerate the person's distinctive facial features in a flattering, good-natured way. Use a clean simple background. The style should be polished and charming — suitable for a real estate agent's profile — not an extreme cartoon, but a warm illustrated portrait that is clearly recognizable as this person.";
+    default: // professional
+      return base + "Transform this into a polished professional headshot. Improve the lighting and color balance, ensure natural and flattering skin tones, sharpen details, and replace any distracting background with a clean neutral backdrop (soft warm gray or off-white gradient). The result should look like a professionally photographed real estate headshot — confident, approachable, and business-ready. Keep the person's appearance natural and true-to-life; do not alter their facial features.";
   }
 }
 
