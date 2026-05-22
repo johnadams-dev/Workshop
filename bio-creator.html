@@ -235,12 +235,56 @@
     }
     #loading-overlay.hidden { display: none; }
 
+    /* ── Next Steps panel (shown after DeltaNet save) ───────────────────────── */
+    #next-steps-panel {
+      display: none;
+      margin-top: 18px;
+      background: white; border-radius: 14px;
+      box-shadow: 0 2px 14px rgba(0,0,0,.06);
+      overflow: hidden;
+    }
+    .next-steps-header {
+      background: #065f46; color: white;
+      padding: 20px 28px;
+    }
+    .next-steps-header h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .next-steps-header p  { font-size: 13px; opacity: .85; line-height: 1.5; }
+    .next-steps-copy-row  { padding: 14px 28px; background: #f0fdf4; border-bottom: 1px solid #d1fae5; display: flex; align-items: center; gap: 12px; }
+    .platform-tabs {
+      display: flex; border-bottom: 1.5px solid #e0ddd6; background: #fafaf9;
+    }
+    .ptab-platform {
+      padding: 11px 22px; font-size: 13px; font-weight: 600; color: #6b7280;
+      cursor: pointer; border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none;
+      font-family: inherit; white-space: nowrap;
+    }
+    .ptab-platform.active { color: #1a1a2e; border-bottom-color: #c9a84c; }
+    .platform-content { padding: 24px 28px; display: none; }
+    .platform-content.active { display: block; }
+    .platform-intro { font-size: 13px; color: #4a4a6a; margin-bottom: 16px; line-height: 1.6; }
+    .step-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .step-item {
+      display: flex; gap: 12px; align-items: flex-start;
+      font-size: 14px; line-height: 1.55; color: #1a1a2e;
+    }
+    .step-num-badge {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      background: #1a1a2e; color: #c9a84c;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px;
+    }
+    .step-item a { color: #1a1a2e; font-weight: 700; }
+    .platform-link-row { margin-top: 18px; }
+
     @media (max-width: 600px) {
       .form-row.cols-2, .form-row.cols-3 { grid-template-columns: 1fr; }
       .container { padding: 0 12px 60px; }
       .card { padding: 18px; }
       .step-tab .step-text { display: none; }
       .save-bar { flex-direction: column; align-items: stretch; }
+      .next-steps-header, .next-steps-copy-row, .platform-content { padding-left: 16px; padding-right: 16px; }
+      .ptab-platform { padding: 10px 14px; font-size: 12px; }
     }
   </style>
 </head>
@@ -557,6 +601,71 @@
         <div class="alert" id="save-dn-msg"></div>
         <div class="alert" id="save-drive-msg"></div>
       </div>
+
+      <!-- Next Steps panel — revealed after successful DeltaNet save -->
+      <div id="next-steps-panel">
+        <div class="next-steps-header">
+          <h3>✅ Bio saved! Now update your other profiles</h3>
+          <p>Your DeltaNet bio is live and Pathfinder will reflect it shortly. Use the steps below to copy it across to Zillow, Realtor.com, and Homes.com.</p>
+        </div>
+        <div class="next-steps-copy-row">
+          <span style="font-size:13px;color:#065f46;font-weight:600;">Copy your bio to paste into each platform:</span>
+          <button class="btn btn-green" style="padding:7px 16px;font-size:13px;" onclick="copyBioToClipboard()">
+            <span id="copy-btn-label">📋 Copy Bio</span>
+          </button>
+        </div>
+        <div class="platform-tabs">
+          <button class="ptab-platform active" onclick="switchPlatformTab('homes')">Homes.com</button>
+          <button class="ptab-platform"        onclick="switchPlatformTab('zillow')">Zillow</button>
+          <button class="ptab-platform"        onclick="switchPlatformTab('realtor')">Realtor.com</button>
+        </div>
+
+        <!-- Homes.com -->
+        <div class="platform-content active" id="pcon-homes">
+          <p class="platform-intro">Homes.com lets you claim your agent profile using your Google account — no separate password needed.</p>
+          <ol class="step-list">
+            <li class="step-item"><div class="step-num-badge">1</div><span>Go to <a href="https://www.homes.com" target="_blank">homes.com</a> and click the <strong>person/card icon</strong> in the top-right corner.</span></li>
+            <li class="step-item"><div class="step-num-badge">2</div><span>Click <strong>Register</strong>, then choose <strong>Continue with Google</strong>.</span></li>
+            <li class="step-item"><div class="step-num-badge">3</div><span>Sign in with your <strong>@adamscameron.com</strong> Google account.</span></li>
+            <li class="step-item"><div class="step-num-badge">4</div><span>Complete any prompts to claim your agent profile.</span></li>
+            <li class="step-item"><div class="step-num-badge">5</div><span>Navigate to your profile and <strong>paste your bio</strong> (use the Copy Bio button above).</span></li>
+            <li class="step-item"><div class="step-num-badge">6</div><span><strong>Upload your photo</strong> — use the Agent Photo Updater to get the same photo you have in DeltaNet.</span></li>
+          </ol>
+          <div class="platform-link-row">
+            <a href="https://www.homes.com" target="_blank" class="btn btn-navy" style="font-size:13px;padding:9px 18px;">Open Homes.com →</a>
+          </div>
+        </div>
+
+        <!-- Zillow -->
+        <div class="platform-content" id="pcon-zillow">
+          <p class="platform-intro">Zillow maintains a separate agent directory. You'll create a Zillow account using your Adams Cameron email to claim your profile.</p>
+          <ol class="step-list">
+            <li class="step-item"><div class="step-num-badge">1</div><span>Go to <a href="https://www.zillow.com/user/Login.htm" target="_blank">zillow.com</a> and click <strong>Create Account</strong>.</span></li>
+            <li class="step-item"><div class="step-num-badge">2</div><span>Enter your <strong>@adamscameron.com</strong> email address and set a password.</span></li>
+            <li class="step-item"><div class="step-num-badge">3</div><span>Follow the prompts to find and claim your agent listing on Zillow.</span></li>
+            <li class="step-item"><div class="step-num-badge">4</div><span>Go to your <strong>Profile</strong> and paste your bio (use the Copy Bio button above).</span></li>
+            <li class="step-item"><div class="step-num-badge">5</div><span><strong>Upload your professional photo</strong> to complete your profile.</span></li>
+          </ol>
+          <div class="platform-link-row">
+            <a href="https://www.zillow.com/user/Login.htm" target="_blank" class="btn btn-navy" style="font-size:13px;padding:9px 18px;">Open Zillow →</a>
+          </div>
+        </div>
+
+        <!-- Realtor.com -->
+        <div class="platform-content" id="pcon-realtor">
+          <p class="platform-intro">Realtor.com supports Google sign-in, making it easy to connect your existing agent profile.</p>
+          <ol class="step-list">
+            <li class="step-item"><div class="step-num-badge">1</div><span>Go to <a href="https://www.realtor.com/realestateagents/" target="_blank">realtor.com</a> and click <strong>Sign In</strong>.</span></li>
+            <li class="step-item"><div class="step-num-badge">2</div><span>Choose <strong>Login with Google</strong> and sign in with your <strong>@adamscameron.com</strong> account.</span></li>
+            <li class="step-item"><div class="step-num-badge">3</div><span>Follow the prompts — Realtor.com will locate your NAR/MLS-linked agent profile automatically.</span></li>
+            <li class="step-item"><div class="step-num-badge">4</div><span>Go to your <strong>Profile page</strong> and paste your bio (use the Copy Bio button above).</span></li>
+            <li class="step-item"><div class="step-num-badge">5</div><span><strong>Upload your photo</strong> to complete your public-facing profile.</span></li>
+          </ol>
+          <div class="platform-link-row">
+            <a href="https://www.realtor.com/realestateagents/" target="_blank" class="btn btn-navy" style="font-size:13px;padding:9px 18px;">Open Realtor.com →</a>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /container -->
@@ -776,23 +885,6 @@ function prefillForm(pf, dn) {
 // Step 2 → 3 — Generate bio
 // ═══════════════════════════════════════════════════════════════
 async function generateBio() {
-  // Validate minimums
-  const checks = [
-    ["f-name",       "Full Name"],
-    ["f-office",     "Office"],
-    ["f-specialty",  "Specialty"],
-    ["f-why",        "Why a client should work with you"],
-  ];
-  for (const [id, label] of checks) {
-    if (!document.getElementById(id)?.value?.trim()) {
-      if (currentStep !== 2) goToStep(2);
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      document.getElementById(id)?.focus();
-      setTimeout(() => alert(`Please fill in: ${label}`), 200);
-      return;
-    }
-  }
-
   const genBtn = document.getElementById("btn-generate");
   const regenBtn = document.getElementById("btn-regen");
   if (genBtn)   { genBtn.disabled  = true;  genBtn.classList.add("loading"); }
@@ -873,6 +965,7 @@ async function saveToDeltaNet() {
     const result = await api("POST", "/bio/save", { bio });
     showAlert("save-dn-msg", "success",
       result.message || "Biography saved to DeltaNet! Pathfinder will reflect it immediately.");
+    showNextSteps();
   } catch (e) {
     showAlert("save-dn-msg", "error", "Save failed: " + e.message);
   } finally {
@@ -988,6 +1081,45 @@ async function linkDmgId() {
   } catch (e) {
     showAlert("link-dmgid-msg", "error", e.message);
     btn.disabled = false; btn.classList.remove("loading");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Next Steps panel
+// ═══════════════════════════════════════════════════════════════
+function showNextSteps() {
+  const panel = document.getElementById("next-steps-panel");
+  if (!panel) return;
+  panel.style.display = "block";
+  setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  switchPlatformTab("homes");
+}
+
+function switchPlatformTab(which) {
+  document.querySelectorAll(".ptab-platform").forEach((btn, i) => {
+    const tabs = ["homes", "zillow", "realtor"];
+    btn.classList.toggle("active", tabs[i] === which);
+  });
+  ["homes", "zillow", "realtor"].forEach(id => {
+    const el = document.getElementById(`pcon-${id}`);
+    if (el) el.classList.toggle("active", id === which);
+  });
+}
+
+async function copyBioToClipboard() {
+  const html  = getCurrentHtml();
+  const label = document.getElementById("copy-btn-label");
+  try {
+    // Try to copy as plain text (strips HTML tags) for easy pasting into web forms
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const text = tmp.innerText || tmp.textContent || html;
+    await navigator.clipboard.writeText(text);
+    label.textContent = "✅ Copied!";
+    setTimeout(() => { label.textContent = "📋 Copy Bio"; }, 2200);
+  } catch {
+    label.textContent = "⚠ Copy failed";
+    setTimeout(() => { label.textContent = "📋 Copy Bio"; }, 2200);
   }
 }
 
