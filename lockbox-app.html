@@ -205,6 +205,18 @@ thead th {
   border-bottom: 1px solid var(--ink-border);
   white-space: nowrap;
 }
+thead th[data-col] {
+  cursor: pointer;
+  user-select: none;
+}
+thead th[data-col]:hover { color: var(--text); }
+thead th[data-col]::after {
+  content: ' ↕';
+  opacity: .2;
+  font-size: 9px;
+}
+thead th.sort-asc::after  { content: ' ▲'; opacity: 1; color: var(--amber); }
+thead th.sort-desc::after { content: ' ▼'; opacity: 1; color: var(--amber); }
 tbody td {
   padding: 9px 14px;
   border-bottom: 1px solid rgba(48,54,61,.5);
@@ -556,6 +568,51 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 }
 .toast.on { transform: translateY(0); opacity: 1; }
 
+/* ── Maintenance sub-tabs ── */
+.maint-tab {
+  padding: 10px 20px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.maint-tab:hover { color: var(--text); }
+.maint-tab.active { color: var(--text); border-bottom-color: var(--amber); }
+
+/* ── Inline editable cell ── */
+.editable-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.editable-field input {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  width: 110px;
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: 4px;
+  color: var(--text);
+}
+.editable-field input:focus { border-color: var(--amber); outline: none; }
+.save-inline {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--green);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  opacity: .7;
+}
+.save-inline:hover { opacity: 1; }
+
 /* ── Empty state ── */
 .empty {
   text-align: center;
@@ -608,6 +665,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   <div class="nav-tab" data-page="checkout"><span class="tab-icon">↑</span> Check Out</div>
   <div class="nav-tab" data-page="checkin"><span class="tab-icon">↓</span> Check In</div>
   <div class="nav-tab" data-page="inventory"><span class="tab-icon">≡</span> Inventory</div>
+  <div class="nav-tab" data-page="maintenance"><span class="tab-icon">⚙</span> Maintenance</div>
 </nav>
 
 <!-- ═══════════════ CONTENT ═══════════════ -->
@@ -904,16 +962,16 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     </div>
     <div class="table-wrap">
       <table>
-        <thead>
+        <thead id="inv-thead">
           <tr>
-            <th>Serial #</th>
-            <th>Shackle</th>
-            <th>Assoc.</th>
-            <th>Status</th>
-            <th>Location</th>
-            <th>Agent</th>
-            <th>Property / Address</th>
-            <th>Out Since</th>
+            <th data-col="serial_number"     onclick="sortInv('serial_number')">Serial #</th>
+            <th data-col="shackle_code"      onclick="sortInv('shackle_code')">Shackle</th>
+            <th data-col="association_abbr"  onclick="sortInv('association_abbr')">Assoc.</th>
+            <th data-col="status"            onclick="sortInv('status')">Status</th>
+            <th data-col="location"          onclick="sortInv('location')">Location</th>
+            <th data-col="agent_name"        onclick="sortInv('agent_name')">Agent</th>
+            <th data-col="location_address"  onclick="sortInv('location_address')">Property / Address</th>
+            <th data-col="checkout_at"       onclick="sortInv('checkout_at')">Out Since</th>
             <th></th>
           </tr>
         </thead>
@@ -924,6 +982,104 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     </div>
     <div id="inv-footer" style="margin-top:8px;font-size:11px;color:var(--text-muted);font-family:var(--mono)"></div>
   </div>
+
+  <!-- ══════ MAINTENANCE ══════ -->
+  <div class="page" id="page-maintenance">
+
+    <!-- Sub-tab bar -->
+    <div style="display:flex;border-bottom:1px solid var(--ink-border);margin-bottom:20px;background:var(--ink-mid);border-radius:6px 6px 0 0;overflow:hidden;">
+      <button class="maint-tab active" data-mtab="associations" onclick="switchMaintTab('associations')">🏢 Associations</button>
+      <button class="maint-tab" data-mtab="transfer" onclick="switchMaintTab('transfer')">↔ Transfer Lockbox</button>
+    </div>
+
+    <!-- ── Associations ── -->
+    <div class="maint-panel active" id="mpanel-associations">
+      <div class="section-head" style="margin-bottom:12px;">
+        <div class="section-title">Association Settings</div>
+        <div style="font-size:12px;color:var(--text-muted)">Click any row to edit fees and contact information.</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Abbr.</th>
+              <th>Name</th>
+              <th>Monthly Fee</th>
+              <th>Purchase Fee</th>
+              <th>Contact</th>
+              <th>Phone / Email</th>
+              <th>Website</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="assoc-tbody">
+            <tr><td colspan="8" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Transfer ── -->
+    <div class="maint-panel" id="mpanel-transfer" style="display:none">
+      <div class="form-card">
+        <div class="form-title">Transfer a Lockbox</div>
+        <div class="form-desc">Move a lockbox directly between offices without going through checkout and check-in. The box must not be currently checked out. This action is logged under your account.</div>
+
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Lockbox Serial #</div>
+              <div class="ta" id="tr-serial-ta">
+                <input id="tr-serial-input" type="text" placeholder="Type or scan serial #…"
+                       oninput="trSerialSearch(this.value)" autocomplete="off">
+                <div class="ta-drop" id="tr-serial-drop"></div>
+              </div>
+            </div>
+            <div class="field">
+              <div class="field-label">Current Location</div>
+              <input id="tr-from" type="text" disabled placeholder="Auto-filled when box is selected">
+            </div>
+          </div>
+
+          <!-- Transfer preview -->
+          <div class="box-preview" id="tr-box-preview">
+            <div class="box-preview-label">Selected Lockbox</div>
+            <div class="bp-grid">
+              <div class="bp-field"><div class="bp-key">Serial #</div><div class="bp-val amber" id="tr-p-serial">—</div></div>
+              <div class="bp-field"><div class="bp-key">Shackle</div><div class="bp-val" id="tr-p-shackle">—</div></div>
+              <div class="bp-field"><div class="bp-key">Assoc.</div><div class="bp-val" id="tr-p-assoc">—</div></div>
+              <div class="bp-field"><div class="bp-key">Status</div><div class="bp-val" id="tr-p-status">—</div></div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Transfer To Office</div>
+              <select id="tr-to-office">
+                <option value="">— Select destination office —</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-label">Notes <span style="font-weight:400;color:var(--text-dim);font-size:10px;">optional</span></div>
+              <input id="tr-notes" type="text" placeholder="Reason for transfer…">
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-label">Authorized By</div>
+            <input id="tr-admin" type="text" disabled>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="submitTransfer()">↔ Record Transfer</button>
+          <button class="btn btn-ghost" onclick="resetTransfer()">Clear</button>
+        </div>
+        <div id="tr-msg" style="margin-top:14px;"></div>
+      </div>
+    </div>
+
+  </div><!-- /page-maintenance -->
 
 </div><!-- /content -->
 </div><!-- /shell -->
@@ -1048,6 +1204,7 @@ let STATE = {
   selectedCoBox: null,
   selectedCiBox: null,
   ciLocType:     "office",
+  invSort:       { col: null, dir: 1 },
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1075,6 +1232,7 @@ async function init() {
   }
 
   populateOfficeDropdowns();
+  populateTransferOfficeDropdown();
   renderDashboard();
   renderInventory(STATE.boxes);
 }
@@ -1089,6 +1247,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 function switchPage(name) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === name));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  if (name === "maintenance") loadAssociations();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1449,6 +1608,33 @@ function resetCheckin() {
 /* ═══════════════════════════════════════════════════════════════════
    INVENTORY
 ═══════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   INVENTORY SORT
+═══════════════════════════════════════════════════════════════════ */
+function sortInv(col) {
+  if (STATE.invSort.col === col) {
+    STATE.invSort.dir *= -1;
+  } else {
+    STATE.invSort.col = col;
+    STATE.invSort.dir = 1;
+  }
+  filterInv();
+}
+
+function invSortVal(b, col) {
+  switch (col) {
+    case "serial_number":    return b.serial_number    || "";
+    case "shackle_code":     return b.shackle_code     || "";
+    case "association_abbr": return b.association_abbr || "";
+    case "status":           return b.status           || "";
+    case "location":         return (b.location_type === "office" ? b.office_name : b.location_address) || "";
+    case "agent_name":       return b.agent_name       || "￿";
+    case "location_address": return b.location_address || "￿";
+    case "checkout_at":      return b.checkout_at      || "￿";
+    default: return "";
+  }
+}
+
 const STATUS_CHIP = {
   available:       '<span class="chip chip-green">Available</span>',
   checked_out:     '<span class="chip chip-amber">Checked Out</span>',
@@ -1458,6 +1644,23 @@ const STATUS_CHIP = {
 };
 
 function renderInventory(boxes) {
+  // Apply sort
+  if (STATE.invSort.col) {
+    const { col, dir } = STATE.invSort;
+    boxes = [...boxes].sort((a, b) => {
+      const av = invSortVal(a, col), bv = invSortVal(b, col);
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+  }
+
+  // Update header indicators
+  document.querySelectorAll("#inv-thead th[data-col]").forEach(th => {
+    th.classList.remove("sort-asc", "sort-desc");
+    if (th.dataset.col === STATE.invSort.col) {
+      th.classList.add(STATE.invSort.dir === 1 ? "sort-asc" : "sort-desc");
+    }
+  });
+
   document.getElementById('inv-tbody').innerHTML = boxes.length
     ? boxes.map(b => `
       <tr>
@@ -1552,6 +1755,205 @@ function toast(msg, type) {
 }
 
 function esc(s) { return (s || '').replace(/'/g, "\\'"); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAINTENANCE — sub-tab switcher
+═══════════════════════════════════════════════════════════════════ */
+function switchMaintTab(name) {
+  document.querySelectorAll(".maint-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.mtab === name));
+  document.querySelectorAll(".maint-panel").forEach(p => {
+    p.style.display = p.id === "mpanel-" + name ? "block" : "none";
+  });
+  if (name === "associations") loadAssociations();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAINTENANCE — Associations
+═══════════════════════════════════════════════════════════════════ */
+let _assocData = [];
+
+async function loadAssociations() {
+  document.getElementById("assoc-tbody").innerHTML =
+    '<tr><td colspan="8" class="empty">Loading…</td></tr>';
+  try {
+    _assocData = await GET("/lockbox/associations");
+    renderAssociations();
+  } catch (e) {
+    document.getElementById("assoc-tbody").innerHTML =
+      `<tr><td colspan="8" class="empty">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderAssociations() {
+  document.getElementById("assoc-tbody").innerHTML = _assocData.length
+    ? _assocData.map(a => `
+      <tr id="assoc-row-${a.id}">
+        <td><span class="chip chip-neutral">${a.abbreviation || "—"}</span></td>
+        <td style="font-weight:500">${a.name || "—"}</td>
+        <td>
+          <div class="editable-field">
+            <input id="assoc-mfee-${a.id}" type="number" step="0.01" min="0"
+              value="${a.monthly_fee ?? ""}" placeholder="0.00"
+              style="width:90px" onkeydown="if(event.key==='Enter')saveAssocField(${a.id},'monthly_fee',this.value)">
+            <button class="save-inline" onclick="saveAssocField(${a.id},'monthly_fee',document.getElementById('assoc-mfee-${a.id}').value)">Save</button>
+          </div>
+        </td>
+        <td>
+          <div class="editable-field">
+            <input id="assoc-pfee-${a.id}" type="number" step="0.01" min="0"
+              value="${a.purchase_fee ?? ""}" placeholder="0.00"
+              style="width:90px" onkeydown="if(event.key==='Enter')saveAssocField(${a.id},'purchase_fee',this.value)">
+            <button class="save-inline" onclick="saveAssocField(${a.id},'purchase_fee',document.getElementById('assoc-pfee-${a.id}').value)">Save</button>
+          </div>
+        </td>
+        <td style="font-size:12px">${a.contact_name || '—'}</td>
+        <td style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">
+          ${[a.contact_phone, a.contact_email].filter(Boolean).join(' · ') || '—'}
+        </td>
+        <td style="font-size:11px;color:var(--blue)">
+          ${a.website ? `<a href="${a.website}" target="_blank" style="color:var(--blue)">${a.website.replace(/^https?:\/\//, '')}</a>` : '—'}
+        </td>
+        <td>
+          <button class="tbl-link" onclick="editAssocContact(${a.id})">Edit Contact</button>
+        </td>
+      </tr>`).join("")
+    : '<tr><td colspan="8" class="empty">No associations found.</td></tr>';
+}
+
+async function saveAssocField(id, field, rawVal) {
+  const value = rawVal === "" ? null : parseFloat(rawVal);
+  try {
+    const updated = await api(`/lockbox/associations/${id}`, {
+      method: "PATCH", body: JSON.stringify({ [field]: value })
+    });
+    const idx = _assocData.findIndex(a => a.id === id);
+    if (idx >= 0) _assocData[idx] = { ..._assocData[idx], ...updated };
+    toast("Saved ✓");
+  } catch (e) {
+    toast("Save failed: " + e.message, "warn");
+  }
+}
+
+function editAssocContact(id) {
+  const a = _assocData.find(x => x.id === id);
+  if (!a) return;
+  const name  = prompt("Contact name:",  a.contact_name  || "");
+  if (name  === null) return;
+  const phone = prompt("Contact phone:", a.contact_phone || "");
+  if (phone === null) return;
+  const email = prompt("Contact email:", a.contact_email || "");
+  if (email === null) return;
+  const web   = prompt("Website URL:",   a.website       || "");
+  if (web   === null) return;
+
+  api(`/lockbox/associations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      contact_name:  name  || null,
+      contact_phone: phone || null,
+      contact_email: email || null,
+      website:       web   || null,
+    })
+  }).then(updated => {
+    const idx = _assocData.findIndex(x => x.id === id);
+    if (idx >= 0) _assocData[idx] = { ..._assocData[idx], ...updated };
+    renderAssociations();
+    toast("Contact info saved ✓");
+  }).catch(e => toast("Save failed: " + e.message, "warn"));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAINTENANCE — Transfer
+═══════════════════════════════════════════════════════════════════ */
+let _selectedTrBox = null;
+
+function populateTransferOfficeDropdown() {
+  const sel = document.getElementById("tr-to-office");
+  sel.innerHTML = '<option value="">— Select destination office —</option>';
+  STATE.offices.forEach(o => {
+    const opt = document.createElement("option");
+    opt.value = o.local_id || o.office_id;
+    opt.textContent = o.name + (o.city ? ` (${o.city})` : "");
+    sel.appendChild(opt);
+  });
+  document.getElementById("tr-admin").value = userDisplay || userEmail;
+}
+
+let _trSerialTimer;
+function trSerialSearch(val) {
+  const drop = document.getElementById("tr-serial-drop");
+  if (!val || val.length < 3) { drop.classList.remove("open"); return; }
+  clearTimeout(_trSerialTimer);
+  _trSerialTimer = setTimeout(() => {
+    const matches = STATE.boxes.filter(b => b.serial_number.includes(val));
+    drop.innerHTML = matches.length
+      ? matches.slice(0, 10).map(b => `
+          <div class="ta-item" onclick='pickTrBox(${JSON.stringify(b).replace(/'/g, "&#39;")})'>
+            <span class="ta-main" style="font-family:var(--mono)">${b.serial_number}</span>
+            <span class="ta-sub">${b.association_abbr} · ${STATUS_CHIP[b.status] || b.status} · ${b.office_name || b.location_address || "—"}</span>
+          </div>`).join("")
+      : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No boxes match</div>';
+    drop.classList.add("open");
+  }, 150);
+}
+
+function pickTrBox(b) {
+  _selectedTrBox = b;
+  document.getElementById("tr-serial-input").value = b.serial_number;
+  document.getElementById("tr-serial-drop").classList.remove("open");
+  document.getElementById("tr-from").value =
+    b.location_type === "office" ? (b.office_name || "Office") : (b.location_address || "Property");
+  document.getElementById("tr-p-serial").textContent  = b.serial_number;
+  document.getElementById("tr-p-shackle").textContent = b.shackle_code || "—";
+  document.getElementById("tr-p-assoc").textContent   = b.association_abbr || "—";
+  document.getElementById("tr-p-status").textContent  = b.status || "—";
+  document.getElementById("tr-box-preview").classList.add("on");
+}
+
+async function submitTransfer() {
+  const msgEl = document.getElementById("tr-msg");
+  msgEl.innerHTML = "";
+
+  if (!_selectedTrBox) { toast("Select a lockbox first", "warn"); return; }
+  const toOffice = document.getElementById("tr-to-office").value;
+  if (!toOffice)  { toast("Select a destination office", "warn"); return; }
+
+  if (_selectedTrBox.status === "checked_out") {
+    toast("This box is checked out — check it in before transferring", "warn"); return;
+  }
+
+  try {
+    const result = await POST("/lockbox/transfer", {
+      serial_number: _selectedTrBox.serial_number,
+      to_office_id:  parseInt(toOffice),
+      notes:         document.getElementById("tr-notes").value.trim() || undefined,
+    });
+    toast(`Transferred to ${result.to_office} ↔`);
+    msgEl.innerHTML = `<div class="alert" style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">
+      ✓ Lockbox <strong>${result.serial_number}</strong> transferred to <strong>${result.to_office}</strong>.
+    </div>`;
+    // Refresh inventory
+    try {
+      STATE.boxes = (await GET("/lockbox/inventory")) || [];
+      renderInventory(STATE.boxes);
+      renderDashboard();
+    } catch { /* stale ok */ }
+    resetTransfer();
+  } catch (e) {
+    toast("Transfer failed: " + e.message, "warn");
+    msgEl.innerHTML = `<div class="alert" style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+function resetTransfer() {
+  _selectedTrBox = null;
+  document.getElementById("tr-serial-input").value = "";
+  document.getElementById("tr-from").value = "";
+  document.getElementById("tr-notes").value = "";
+  document.getElementById("tr-to-office").value = "";
+  document.getElementById("tr-box-preview").classList.remove("on");
+}
 
 // Close typeaheads on outside click
 document.addEventListener('click', e => {
