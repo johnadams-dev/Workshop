@@ -667,7 +667,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   <div class="nav-tab" data-page="checkout"><span class="tab-icon">↑</span> Check Out</div>
   <div class="nav-tab" data-page="checkin"><span class="tab-icon">↓</span> Check In</div>
   <div class="nav-tab" data-page="inventory"><span class="tab-icon">≡</span> Inventory</div>
-  <div class="nav-tab" data-page="maintenance"><span class="tab-icon">⚙</span> Maintenance</div>
+  <div class="nav-tab" data-page="settings"><span class="tab-icon">⚙</span> Settings</div>
 </nav>
 
 <!-- ═══════════════ CONTENT ═══════════════ -->
@@ -810,9 +810,8 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
         <div class="form-row">
           <div class="field">
-            <div class="field-label req">Processed By (Admin)</div>
-            <!-- TODO: pre-fill from session / x-user-email header -->
-            <input id="co-admin" type="text" placeholder="Admin name">
+            <div class="field-label">Processed By</div>
+            <input id="co-admin" type="text" disabled style="opacity:.7">
           </div>
           <div class="field">
             <div class="field-label">Notes</div>
@@ -882,18 +881,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
         <div class="divider">return details</div>
 
-        <!-- Where is it going? -->
-        <div class="field">
-          <div class="field-label req">Returning To</div>
-          <div class="loc-toggle">
-            <div class="loc-opt active" id="ci-opt-office" onclick="setCiLoc('office')">🏢 Office</div>
-            <div class="loc-opt" id="ci-opt-other" onclick="setCiLoc('other')">📍 Other / Association</div>
-          </div>
-        </div>
-
-        <div id="ci-office-row" class="form-row">
+        <div class="form-row">
           <div class="field">
-            <div class="field-label req">Office</div>
+            <div class="field-label req">Returning To Office</div>
             <select id="ci-office">
               <option value="">— Select office —</option>
             </select>
@@ -903,23 +893,16 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <select id="ci-condition">
               <option value="ok">✅ Good — Ready to redeploy</option>
               <option value="needs_service">⚠️ Needs service / repair</option>
-              <option value="broken">❌ Broken — Send to association</option>
+              <option value="broken">❌ Broken — needs attention</option>
               <option value="stuck_shackle">🔧 Shackle stuck</option>
             </select>
           </div>
         </div>
 
-        <div id="ci-other-row" style="display:none">
-          <div class="field">
-            <div class="field-label req">Location / Notes</div>
-            <input id="ci-other-addr" type="text" placeholder="e.g. Returned to NSBAR for exchange">
-          </div>
-        </div>
-
         <div class="form-row">
           <div class="field">
-            <div class="field-label req">Received By (Admin)</div>
-            <input id="ci-admin" type="text" placeholder="Admin name">
+            <div class="field-label">Received By</div>
+            <input id="ci-admin" type="text" disabled style="opacity:.7">
           </div>
           <div class="field">
             <div class="field-label">Notes</div>
@@ -940,6 +923,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   <div class="page" id="page-inventory">
     <div class="inv-bar">
       <input id="inv-q" type="text" placeholder="Search serial, shackle, agent, address…" oninput="filterInv()">
+      <select id="inv-office" onchange="filterInv()" style="width:170px">
+        <option value="">All Offices</option>
+      </select>
       <select id="inv-assoc" onchange="filterInv()">
         <option value="">All Associations</option>
         <option>NSBAR</option>
@@ -986,12 +972,13 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   </div>
 
   <!-- ══════ MAINTENANCE ══════ -->
-  <div class="page" id="page-maintenance">
+  <div class="page" id="page-settings">
 
     <!-- Sub-tab bar -->
     <div style="display:flex;border-bottom:1px solid var(--ink-border);margin-bottom:20px;background:var(--ink-mid);border-radius:6px 6px 0 0;overflow:hidden;">
       <button class="maint-tab active" data-mtab="associations" onclick="switchMaintTab('associations')">🏢 Associations</button>
-      <button class="maint-tab" data-mtab="transfer" onclick="switchMaintTab('transfer')">↔ Transfer Lockbox</button>
+      <button class="maint-tab" data-mtab="transfer"            onclick="switchMaintTab('transfer')">↔ Transfer</button>
+      <button class="maint-tab" data-mtab="lockboxes"           onclick="switchMaintTab('lockboxes')">📦 Lockboxes</button>
     </div>
 
     <!-- ── Associations ── -->
@@ -1081,7 +1068,96 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       </div>
     </div>
 
-  </div><!-- /page-maintenance -->
+    <!-- ── Lockboxes ── -->
+    <div class="maint-panel" id="mpanel-lockboxes" style="display:none">
+
+      <!-- Add new lockbox -->
+      <div class="form-card" style="margin-bottom:20px;">
+        <div class="form-title">Add Lockbox to Inventory</div>
+        <div class="form-desc">Register a new lockbox received from an association.</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Serial #</div>
+              <input id="lb-serial" type="text" placeholder="e.g. 20033334">
+            </div>
+            <div class="field">
+              <div class="field-label req">Shackle Code</div>
+              <input id="lb-shackle" type="text" placeholder="e.g. 5833">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Association</div>
+              <select id="lb-assoc">
+                <option value="">— Select association —</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-label req">Assigned Office</div>
+              <select id="lb-office">
+                <option value="">— Select office —</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label">Notes <span style="font-weight:400;color:var(--text-dim);font-size:10px">optional</span></div>
+            <input id="lb-notes" type="text" placeholder="e.g. Replacement for decommissioned #20033111">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="addLockbox()">+ Add to Inventory</button>
+          <button class="btn btn-ghost" onclick="resetAddLockbox()">Clear</button>
+        </div>
+        <div id="lb-add-msg" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- Update lockbox status -->
+      <div class="form-card">
+        <div class="form-title">Decommission / Status Update</div>
+        <div class="form-desc">Remove a lockbox from service, mark it broken, or send it to the association for exchange.</div>
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Serial #</div>
+              <div class="ta" id="lb-dcm-ta">
+                <input id="lb-dcm-serial" type="text" placeholder="Type or scan serial #…"
+                       oninput="dcmSerialSearch(this.value)" autocomplete="off">
+                <div class="ta-drop" id="lb-dcm-drop"></div>
+              </div>
+            </div>
+            <div class="field">
+              <div class="field-label">Current Status</div>
+              <input id="lb-dcm-status" type="text" disabled placeholder="Auto-filled">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">New Status</div>
+              <select id="lb-dcm-new-status">
+                <option value="">— Select action —</option>
+                <option value="broken">❌ Mark Broken</option>
+                <option value="sent_to_assoc">📦 Sent to Association</option>
+                <option value="decommissioned">🗑 Decommission (remove from service)</option>
+                <option value="available">✅ Return to Available</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-label">Notes</div>
+              <input id="lb-dcm-notes" type="text" placeholder="Reason, reference number, etc.">
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="updateLockboxStatus()">Update Status</button>
+          <button class="btn btn-ghost" onclick="resetDcm()">Clear</button>
+        </div>
+        <div id="lb-dcm-msg" style="margin-top:12px;"></div>
+      </div>
+
+    </div><!-- /mpanel-lockboxes -->
+
+  </div><!-- /page-settings -->
 
 </div><!-- /content -->
 </div><!-- /shell -->
@@ -1205,7 +1281,6 @@ let STATE = {
   activity:      [],
   selectedCoBox: null,
   selectedCiBox: null,
-  ciLocType:     "office",
   invSort:       { col: null, dir: 1 },
 };
 
@@ -1248,7 +1323,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 function switchPage(name) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === name));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
-  if (name === "maintenance") loadAssociations();
+  if (name === "settings") loadAssociations();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1256,7 +1331,7 @@ function switchPage(name) {
    Populated from DeltaNet /lockbox/offices (already loaded at init).
 ═══════════════════════════════════════════════════════════════════ */
 function populateOfficeDropdowns() {
-  const selects = ['co-office', 'ci-office', 'dash-office-filter', 'tr-to-office'];
+  const selects = ['co-office', 'ci-office', 'dash-office-filter', 'tr-to-office', 'inv-office', 'lb-office'];
   selects.forEach(id => {
     const el = document.getElementById(id);
     const isDash = id === 'dash-office-filter';
@@ -1529,56 +1604,34 @@ function pickCiBox(b) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CHECKIN LOCATION TOGGLE
-═══════════════════════════════════════════════════════════════════ */
-function setCiLoc(type) {
-  STATE.ciLocType = type;
-  document.getElementById('ci-opt-office').classList.toggle('active', type === 'office');
-  document.getElementById('ci-opt-other').classList.toggle('active',  type === 'other');
-  document.getElementById('ci-office-row').style.display = type === 'office' ? '' : 'none';
-  document.getElementById('ci-other-row').style.display  = type === 'other'  ? '' : 'none';
-}
-
-/* ═══════════════════════════════════════════════════════════════════
    CHECKIN SUBMIT
-   TODO (Claude Code): POST /lockbox/checkin
 ═══════════════════════════════════════════════════════════════════ */
 function submitCheckin() {
   if (!STATE.selectedCiBox) { toast('Find a checked-out box first', 'warn'); return; }
 
-  let locLabel = '';
-  if (STATE.ciLocType === 'office') {
-    const sel = document.getElementById('ci-office');
-    if (!sel.value) { toast('Select the receiving office', 'warn'); return; }
-    locLabel = sel.options[sel.selectedIndex].text;
-  } else {
-    locLabel = document.getElementById('ci-other-addr').value.trim();
-    if (!locLabel) { toast('Enter a location or notes', 'warn'); return; }
-  }
+  const sel = document.getElementById('ci-office');
+  if (!sel.value) { toast('Select the receiving office', 'warn'); return; }
 
-  const condEl   = document.getElementById('ci-condition');
-  const condText = condEl.options[condEl.selectedIndex].text;
+  const condEl = document.getElementById('ci-condition');
 
   document.getElementById('ci-modal-body').innerHTML = modalRows([
     ['Serial #',     STATE.selectedCiBox.serial_number, true],
     ['Agent',        STATE.selectedCiBox.agent_name || '—', false],
     ['Was at',       STATE.selectedCiBox.location_address || '—', false],
-    ['Returning to', locLabel, false],
-    STATE.ciLocType === 'office' ? ['Condition', condText, false] : null,
+    ['Returning to', sel.options[sel.selectedIndex].text, false],
+    ['Condition',    condEl.options[condEl.selectedIndex].text, false],
     ['Date / Time',  new Date().toLocaleString(), false],
   ]);
   document.getElementById('ci-modal').classList.add('open');
 }
 
 async function confirmCheckin() {
-  const sel      = document.getElementById("ci-office");
-  const officeId = sel.value ? parseInt(sel.value) : null;
+  const sel = document.getElementById("ci-office");
   const body = {
-    serial_number:    STATE.selectedCiBox.serial_number,
-    office_id:        officeId || undefined,
-    location_address: STATE.ciLocType === "other" ? document.getElementById("ci-other-addr").value.trim() : undefined,
-    condition:        document.getElementById("ci-condition").value,
-    notes:            document.getElementById("ci-notes").value.trim() || undefined,
+    serial_number: STATE.selectedCiBox.serial_number,
+    office_id:     parseInt(sel.value),
+    condition:     document.getElementById("ci-condition").value,
+    notes:         document.getElementById("ci-notes").value.trim() || undefined,
   };
 
   try { await POST("/lockbox/checkin", body); }
@@ -1587,7 +1640,6 @@ async function confirmCheckin() {
   closeModals();
   toast("Lockbox checked in ↓");
   resetCheckin();
-  // Refresh live data
   try {
     const [boxes, activity] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/activity")]);
     STATE.boxes    = boxes    || [];
@@ -1598,11 +1650,10 @@ async function confirmCheckin() {
 }
 
 function resetCheckin() {
-  ['ci-serial-input','ci-agent-input','ci-notes','ci-other-addr']
+  ['ci-serial-input','ci-agent-input','ci-notes']
     .forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   document.getElementById('ci-found').classList.remove('on');
   document.getElementById('ci-office').value = '';
-  setCiLoc('office');
   STATE.selectedCiBox = null;
 }
 
@@ -1695,10 +1746,11 @@ function renderInventory(boxes) {
 }
 
 function filterInv() {
-  const q   = document.getElementById('inv-q').value.toLowerCase();
-  const as  = document.getElementById('inv-assoc').value;
-  const st  = document.getElementById('inv-status').value;
-  const loc = document.getElementById('inv-loc').value;
+  const q      = document.getElementById('inv-q').value.toLowerCase();
+  const office = document.getElementById('inv-office').value;
+  const as     = document.getElementById('inv-assoc').value;
+  const st     = document.getElementById('inv-status').value;
+  const loc    = document.getElementById('inv-loc').value;
 
   renderInventory(STATE.boxes.filter(b => {
     const textMatch = !q ||
@@ -1707,7 +1759,12 @@ function filterInv() {
       (b.agent_name || '').toLowerCase().includes(q) ||
       (b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
+    const officeMatch = !office || String(b.office_id || b.office_id) === office ||
+      (b.office_name || '').toLowerCase().includes(
+        (STATE.offices.find(o => String(o.local_id || o.office_id) === office)?.name || '').toLowerCase().split(' ')[0]
+      );
     return textMatch
+      && officeMatch
       && (!as  || b.association_abbr === as)
       && (!st  || b.status === st)
       && (!loc || b.location_type === loc);
@@ -1767,6 +1824,7 @@ function switchMaintTab(name) {
     p.style.display = p.id === "mpanel-" + name ? "block" : "none";
   });
   if (name === "associations") loadAssociations();
+  if (name === "lockboxes") { if (!_assocData.length) loadAssociations().then(populateAssocSelect); else populateAssocSelect(); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1941,6 +1999,108 @@ function resetTransfer() {
   document.getElementById("tr-notes").value = "";
   document.getElementById("tr-to-office").value = "";
   document.getElementById("tr-box-preview").classList.remove("on");
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SETTINGS — Lockbox Management
+═══════════════════════════════════════════════════════════════════ */
+function populateAssocSelect() {
+  const sel = document.getElementById("lb-assoc");
+  if (!sel || sel.options.length > 1) return;
+  _assocData.forEach(a => {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = `${a.abbreviation} — ${a.name}`;
+    sel.appendChild(opt);
+  });
+}
+
+async function addLockbox() {
+  const serial  = document.getElementById("lb-serial").value.trim();
+  const shackle = document.getElementById("lb-shackle").value.trim();
+  const assocId = document.getElementById("lb-assoc").value;
+  const officeId = document.getElementById("lb-office").value;
+  const notes   = document.getElementById("lb-notes").value.trim();
+  const msgEl   = document.getElementById("lb-add-msg");
+
+  if (!serial)  { toast("Serial # required", "warn"); return; }
+  if (!shackle) { toast("Shackle code required", "warn"); return; }
+  if (!assocId) { toast("Select an association", "warn"); return; }
+  if (!officeId){ toast("Select an assigned office", "warn"); return; }
+
+  try {
+    await POST("/lockbox", { serial_number: serial, shackle_code: shackle,
+      association_id: parseInt(assocId), office_id: parseInt(officeId),
+      notes: notes || undefined });
+    msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ Lockbox <strong>${serial}</strong> added to inventory.</div>`;
+    toast("Lockbox added ✓");
+    resetAddLockbox();
+    STATE.boxes = (await GET("/lockbox/inventory")) || [];
+    renderDashboard(); renderInventory(STATE.boxes);
+  } catch (e) {
+    msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+function resetAddLockbox() {
+  ["lb-serial","lb-shackle","lb-notes"].forEach(id => { const e = document.getElementById(id); if(e) e.value=""; });
+  document.getElementById("lb-assoc").value = "";
+  document.getElementById("lb-office").value = "";
+}
+
+let _dcmSerial = null;
+let _dcmTimer;
+function dcmSerialSearch(val) {
+  const drop = document.getElementById("lb-dcm-drop");
+  if (!val || val.length < 3) { drop.classList.remove("open"); return; }
+  clearTimeout(_dcmTimer);
+  _dcmTimer = setTimeout(() => {
+    const matches = STATE.boxes.filter(b => b.serial_number.includes(val));
+    drop.innerHTML = matches.length
+      ? matches.slice(0, 8).map(b => `
+          <div class="ta-item" onclick='pickDcmBox(${JSON.stringify(b).replace(/'/g,"&#39;")})'>
+            <span class="ta-main" style="font-family:var(--mono)">${b.serial_number}</span>
+            <span class="ta-sub">${b.association_abbr} · ${b.status} · ${b.office_name || "—"}</span>
+          </div>`).join("")
+      : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No boxes match</div>';
+    drop.classList.add("open");
+  }, 150);
+}
+
+function pickDcmBox(b) {
+  _dcmSerial = b.serial_number;
+  document.getElementById("lb-dcm-serial").value = b.serial_number;
+  document.getElementById("lb-dcm-status").value = b.status;
+  document.getElementById("lb-dcm-drop").classList.remove("open");
+}
+
+async function updateLockboxStatus() {
+  const msgEl  = document.getElementById("lb-dcm-msg");
+  const status = document.getElementById("lb-dcm-new-status").value;
+  const notes  = document.getElementById("lb-dcm-notes").value.trim();
+  if (!_dcmSerial) { toast("Select a lockbox first", "warn"); return; }
+  if (!status)     { toast("Select a new status", "warn"); return; }
+
+  try {
+    await api(`/lockbox/${encodeURIComponent(_dcmSerial)}/status`, {
+      method: "PATCH", body: JSON.stringify({ status, notes: notes || undefined })
+    });
+    msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ <strong>${_dcmSerial}</strong> updated to <strong>${status}</strong>.</div>`;
+    toast("Status updated ✓");
+    resetDcm();
+    STATE.boxes = (await GET("/lockbox/inventory")) || [];
+    renderDashboard(); renderInventory(STATE.boxes);
+  } catch (e) {
+    msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+function resetDcm() {
+  _dcmSerial = null;
+  document.getElementById("lb-dcm-serial").value = "";
+  document.getElementById("lb-dcm-status").value = "";
+  document.getElementById("lb-dcm-new-status").value = "";
+  document.getElementById("lb-dcm-notes").value = "";
 }
 
 // Close typeaheads on outside click
