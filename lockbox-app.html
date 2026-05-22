@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lockbox Manager · Adams Cameron & Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS
+   Utilitarian / industrial — feels like a real ops tool
+═══════════════════════════════════════════════════════ */
+:root {
+  --ink:        #0d1117;
+  --ink-mid:    #161b22;
+  --ink-light:  #21262d;
+  --ink-border: #30363d;
+  --amber:      #d29922;
+  --amber-bg:   rgba(210,153,34,.12);
+  --green:      #3fb950;
+  --green-bg:   rgba(63,185,80,.1);
+  --red:        #f85149;
+  --red-bg:     rgba(248,81,73,.1);
+  --blue:       #58a6ff;
+  --blue-bg:    rgba(88,166,255,.1);
+  --text:       #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim:   #484f58;
+  --mono:       'IBM Plex Mono', monospace;
+  --sans:       'IBM Plex Sans', sans-serif;
+  --r:          6px;
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ── Layout shell ── */
+.shell { display: grid; grid-template-rows: 48px 40px 1fr; min-height: 100vh; }
+
+/* ═══════════════════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════════════════ */
+.topbar {
+  background: var(--ink-mid);
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text);
+}
+.brand-icon {
+  width: 26px; height: 26px;
+  background: var(--amber);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.brand-sep { color: var(--text-dim); margin: 0 2px; }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 20px;
+  padding: 3px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-chip::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAV TABS
+═══════════════════════════════════════════════════════ */
+.nav {
+  background: var(--ink-mid);
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: stretch;
+  padding: 0 20px;
+  gap: 0;
+  overflow-x: auto;
+}
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  user-select: none;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--text); border-bottom-color: var(--amber); }
+.nav-tab .tab-icon { font-size: 13px; }
+
+/* ═══════════════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════════════ */
+.content { overflow-y: auto; }
+.page { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════
+   STAT CARDS
+═══════════════════════════════════════════════════════ */
+.stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+.stat {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+}
+.stat-num {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-num.amber { color: var(--amber); }
+.stat-num.green { color: var(--green); }
+.stat-num.red   { color: var(--red);   }
+.stat-num.blue  { color: var(--blue);  }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+
+/* ═══════════════════════════════════════════════════════
+   SECTION HEADER
+═══════════════════════════════════════════════════════ */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+/* ═══════════════════════════════════════════════════════
+   TABLES
+═══════════════════════════════════════════════════════ */
+.table-wrap {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  overflow: auto;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  text-align: left;
+  padding: 9px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  background: rgba(0,0,0,.2);
+  border-bottom: 1px solid var(--ink-border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(48,54,61,.5);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(255,255,255,.02); }
+
+/* ═══════════════════════════════════════════════════════
+   INLINE CHIPS / PILLS
+═══════════════════════════════════════════════════════ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.chip-amber   { background: var(--amber-bg); color: var(--amber); }
+.chip-green   { background: var(--green-bg); color: var(--green); }
+.chip-red     { background: var(--red-bg);   color: var(--red);   }
+.chip-blue    { background: var(--blue-bg);  color: var(--blue);  }
+.chip-neutral { background: var(--ink-light); color: var(--text-muted); border: 1px solid var(--ink-border); }
+
+.serial {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--amber);
+  background: var(--amber-bg);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.loc-chip {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════
+   FORM CARD
+═══════════════════════════════════════════════════════ */
+.form-card {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 28px;
+  max-width: 680px;
+}
+.form-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.form-desc  { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
+
+.form-grid  { display: grid; gap: 16px; }
+.form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field      { display: flex; flex-direction: column; gap: 5px; }
+
+.field-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+.field-label.req::after { content: ' *'; color: var(--amber); }
+
+input, select, textarea {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 8px 11px;
+  outline: none;
+  width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+}
+input::placeholder { color: var(--text-dim); }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(210,153,34,.15);
+}
+select option { background: var(--ink-mid); }
+input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
+
+/* suffix tag inside input */
+.input-wrap { position: relative; }
+.input-wrap input { padding-right: 80px; }
+.input-suffix {
+  position: absolute;
+  right: 9px; top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* ── Typeahead ── */
+.ta { position: relative; }
+.ta-drop {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0; right: 0;
+  background: var(--ink-mid);
+  border: 1px solid var(--amber);
+  border-radius: var(--r);
+  z-index: 100;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.ta-drop.open { display: block; }
+.ta-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--ink-border);
+  transition: background .1s;
+}
+.ta-item:last-child { border-bottom: none; }
+.ta-item:hover { background: rgba(210,153,34,.08); }
+.ta-main { font-weight: 500; font-size: 13px; }
+.ta-sub  { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+/* ── Divider label ── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--ink-border);
+}
+
+/* ── Box preview ── */
+.box-preview {
+  background: rgba(210,153,34,.06);
+  border: 1px solid rgba(210,153,34,.25);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  display: none;
+}
+.box-preview.on { display: block; }
+.box-preview-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--amber);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+.bp-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+.bp-field .bp-key {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 3px;
+}
+.bp-field .bp-val {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+}
+.bp-val.amber { color: var(--amber); }
+
+/* ── Found box (checkin) ── */
+.found-preview {
+  background: rgba(63,185,80,.05);
+  border: 1px solid rgba(63,185,80,.2);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  display: none;
+}
+.found-preview.on { display: block; }
+.found-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--green);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+
+/* ── Location toggle ── */
+.loc-toggle {
+  display: flex;
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.loc-opt {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  user-select: none;
+}
+.loc-opt + .loc-opt { border-left: 1px solid var(--ink-border); }
+.loc-opt.active { background: var(--amber); color: var(--ink); }
+.loc-opt:not(.active):hover { background: var(--ink-light); color: var(--text); }
+
+/* ── Alert ── */
+.alert {
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+}
+.alert-info { background: var(--blue-bg); border: 1px solid rgba(88,166,255,.2); color: var(--blue); }
+.alert-warn { background: var(--amber-bg); border: 1px solid rgba(210,153,34,.25); color: var(--amber); }
+
+.field-hint { font-size: 11px; color: var(--text-muted); }
+.field-hint.ok  { color: var(--green); }
+.field-hint.err { color: var(--red);   }
+
+/* ═══════════════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r);
+  border: none;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.98); }
+.btn-primary { background: var(--amber); color: var(--ink); }
+.btn-primary:hover { opacity: .9; }
+.btn-ghost {
+  background: var(--ink-light);
+  color: var(--text-muted);
+  border: 1px solid var(--ink-border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+.btn-row { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
+
+/* ── Link button in tables ── */
+.tbl-link {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--amber);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.tbl-link:hover { opacity: .75; }
+
+/* ═══════════════════════════════════════════════════════
+   INVENTORY CONTROLS
+═══════════════════════════════════════════════════════ */
+.inv-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.inv-bar input  { flex: 1; min-width: 180px; }
+.inv-bar select { width: 150px; flex-shrink: 0; }
+.inv-bar .btn   { flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════════ */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.overlay.open { display: flex; }
+.modal {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.modal-desc  { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+.modal-body  { background: rgba(0,0,0,.2); border-radius: var(--r); padding: 12px; margin-bottom: 16px; }
+.mrow { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(48,54,61,.5); font-size: 12px; }
+.mrow:last-child { border-bottom: none; }
+.mrow-k { color: var(--text-muted); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.mrow-v { font-weight: 500; text-align: right; max-width: 260px; }
+.mrow-v.mono { font-family: var(--mono); color: var(--amber); }
+
+/* ═══════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  background: var(--green);
+  color: var(--ink);
+  padding: 10px 16px;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 1000;
+  transform: translateY(60px);
+  opacity: 0;
+  transition: transform .25s cubic-bezier(.34,1.56,.64,1), opacity .25s;
+  max-width: 300px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.toast.on { transform: translateY(0); opacity: 1; }
+
+/* ── Empty state ── */
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .stat-row  { grid-template-columns: 1fr 1fr; }
+  .form-row  { grid-template-columns: 1fr; }
+  .bp-grid   { grid-template-columns: 1fr 1fr; }
+  .page      { padding: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
+<div id="auth-gate" style="position:fixed;inset:0;background:#0d1117;display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
+    <div style="width:52px;height:52px;background:#d29922;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🔑</div>
+    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:#d29922;margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
+    <h1 style="font-size:20px;font-weight:600;color:#e6edf3;margin-bottom:6px;">Lockbox Manager</h1>
+    <p style="font-size:13px;color:#8b949e;margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <p style="font-size:11px;color:#484f58;margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
+  </div>
+</div>
+
+<div class="shell" id="app" style="display:none">
+
+<!-- ═══════════════ TOPBAR ═══════════════ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">🔑</div>
+    <span>Adams Cameron</span>
+    <span class="brand-sep">/</span>
+    <span style="color:var(--text-muted);font-weight:400">Lockbox Manager</span>
+  </div>
+  <div class="topbar-right">
+    <div class="admin-chip" id="admin-chip">Loading…</div>
+  </div>
+</header>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav class="nav">
+  <div class="nav-tab active" data-page="dashboard"><span class="tab-icon">◈</span> Dashboard</div>
+  <div class="nav-tab" data-page="checkout"><span class="tab-icon">↑</span> Check Out</div>
+  <div class="nav-tab" data-page="checkin"><span class="tab-icon">↓</span> Check In</div>
+  <div class="nav-tab" data-page="inventory"><span class="tab-icon">≡</span> Inventory</div>
+</nav>
+
+<!-- ═══════════════ CONTENT ═══════════════ -->
+<div class="content">
+
+  <!-- ══════ DASHBOARD ══════ -->
+  <div class="page active" id="page-dashboard">
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-num amber" id="s-out">—</div>
+        <div class="stat-label">Checked Out</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num green" id="s-avail">—</div>
+        <div class="stat-label">Available</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num red" id="s-broken">—</div>
+        <div class="stat-label">Broken / Hold</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num blue" id="s-total">—</div>
+        <div class="stat-label">Total Inventory</div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div class="section-title">Recent Activity</div>
+      <select id="dash-office-filter" style="width:auto;font-size:12px;padding:5px 8px" onchange="renderActivity()">
+        <option value="">All Offices</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Serial #</th>
+            <th>Assoc.</th>
+            <th>Agent</th>
+            <th>Property / Location</th>
+            <th>Office</th>
+            <th>Admin</th>
+          </tr>
+        </thead>
+        <tbody id="dash-tbody">
+          <tr><td colspan="8" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════ CHECK OUT ══════ -->
+  <div class="page" id="page-checkout">
+    <div class="form-card">
+      <div class="form-title">Check Out a Lockbox</div>
+      <div class="form-desc">Assign an available lockbox to a listing. Use the MLS ID to auto-fill via DeltaNet, or enter manually.</div>
+
+      <div class="form-grid">
+
+        <!-- MLS lookup -->
+        <div class="alert alert-info">💡 Entering an MLS ID will auto-fill the agent and address from DeltaNet.</div>
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label">MLS ID</div>
+            <div class="input-wrap">
+              <input id="co-mls" type="text" placeholder="e.g. 1234567">
+              <span class="input-suffix">DeltaNet</span>
+            </div>
+            <span class="field-hint" id="co-mls-hint">Enter MLS # to auto-fill</span>
+          </div>
+          <div class="field" style="justify-content:flex-end">
+            <div class="field-label">&nbsp;</div>
+            <button class="btn btn-ghost" onclick="mlsLookup()">↗ Fetch Listing</button>
+          </div>
+        </div>
+
+        <div class="divider">or enter manually</div>
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label req">Listing Agent</div>
+            <div class="ta" id="co-agent-ta">
+              <input id="co-agent-input" type="text" placeholder="Type agent name…"
+                     oninput="agentSearch(this.value)" autocomplete="off">
+              <input type="hidden" id="co-agent-id">
+              <div class="ta-drop" id="co-agent-drop"></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label req">Property Address</div>
+            <input id="co-address" type="text" placeholder="Street address of listing">
+          </div>
+        </div>
+
+        <div class="divider">lockbox selection</div>
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label req">From Office</div>
+            <select id="co-office" onchange="clearBoxSelection()">
+              <option value="">— Select office —</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label req">Lockbox Serial #</div>
+            <div class="ta" id="co-serial-ta">
+              <input id="co-serial-input" type="text" placeholder="Search available boxes…"
+                     oninput="serialSearch(this.value)" autocomplete="off">
+              <input type="hidden" id="co-serial-val">
+              <div class="ta-drop" id="co-serial-drop"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box preview -->
+        <div class="box-preview" id="co-box-preview">
+          <div class="box-preview-label">Selected Lockbox</div>
+          <div class="bp-grid">
+            <div class="bp-field">
+              <div class="bp-key">Serial #</div>
+              <div class="bp-val amber" id="co-p-serial">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Shackle Code</div>
+              <div class="bp-val" id="co-p-shackle">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Association</div>
+              <div class="bp-val" id="co-p-assoc">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Currently At</div>
+              <div class="bp-val" id="co-p-loc">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label req">Processed By (Admin)</div>
+            <!-- TODO: pre-fill from session / x-user-email header -->
+            <input id="co-admin" type="text" placeholder="Admin name">
+          </div>
+          <div class="field">
+            <div class="field-label">Notes</div>
+            <input id="co-notes" type="text" placeholder="Optional">
+          </div>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="submitCheckout()">↑ Complete Check Out</button>
+        <button class="btn btn-ghost" onclick="resetCheckout()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ CHECK IN ══════ -->
+  <div class="page" id="page-checkin">
+    <div class="form-card">
+      <div class="form-title">Check In a Lockbox</div>
+      <div class="form-desc">Find the box by serial number or the agent who had it. Then record the return details.</div>
+
+      <div class="form-grid">
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label req">Serial Number</div>
+            <div class="ta" id="ci-serial-ta">
+              <input id="ci-serial-input" type="text" placeholder="Scan or type serial #…"
+                     oninput="ciSerialSearch(this.value)" autocomplete="off">
+              <div class="ta-drop" id="ci-serial-drop"></div>
+            </div>
+            <span class="field-hint">Or find by agent name →</span>
+          </div>
+          <div class="field">
+            <div class="field-label">Find by Agent</div>
+            <div class="ta" id="ci-agent-ta">
+              <input id="ci-agent-input" type="text" placeholder="Agent name…"
+                     oninput="ciAgentSearch(this.value)" autocomplete="off">
+              <div class="ta-drop" id="ci-agent-drop"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Found box preview -->
+        <div class="found-preview" id="ci-found">
+          <div class="found-label">📦 Box Found — Currently Out</div>
+          <div class="bp-grid" style="grid-template-columns:repeat(4,1fr)">
+            <div class="bp-field">
+              <div class="bp-key">Serial #</div>
+              <div class="bp-val amber" id="ci-p-serial">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Agent</div>
+              <div class="bp-val" id="ci-p-agent">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Property</div>
+              <div class="bp-val" id="ci-p-prop">—</div>
+            </div>
+            <div class="bp-field">
+              <div class="bp-key">Out Since</div>
+              <div class="bp-val" id="ci-p-date">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider">return details</div>
+
+        <!-- Where is it going? -->
+        <div class="field">
+          <div class="field-label req">Returning To</div>
+          <div class="loc-toggle">
+            <div class="loc-opt active" id="ci-opt-office" onclick="setCiLoc('office')">🏢 Office</div>
+            <div class="loc-opt" id="ci-opt-other" onclick="setCiLoc('other')">📍 Other / Association</div>
+          </div>
+        </div>
+
+        <div id="ci-office-row" class="form-row">
+          <div class="field">
+            <div class="field-label req">Office</div>
+            <select id="ci-office">
+              <option value="">— Select office —</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label req">Condition</div>
+            <select id="ci-condition">
+              <option value="ok">✅ Good — Ready to redeploy</option>
+              <option value="needs_service">⚠️ Needs service / repair</option>
+              <option value="broken">❌ Broken — Send to association</option>
+              <option value="stuck_shackle">🔧 Shackle stuck</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="ci-other-row" style="display:none">
+          <div class="field">
+            <div class="field-label req">Location / Notes</div>
+            <input id="ci-other-addr" type="text" placeholder="e.g. Returned to NSBAR for exchange">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <div class="field-label req">Received By (Admin)</div>
+            <input id="ci-admin" type="text" placeholder="Admin name">
+          </div>
+          <div class="field">
+            <div class="field-label">Notes</div>
+            <input id="ci-notes" type="text" placeholder="Condition notes, etc.">
+          </div>
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="submitCheckin()">↓ Complete Check In</button>
+        <button class="btn btn-ghost" onclick="resetCheckin()">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ INVENTORY ══════ -->
+  <div class="page" id="page-inventory">
+    <div class="inv-bar">
+      <input id="inv-q" type="text" placeholder="Search serial, shackle, agent, address…" oninput="filterInv()">
+      <select id="inv-assoc" onchange="filterInv()">
+        <option value="">All Associations</option>
+        <option>NSBAR</option>
+        <option>DBAAR</option>
+        <option>WVAR</option>
+        <option>FCAR</option>
+      </select>
+      <select id="inv-status" onchange="filterInv()">
+        <option value="">All Statuses</option>
+        <option value="available">Available</option>
+        <option value="checked_out">Checked Out</option>
+        <option value="broken">Broken</option>
+        <option value="office_inventory">Office Inventory</option>
+        <option value="sent_to_assoc">Sent to Assoc.</option>
+      </select>
+      <select id="inv-loc" onchange="filterInv()">
+        <option value="">All Locations</option>
+        <option value="office">At Office</option>
+        <option value="property">At Property</option>
+      </select>
+      <button class="btn btn-ghost" onclick="exportCSV()">↓ CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Serial #</th>
+            <th>Shackle</th>
+            <th>Assoc.</th>
+            <th>Status</th>
+            <th>Location</th>
+            <th>Agent</th>
+            <th>Property / Address</th>
+            <th>Out Since</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="inv-tbody">
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="inv-footer" style="margin-top:8px;font-size:11px;color:var(--text-muted);font-family:var(--mono)"></div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /shell -->
+
+<!-- ═══════════════ CONFIRM CHECKOUT ═══════════════ -->
+<div class="overlay" id="co-modal">
+  <div class="modal">
+    <div class="modal-title">Confirm Check Out</div>
+    <div class="modal-desc">Review before completing.</div>
+    <div class="modal-body" id="co-modal-body"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmCheckout()">↑ Confirm Check Out</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CONFIRM CHECKIN ═══════════════ -->
+<div class="overlay" id="ci-modal">
+  <div class="modal">
+    <div class="modal-title">Confirm Check In</div>
+    <div class="modal-desc">Review before completing.</div>
+    <div class="modal-body" id="ci-modal-body"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmCheckin()">↓ Confirm Check In</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH STATE
+═══════════════════════════════════════════════════════════════════ */
+let userEmail   = "";
+let userDisplay = "";
+let proxyKey    = "";
+
+/* ═══════════════════════════════════════════════════════════════════
+   GOOGLE SIGN-IN
+═══════════════════════════════════════════════════════════════════ */
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail   = payload.email || "";
+    userDisplay = payload.name  || userEmail;
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "grid";
+
+    await init();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════════════════════════════ */
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+const GET  = (path)       => api(path);
+const POST = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let STATE = {
+  offices:       [],
+  boxes:         [],
+  activity:      [],
+  selectedCoBox: null,
+  selectedCiBox: null,
+  ciLocType:     "office",
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+async function init() {
+  document.getElementById("admin-chip").textContent = userDisplay || userEmail;
+
+  // Pre-fill admin name fields from signed-in user
+  document.getElementById("co-admin").value = userDisplay || userEmail;
+  document.getElementById("ci-admin").value = userDisplay || userEmail;
+
+  try {
+    const [offices, boxes, activity] = await Promise.all([
+      GET("/lockbox/offices"),
+      GET("/lockbox/inventory"),
+      GET("/lockbox/activity"),
+    ]);
+    STATE.offices  = offices  || [];
+    STATE.boxes    = boxes    || [];
+    STATE.activity = activity || [];
+  } catch (e) {
+    toast("Failed to load data: " + e.message, "warn");
+    STATE.offices = []; STATE.boxes = []; STATE.activity = [];
+  }
+
+  populateOfficeDropdowns();
+  renderDashboard();
+  renderInventory(STATE.boxes);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchPage(tab.dataset.page));
+});
+
+function switchPage(name) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === name));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OFFICE DROPDOWNS
+   Populated from DeltaNet /lockbox/offices (already loaded at init).
+═══════════════════════════════════════════════════════════════════ */
+function populateOfficeDropdowns() {
+  const selects = ['co-office', 'ci-office', 'dash-office-filter'];
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    const isDash = id === 'dash-office-filter';
+    el.innerHTML = isDash ? '<option value="">All Offices</option>' : '<option value="">— Select office —</option>';
+    STATE.offices.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.local_id || o.office_id;
+      opt.textContent = o.name + (o.city ? ` (${o.city})` : '');
+      el.appendChild(opt);
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════════════════════ */
+function renderDashboard() {
+  document.getElementById('s-out').textContent    = STATE.boxes.filter(b => b.status === 'checked_out').length;
+  document.getElementById('s-avail').textContent  = STATE.boxes.filter(b => b.status === 'available').length;
+  document.getElementById('s-broken').textContent = STATE.boxes.filter(b => b.status === 'broken').length;
+  document.getElementById('s-total').textContent  = STATE.boxes.length;
+  renderActivity();
+}
+
+function renderActivity() {
+  const officeFilter = document.getElementById('dash-office-filter').value;
+  const rows = STATE.activity.filter(a => {
+    if (!officeFilter) return true;
+    const office = STATE.offices.find(o => String(o.local_id || o.office_id) === officeFilter);
+    return office && (a.office_name || '').includes(office.name.split(' ')[0]);
+  });
+
+  document.getElementById('dash-tbody').innerHTML = rows.length ? rows.map(a => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${a.event_at}</td>
+      <td><span class="chip ${a.action === 'checkout' ? 'chip-amber' : 'chip-green'}">${a.action === 'checkout' ? '↑ OUT' : '↓ IN'}</span></td>
+      <td><span class="serial">${a.lockbox_serial}</span></td>
+      <td><span class="chip chip-neutral">${a.association_abbr}</span></td>
+      <td>${a.agent_name || '—'}</td>
+      <td style="font-size:12px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis">${a.property_address || '—'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${a.office_name || '—'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${a.admin_name || '—'}</td>
+    </tr>`).join('') : '<tr><td colspan="8" class="empty">No activity found.</td></tr>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MLS LOOKUP
+═══════════════════════════════════════════════════════════════════ */
+async function mlsLookup() {
+  const id   = document.getElementById("co-mls").value.trim();
+  if (!id) return;
+  const hint = document.getElementById("co-mls-hint");
+  hint.textContent = "⏳ Looking up…"; hint.className = "field-hint";
+
+  try {
+    const data    = await GET(`/deltanet/listings?mls_id=${encodeURIComponent(id)}`);
+    const listing = (data.listings || [])[0];
+    if (!listing) {
+      hint.textContent = "✗ MLS ID not found in DeltaNet"; hint.className = "field-hint err";
+      return;
+    }
+
+    // DeltaNet field names vary — cascade through common possibilities
+    const agentName = listing.agent_name
+      || listing.list_agent_full_name
+      || [listing.list_agent_first_name, listing.list_agent_last_name].filter(Boolean).join(" ")
+      || "";
+    const address = listing.address
+      || listing.street_address
+      || [listing.street_number, listing.street_name, listing.city].filter(Boolean).join(" ")
+      || "";
+
+    if (agentName) {
+      document.getElementById("co-agent-input").value = agentName;
+      // Best-effort: look up the agent's local DB id for the checkout POST
+      try {
+        const agents = await GET(`/lockbox/agents?q=${encodeURIComponent(agentName)}`);
+        if (agents.length) document.getElementById("co-agent-id").value = agents[0].id;
+      } catch { /* non-fatal */ }
+    }
+    if (address) document.getElementById("co-address").value = address;
+
+    hint.textContent = "✓ Loaded from DeltaNet"; hint.className = "field-hint ok";
+  } catch (e) {
+    hint.textContent = "✗ Not found: " + e.message; hint.className = "field-hint err";
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AGENT TYPEAHEAD
+═══════════════════════════════════════════════════════════════════ */
+let _agentTimer;
+function agentSearch(val) {
+  const drop = document.getElementById("co-agent-drop");
+  if (!val || val.length < 2) { drop.classList.remove("open"); return; }
+  clearTimeout(_agentTimer);
+  _agentTimer = setTimeout(async () => {
+    try {
+      const agents = await GET(`/lockbox/agents?q=${encodeURIComponent(val)}`);
+      drop.innerHTML = agents.length
+        ? agents.slice(0, 8).map(a => `
+            <div class="ta-item" onclick="pickAgent(${a.id}, '${esc(a.full_name)}')">
+              <span class="ta-main">${a.full_name}</span>
+              <span class="ta-sub">${a.office_name || ""}</span>
+            </div>`).join("")
+        : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No agents found</div>';
+      drop.classList.add("open");
+    } catch { drop.classList.remove("open"); }
+  }, 220);
+}
+
+function pickAgent(id, name) {
+  document.getElementById('co-agent-input').value = name;
+  document.getElementById('co-agent-id').value    = id;
+  document.getElementById('co-agent-drop').classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SERIAL # TYPEAHEAD (checkout) — filters from loaded inventory
+═══════════════════════════════════════════════════════════════════ */
+function serialSearch(val) {
+  const drop = document.getElementById("co-serial-drop");
+  if (!val || val.length < 3) { drop.classList.remove("open"); return; }
+
+  const officeId = document.getElementById("co-office").value;
+  const avail = STATE.boxes.filter(b =>
+    b.status === "available" &&
+    b.serial_number.includes(val) &&
+    (!officeId || String(b.office_id || "") === officeId ||
+      (b.office_name || "").includes(
+        (STATE.offices.find(o => String(o.local_id || o.office_id) === officeId)?.name || "").split(" ")[0]
+      ))
+  );
+
+  drop.innerHTML = avail.length
+    ? avail.slice(0, 8).map(b => `
+        <div class="ta-item" onclick='pickBox(${JSON.stringify(b)})'>
+          <span class="ta-main" style="font-family:var(--mono)">${b.serial_number}</span>
+          <span class="ta-sub">${b.shackle_code} · ${b.association_abbr} · ${b.office_name || ''}</span>
+        </div>`).join('')
+    : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No available boxes match</div>';
+  drop.classList.add('open');
+}
+
+function pickBox(b) {
+  STATE.selectedCoBox = b;
+  document.getElementById('co-serial-input').value = b.serial_number;
+  document.getElementById('co-serial-val').value   = b.serial_number;
+  document.getElementById('co-serial-drop').classList.remove('open');
+  document.getElementById('co-p-serial').textContent  = b.serial_number;
+  document.getElementById('co-p-shackle').textContent = b.shackle_code;
+  document.getElementById('co-p-assoc').textContent   = b.association_abbr;
+  document.getElementById('co-p-loc').textContent     =
+    b.location_type === 'office' ? '🏢 ' + (b.office_name || '') : '📍 ' + (b.location_address || '');
+  document.getElementById('co-box-preview').classList.add('on');
+}
+
+function clearBoxSelection() {
+  STATE.selectedCoBox = null;
+  document.getElementById('co-serial-input').value = '';
+  document.getElementById('co-serial-val').value   = '';
+  document.getElementById('co-box-preview').classList.remove('on');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHECKOUT SUBMIT
+   TODO (Claude Code): POST /lockbox/checkout
+═══════════════════════════════════════════════════════════════════ */
+function submitCheckout() {
+  const agent   = document.getElementById('co-agent-input').value.trim();
+  const agentId = document.getElementById('co-agent-id').value;
+  const address = document.getElementById('co-address').value.trim();
+  const officeEl = document.getElementById('co-office');
+  const mls     = document.getElementById('co-mls').value.trim();
+
+  if (!STATE.selectedCoBox) { toast('Select a lockbox first', 'warn'); return; }
+  if (!agent)               { toast('Agent name required', 'warn'); return; }
+  if (!address)             { toast('Property address required', 'warn'); return; }
+  if (!officeEl.value)      { toast('Select the From Office', 'warn'); return; }
+
+  document.getElementById('co-modal-body').innerHTML = modalRows([
+    ['Serial #',       STATE.selectedCoBox.serial_number, true],
+    ['Shackle',        STATE.selectedCoBox.shackle_code,  false],
+    ['Association',    STATE.selectedCoBox.association_abbr, false],
+    ['Agent',          agent,   false],
+    ['Property',       address, false],
+    mls ? ['MLS ID',   mls,     false] : null,
+    ['From Office',    officeEl.options[officeEl.selectedIndex]?.text || '', false],
+    ['Date / Time',    new Date().toLocaleString(), false],
+  ]);
+  document.getElementById('co-modal').classList.add('open');
+}
+
+async function confirmCheckout() {
+  const body = {
+    serial_number:    STATE.selectedCoBox.serial_number,
+    agent_id:         parseInt(document.getElementById("co-agent-id").value) || null,
+    property_address: document.getElementById("co-address").value.trim(),
+    mls_id:           document.getElementById("co-mls").value.trim() || undefined,
+    office_id:        parseInt(document.getElementById("co-office").value),
+    notes:            document.getElementById("co-notes").value.trim() || undefined,
+  };
+
+  try { await POST("/lockbox/checkout", body); }
+  catch (e) { toast("Error: " + e.message, "warn"); return; }
+
+  closeModals();
+  toast("Lockbox checked out ↑");
+  resetCheckout();
+  // Refresh live data
+  try {
+    const [boxes, activity] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/activity")]);
+    STATE.boxes    = boxes    || [];
+    STATE.activity = activity || [];
+  } catch { /* keep stale */ }
+  renderDashboard();
+  renderInventory(STATE.boxes);
+}
+
+function resetCheckout() {
+  ['co-mls','co-agent-input','co-agent-id','co-address','co-serial-input','co-serial-val','co-notes']
+    .forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('co-box-preview').classList.remove('on');
+  document.getElementById('co-office').value = '';
+  const h = document.getElementById('co-mls-hint');
+  h.textContent = 'Enter MLS # to auto-fill'; h.className = 'field-hint';
+  STATE.selectedCoBox = null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHECKIN SEARCH
+═══════════════════════════════════════════════════════════════════ */
+function ciSerialSearch(val) {
+  const drop = document.getElementById('ci-serial-drop');
+  if (!val || val.length < 4) { drop.classList.remove('open'); return; }
+  const matches = STATE.boxes.filter(b => b.status === 'checked_out' && b.serial_number.includes(val));
+  renderCiDrop(drop, matches);
+}
+
+function ciAgentSearch(val) {
+  const drop = document.getElementById('ci-agent-drop');
+  if (!val || val.length < 2) { drop.classList.remove('open'); return; }
+  const matches = STATE.boxes.filter(b =>
+    b.status === 'checked_out' && (b.agent_name || '').toLowerCase().includes(val.toLowerCase())
+  );
+  renderCiDrop(drop, matches, true);
+}
+
+function renderCiDrop(drop, matches, byAgent = false) {
+  drop.innerHTML = matches.length
+    ? matches.slice(0, 8).map(b => `
+        <div class="ta-item" onclick='pickCiBox(${JSON.stringify(b)})'>
+          <span class="ta-main">${byAgent ? b.agent_name : `<span style="font-family:var(--mono)">${b.serial_number}</span>`}</span>
+          <span class="ta-sub">${byAgent ? b.serial_number + ' · ' : ''}${(b.location_address || '').slice(0, 30)}</span>
+        </div>`).join('')
+    : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No checked-out boxes match</div>';
+  drop.classList.add('open');
+}
+
+function pickCiBox(b) {
+  STATE.selectedCiBox = b;
+  document.getElementById('ci-serial-input').value = b.serial_number;
+  document.getElementById('ci-agent-input').value  = b.agent_name || '';
+  ['ci-serial-drop','ci-agent-drop'].forEach(id => document.getElementById(id).classList.remove('open'));
+  document.getElementById('ci-p-serial').textContent = b.serial_number;
+  document.getElementById('ci-p-agent').textContent  = b.agent_name || '—';
+  document.getElementById('ci-p-prop').textContent   = (b.location_address || '—').slice(0, 30);
+  document.getElementById('ci-p-date').textContent   = b.checkout_at || '—';
+  document.getElementById('ci-found').classList.add('on');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHECKIN LOCATION TOGGLE
+═══════════════════════════════════════════════════════════════════ */
+function setCiLoc(type) {
+  STATE.ciLocType = type;
+  document.getElementById('ci-opt-office').classList.toggle('active', type === 'office');
+  document.getElementById('ci-opt-other').classList.toggle('active',  type === 'other');
+  document.getElementById('ci-office-row').style.display = type === 'office' ? '' : 'none';
+  document.getElementById('ci-other-row').style.display  = type === 'other'  ? '' : 'none';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CHECKIN SUBMIT
+   TODO (Claude Code): POST /lockbox/checkin
+═══════════════════════════════════════════════════════════════════ */
+function submitCheckin() {
+  if (!STATE.selectedCiBox) { toast('Find a checked-out box first', 'warn'); return; }
+
+  let locLabel = '';
+  if (STATE.ciLocType === 'office') {
+    const sel = document.getElementById('ci-office');
+    if (!sel.value) { toast('Select the receiving office', 'warn'); return; }
+    locLabel = sel.options[sel.selectedIndex].text;
+  } else {
+    locLabel = document.getElementById('ci-other-addr').value.trim();
+    if (!locLabel) { toast('Enter a location or notes', 'warn'); return; }
+  }
+
+  const condEl   = document.getElementById('ci-condition');
+  const condText = condEl.options[condEl.selectedIndex].text;
+
+  document.getElementById('ci-modal-body').innerHTML = modalRows([
+    ['Serial #',     STATE.selectedCiBox.serial_number, true],
+    ['Agent',        STATE.selectedCiBox.agent_name || '—', false],
+    ['Was at',       STATE.selectedCiBox.location_address || '—', false],
+    ['Returning to', locLabel, false],
+    STATE.ciLocType === 'office' ? ['Condition', condText, false] : null,
+    ['Date / Time',  new Date().toLocaleString(), false],
+  ]);
+  document.getElementById('ci-modal').classList.add('open');
+}
+
+async function confirmCheckin() {
+  const sel      = document.getElementById("ci-office");
+  const officeId = sel.value ? parseInt(sel.value) : null;
+  const body = {
+    serial_number:    STATE.selectedCiBox.serial_number,
+    office_id:        officeId || undefined,
+    location_address: STATE.ciLocType === "other" ? document.getElementById("ci-other-addr").value.trim() : undefined,
+    condition:        document.getElementById("ci-condition").value,
+    notes:            document.getElementById("ci-notes").value.trim() || undefined,
+  };
+
+  try { await POST("/lockbox/checkin", body); }
+  catch (e) { toast("Error: " + e.message, "warn"); return; }
+
+  closeModals();
+  toast("Lockbox checked in ↓");
+  resetCheckin();
+  // Refresh live data
+  try {
+    const [boxes, activity] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/activity")]);
+    STATE.boxes    = boxes    || [];
+    STATE.activity = activity || [];
+  } catch { /* keep stale */ }
+  renderDashboard();
+  renderInventory(STATE.boxes);
+}
+
+function resetCheckin() {
+  ['ci-serial-input','ci-agent-input','ci-notes','ci-other-addr']
+    .forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  document.getElementById('ci-found').classList.remove('on');
+  document.getElementById('ci-office').value = '';
+  setCiLoc('office');
+  STATE.selectedCiBox = null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INVENTORY
+═══════════════════════════════════════════════════════════════════ */
+const STATUS_CHIP = {
+  available:       '<span class="chip chip-green">Available</span>',
+  checked_out:     '<span class="chip chip-amber">Checked Out</span>',
+  broken:          '<span class="chip chip-red">Broken</span>',
+  office_inventory:'<span class="chip chip-neutral">Office Inv.</span>',
+  sent_to_assoc:   '<span class="chip chip-neutral">Sent to Assoc.</span>',
+};
+
+function renderInventory(boxes) {
+  document.getElementById('inv-tbody').innerHTML = boxes.length
+    ? boxes.map(b => `
+      <tr>
+        <td><span class="serial">${b.serial_number}</span></td>
+        <td style="font-family:var(--mono);font-size:12px">${b.shackle_code}</td>
+        <td><span class="chip chip-neutral">${b.association_abbr}</span></td>
+        <td>${STATUS_CHIP[b.status] || b.status}</td>
+        <td>
+          <span class="loc-chip">
+            ${b.location_type === 'office' ? '🏢' : '📍'}
+            ${b.location_type === 'office' ? (b.office_name || '') : (b.location_address || '').slice(0, 22)}
+          </span>
+        </td>
+        <td style="font-size:13px">${b.agent_name || '—'}</td>
+        <td style="font-size:12px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">
+          ${b.location_type === 'property' && b.location_address ? b.location_address : '—'}
+        </td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
+        <td>
+          ${b.status === 'checked_out'
+            ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button>`
+            : b.status === 'available'
+            ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button>`
+            : '—'}
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="9" class="empty">No boxes match.</td></tr>';
+
+  document.getElementById('inv-footer').textContent =
+    `${boxes.length} of ${STATE.boxes.length} lockboxes`;
+}
+
+function filterInv() {
+  const q   = document.getElementById('inv-q').value.toLowerCase();
+  const as  = document.getElementById('inv-assoc').value;
+  const st  = document.getElementById('inv-status').value;
+  const loc = document.getElementById('inv-loc').value;
+
+  renderInventory(STATE.boxes.filter(b => {
+    const textMatch = !q ||
+      b.serial_number.includes(q) ||
+      b.shackle_code.includes(q) ||
+      (b.agent_name || '').toLowerCase().includes(q) ||
+      (b.location_address || '').toLowerCase().includes(q) ||
+      (b.office_name || '').toLowerCase().includes(q);
+    return textMatch
+      && (!as  || b.association_abbr === as)
+      && (!st  || b.status === st)
+      && (!loc || b.location_type === loc);
+  }));
+}
+
+function exportCSV() {
+  const h = ['Serial','Shackle','Assoc','Status','Location Type','Office / Address','Agent','Out Since'];
+  const rows = STATE.boxes.map(b => [
+    b.serial_number, b.shackle_code, b.association_abbr, b.status, b.location_type,
+    b.location_type === 'office' ? (b.office_name || '') : (b.location_address || ''),
+    b.agent_name || '', b.checkout_at || ''
+  ]);
+  const csv = [h, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'lockboxes_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════════ */
+function modalRows(rows) {
+  return rows.filter(Boolean).map(([k, v, mono]) =>
+    `<div class="mrow">
+       <span class="mrow-k">${k}</span>
+       <span class="mrow-v${mono ? ' mono' : ''}">${v}</span>
+     </div>`
+  ).join('');
+}
+
+function closeModals() {
+  document.querySelectorAll('.overlay').forEach(o => o.classList.remove('open'));
+}
+
+let _toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = type === 'warn' ? 'var(--amber)' : 'var(--green)';
+  el.style.color = 'var(--ink)';
+  el.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('on'), 3200);
+}
+
+function esc(s) { return (s || '').replace(/'/g, "\\'"); }
+
+// Close typeaheads on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ta')) {
+    document.querySelectorAll('.ta-drop').forEach(d => d.classList.remove('open'));
+  }
+});
+
+// Close modals on overlay click
+document.querySelectorAll(".overlay").forEach(o => {
+  o.addEventListener("click", e => { if (e.target === o) closeModals(); });
+});
+</script>
+</body>
+</html>
