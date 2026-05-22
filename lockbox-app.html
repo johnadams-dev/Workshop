@@ -1008,7 +1008,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
               <th>Purchase Fee</th>
               <th>Contact</th>
               <th>Phone / Email</th>
-              <th>Website</th>
+              <th>Address</th>
               <th></th>
             </tr>
           </thead>
@@ -1811,9 +1811,7 @@ function renderAssociations() {
         <td style="font-size:11px;color:var(--text-muted);font-family:var(--mono)">
           ${[a.contact_phone, a.contact_email].filter(Boolean).join(' · ') || '—'}
         </td>
-        <td style="font-size:11px;color:var(--blue)">
-          ${a.website ? `<a href="${a.website}" target="_blank" style="color:var(--blue)">${a.website.replace(/^https?:\/\//, '')}</a>` : '—'}
-        </td>
+        <td style="font-size:12px;color:var(--text-muted)">${a.address || '—'}</td>
         <td>
           <button class="tbl-link" onclick="editAssocContact(${a.id})">Edit Contact</button>
         </td>
@@ -1838,22 +1836,22 @@ async function saveAssocField(id, field, rawVal) {
 function editAssocContact(id) {
   const a = _assocData.find(x => x.id === id);
   if (!a) return;
-  const name  = prompt("Contact name:",  a.contact_name  || "");
-  if (name  === null) return;
-  const phone = prompt("Contact phone:", a.contact_phone || "");
-  if (phone === null) return;
-  const email = prompt("Contact email:", a.contact_email || "");
-  if (email === null) return;
-  const web   = prompt("Website URL:",   a.website       || "");
-  if (web   === null) return;
+  const name    = prompt("Contact name:",  a.contact_name  || "");
+  if (name    === null) return;
+  const phone   = prompt("Contact phone:", a.contact_phone || "");
+  if (phone   === null) return;
+  const email   = prompt("Contact email:", a.contact_email || "");
+  if (email   === null) return;
+  const address = prompt("Mailing address:", a.address    || "");
+  if (address === null) return;
 
   api(`/lockbox/associations/${id}`, {
     method: "PATCH",
     body: JSON.stringify({
-      contact_name:  name  || null,
-      contact_phone: phone || null,
-      contact_email: email || null,
-      website:       web   || null,
+      contact_name:  name    || null,
+      contact_phone: phone   || null,
+      contact_email: email   || null,
+      address:       address || null,
     })
   }).then(updated => {
     const idx = _assocData.findIndex(x => x.id === id);
