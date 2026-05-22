@@ -1234,7 +1234,6 @@ async function init() {
   }
 
   populateOfficeDropdowns();
-  populateTransferOfficeDropdown();
   renderDashboard();
   renderInventory(STATE.boxes);
 }
@@ -1257,7 +1256,7 @@ function switchPage(name) {
    Populated from DeltaNet /lockbox/offices (already loaded at init).
 ═══════════════════════════════════════════════════════════════════ */
 function populateOfficeDropdowns() {
-  const selects = ['co-office', 'ci-office', 'dash-office-filter'];
+  const selects = ['co-office', 'ci-office', 'dash-office-filter', 'tr-to-office'];
   selects.forEach(id => {
     const el = document.getElementById(id);
     const isDash = id === 'dash-office-filter';
@@ -1868,17 +1867,6 @@ function editAssocContact(id) {
 ═══════════════════════════════════════════════════════════════════ */
 let _selectedTrBox = null;
 
-function populateTransferOfficeDropdown() {
-  const sel = document.getElementById("tr-to-office");
-  sel.innerHTML = '<option value="">— Select destination office —</option>';
-  STATE.offices.forEach(o => {
-    const opt = document.createElement("option");
-    opt.value = o.local_id || o.office_id;
-    opt.textContent = o.name + (o.city ? ` (${o.city})` : "");
-    sel.appendChild(opt);
-  });
-  document.getElementById("tr-admin").value = userDisplay || userEmail;
-}
 
 let _trSerialTimer;
 function trSerialSearch(val) {
