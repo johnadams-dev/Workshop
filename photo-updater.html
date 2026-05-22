@@ -372,6 +372,24 @@
       </div>
       <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)">
 
+      <!-- Google Drive / URL paste -->
+      <div style="margin-top: 14px; display: flex; align-items: center; gap: 10px;">
+        <div style="flex:1; height:1px; background:#e0ddd6;"></div>
+        <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">or paste a Google Drive link</span>
+        <div style="flex:1; height:1px; background:#e0ddd6;"></div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px; align-items:flex-start;">
+        <input type="url" id="url-input" placeholder="https://drive.google.com/file/d/…/view"
+          style="flex:1; border:1.5px solid #e0ddd6; border-radius:8px; padding:9px 13px;
+                 font-size:13px; font-family:inherit; color:#1a1a2e; background:#fdfcfb;"
+          onkeydown="if(event.key==='Enter') fetchFromUrl()">
+        <button class="btn btn-ghost" id="btn-fetch-url" onclick="fetchFromUrl()">
+          <span class="spinner dark"></span>
+          <span class="btn-label">Load Photo</span>
+        </button>
+      </div>
+      <div class="alert" id="url-msg"></div>
+
       <!-- Preview (shown after photo selected) -->
       <div id="preview-section" style="margin-top: 20px;">
         <div class="preview-grid">
@@ -628,6 +646,38 @@ function useExistingPhoto() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // File selection & drag-drop
 // ═══════════════════════════════════════════════════════════════════════════════
+async function fetchFromUrl() {
+  let url = document.getElementById("url-input").value.trim();
+  if (!url) return;
+
+  // Convert Google Drive sharing URL to direct download URL
+  const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (driveMatch) {
+    url = `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+  }
+
+  const btn = document.getElementById("btn-fetch-url");
+  btn.disabled = true; btn.classList.add("loading");
+  clearAlert("url-msg");
+
+  try {
+    const result = await api("POST", "/photo/fetch-url", { url });
+    if (!result.base64) throw new Error("No image data returned");
+    processBase64(result.base64, result.mimeType || "image/jpeg");
+    document.getElementById("url-input").value = "";
+  } catch (err) {
+    showAlert("url-msg", "error", err.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove("loading");
+  }
+}
+
+function processBase64(base64, mimeType) {
+  const img = new Image();
+  img.onload = () => compressAndSetPhoto(img, mimeType);
+  img.src = `data:${mimeType};base64,${base64}`;
+}
+
 function handleDragOver(e) {
   e.preventDefault();
   document.getElementById("drop-zone").classList.add("dragover");
