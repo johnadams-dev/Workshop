@@ -1454,21 +1454,26 @@ async function mlsLookup() {
       return;
     }
 
-    // Log full listing so field names are visible in DevTools → Console
-    console.log("[MLS lookup] raw listing object:", listing);
-    console.log("[MLS lookup] keys:", Object.keys(listing).join(", "));
-
     // DeltaNet field names confirmed from live API response
-    const agentName = listing.listing_agent || listing.list_agent_full_name || listing.ListAgentFullName || "";
-    const baseAddr  = listing.address || listing.street_address || listing.UnparsedAddress || "";
-    const address   = baseAddr
+    const agentName   = listing.listing_agent || "";
+    const agentDmgId  = listing.listing_agent_id || listing.list_agent_id || listing.listing_agent_member_id || "";
+    const baseAddr    = listing.address || "";
+    const address     = baseAddr
       ? [baseAddr, listing.city, listing.state].filter(Boolean).join(", ")
       : "";
+
+    // Log for field discovery
+    console.log("[MLS lookup] agent name:", agentName, "| dmg_id candidate:", agentDmgId);
+    console.log("[MLS lookup] all keys:", Object.keys(listing).join(", "));
 
     if (agentName) {
       document.getElementById("co-agent-input").value = agentName;
       try {
-        const agents = await GET(`/lockbox/agents?q=${encodeURIComponent(agentName)}`);
+        // Prefer exact DeltaNet ID match; fall back to name search
+        const lookup = agentDmgId
+          ? `/lockbox/agents?dmg_id=${encodeURIComponent(agentDmgId)}`
+          : `/lockbox/agents?q=${encodeURIComponent(agentName)}`;
+        const agents = await GET(lookup);
         if (agents.length) document.getElementById("co-agent-id").value = agents[0].id;
       } catch { /* non-fatal */ }
     }
