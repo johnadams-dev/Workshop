@@ -963,9 +963,10 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <th data-col="shackle_code"      onclick="sortInv('shackle_code')">Shackle</th>
             <th data-col="association_abbr"  onclick="sortInv('association_abbr')">Assoc.</th>
             <th data-col="status"            onclick="sortInv('status')">Status</th>
-            <th data-col="location"          onclick="sortInv('location')">Location</th>
+            <th data-col="assigned_office"   onclick="sortInv('assigned_office')">Office</th>
             <th data-col="agent_name"        onclick="sortInv('agent_name')">Agent</th>
             <th data-col="location_address"  onclick="sortInv('location_address')">Property / Address</th>
+            <th>MLS ID</th>
             <th data-col="checkout_at"       onclick="sortInv('checkout_at')">Out Since</th>
             <th>Cost</th>
             <th></th>
@@ -1736,7 +1737,7 @@ function invSortVal(b, col) {
     case "shackle_code":     return b.shackle_code     || "";
     case "association_abbr": return b.association_abbr || "";
     case "status":           return b.status           || "";
-    case "location":         return (b.location_type === "office" ? b.office_name : (b.property_address || b.location_address)) || "";
+    case "assigned_office":  return b.assigned_office_name || b.office_name || "";
     case "agent_name":       return b.agent_name       || "￿";
     case "location_address": return (b.property_address || b.location_address) || "￿";
     case "checkout_at":      return b.checkout_at      || "￿";
@@ -1792,16 +1793,14 @@ function renderInventory(boxes) {
           ${STATUS_CHIP[b.status] || b.status}
           ${invFlagChips(b)}
         </td>
-        <td>
-          <span class="loc-chip">
-            ${b.location_type === 'office' ? '🏢' : '📍'}
-            ${b.location_type === 'office' ? (b.office_name || '') : (b.property_address || b.location_address || '').slice(0, 22)}
-          </span>
-        </td>
+        <td style="font-size:12px;color:var(--text-muted)">${b.assigned_office_name || b.office_name || '—'}</td>
         <td style="font-size:13px">${b.agent_name || '—'}</td>
         <td style="font-size:12px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">
-          ${b.location_type === 'property' && (b.property_address || b.location_address) ? (b.property_address || b.location_address) : '—'}
+          ${b.status === 'checked_out'
+            ? (b.property_address || '—')
+            : (b.assigned_office_name || b.office_name || '—')}
         </td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.mls_id || '—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
         <td>${costCell}</td>
         <td>
@@ -1812,7 +1811,7 @@ function renderInventory(boxes) {
             : '—'}
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="10" class="empty">No boxes match.</td></tr>';
+    : '<tr><td colspan="11" class="empty">No boxes match.</td></tr>';
 
   document.getElementById('inv-footer').textContent =
     `${boxes.length} of ${STATE.boxes.length} lockboxes`;
@@ -1836,7 +1835,7 @@ function filterInv() {
       (b.agent_name || '').toLowerCase().includes(q) ||
       (b.property_address || b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
-    const officeMatch = !office || String(b.office_id || '') === office;
+    const officeMatch = !office || String(b.assigned_office_id || b.office_id || '') === office;
     return textMatch
       && officeMatch
       && (!as  || b.association_abbr === as)
@@ -1846,7 +1845,7 @@ function filterInv() {
 }
 
 function exportCSV() {
-  const h = ['Serial','Shackle','Assoc','Status','Flags','Location Type','Office / Address','Agent','Out Since','Cost'];
+  const h = ['Serial','Shackle','Assoc','Status','Flags','Office','Agent','Property / Address','MLS ID','Out Since','Cost'];
   const rows = STATE.boxes.map(b => {
     const flags = [];
     const mlsFlag = STATE.mlsFlags[b.serial_number];
@@ -1855,9 +1854,12 @@ function exportCSV() {
     if (b.agent_active === false)                flags.push('Agent Inactive');
     return [
       b.serial_number, b.shackle_code, b.association_abbr, b.status,
-      flags.join('; '), b.location_type,
-      b.location_type === 'office' ? (b.office_name || '') : (b.property_address || b.location_address || ''),
-      b.agent_name || '', b.checkout_at || '',
+      flags.join('; '),
+      b.assigned_office_name || b.office_name || '',
+      b.agent_name || '',
+      b.status === 'checked_out' ? (b.property_address || '') : (b.assigned_office_name || b.office_name || ''),
+      b.mls_id || '',
+      b.checkout_at || '',
       STATE.dbaarFee != null ? STATE.dbaarFee.toFixed(2) : ''
     ];
   });
