@@ -1458,25 +1458,12 @@ async function mlsLookup() {
     console.log("[MLS lookup] raw listing object:", listing);
     console.log("[MLS lookup] keys:", Object.keys(listing).join(", "));
 
-    // DeltaNet field names vary across listing_data shapes — cascade through known possibilities
-    const agentName = listing.list_agent_full_name
-      || listing.ListAgentFullName
-      || listing.agent_name
-      || listing.list_agent_name
-      || listing.ListAgentName
-      || [listing.list_agent_first_name, listing.list_agent_last_name].filter(Boolean).join(" ")
-      || [listing.ListAgentFirstName, listing.ListAgentLastName].filter(Boolean).join(" ")
-      || "";
-    const address = listing.unparsed_address
-      || listing.UnparsedAddress
-      || listing.full_address
-      || listing.address
-      || listing.street_address
-      || listing.PropertyAddress
-      || listing.property_address
-      || [listing.street_number, listing.street_name, listing.city].filter(Boolean).join(" ")
-      || [listing.StreetNumber, listing.StreetName, listing.City].filter(Boolean).join(" ")
-      || "";
+    // DeltaNet field names confirmed from live API response
+    const agentName = listing.listing_agent || listing.list_agent_full_name || listing.ListAgentFullName || "";
+    const baseAddr  = listing.address || listing.street_address || listing.UnparsedAddress || "";
+    const address   = baseAddr
+      ? [baseAddr, listing.city, listing.state].filter(Boolean).join(", ")
+      : "";
 
     if (agentName) {
       document.getElementById("co-agent-input").value = agentName;
