@@ -698,6 +698,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       <div class="stat">
         <div class="stat-num" id="s-cost" style="font-size:22px;color:var(--text-muted)">—</div>
         <div class="stat-label">Replacement Cost</div>
+        <div id="s-cost-hint" style="font-size:10px;color:var(--text-dim);margin-top:4px;display:none">Set DBAAR fee in Settings</div>
       </div>
     </div>
 
@@ -945,7 +946,6 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <option value="available">Available</option>
         <option value="checked_out">Checked Out</option>
         <option value="broken">Broken</option>
-        <option value="office_inventory">Office Inventory</option>
         <option value="sent_to_assoc">Sent to Assoc.</option>
       </select>
       <select id="inv-loc" onchange="filterInv()">
@@ -1147,7 +1147,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
                 <option value="broken">❌ Mark Broken</option>
                 <option value="sent_to_assoc">📦 Sent to Association</option>
                 <option value="decommissioned">🗑 Decommission (remove from service)</option>
-                <option value="available">✅ Return to Available</option>
+                <option value="available">✅ Mark Available</option>
               </select>
             </div>
             <div class="field">
@@ -1382,8 +1382,8 @@ function populateOfficeDropdowns() {
     el.innerHTML = isDash ? '<option value="">All Offices</option>' : '<option value="">— Select office —</option>';
     STATE.offices.forEach(o => {
       const opt = document.createElement('option');
-      opt.value = o.local_id || o.office_id;
-      opt.textContent = o.name + (o.city ? ` (${o.city})` : '');
+      opt.value = o.local_id;
+      opt.textContent = o.name;
       el.appendChild(opt);
     });
   });
@@ -1398,12 +1398,16 @@ function renderDashboard() {
   document.getElementById('s-broken').textContent = STATE.boxes.filter(b => b.status === 'broken').length;
   document.getElementById('s-total').textContent  = STATE.boxes.length;
 
-  const costEl = document.getElementById('s-cost');
+  const costEl  = document.getElementById('s-cost');
+  const hintEl  = document.getElementById('s-cost-hint');
   if (STATE.dbaarFee != null) {
     const total = STATE.boxes.length * STATE.dbaarFee;
     costEl.textContent = '$' + total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    costEl.style.color = 'var(--text-muted)';
+    hintEl.style.display = 'none';
   } else {
     costEl.textContent = '—';
+    hintEl.style.display = 'block';
   }
 
   renderActivity();
@@ -1741,11 +1745,10 @@ function invSortVal(b, col) {
 }
 
 const STATUS_CHIP = {
-  available:       '<span class="chip chip-green">Available</span>',
-  checked_out:     '<span class="chip chip-amber">Checked Out</span>',
-  broken:          '<span class="chip chip-red">Broken</span>',
-  office_inventory:'<span class="chip chip-neutral">Office Inv.</span>',
-  sent_to_assoc:   '<span class="chip chip-neutral">Sent to Assoc.</span>',
+  available:     '<span class="chip chip-green">Available</span>',
+  checked_out:   '<span class="chip chip-amber">Checked Out</span>',
+  broken:        '<span class="chip chip-red">Broken</span>',
+  sent_to_assoc: '<span class="chip chip-neutral">Sent to Assoc.</span>',
 };
 
 function invFlagChips(b) {
@@ -1833,10 +1836,7 @@ function filterInv() {
       (b.agent_name || '').toLowerCase().includes(q) ||
       (b.property_address || b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
-    const officeMatch = !office || String(b.office_id || b.office_id) === office ||
-      (b.office_name || '').toLowerCase().includes(
-        (STATE.offices.find(o => String(o.local_id || o.office_id) === office)?.name || '').toLowerCase().split(' ')[0]
-      );
+    const officeMatch = !office || String(b.office_id || '') === office;
     return textMatch
       && officeMatch
       && (!as  || b.association_abbr === as)
