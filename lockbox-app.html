@@ -823,9 +823,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <div class="field-label">Processed By</div>
             <input id="co-admin" type="text" disabled style="opacity:.7">
           </div>
-          <div class="field">
+          <div class="field" style="grid-column:1/-1">
             <div class="field-label">Notes</div>
-            <input id="co-notes" type="text" placeholder="Optional">
+            <textarea id="co-notes" rows="3" placeholder="Optional" style="width:100%;resize:vertical;background:var(--ink-light);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);padding:8px 10px;font-family:var(--sans);font-size:13px;line-height:1.5"></textarea>
           </div>
         </div>
 
@@ -914,9 +914,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <div class="field-label">Received By</div>
             <input id="ci-admin" type="text" disabled style="opacity:.7">
           </div>
-          <div class="field">
+          <div class="field" style="grid-column:1/-1">
             <div class="field-label">Notes</div>
-            <input id="ci-notes" type="text" placeholder="Condition notes, etc.">
+            <textarea id="ci-notes" rows="3" placeholder="Condition notes, etc." style="width:100%;resize:vertical;background:var(--ink-light);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);padding:8px 10px;font-family:var(--sans);font-size:13px;line-height:1.5"></textarea>
           </div>
         </div>
 
@@ -1454,6 +1454,10 @@ async function mlsLookup() {
       return;
     }
 
+    // Log full listing so field names are visible in DevTools → Console
+    console.log("[MLS lookup] raw listing object:", listing);
+    console.log("[MLS lookup] keys:", Object.keys(listing).join(", "));
+
     // DeltaNet field names vary across listing_data shapes — cascade through known possibilities
     const agentName = listing.list_agent_full_name
       || listing.ListAgentFullName
@@ -1476,7 +1480,6 @@ async function mlsLookup() {
 
     if (agentName) {
       document.getElementById("co-agent-input").value = agentName;
-      // Best-effort: look up the agent's local DB id for the checkout POST
       try {
         const agents = await GET(`/lockbox/agents?q=${encodeURIComponent(agentName)}`);
         if (agents.length) document.getElementById("co-agent-id").value = agents[0].id;
@@ -1484,7 +1487,12 @@ async function mlsLookup() {
     }
     if (address) document.getElementById("co-address").value = address;
 
-    hint.textContent = "✓ Loaded from DeltaNet"; hint.className = "field-hint ok";
+    const filled = [agentName && "agent", address && "address"].filter(Boolean);
+    if (filled.length) {
+      hint.textContent = `✓ Filled: ${filled.join(" & ")} from DeltaNet`; hint.className = "field-hint ok";
+    } else {
+      hint.textContent = "⚠ Listing found but agent/address fields not mapped — check console"; hint.className = "field-hint err";
+    }
   } catch (e) {
     hint.textContent = "✗ Not found: " + e.message; hint.className = "field-hint err";
   }
