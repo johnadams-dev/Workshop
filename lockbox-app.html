@@ -1820,9 +1820,9 @@ function renderInventory(boxes) {
         <td style="font-size:12px;color:var(--text-muted)">${b.assigned_office_name || b.office_name || '—'}</td>
         <td style="font-size:13px">${b.agent_name || '—'}</td>
         <td style="font-size:12px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">
-          ${b.status === 'checked_out'
-            ? (b.property_address || '—')
-            : (b.assigned_office_name || b.office_name || '—')}
+          ${b.property_address || b.location_address
+            || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : null)
+            || '—'}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.mls_id || '—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
@@ -1881,7 +1881,7 @@ function exportCSV() {
       flags.join('; '),
       b.assigned_office_name || b.office_name || '',
       b.agent_name || '',
-      b.status === 'checked_out' ? (b.property_address || '') : (b.assigned_office_name || b.office_name || ''),
+      b.property_address || b.location_address || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : '') || '',
       b.mls_id || '',
       b.checkout_at || '',
       STATE.dbaarFee != null ? STATE.dbaarFee.toFixed(2) : ''
