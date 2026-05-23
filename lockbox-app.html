@@ -1538,7 +1538,7 @@ function pickBox(b) {
   document.getElementById('co-p-shackle').textContent = b.shackle_code;
   document.getElementById('co-p-assoc').textContent   = b.association_abbr;
   document.getElementById('co-p-loc').textContent     =
-    b.location_type === 'office' ? '🏢 ' + (b.office_name || '') : '📍 ' + (b.location_address || '');
+    b.location_type === 'office' ? '🏢 ' + (b.office_name || '') : '📍 ' + (b.property_address || b.location_address || '');
   document.getElementById('co-box-preview').classList.add('on');
 }
 
@@ -1638,7 +1638,7 @@ function renderCiDrop(drop, matches, byAgent = false) {
     ? matches.slice(0, 8).map(b => `
         <div class="ta-item" onclick='pickCiBox(${JSON.stringify(b)})'>
           <span class="ta-main">${byAgent ? b.agent_name : `<span style="font-family:var(--mono)">${b.serial_number}</span>`}</span>
-          <span class="ta-sub">${byAgent ? b.serial_number + ' · ' : ''}${(b.location_address || '').slice(0, 30)}</span>
+          <span class="ta-sub">${byAgent ? b.serial_number + ' · ' : ''}${(b.property_address || b.location_address || '').slice(0, 30)}</span>
         </div>`).join('')
     : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No checked-out boxes match</div>';
   drop.classList.add('open');
@@ -1651,7 +1651,7 @@ function pickCiBox(b) {
   ['ci-serial-drop','ci-agent-drop'].forEach(id => document.getElementById(id).classList.remove('open'));
   document.getElementById('ci-p-serial').textContent = b.serial_number;
   document.getElementById('ci-p-agent').textContent  = b.agent_name || '—';
-  document.getElementById('ci-p-prop').textContent   = (b.location_address || '—').slice(0, 30);
+  document.getElementById('ci-p-prop').textContent   = (b.property_address || b.location_address || '—').slice(0, 30);
   document.getElementById('ci-p-date').textContent   = b.checkout_at || '—';
   document.getElementById('ci-found').classList.add('on');
 }
@@ -1670,7 +1670,7 @@ function submitCheckin() {
   document.getElementById('ci-modal-body').innerHTML = modalRows([
     ['Serial #',     STATE.selectedCiBox.serial_number, true],
     ['Agent',        STATE.selectedCiBox.agent_name || '—', false],
-    ['Was at',       STATE.selectedCiBox.location_address || '—', false],
+    ['Was at',       STATE.selectedCiBox.property_address || STATE.selectedCiBox.location_address || '—', false],
     ['Returning to', sel.options[sel.selectedIndex].text, false],
     ['Condition',    condEl.options[condEl.selectedIndex].text, false],
     ['Date / Time',  new Date().toLocaleString(), false],
@@ -1732,9 +1732,9 @@ function invSortVal(b, col) {
     case "shackle_code":     return b.shackle_code     || "";
     case "association_abbr": return b.association_abbr || "";
     case "status":           return b.status           || "";
-    case "location":         return (b.location_type === "office" ? b.office_name : b.location_address) || "";
+    case "location":         return (b.location_type === "office" ? b.office_name : (b.property_address || b.location_address)) || "";
     case "agent_name":       return b.agent_name       || "￿";
-    case "location_address": return b.location_address || "￿";
+    case "location_address": return (b.property_address || b.location_address) || "￿";
     case "checkout_at":      return b.checkout_at      || "￿";
     default: return "";
   }
@@ -1792,12 +1792,12 @@ function renderInventory(boxes) {
         <td>
           <span class="loc-chip">
             ${b.location_type === 'office' ? '🏢' : '📍'}
-            ${b.location_type === 'office' ? (b.office_name || '') : (b.location_address || '').slice(0, 22)}
+            ${b.location_type === 'office' ? (b.office_name || '') : (b.property_address || b.location_address || '').slice(0, 22)}
           </span>
         </td>
         <td style="font-size:13px">${b.agent_name || '—'}</td>
         <td style="font-size:12px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">
-          ${b.location_type === 'property' && b.location_address ? b.location_address : '—'}
+          ${b.location_type === 'property' && (b.property_address || b.location_address) ? (b.property_address || b.location_address) : '—'}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
         <td>${costCell}</td>
@@ -1831,7 +1831,7 @@ function filterInv() {
       b.serial_number.includes(q) ||
       b.shackle_code.includes(q) ||
       (b.agent_name || '').toLowerCase().includes(q) ||
-      (b.location_address || '').toLowerCase().includes(q) ||
+      (b.property_address || b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
     const officeMatch = !office || String(b.office_id || b.office_id) === office ||
       (b.office_name || '').toLowerCase().includes(
@@ -1856,7 +1856,7 @@ function exportCSV() {
     return [
       b.serial_number, b.shackle_code, b.association_abbr, b.status,
       flags.join('; '), b.location_type,
-      b.location_type === 'office' ? (b.office_name || '') : (b.location_address || ''),
+      b.location_type === 'office' ? (b.office_name || '') : (b.property_address || b.location_address || ''),
       b.agent_name || '', b.checkout_at || '',
       STATE.dbaarFee != null ? STATE.dbaarFee.toFixed(2) : ''
     ];
@@ -2020,7 +2020,7 @@ function trSerialSearch(val) {
       ? matches.slice(0, 10).map(b => `
           <div class="ta-item" onclick='pickTrBox(${JSON.stringify(b).replace(/'/g, "&#39;")})'>
             <span class="ta-main" style="font-family:var(--mono)">${b.serial_number}</span>
-            <span class="ta-sub">${b.association_abbr} · ${STATUS_CHIP[b.status] || b.status} · ${b.office_name || b.location_address || "—"}</span>
+            <span class="ta-sub">${b.association_abbr} · ${STATUS_CHIP[b.status] || b.status} · ${b.office_name || b.property_address || b.location_address || "—"}</span>
           </div>`).join("")
       : '<div class="ta-item" style="cursor:default;color:var(--text-muted)">No boxes match</div>';
     drop.classList.add("open");
@@ -2032,7 +2032,7 @@ function pickTrBox(b) {
   document.getElementById("tr-serial-input").value = b.serial_number;
   document.getElementById("tr-serial-drop").classList.remove("open");
   document.getElementById("tr-from").value =
-    b.location_type === "office" ? (b.office_name || "Office") : (b.location_address || "Property");
+    b.location_type === "office" ? (b.office_name || "Office") : (b.property_address || b.location_address || "Property");
   document.getElementById("tr-p-serial").textContent  = b.serial_number;
   document.getElementById("tr-p-shackle").textContent = b.shackle_code || "—";
   document.getElementById("tr-p-assoc").textContent   = b.association_abbr || "—";
