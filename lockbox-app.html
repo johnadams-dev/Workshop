@@ -744,14 +744,16 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
           <div class="field">
             <div class="field-label">MLS ID</div>
             <div class="input-wrap">
-              <input id="co-mls" type="text" placeholder="e.g. 1234567">
+              <input id="co-mls" type="text" placeholder="e.g. 1234567"
+                     onblur="mlsLookup()"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();mlsLookup()}">
               <span class="input-suffix">DeltaNet</span>
             </div>
-            <span class="field-hint" id="co-mls-hint">Enter MLS # to auto-fill</span>
+            <span class="field-hint" id="co-mls-hint">Tab or Enter to auto-fill agent &amp; address</span>
           </div>
           <div class="field" style="justify-content:flex-end">
             <div class="field-label">&nbsp;</div>
-            <button class="btn btn-ghost" onclick="mlsLookup()">↗ Fetch Listing</button>
+            <button class="btn btn-ghost" onclick="mlsLookup()">↗ Lookup</button>
           </div>
         </div>
 
@@ -1452,14 +1454,24 @@ async function mlsLookup() {
       return;
     }
 
-    // DeltaNet field names vary — cascade through common possibilities
-    const agentName = listing.agent_name
-      || listing.list_agent_full_name
+    // DeltaNet field names vary across listing_data shapes — cascade through known possibilities
+    const agentName = listing.list_agent_full_name
+      || listing.ListAgentFullName
+      || listing.agent_name
+      || listing.list_agent_name
+      || listing.ListAgentName
       || [listing.list_agent_first_name, listing.list_agent_last_name].filter(Boolean).join(" ")
+      || [listing.ListAgentFirstName, listing.ListAgentLastName].filter(Boolean).join(" ")
       || "";
-    const address = listing.address
+    const address = listing.unparsed_address
+      || listing.UnparsedAddress
+      || listing.full_address
+      || listing.address
       || listing.street_address
+      || listing.PropertyAddress
+      || listing.property_address
       || [listing.street_number, listing.street_name, listing.city].filter(Boolean).join(" ")
+      || [listing.StreetNumber, listing.StreetName, listing.City].filter(Boolean).join(" ")
       || "";
 
     if (agentName) {
@@ -1518,10 +1530,7 @@ function serialSearch(val) {
   const avail = STATE.boxes.filter(b =>
     b.status === "available" &&
     b.serial_number.includes(val) &&
-    (!officeId || String(b.office_id || "") === officeId ||
-      (b.office_name || "").includes(
-        (STATE.offices.find(o => String(o.local_id || o.office_id) === officeId)?.name || "").split(" ")[0]
-      ))
+    (!officeId || String(b.assigned_office_id || b.office_id || "") === officeId)
   );
 
   drop.innerHTML = avail.length
