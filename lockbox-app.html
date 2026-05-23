@@ -146,7 +146,7 @@ body {
 /* ═══════════════════════════════════════════════════════
    STAT CARDS
 ═══════════════════════════════════════════════════════ */
-.stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+.stat-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 24px; }
 .stat {
   background: var(--ink-mid);
   border: 1px solid var(--ink-border);
@@ -624,6 +624,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 }
 
 /* ── Responsive ── */
+@media (max-width: 900px) {
+  .stat-row  { grid-template-columns: repeat(3,1fr); }
+}
 @media (max-width: 700px) {
   .stat-row  { grid-template-columns: 1fr 1fr; }
   .form-row  { grid-template-columns: 1fr; }
@@ -691,6 +694,10 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       <div class="stat">
         <div class="stat-num blue" id="s-total">—</div>
         <div class="stat-label">Total Inventory</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num" id="s-cost" style="font-size:22px;color:var(--text-muted)">—</div>
+        <div class="stat-label">Replacement Cost</div>
       </div>
     </div>
 
@@ -960,11 +967,12 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <th data-col="agent_name"        onclick="sortInv('agent_name')">Agent</th>
             <th data-col="location_address"  onclick="sortInv('location_address')">Property / Address</th>
             <th data-col="checkout_at"       onclick="sortInv('checkout_at')">Out Since</th>
+            <th>Cost</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="inv-tbody">
-          <tr><td colspan="9" class="empty">Loading…</td></tr>
+          <tr><td colspan="10" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1282,6 +1290,10 @@ let STATE = {
   selectedCoBox: null,
   selectedCiBox: null,
   invSort:       { col: null, dir: 1 },
+  dbaarFee:      null,   // DBAAR purchase_fee — replacement cost basis
+  mlsFlags:      {},     // { serial_number: { flag, status } }
+  userRole:      "unknown", // 'manager' | 'staff' | 'agent' | 'unknown'
+  userAgentId:   null,   // DB agent id if userRole === 'agent'
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1293,16 +1305,26 @@ async function init() {
   // Pre-fill admin name fields from signed-in user
   document.getElementById("co-admin").value = userDisplay || userEmail;
   document.getElementById("ci-admin").value = userDisplay || userEmail;
+  document.getElementById("tr-admin").value = userDisplay || userEmail;
 
   try {
-    const [offices, boxes, activity] = await Promise.all([
+    const [offices, boxes, activity, assocs, me] = await Promise.all([
       GET("/lockbox/offices"),
       GET("/lockbox/inventory"),
       GET("/lockbox/activity"),
+      GET("/lockbox/associations"),
+      GET("/lockbox/me"),
     ]);
     STATE.offices  = offices  || [];
     STATE.boxes    = boxes    || [];
     STATE.activity = activity || [];
+
+    const dbaar = (assocs || []).find(a => a.id === 2);
+    STATE.dbaarFee = dbaar && dbaar.purchase_fee != null ? parseFloat(dbaar.purchase_fee) : null;
+
+    STATE.userRole    = (me || {}).role      || "unknown";
+    STATE.userAgentId = (me || {}).agent_id  || null;
+    applyRoleRestrictions();
   } catch (e) {
     toast("Failed to load data: " + e.message, "warn");
     STATE.offices = []; STATE.boxes = []; STATE.activity = [];
@@ -1311,6 +1333,28 @@ async function init() {
   populateOfficeDropdowns();
   renderDashboard();
   renderInventory(STATE.boxes);
+
+  // Load MLS flags asynchronously — DeltaNet calls may be slow
+  loadMlsFlags();
+}
+
+function applyRoleRestrictions() {
+  if (STATE.userRole !== "agent") return;
+  // Agents see inventory only — hide operational and settings tabs
+  document.querySelectorAll(".nav-tab").forEach(t => {
+    if (["checkout", "checkin", "settings"].includes(t.dataset.page)) t.style.display = "none";
+  });
+  switchPage("inventory");
+}
+
+async function loadMlsFlags() {
+  const hasCheckedOut = STATE.boxes.some(b => b.status === "checked_out" && b.mls_id);
+  if (!hasCheckedOut) return;
+  try {
+    STATE.mlsFlags = await GET("/lockbox/mls-flags");
+    filterInv();
+    renderDashboard();
+  } catch { /* non-fatal — flags just won't appear */ }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1353,6 +1397,15 @@ function renderDashboard() {
   document.getElementById('s-avail').textContent  = STATE.boxes.filter(b => b.status === 'available').length;
   document.getElementById('s-broken').textContent = STATE.boxes.filter(b => b.status === 'broken').length;
   document.getElementById('s-total').textContent  = STATE.boxes.length;
+
+  const costEl = document.getElementById('s-cost');
+  if (STATE.dbaarFee != null) {
+    const total = STATE.boxes.length * STATE.dbaarFee;
+    costEl.textContent = '$' + total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  } else {
+    costEl.textContent = '—';
+  }
+
   renderActivity();
 }
 
@@ -1695,6 +1748,15 @@ const STATUS_CHIP = {
   sent_to_assoc:   '<span class="chip chip-neutral">Sent to Assoc.</span>',
 };
 
+function invFlagChips(b) {
+  const chips = [];
+  const mlsFlag = STATE.mlsFlags[b.serial_number];
+  if (mlsFlag && mlsFlag.flag === 'closed')    chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Listing is closed or sold">LISTING CLOSED</span>');
+  if (mlsFlag && mlsFlag.flag === 'not_found') chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="MLS listing not found in DeltaNet">MLS NOT FOUND</span>');
+  if (b.agent_active === false)                chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Assigned agent is inactive">AGENT INACTIVE</span>');
+  return chips.length ? `<div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">${chips.join('')}</div>` : '';
+}
+
 function renderInventory(boxes) {
   // Apply sort
   if (STATE.invSort.col) {
@@ -1713,13 +1775,20 @@ function renderInventory(boxes) {
     }
   });
 
+  const costCell = STATE.dbaarFee != null
+    ? `<span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">$${STATE.dbaarFee.toFixed(2)}</span>`
+    : '—';
+
   document.getElementById('inv-tbody').innerHTML = boxes.length
     ? boxes.map(b => `
       <tr>
         <td><span class="serial">${b.serial_number}</span></td>
         <td style="font-family:var(--mono);font-size:12px">${b.shackle_code}</td>
         <td><span class="chip chip-neutral">${b.association_abbr}</span></td>
-        <td>${STATUS_CHIP[b.status] || b.status}</td>
+        <td>
+          ${STATUS_CHIP[b.status] || b.status}
+          ${invFlagChips(b)}
+        </td>
         <td>
           <span class="loc-chip">
             ${b.location_type === 'office' ? '🏢' : '📍'}
@@ -1731,15 +1800,16 @@ function renderInventory(boxes) {
           ${b.location_type === 'property' && b.location_address ? b.location_address : '—'}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
+        <td>${costCell}</td>
         <td>
-          ${b.status === 'checked_out'
+          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button>`
-            : b.status === 'available'
+            : b.status === 'available' && STATE.userRole !== 'agent'
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button>`
             : '—'}
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="9" class="empty">No boxes match.</td></tr>';
+    : '<tr><td colspan="10" class="empty">No boxes match.</td></tr>';
 
   document.getElementById('inv-footer').textContent =
     `${boxes.length} of ${STATE.boxes.length} lockboxes`;
@@ -1753,6 +1823,10 @@ function filterInv() {
   const loc    = document.getElementById('inv-loc').value;
 
   renderInventory(STATE.boxes.filter(b => {
+    // Agent role: only show their currently checked-out boxes
+    if (STATE.userRole === 'agent') {
+      if (b.agent_id !== STATE.userAgentId || b.status !== 'checked_out') return false;
+    }
     const textMatch = !q ||
       b.serial_number.includes(q) ||
       b.shackle_code.includes(q) ||
@@ -1772,12 +1846,21 @@ function filterInv() {
 }
 
 function exportCSV() {
-  const h = ['Serial','Shackle','Assoc','Status','Location Type','Office / Address','Agent','Out Since'];
-  const rows = STATE.boxes.map(b => [
-    b.serial_number, b.shackle_code, b.association_abbr, b.status, b.location_type,
-    b.location_type === 'office' ? (b.office_name || '') : (b.location_address || ''),
-    b.agent_name || '', b.checkout_at || ''
-  ]);
+  const h = ['Serial','Shackle','Assoc','Status','Flags','Location Type','Office / Address','Agent','Out Since','Cost'];
+  const rows = STATE.boxes.map(b => {
+    const flags = [];
+    const mlsFlag = STATE.mlsFlags[b.serial_number];
+    if (mlsFlag && mlsFlag.flag === 'closed')    flags.push('Listing Closed');
+    if (mlsFlag && mlsFlag.flag === 'not_found') flags.push('MLS Not Found');
+    if (b.agent_active === false)                flags.push('Agent Inactive');
+    return [
+      b.serial_number, b.shackle_code, b.association_abbr, b.status,
+      flags.join('; '), b.location_type,
+      b.location_type === 'office' ? (b.office_name || '') : (b.location_address || ''),
+      b.agent_name || '', b.checkout_at || '',
+      STATE.dbaarFee != null ? STATE.dbaarFee.toFixed(2) : ''
+    ];
+  });
   const csv = [h, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
