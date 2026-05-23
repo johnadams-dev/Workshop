@@ -1819,10 +1819,16 @@ function renderInventory(boxes) {
         </td>
         <td style="font-size:12px;color:var(--text-muted)">${b.assigned_office_name || b.office_name || '—'}</td>
         <td style="font-size:13px">${b.agent_name || '—'}</td>
-        <td style="font-size:12px;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis">
-          ${b.property_address || b.location_address
-            || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : null)
-            || '—'}
+        <td style="font-size:12px;color:var(--text-muted);max-width:200px">
+          <span style="overflow:hidden;text-overflow:ellipsis;display:block;max-width:160px;float:left">
+            ${b.property_address || b.location_address
+              || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : null)
+              || '—'}
+          </span>
+          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
+            ? `<button class="tbl-link" title="Edit address" style="margin-left:4px;opacity:.5;font-size:10px;float:right"
+                onclick='editInvAddress(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏</button>`
+            : ''}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.mls_id || '—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
@@ -1839,6 +1845,21 @@ function renderInventory(boxes) {
 
   document.getElementById('inv-footer').textContent =
     `${boxes.length} of ${STATE.boxes.length} lockboxes`;
+}
+
+async function editInvAddress(b) {
+  const current = b.property_address || b.location_address || '';
+  const addr = window.prompt(`Update property address for #${b.serial_number}:`, current);
+  if (addr === null) return; // cancelled
+  try {
+    await POST('/lockbox/inventory/update-address', { serial_number: b.serial_number, location_address: addr.trim() });
+    // Update local state so the table refreshes without a full reload
+    const box = STATE.boxes.find(x => x.serial_number === b.serial_number);
+    if (box) { box.location_address = addr.trim(); box.property_address = addr.trim(); }
+    renderInventory(STATE.boxes);
+  } catch (e) {
+    alert('Failed to update address: ' + e.message);
+  }
 }
 
 function filterInv() {
