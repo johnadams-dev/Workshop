@@ -990,6 +990,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       <button class="maint-tab active" data-mtab="associations" onclick="switchMaintTab('associations')">🏢 Associations</button>
       <button class="maint-tab" data-mtab="transfer"            onclick="switchMaintTab('transfer')">↔ Transfer</button>
       <button class="maint-tab" data-mtab="lockboxes"           onclick="switchMaintTab('lockboxes')">📦 Lockboxes</button>
+      <button class="maint-tab" data-mtab="admin-tools"         onclick="switchMaintTab('admin-tools')">🔧 Admin Tools</button>
     </div>
 
     <!-- ── Associations ── -->
@@ -1167,6 +1168,20 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       </div>
 
     </div><!-- /mpanel-lockboxes -->
+
+    <!-- ── Admin Tools ── -->
+    <div class="maint-panel" id="mpanel-admin-tools" style="display:none">
+
+      <div class="form-card" style="margin-bottom:20px;">
+        <div class="form-title">Sync Agent DeltaNet IDs</div>
+        <div class="form-desc">Fetches all DeltaNet user accounts and matches them to agents in the database by email address. Updates <code>dmg_id</code> for any agent that is missing it. This enables precise MLS listing agent matching during checkout.</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="syncAgentDmgIds()">↻ Sync Agent IDs from DeltaNet</button>
+        </div>
+        <div id="sync-agent-msg" style="margin-top:12px;font-size:13px;"></div>
+      </div>
+
+    </div><!-- /mpanel-admin-tools -->
 
   </div><!-- /page-settings -->
 
@@ -2195,6 +2210,19 @@ function resetDcm() {
   document.getElementById("lb-dcm-status").value = "";
   document.getElementById("lb-dcm-new-status").value = "";
   document.getElementById("lb-dcm-notes").value = "";
+}
+
+async function syncAgentDmgIds() {
+  const msg = document.getElementById("sync-agent-msg");
+  msg.textContent = "⏳ Syncing — fetching DeltaNet users…";
+  try {
+    const r = await POST("/lockbox/admin/sync-agent-dmg-ids", {});
+    msg.textContent = `✓ Done — DeltaNet users: ${r.dn_users} | Agents checked: ${r.candidates} | Updated: ${r.updated} | No match: ${r.skipped}`;
+    msg.style.color = "var(--green)";
+  } catch (e) {
+    msg.textContent = "✗ " + e.message;
+    msg.style.color = "var(--red)";
+  }
 }
 
 // Close typeaheads on outside click
