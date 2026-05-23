@@ -16,6 +16,7 @@
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
 
     <script>
@@ -712,28 +713,107 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     }
 
     // ── PDF EXPORT ──────────────────────────────────────────────────
-    function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        try { doc.addImage(document.getElementById('logoImg').src, 'JPEG', 80, 5, 30, 30); } catch(e) {}
-        doc.setFontSize(20); doc.text('Contract Date Calculator', 105, 45, { align: 'center' });
-        doc.setFontSize(12); doc.text('Florida FAR/BAR Residential Contract', 105, 52, { align: 'center' });
-        doc.setFontSize(11); doc.text(`Property: ${document.getElementById('resultPropertyId').textContent}`, 20, 65);
-        let y = 75;
-        calculatedDates.forEach(item => {
-            if (y > 270) { doc.addPage(); y = 20; }
-            doc.setFont(undefined,'bold'); doc.setFontSize(10); doc.text(item.label, 20, y); y += 6;
-            doc.setFont(undefined,'normal');                      doc.text(fmt(item.date), 20, y); y += 5;
-            doc.setTextColor(100); doc.setFontSize(9);            doc.text(item.description, 20, y);
-            doc.setTextColor(0);   doc.setFontSize(10);           y += 8;
-            if (item.warning) {
-                doc.setTextColor(220,53,69); doc.text(item.warning, 20, y);
-                doc.setTextColor(0); y += 8;
+    async function generatePDF() {
+        if (!calculatedDates.length) { showNotification('Calculate dates first.', 'error'); return; }
+
+        const btn = document.querySelector('.btn-pdf');
+        const origText = btn.textContent;
+        btn.textContent = '⏳ Generating…';
+        btn.disabled = true;
+
+        try {
+            // Build a fixed-width snapshot div that mirrors the on-screen report
+            const snapshot = document.createElement('div');
+            snapshot.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:white;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+            // ── Header (cloned from live header) ──
+            const headerClone = document.querySelector('.header').cloneNode(true);
+            // Remove badges that don't add value in print
+            headerClone.querySelectorAll('.ai-badge,.google-badge').forEach(el => el.remove());
+            snapshot.appendChild(headerClone);
+
+            // ── Body area ──
+            const body = document.createElement('div');
+            body.style.cssText = 'padding:30px 40px;';
+
+            // Property line
+            const propLine = document.createElement('p');
+            propLine.style.cssText = 'font-size:16px;color:#6c757d;margin-bottom:24px;';
+            propLine.innerHTML = 'Property: <strong style="color:#2c3e50;">' + document.getElementById('resultPropertyId').textContent + '</strong>';
+            body.appendChild(propLine);
+
+            // Date cards
+            calculatedDates.forEach(item => {
+                const card = document.createElement('div');
+                card.style.cssText = 'background:white;border-left:4px solid ' + (item.warning ? '#dc3545' : '#667eea') + ';padding:16px 20px;margin-bottom:12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);' + (item.warning ? 'background:#fff5f5;' : '');
+                card.innerHTML =
+                    '<div style="font-size:16px;font-weight:bold;color:#2c3e50;margin-bottom:4px;">' + item.label + '</div>' +
+                    '<div style="font-size:22px;color:' + (item.warning ? '#dc3545' : '#667eea') + ';font-weight:bold;margin-bottom:4px;">' + fmt(item.date) + '</div>' +
+                    '<div style="font-size:13px;color:#6c757d;">' + item.description + '</div>' +
+                    (item.warning ? '<div style="background:#dc3545;color:white;padding:8px 12px;border-radius:5px;font-size:13px;font-weight:bold;margin-top:8px;">' + item.warning + '</div>' : '');
+                body.appendChild(card);
+            });
+
+            // Footer
+            const footer = document.createElement('div');
+            footer.style.cssText = 'text-align:center;margin-top:24px;padding-top:16px;border-top:1px solid #e9ecef;font-size:11px;color:#aaa;';
+            footer.textContent = 'Adams, Cameron & Co. Realtors — accagents.com — Generated ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+            body.appendChild(footer);
+
+            snapshot.appendChild(body);
+            document.body.appendChild(snapshot);
+
+            // Render to canvas
+            const canvas = await html2canvas(snapshot, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: false
+            });
+            document.body.removeChild(snapshot);
+
+            // Build PDF — paginate if content is taller than one page
+            const { jsPDF } = window.jspdf;
+            const pdf      = new jsPDF('p', 'mm', 'a4');
+            const pageW    = pdf.internal.pageSize.getWidth();
+            const pageH    = pdf.internal.pageSize.getHeight();
+            const imgW     = pageW;
+            const imgH     = (canvas.height * imgW) / canvas.width;
+            const imgData  = canvas.toDataURL('image/jpeg', 0.92);
+
+            let remaining = imgH;
+            let srcY      = 0;
+
+            while (remaining > 0) {
+                const sliceH  = Math.min(remaining, pageH);
+                const slicePx = Math.round((sliceH / imgH) * canvas.height);
+
+                // Slice this page from the full canvas
+                const slice = document.createElement('canvas');
+                slice.width  = canvas.width;
+                slice.height = slicePx;
+                slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+
+                pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, imgW, sliceH);
+
+                remaining -= pageH;
+                srcY      += slicePx;
+                if (remaining > 0) pdf.addPage();
             }
-        });
-        doc.setFontSize(8); doc.setTextColor(150);
-        doc.text('johnadams.org — Florida Real Estate AI Tools', 105, 285, { align: 'center' });
-        doc.save('Contract_Dates.pdf');
+
+            const propId = document.getElementById('resultPropertyId').textContent;
+            const safeName = propId.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40) || 'Contract';
+            pdf.save(safeName + '_Dates.pdf');
+            showNotification('✓ PDF saved!', 'success');
+
+        } catch (err) {
+            console.error('PDF error:', err);
+            showNotification('PDF generation failed — try Print instead.', 'error');
+        } finally {
+            btn.textContent = origText;
+            btn.disabled = false;
+        }
     }
 
     function printReport() {
@@ -744,16 +824,33 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     }
 
     function copyToClipboard() {
+        if (!calculatedDates.length) { showNotification('Calculate dates first.', 'error'); return; }
         const propId = document.getElementById('resultPropertyId').textContent;
-        let t  = '═══════════════════════════════════\n';
-            t += 'CONTRACT DATE CALCULATOR\njohnadams.org\n';
-            t += '═══════════════════════════════════\n\n';
-            t += `Property: ${propId}\n\n`;
+        const isCash = document.getElementById('cashRadio').checked;
+        const txType = isCash ? 'Cash' : 'Financed';
+        const generated = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+        let t  = '╔═══════════════════════════════════════════╗\n';
+            t += '║     ADAMS, CAMERON & CO. REALTORS         ║\n';
+            t += '║     Contract Date Calculator              ║\n';
+            t += '║     Florida FAR/BAR Residential Contract  ║\n';
+            t += '╚═══════════════════════════════════════════╝\n\n';
+            t += 'Property:    ' + propId + '\n';
+            t += 'Transaction: ' + txType + '\n';
+            t += 'Generated:   ' + generated + '\n';
+            t += '─'.repeat(47) + '\n\n';
+
         calculatedDates.forEach(item => {
-            t += `${item.label}\n${fmt(item.date)}\n${item.description}\n`;
-            if (item.warning) t += `⚠️  ${item.warning}\n`;
+            t += item.label.toUpperCase() + '\n';
+            t += fmt(item.date) + '\n';
+            t += item.description + '\n';
+            if (item.warning) t += '⚠️  ' + item.warning + '\n';
             t += '\n';
         });
+
+        t += '─'.repeat(47) + '\n';
+        t += 'Adams, Cameron & Co. Realtors — accagents.com\n';
+
         if (navigator.clipboard?.writeText) {
             navigator.clipboard.writeText(t).then(() => showNotification('✓ Dates copied!', 'success')).catch(() => fallbackCopy(t));
         } else { fallbackCopy(t); }
