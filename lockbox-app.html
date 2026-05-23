@@ -957,6 +957,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       </select>
       <button class="btn btn-ghost" onclick="exportCSV()">↓ CSV</button>
     </div>
+    <div id="inv-value-bar" style="display:none;padding:8px 12px;background:var(--ink-mid);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--text-muted)">
+      Showing <strong id="inv-value-count">—</strong> lockboxes &nbsp;·&nbsp; Est. replacement value: <strong id="inv-value-total" style="color:var(--text-base)">—</strong>
+    </div>
     <div class="table-wrap">
       <table>
         <thead id="inv-thead">
@@ -970,12 +973,11 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
             <th data-col="location_address"  onclick="sortInv('location_address')">Property / Address</th>
             <th>MLS ID</th>
             <th data-col="checkout_at"       onclick="sortInv('checkout_at')">Out Since</th>
-            <th>Cost</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="inv-tbody">
-          <tr><td colspan="10" class="empty">Loading…</td></tr>
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1803,9 +1805,17 @@ function renderInventory(boxes) {
     }
   });
 
-  const costCell = STATE.dbaarFee != null
-    ? `<span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">$${STATE.dbaarFee.toFixed(2)}</span>`
-    : '—';
+  // Value summary bar
+  const valBar   = document.getElementById('inv-value-bar');
+  const valCount = document.getElementById('inv-value-count');
+  const valTotal = document.getElementById('inv-value-total');
+  if (STATE.dbaarFee != null) {
+    valBar.style.display = 'block';
+    valCount.textContent = boxes.length;
+    valTotal.textContent = '$' + (boxes.length * STATE.dbaarFee).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  } else {
+    valBar.style.display = 'none';
+  }
 
   document.getElementById('inv-tbody').innerHTML = boxes.length
     ? boxes.map(b => `
@@ -1832,7 +1842,6 @@ function renderInventory(boxes) {
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.mls_id || '—'}</td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
-        <td>${costCell}</td>
         <td>
           ${b.status === 'checked_out' && STATE.userRole !== 'agent'
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button>`
@@ -1841,7 +1850,7 @@ function renderInventory(boxes) {
             : '—'}
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="11" class="empty">No boxes match.</td></tr>';
+    : '<tr><td colspan="9" class="empty">No boxes match.</td></tr>';
 
   document.getElementById('inv-footer').textContent =
     `${boxes.length} of ${STATE.boxes.length} lockboxes`;
@@ -1890,7 +1899,7 @@ function filterInv() {
 }
 
 function exportCSV() {
-  const h = ['Serial','Shackle','Assoc','Status','Flags','Office','Agent','Property / Address','MLS ID','Out Since','Cost'];
+  const h = ['Serial','Shackle','Assoc','Status','Flags','Office','Agent','Property / Address','MLS ID','Out Since'];
   const rows = STATE.boxes.map(b => {
     const flags = [];
     const mlsFlag = STATE.mlsFlags[b.serial_number];
@@ -1904,8 +1913,7 @@ function exportCSV() {
       b.agent_name || '',
       b.property_address || b.location_address || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : '') || '',
       b.mls_id || '',
-      b.checkout_at || '',
-      STATE.dbaarFee != null ? STATE.dbaarFee.toFixed(2) : ''
+      b.checkout_at || ''
     ];
   });
   const csv = [h, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
