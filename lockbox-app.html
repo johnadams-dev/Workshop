@@ -1691,13 +1691,12 @@ function pickBox(b) {
   document.getElementById('co-p-loc').textContent     =
     b.location_type === 'office' ? '🏢 ' + (b.office_name || '') : '📍 ' + (b.property_address || b.location_address || '');
   document.getElementById('co-box-preview').classList.add('on');
-  // Auto-fill the office — prefer location_office_id (always set for boxes at an office),
-  // fall back to assigned_office_id or office_id, then match by name if all IDs are null
-  const officeId = b.location_office_id || b.assigned_office_id || b.office_id;
+  // Auto-fill the office from box data — reset first so a failed ID lookup
+  // doesn't leave a stale value that blocks the name fallback
   const sel = document.getElementById('co-office');
-  if (officeId) {
-    sel.value = String(officeId);
-  }
+  sel.value = '';
+  const officeId = b.location_office_id || b.assigned_office_id || b.office_id;
+  if (officeId) sel.value = String(officeId);
   if (!sel.value) {
     const name = b.assigned_office_name || b.office_name;
     if (name) {
@@ -1717,7 +1716,8 @@ function clearBoxSelection() {
 function onCoOfficeChange() {
   if (!STATE.selectedCoBox) return;
   const newOffice = document.getElementById('co-office').value;
-  const boxOffice = String(STATE.selectedCoBox.assigned_office_id || STATE.selectedCoBox.office_id || '');
+  const b = STATE.selectedCoBox;
+  const boxOffice = String(b.location_office_id || b.assigned_office_id || b.office_id || '');
   if (newOffice !== boxOffice) clearBoxSelection();
 }
 
@@ -2557,8 +2557,6 @@ function resetScanResult() {
 
 function scanCheckOut() {
   if (!_scannedBox) return;
-  const officeId = _scannedBox.assigned_office_id || _scannedBox.office_id || '';
-  if (officeId) document.getElementById('co-office').value = String(officeId);
   pickBox(_scannedBox);
   switchPage('checkout');
 }
