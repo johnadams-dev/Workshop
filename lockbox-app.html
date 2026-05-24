@@ -1596,20 +1596,29 @@ async function mlsLookup() {
 
     if (agentName) {
       document.getElementById("co-agent-input").value = agentName;
+      document.getElementById("co-agent-id").value    = "";
       try {
         // Prefer exact DeltaNet ID match; fall back to name search
         const lookup = agentDmgId
           ? `/lockbox/agents?dmg_id=${encodeURIComponent(agentDmgId)}`
           : `/lockbox/agents?q=${encodeURIComponent(agentName)}`;
         const agents = await GET(lookup);
-        if (agents.length) document.getElementById("co-agent-id").value = agents[0].id;
+        if (agents.length) {
+          document.getElementById("co-agent-id").value = agents[0].id;
+        } else {
+          // Name filled but no DB match — open typeahead so user can pick
+          agentSearch(agentName);
+        }
       } catch { /* non-fatal */ }
     }
     if (address) document.getElementById("co-address").value = address;
 
-    const filled = [agentName && "agent", address && "address"].filter(Boolean);
+    const agentResolved = !!document.getElementById("co-agent-id").value;
+    const filled = [agentName && (agentResolved ? "agent" : "agent ⚠ not matched"), address && "address"].filter(Boolean);
     if (filled.length) {
-      hint.textContent = `✓ Filled: ${filled.join(" & ")} from DeltaNet`; hint.className = "field-hint ok";
+      const allOk = agentResolved;
+      hint.textContent = (allOk ? "✓ Filled: " : "⚠ Filled: ") + filled.join(" & ") + " from DeltaNet";
+      hint.className   = allOk ? "field-hint ok" : "field-hint err";
     } else {
       hint.textContent = "⚠ Listing found but agent/address fields not mapped — check console"; hint.className = "field-hint err";
     }
@@ -1704,6 +1713,7 @@ function submitCheckout() {
 
   if (!STATE.selectedCoBox) { toast('Select a lockbox first', 'warn'); return; }
   if (!agent)               { toast('Agent name required', 'warn'); return; }
+  if (!agentId)             { toast('Select the agent from the dropdown — name not matched in database', 'warn'); agentSearch(agent); return; }
   if (!address)             { toast('Property address required', 'warn'); return; }
   if (!officeEl.value)      { toast('Select the From Office', 'warn'); return; }
 
