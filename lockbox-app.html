@@ -961,6 +961,9 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     <div id="inv-value-bar" style="display:none;padding:8px 12px;background:var(--ink-mid);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--text-muted)">
       Showing <strong id="inv-value-count">—</strong> lockboxes &nbsp;·&nbsp; Est. replacement value: <strong id="inv-value-total" style="color:var(--text-base)">—</strong>
     </div>
+    <div id="inv-recall-bar" style="display:none;padding:10px 14px;background:#3d1a1a;border:1px solid var(--red);border-radius:6px;margin-bottom:10px;font-size:13px;color:#f87171">
+      <strong>⚠ Recall needed:</strong> <span id="inv-recall-msg"></span>
+    </div>
     <div class="table-wrap">
       <table>
         <thead id="inv-thead">
@@ -1370,8 +1373,11 @@ function applyRoleRestrictions() {
 }
 
 async function loadMlsFlags() {
-  const hasCheckedOut = STATE.boxes.some(b => b.status === "checked_out" && b.mls_id);
-  if (!hasCheckedOut) return;
+  // Always re-render so "NO MLS ID" chips appear immediately
+  filterInv();
+  // Only call DeltaNet if there are checked-out boxes with MLS IDs to check
+  const hasIds = STATE.boxes.some(b => b.status === "checked_out" && b.mls_id);
+  if (!hasIds) return;
   try {
     STATE.mlsFlags = await GET("/lockbox/mls-flags");
     filterInv();
@@ -1784,8 +1790,9 @@ const STATUS_CHIP = {
 function invFlagChips(b) {
   const chips = [];
   const mlsFlag = STATE.mlsFlags[b.serial_number];
-  if (mlsFlag && mlsFlag.flag === 'closed')    chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Listing is closed or sold">LISTING CLOSED</span>');
-  if (mlsFlag && mlsFlag.flag === 'not_found') chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="MLS listing not found in DeltaNet">MLS NOT FOUND</span>');
+  if (mlsFlag && mlsFlag.flag === 'closed')    chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Listing is closed or sold — recall this lockbox">⚠ LISTING CLOSED</span>');
+  if (mlsFlag && mlsFlag.flag === 'not_found') chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Listing not on market in DeltaNet — recall this lockbox">⚠ OFF MARKET</span>');
+  if (b.status === 'checked_out' && !b.mls_id) chips.push('<span class="chip chip-amber" style="font-size:9px;margin-top:3px" title="No MLS ID — cannot verify listing status">NO MLS ID</span>');
   if (b.agent_active === false)                chips.push('<span class="chip chip-red" style="font-size:9px;margin-top:3px" title="Assigned agent is inactive">AGENT INACTIVE</span>');
   return chips.length ? `<div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">${chips.join('')}</div>` : '';
 }
@@ -1820,9 +1827,31 @@ function renderInventory(boxes) {
     valBar.style.display = 'none';
   }
 
+  // Recall warning banner — count off-market and no-MLS boxes in current view
+  const offMarket = boxes.filter(b => {
+    const f = STATE.mlsFlags[b.serial_number];
+    return f && (f.flag === 'not_found' || f.flag === 'closed');
+  });
+  const noMls = boxes.filter(b => b.status === 'checked_out' && !b.mls_id);
+  const recallBar = document.getElementById('inv-recall-bar');
+  const recallMsg = document.getElementById('inv-recall-msg');
+  const recallParts = [];
+  if (offMarket.length) recallParts.push(`${offMarket.length} listing${offMarket.length > 1 ? 's' : ''} off market`);
+  if (noMls.length)     recallParts.push(`${noMls.length} checked out without MLS ID`);
+  if (recallParts.length) {
+    recallMsg.textContent = recallParts.join(' · ');
+    recallBar.style.display = 'block';
+  } else {
+    recallBar.style.display = 'none';
+  }
+
   document.getElementById('inv-tbody').innerHTML = boxes.length
-    ? boxes.map(b => `
-      <tr>
+    ? boxes.map(b => {
+        const flag = STATE.mlsFlags[b.serial_number]?.flag;
+        const needsRecall = flag === 'not_found' || flag === 'closed';
+        const rowStyle = needsRecall ? 'border-left:3px solid var(--red)' : '';
+        return `
+      <tr style="${rowStyle}">
         <td><span class="serial">${b.serial_number}</span></td>
         <td style="font-family:var(--mono);font-size:12px">${b.shackle_code}</td>
         <td><span class="chip chip-neutral">${b.association_abbr}</span></td>
@@ -1843,7 +1872,13 @@ function renderInventory(boxes) {
                 onclick='editInvAddress(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏</button>`
             : ''}
         </td>
-        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.mls_id || '—'}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">
+          ${b.mls_id || '—'}
+          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
+            ? `<button class="tbl-link" title="Edit MLS ID" style="margin-left:4px;opacity:.5;font-size:10px"
+                onclick='editInvMlsId(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏</button>`
+            : ''}
+        </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
         <td>
           ${b.status === 'checked_out' && STATE.userRole !== 'agent'
@@ -1852,7 +1887,8 @@ function renderInventory(boxes) {
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button>`
             : '—'}
         </td>
-      </tr>`).join('')
+      </tr>`;
+      }).join('')
     : '<tr><td colspan="9" class="empty">No boxes match.</td></tr>';
 
   document.getElementById('inv-footer').textContent =
@@ -1862,15 +1898,30 @@ function renderInventory(boxes) {
 async function editInvAddress(b) {
   const current = b.property_address || b.location_address || '';
   const addr = window.prompt(`Update property address for #${b.serial_number}:`, current);
-  if (addr === null) return; // cancelled
+  if (addr === null) return;
   try {
     await POST('/lockbox/inventory/update-address', { serial_number: b.serial_number, location_address: addr.trim() });
-    // Update local state so the table refreshes without a full reload
     const box = STATE.boxes.find(x => x.serial_number === b.serial_number);
     if (box) { box.location_address = addr.trim(); box.property_address = addr.trim(); }
     renderInventory(STATE.boxes);
   } catch (e) {
     alert('Failed to update address: ' + e.message);
+  }
+}
+
+async function editInvMlsId(b) {
+  const current = b.mls_id || '';
+  const mls = window.prompt(`Update MLS ID for #${b.serial_number}:`, current);
+  if (mls === null) return;
+  try {
+    await POST('/lockbox/inventory/update-mls-id', { serial_number: b.serial_number, mls_id: mls.trim() });
+    const box = STATE.boxes.find(x => x.serial_number === b.serial_number);
+    if (box) box.mls_id = mls.trim() || null;
+    renderInventory(STATE.boxes);
+    // Re-run MLS status check so the recall banner updates
+    loadMlsFlags();
+  } catch (e) {
+    alert('Failed to update MLS ID: ' + e.message);
   }
 }
 
