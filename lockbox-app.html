@@ -1696,6 +1696,15 @@ function pickBox(b) {
   const sel = document.getElementById('co-office');
   sel.value = '';
   const officeId = b.location_office_id || b.assigned_office_id || b.office_id;
+  console.log('[pickBox] office debug', {
+    location_office_id: b.location_office_id,
+    assigned_office_id: b.assigned_office_id,
+    office_id: b.office_id,
+    office_name: b.office_name,
+    assigned_office_name: b.assigned_office_name,
+    officeId,
+    options: [...sel.options].map(o => ({v: o.value, t: o.text}))
+  });
   if (officeId) sel.value = String(officeId);
   if (!sel.value) {
     const name = b.assigned_office_name || b.office_name;
@@ -1704,6 +1713,7 @@ function pickBox(b) {
       if (opt) sel.value = opt.value;
     }
   }
+  console.log('[pickBox] sel.value after =', sel.value);
 }
 
 function clearBoxSelection() {
@@ -2665,24 +2675,25 @@ function printQrLabel(b) {
 }
 
 function _openPrintWindow(d, imgSrc) {
-  const w = window.open('', '_blank', 'width=340,height=430');
+  const w = window.open('', '_blank', 'width=210,height=210');
   if (!w) { toast('Allow pop-ups to print labels', 'warn'); return; }
   w.document.write(`<!DOCTYPE html><html><head>
 <title>Lockbox · ${d.serial}</title>
 <style>
-  @page { margin:.4in }
-  body { font-family:"Courier New",monospace; text-align:center; padding:16px; background:#fff; color:#000; margin:0 }
-  .brand { font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#777; margin-bottom:8px }
-  .qr { width:180px; height:180px; display:block; margin:0 auto 12px }
-  .serial { font-size:26px; font-weight:bold; letter-spacing:.08em; margin-bottom:8px }
-  .detail { font-size:12px; color:#444; margin:3px 0 }
+  @page { size:2in 2in; margin:0 }
+  * { box-sizing:border-box; margin:0; padding:0 }
+  body { width:2in; height:2in; display:flex; flex-direction:column; align-items:center;
+         justify-content:center; gap:4px; padding:0.1in;
+         font-family:Arial,sans-serif; background:#fff; color:#000 }
+  .brand { font-size:7pt; letter-spacing:.12em; text-transform:uppercase; text-align:center }
+  .qr { width:1.45in; height:1.45in; display:block }
+  .serial { font-size:11pt; font-weight:bold; letter-spacing:.06em;
+            font-family:"Courier New",monospace; text-align:center }
 </style>
 </head><body>
 <div class="brand">Adams Cameron &amp; Co.</div>
 <img class="qr" src="${imgSrc}" alt="QR">
 <div class="serial">${d.serial}</div>
-<div class="detail">Shackle: <strong>${d.shackle}</strong></div>
-<div class="detail">${d.assoc} &nbsp;·&nbsp; ${d.office}</div>
 <script>window.onload=function(){window.print();window.close()}<\/script></body></html>`);
   w.document.close();
 }
