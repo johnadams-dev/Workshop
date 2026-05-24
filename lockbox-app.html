@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    DESIGN TOKENS
@@ -623,6 +625,18 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   font-size: 13px;
 }
 
+/* ── Scanner page ── */
+#qr-reader {
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+#qr-reader * { box-sizing: content-box; }
+#qr-reader video { border-radius: 0; }
+#qr-modal-code canvas, #qr-modal-code img { display: block; margin: 0 auto; border-radius: 4px; }
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .stat-row  { grid-template-columns: repeat(3,1fr); }
@@ -669,6 +683,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
   <div class="nav-tab active" data-page="dashboard"><span class="tab-icon">◈</span> Dashboard</div>
   <div class="nav-tab" data-page="checkout"><span class="tab-icon">↑</span> Check Out</div>
   <div class="nav-tab" data-page="checkin"><span class="tab-icon">↓</span> Check In</div>
+  <div class="nav-tab" data-page="scan"><span class="tab-icon">⊟</span> Scan</div>
   <div class="nav-tab" data-page="inventory"><span class="tab-icon">≡</span> Inventory</div>
   <div class="nav-tab" data-page="settings"><span class="tab-icon">⚙</span> Settings</div>
 </nav>
@@ -926,6 +941,34 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <button class="btn btn-primary" onclick="submitCheckin()">↓ Complete Check In</button>
         <button class="btn btn-ghost" onclick="resetCheckin()">Clear</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ══════ SCAN ══════ -->
+  <div class="page" id="page-scan">
+    <div style="max-width:580px">
+
+      <div class="form-card" style="margin-bottom:20px">
+        <div class="form-title">Scan a Lockbox</div>
+        <div class="form-desc">Point your camera at the QR code label on the lockbox, or enter the serial number below.</div>
+
+        <div id="qr-reader"></div>
+
+        <div class="divider" style="margin-top:16px">or enter manually</div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <input id="scan-manual" type="text" placeholder="Serial number, e.g. 20033334"
+                 style="flex:1;font-family:var(--mono);font-size:14px;letter-spacing:.04em"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();doManualScan()}">
+          <button class="btn btn-primary" onclick="doManualScan()">↗ Look Up</button>
+        </div>
+        <div id="scan-hint" style="margin-top:6px;font-size:12px;color:var(--text-muted);min-height:18px"></div>
+      </div>
+
+      <div id="scan-result-panel" class="form-card" style="display:none">
+        <div id="scan-result-inner"></div>
+      </div>
+
     </div>
   </div>
 
@@ -1195,6 +1238,64 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 </div><!-- /content -->
 </div><!-- /shell -->
 
+<!-- ═══════════════ SCANNER QUICK CHECK-IN ═══════════════ -->
+<div class="overlay" id="scan-ci-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">Quick Check In</div>
+    <div class="modal-desc">Record the return of this lockbox.</div>
+    <div class="modal-body" id="scan-ci-modal-body"></div>
+    <div class="form-grid" style="margin-bottom:4px">
+      <div class="form-row">
+        <div class="field">
+          <div class="field-label req">Returning to Office</div>
+          <select id="scan-ci-office">
+            <option value="">— Select office —</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label req">Condition</div>
+          <select id="scan-ci-condition">
+            <option value="ok">✅ Good — Ready to redeploy</option>
+            <option value="needs_service">⚠️ Needs service</option>
+            <option value="broken">❌ Broken</option>
+            <option value="stuck_shackle">🔧 Shackle stuck</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Notes <span style="font-weight:400;color:var(--text-dim);font-size:10px">optional</span></div>
+        <input id="scan-ci-notes" type="text" placeholder="Condition notes…">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="confirmScanCheckin()">↓ Confirm Check In</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ QR CODE MODAL ═══════════════ -->
+<div class="overlay" id="qr-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title">QR Code Label</div>
+    <div class="modal-desc" id="qr-modal-desc">Attach this label to the lockbox.</div>
+    <div style="text-align:center;padding:16px 0">
+      <div id="qr-modal-code" style="display:inline-block;background:#fff;padding:12px;border-radius:6px"></div>
+    </div>
+    <div class="modal-body" style="margin-bottom:16px">
+      <div class="mrow"><span class="mrow-k">Serial #</span><span class="mrow-v mono" id="qr-modal-serial">—</span></div>
+      <div class="mrow"><span class="mrow-k">Shackle</span><span class="mrow-v" id="qr-modal-shackle">—</span></div>
+      <div class="mrow"><span class="mrow-k">Assoc.</span><span class="mrow-v" id="qr-modal-assoc">—</span></div>
+      <div class="mrow"><span class="mrow-k">Office</span><span class="mrow-v" id="qr-modal-office">—</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="printQrLabelFromModal()">⊟ Print Label</button>
+      <button class="btn btn-ghost" onclick="downloadQrCode()">↓ Download</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ CONFIRM CHECKOUT ═══════════════ -->
 <div class="overlay" id="co-modal">
   <div class="modal">
@@ -1367,7 +1468,7 @@ function applyRoleRestrictions() {
   if (STATE.userRole !== "agent") return;
   // Agents see inventory only — hide operational and settings tabs
   document.querySelectorAll(".nav-tab").forEach(t => {
-    if (["checkout", "checkin", "settings"].includes(t.dataset.page)) t.style.display = "none";
+    if (["checkout", "checkin", "scan", "settings"].includes(t.dataset.page)) t.style.display = "none";
   });
   switchPage("inventory");
 }
@@ -1393,9 +1494,11 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 });
 
 function switchPage(name) {
+  if (name !== 'scan') stopScanner();
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === name));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   if (name === "settings") loadAssociations();
+  if (name === "scan") { resetScanResult(); initScanner(); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1403,7 +1506,7 @@ function switchPage(name) {
    Populated from DeltaNet /lockbox/offices (already loaded at init).
 ═══════════════════════════════════════════════════════════════════ */
 function populateOfficeDropdowns() {
-  const selects = ['co-office', 'ci-office', 'dash-office-filter', 'tr-to-office', 'inv-office', 'lb-office'];
+  const selects = ['co-office', 'ci-office', 'dash-office-filter', 'tr-to-office', 'inv-office', 'lb-office', 'scan-ci-office'];
   selects.forEach(id => {
     const el = document.getElementById(id);
     const isDash = id === 'dash-office-filter';
@@ -1880,12 +1983,13 @@ function renderInventory(boxes) {
             : ''}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
-        <td>
+        <td style="white-space:nowrap">
           ${b.status === 'checked_out' && STATE.userRole !== 'agent'
-            ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button>`
+            ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button> `
             : b.status === 'available' && STATE.userRole !== 'agent'
-            ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button>`
-            : '—'}
+            ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button> `
+            : ''}
+          <button class="tbl-link" title="Print QR Label" onclick='showQrModal(${JSON.stringify(b).replace(/'/g,"&#39;")})' style="opacity:.5">QR</button>
         </td>
       </tr>`;
       }).join('')
@@ -2229,6 +2333,8 @@ async function addLockbox() {
     resetAddLockbox();
     STATE.boxes = (await GET("/lockbox/inventory")) || [];
     renderDashboard(); renderInventory(STATE.boxes);
+    const newBox = STATE.boxes.find(b => b.serial_number === serial);
+    if (newBox) showQrModal(newBox);
   } catch (e) {
     msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
   }
@@ -2306,6 +2412,250 @@ async function syncAgentDmgIds() {
     msg.textContent = "✗ " + e.message;
     msg.style.color = "var(--red)";
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCANNER
+═══════════════════════════════════════════════════════════════════ */
+let _scanner    = null;
+let _scannedBox = null;
+
+function initScanner() {
+  if (_scanner || typeof Html5QrcodeScanner === 'undefined') return;
+  const scanTypes = typeof Html5QrcodeScanType !== 'undefined'
+    ? [Html5QrcodeScanType.SCAN_TYPE_CAMERA, Html5QrcodeScanType.SCAN_TYPE_FILE]
+    : [0, 1];
+  _scanner = new Html5QrcodeScanner('qr-reader', {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    rememberLastUsedCamera: true,
+    supportedScanTypes: scanTypes,
+  }, false);
+  _scanner.render(
+    text => { document.getElementById('scan-manual').value = text.trim(); scanLookup(text.trim()); },
+    () => {}
+  );
+}
+
+function stopScanner() {
+  if (!_scanner) return;
+  _scanner.clear().catch(() => {});
+  _scanner = null;
+}
+
+function doManualScan() {
+  const val = document.getElementById('scan-manual').value.trim();
+  if (!val) { document.getElementById('scan-hint').textContent = 'Enter a serial number first'; return; }
+  scanLookup(val);
+}
+
+function scanLookup(serial) {
+  document.getElementById('scan-hint').textContent = '';
+  const norm = serial.toUpperCase();
+  const box = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+  if (box) { showScanResult(box); return; }
+
+  document.getElementById('scan-hint').textContent = '⏳ Looking up…';
+  GET('/lockbox/inventory').then(boxes => {
+    STATE.boxes = boxes || STATE.boxes;
+    const found = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+    if (found) {
+      showScanResult(found);
+      document.getElementById('scan-hint').textContent = '';
+    } else {
+      document.getElementById('scan-hint').textContent = `✗ #${serial} not found in inventory`;
+      document.getElementById('scan-result-panel').style.display = 'none';
+    }
+  }).catch(e => { document.getElementById('scan-hint').textContent = '✗ ' + e.message; });
+}
+
+const SCAN_STATUS_INFO = {
+  available:     { chip: 'chip-green',   icon: '✅', label: 'Available' },
+  checked_out:   { chip: 'chip-amber',   icon: '📦', label: 'Checked Out' },
+  broken:        { chip: 'chip-red',     icon: '❌', label: 'Broken' },
+  missing:       { chip: 'chip-red',     icon: '🔍', label: 'Missing' },
+  sent_to_assoc: { chip: 'chip-neutral', icon: '📬', label: 'Sent to Assoc.' },
+};
+
+function showScanResult(box) {
+  _scannedBox = box;
+  const si = SCAN_STATUS_INFO[box.status] || { chip: 'chip-neutral', icon: '◈', label: box.status };
+
+  let actionHtml = '';
+  if (box.status === 'checked_out' && STATE.userRole !== 'agent') {
+    actionHtml = `<button class="btn btn-primary" onclick="openScanCheckin()">↓ Check In</button>`;
+  } else if (['available', 'broken', 'missing'].includes(box.status) && STATE.userRole !== 'agent') {
+    actionHtml = `<button class="btn btn-primary" onclick="scanCheckOut()">↑ Check Out</button>`;
+  } else if (!['checked_out', 'available', 'broken', 'missing'].includes(box.status)) {
+    actionHtml = `<div class="alert alert-warn" style="font-size:12px">⚠ No action available — status is <strong>${si.label}</strong>.</div>`;
+  }
+
+  const loc = box.status === 'checked_out'
+    ? `📍 ${box.property_address || box.location_address || 'Unknown property'}${box.agent_name ? ' — ' + box.agent_name : ''}`
+    : `🏢 ${box.assigned_office_name || box.office_name || 'Unknown office'}`;
+
+  const bJson = JSON.stringify(box).replace(/'/g, "&#39;");
+
+  document.getElementById('scan-result-inner').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:600">${si.icon} Lockbox Found</span>
+      <span class="chip ${si.chip}">${si.label}</span>
+    </div>
+    <div class="bp-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+      <div class="bp-field"><div class="bp-key">Serial #</div><div class="bp-val amber" style="font-size:18px">${box.serial_number}</div></div>
+      <div class="bp-field"><div class="bp-key">Shackle Code</div><div class="bp-val" style="font-size:18px">${box.shackle_code || '—'}</div></div>
+      <div class="bp-field"><div class="bp-key">Association</div><div class="bp-val">${box.association_abbr || '—'}</div></div>
+      <div class="bp-field"><div class="bp-key">Office</div><div class="bp-val">${box.assigned_office_name || box.office_name || '—'}</div></div>
+    </div>
+    <div style="background:rgba(0,0,0,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px">${loc}</div>
+    <div class="btn-row" style="margin-top:0">
+      ${actionHtml}
+      <button class="btn btn-ghost" onclick='showQrModal(${bJson})'>⬜ QR Label</button>
+      <button class="btn btn-ghost" onclick="resetScanResult()">✕ Clear</button>
+    </div>`;
+
+  document.getElementById('scan-result-panel').style.display = 'block';
+}
+
+function resetScanResult() {
+  _scannedBox = null;
+  document.getElementById('scan-result-panel').style.display = 'none';
+  document.getElementById('scan-manual').value = '';
+  document.getElementById('scan-hint').textContent = '';
+}
+
+function scanCheckOut() {
+  if (!_scannedBox) return;
+  const officeId = _scannedBox.assigned_office_id || _scannedBox.office_id || '';
+  if (officeId) document.getElementById('co-office').value = String(officeId);
+  pickBox(_scannedBox);
+  switchPage('checkout');
+}
+
+function openScanCheckin() {
+  if (!_scannedBox) return;
+  document.getElementById('scan-ci-modal-body').innerHTML = modalRows([
+    ['Serial #', _scannedBox.serial_number, true],
+    ['Shackle',  _scannedBox.shackle_code || '—', false],
+    ['Agent',    _scannedBox.agent_name || '—', false],
+    ['Was at',   _scannedBox.property_address || _scannedBox.location_address || '—', false],
+  ]);
+  document.getElementById('scan-ci-notes').value  = '';
+  document.getElementById('scan-ci-office').value = '';
+  document.getElementById('scan-ci-modal').classList.add('open');
+}
+
+async function confirmScanCheckin() {
+  const office = document.getElementById('scan-ci-office').value;
+  if (!office) { toast('Select the receiving office', 'warn'); return; }
+
+  const body = {
+    serial_number: _scannedBox.serial_number,
+    office_id:     parseInt(office),
+    condition:     document.getElementById('scan-ci-condition').value,
+    notes:         document.getElementById('scan-ci-notes').value.trim() || undefined,
+  };
+
+  try { await POST('/lockbox/checkin', body); }
+  catch (e) { toast('Error: ' + e.message, 'warn'); return; }
+
+  closeModals();
+  toast('Lockbox checked in ↓');
+  resetScanResult();
+  try {
+    const [boxes, activity] = await Promise.all([GET('/lockbox/inventory'), GET('/lockbox/activity')]);
+    STATE.boxes    = boxes    || STATE.boxes;
+    STATE.activity = activity || STATE.activity;
+  } catch { /* keep stale */ }
+  renderDashboard();
+  renderInventory(STATE.boxes);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   QR CODE
+═══════════════════════════════════════════════════════════════════ */
+let _qrModalData = null;
+
+function showQrModal(b) {
+  if (typeof QRCode === 'undefined') { toast('QR library loading — try again', 'warn'); return; }
+  _qrModalData = {
+    serial:  b.serial_number,
+    shackle: b.shackle_code || '—',
+    assoc:   b.association_abbr || '—',
+    office:  b.assigned_office_name || b.office_name || '—',
+  };
+  document.getElementById('qr-modal-serial').textContent  = _qrModalData.serial;
+  document.getElementById('qr-modal-shackle').textContent = _qrModalData.shackle;
+  document.getElementById('qr-modal-assoc').textContent   = _qrModalData.assoc;
+  document.getElementById('qr-modal-office').textContent  = _qrModalData.office;
+  document.getElementById('qr-modal-desc').textContent    = `Scan to identify lockbox #${_qrModalData.serial}`;
+
+  const el = document.getElementById('qr-modal-code');
+  el.innerHTML = '';
+  new QRCode(el, { text: _qrModalData.serial, width: 200, height: 200,
+    colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+
+  document.getElementById('qr-modal').classList.add('open');
+}
+
+function _qrCanvas() { return document.getElementById('qr-modal-code').querySelector('canvas'); }
+
+function downloadQrCode() {
+  const c = _qrCanvas(); if (!c || !_qrModalData) return;
+  const a = document.createElement('a');
+  a.href     = c.toDataURL('image/png');
+  a.download = `lockbox-qr-${_qrModalData.serial}.png`;
+  a.click();
+}
+
+function printQrLabelFromModal() {
+  if (!_qrModalData) return;
+  const c = _qrCanvas(); if (!c) return;
+  _openPrintWindow(_qrModalData, c.toDataURL('image/png'));
+}
+
+function printQrLabel(b) {
+  if (typeof QRCode === 'undefined') { toast('QR library loading — try again', 'warn'); return; }
+  const data = {
+    serial:  b.serial_number,
+    shackle: b.shackle_code || '—',
+    assoc:   b.association_abbr || '—',
+    office:  b.assigned_office_name || b.office_name || '—',
+  };
+  const tmp = document.createElement('div');
+  tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;background:#fff';
+  document.body.appendChild(tmp);
+  new QRCode(tmp, { text: data.serial, width: 200, height: 200,
+    colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  setTimeout(() => {
+    const c = tmp.querySelector('canvas');
+    const src = c ? c.toDataURL('image/png') : '';
+    document.body.removeChild(tmp);
+    _openPrintWindow(data, src);
+  }, 80);
+}
+
+function _openPrintWindow(d, imgSrc) {
+  const w = window.open('', '_blank', 'width=340,height=430');
+  if (!w) { toast('Allow pop-ups to print labels', 'warn'); return; }
+  w.document.write(`<!DOCTYPE html><html><head>
+<title>Lockbox · ${d.serial}</title>
+<style>
+  @page { margin:.4in }
+  body { font-family:"Courier New",monospace; text-align:center; padding:16px; background:#fff; color:#000; margin:0 }
+  .brand { font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#777; margin-bottom:8px }
+  .qr { width:180px; height:180px; display:block; margin:0 auto 12px }
+  .serial { font-size:26px; font-weight:bold; letter-spacing:.08em; margin-bottom:8px }
+  .detail { font-size:12px; color:#444; margin:3px 0 }
+</style>
+</head><body>
+<div class="brand">Adams Cameron &amp; Co.</div>
+<img class="qr" src="${imgSrc}" alt="QR">
+<div class="serial">${d.serial}</div>
+<div class="detail">Shackle: <strong>${d.shackle}</strong></div>
+<div class="detail">${d.assoc} &nbsp;·&nbsp; ${d.office}</div>
+<script>window.onload=function(){window.print();window.close()}<\/script></body></html>`);
+  w.document.close();
 }
 
 // Close typeaheads on outside click
