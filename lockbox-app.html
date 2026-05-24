@@ -1549,7 +1549,7 @@ function renderActivity() {
   const rows = STATE.activity.filter(a => {
     if (!officeFilter) return true;
     const office = STATE.offices.find(o => String(o.local_id || o.office_id) === officeFilter);
-    return office && (a.office_name || '').includes(office.name.split(' ')[0]);
+    return office && (a.office_name || '') === office.name;
   });
 
   document.getElementById('dash-tbody').innerHTML = rows.length ? rows.map(a => `
@@ -1691,9 +1691,20 @@ function pickBox(b) {
   document.getElementById('co-p-loc').textContent     =
     b.location_type === 'office' ? '🏢 ' + (b.office_name || '') : '📍 ' + (b.property_address || b.location_address || '');
   document.getElementById('co-box-preview').classList.add('on');
-  // Auto-fill the office from the box so the user doesn't have to
-  const officeId = b.assigned_office_id || b.office_id;
-  if (officeId) document.getElementById('co-office').value = String(officeId);
+  // Auto-fill the office — prefer location_office_id (always set for boxes at an office),
+  // fall back to assigned_office_id or office_id, then match by name if all IDs are null
+  const officeId = b.location_office_id || b.assigned_office_id || b.office_id;
+  const sel = document.getElementById('co-office');
+  if (officeId) {
+    sel.value = String(officeId);
+  }
+  if (!sel.value) {
+    const name = b.assigned_office_name || b.office_name;
+    if (name) {
+      const opt = [...sel.options].find(o => o.text === name);
+      if (opt) sel.value = opt.value;
+    }
+  }
 }
 
 function clearBoxSelection() {
