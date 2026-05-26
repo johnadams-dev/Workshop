@@ -742,6 +742,26 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         </tbody>
       </table>
     </div>
+
+    <div class="section-head" style="margin-top:24px">
+      <div class="section-title">Inventory Events</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Serial #</th>
+            <th>Detail</th>
+            <th>Admin</th>
+          </tr>
+        </thead>
+        <tbody id="events-tbody">
+          <tr><td colspan="5" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- ══════ CHECK OUT ══════ -->
@@ -1413,6 +1433,7 @@ let STATE = {
   offices:       [],
   boxes:         [],
   activity:      [],
+  events:        [],
   selectedCoBox: null,
   selectedCiBox: null,
   invSort:       { col: null, dir: 1 },
@@ -1434,16 +1455,18 @@ async function init() {
   document.getElementById("tr-admin").value = userDisplay || userEmail;
 
   try {
-    const [offices, boxes, activity, assocs, me] = await Promise.all([
+    const [offices, boxes, activity, events, assocs, me] = await Promise.all([
       GET("/lockbox/offices"),
       GET("/lockbox/inventory"),
       GET("/lockbox/activity"),
+      GET("/lockbox/events"),
       GET("/lockbox/associations"),
       GET("/lockbox/me"),
     ]);
     STATE.offices  = offices  || [];
     STATE.boxes    = boxes    || [];
     STATE.activity = activity || [];
+    STATE.events   = events   || [];
 
     const dbaar = (assocs || []).find(a => a.id === 2);
     STATE.dbaarFee = dbaar && dbaar.purchase_fee != null ? parseFloat(dbaar.purchase_fee) : null;
@@ -1453,7 +1476,7 @@ async function init() {
     applyRoleRestrictions();
   } catch (e) {
     toast("Failed to load data: " + e.message, "warn");
-    STATE.offices = []; STATE.boxes = []; STATE.activity = [];
+    STATE.offices = []; STATE.boxes = []; STATE.activity = []; STATE.events = [];
   }
 
   populateOfficeDropdowns();
@@ -1542,6 +1565,7 @@ function renderDashboard() {
   }
 
   renderActivity();
+  renderEvents();
 }
 
 function renderActivity() {
@@ -1563,6 +1587,39 @@ function renderActivity() {
       <td style="font-size:12px;color:var(--text-muted)">${a.office_name || '—'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${a.admin_name || '—'}</td>
     </tr>`).join('') : '<tr><td colspan="8" class="empty">No activity found.</td></tr>';
+}
+
+function renderEvents() {
+  const STATUS_LABEL = {
+    available: 'Available', checked_out: 'Checked Out', broken: 'Broken',
+    missing: 'Missing', sent_to_assoc: 'Sent to Assoc', decommissioned: 'Decommissioned'
+  };
+  const rows = STATE.events || [];
+  document.getElementById('events-tbody').innerHTML = rows.length ? rows.map(e => {
+    let chip, detail;
+    if (e.event_type === 'added') {
+      chip   = '<span class="chip chip-green">✚ Added</span>';
+      detail = e.new_value ? `Office: ${e.new_value}` : '';
+    } else if (e.event_type === 'status_changed') {
+      const isDecom = e.new_value === 'decommissioned';
+      chip   = `<span class="chip ${isDecom ? 'chip-red' : 'chip-neutral'}">${isDecom ? '🗑 Decom' : '⚙ Status'}</span>`;
+      detail = `${STATUS_LABEL[e.old_value] || e.old_value || '—'} → ${STATUS_LABEL[e.new_value] || e.new_value}`;
+    } else if (e.event_type === 'transferred') {
+      chip   = '<span class="chip chip-amber">→ Transfer</span>';
+      detail = `${e.old_value || '—'} → ${e.new_value || '—'}`;
+    } else {
+      chip   = `<span class="chip chip-neutral">${e.event_type}</span>`;
+      detail = e.new_value || '';
+    }
+    const noteStr = e.notes ? ` <span style="color:var(--text-dim)">· ${e.notes}</span>` : '';
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${e.created_at}</td>
+      <td>${chip}</td>
+      <td><span class="serial">${e.serial_number}</span></td>
+      <td style="font-size:12px;color:var(--text-muted)">${detail}${noteStr}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${e.admin_name || '—'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">No inventory events yet.</td></tr>';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2306,9 +2363,11 @@ async function submitTransfer() {
     msgEl.innerHTML = `<div class="alert" style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">
       ✓ Lockbox <strong>${result.serial_number}</strong> transferred to <strong>${result.to_office}</strong>.
     </div>`;
-    // Refresh inventory
+    // Refresh inventory + events
     try {
-      STATE.boxes = (await GET("/lockbox/inventory")) || [];
+      const [boxes, events] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/events")]);
+      STATE.boxes  = boxes  || [];
+      STATE.events = events || [];
       renderInventory(STATE.boxes);
       renderDashboard();
     } catch { /* stale ok */ }
@@ -2362,7 +2421,8 @@ async function addLockbox() {
     msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ Lockbox <strong>${serial}</strong> added to inventory.</div>`;
     toast("Lockbox added ✓");
     resetAddLockbox();
-    STATE.boxes = (await GET("/lockbox/inventory")) || [];
+    const [_ab, _ae] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/events")]);
+    STATE.boxes = _ab || []; STATE.events = _ae || [];
     renderDashboard(); renderInventory(STATE.boxes);
     const newBox = STATE.boxes.find(b => b.serial_number === serial);
     if (newBox) showQrModal(newBox);
@@ -2417,7 +2477,8 @@ async function updateLockboxStatus() {
     msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ <strong>${_dcmSerial}</strong> updated to <strong>${status}</strong>.</div>`;
     toast("Status updated ✓");
     resetDcm();
-    STATE.boxes = (await GET("/lockbox/inventory")) || [];
+    const [_sb, _se] = await Promise.all([GET("/lockbox/inventory"), GET("/lockbox/events")]);
+    STATE.boxes = _sb || []; STATE.events = _se || [];
     renderDashboard(); renderInventory(STATE.boxes);
   } catch (e) {
     msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
