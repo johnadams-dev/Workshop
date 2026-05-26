@@ -1014,10 +1014,12 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <option value="sent_to_assoc">Sent to Assoc.</option>
         <option value="missing">Missing</option>
       </select>
-      <select id="inv-loc" onchange="filterInv()">
-        <option value="">All Locations</option>
-        <option value="office">At Office</option>
-        <option value="property">At Property</option>
+      <select id="inv-issue" onchange="filterInv()">
+        <option value="">All Boxes</option>
+        <option value="no_mls">⚠ No MLS ID</option>
+        <option value="inactive">⚠ Listing Not Active</option>
+        <option value="agent_inactive">⚠ Agent Inactive</option>
+        <option value="any_issue">⚠ Any Issue</option>
       </select>
       <button class="btn btn-ghost" onclick="exportCSV()">↓ CSV</button>
     </div>
@@ -2122,7 +2124,7 @@ function filterInv() {
   const office = document.getElementById('inv-office').value;
   const as     = document.getElementById('inv-assoc').value;
   const st     = document.getElementById('inv-status').value;
-  const loc    = document.getElementById('inv-loc').value;
+  const issue  = document.getElementById('inv-issue').value;
 
   renderInventory(STATE.boxes.filter(b => {
     // Agent role: only show their currently checked-out boxes
@@ -2135,12 +2137,24 @@ function filterInv() {
       (b.agent_name || '').toLowerCase().includes(q) ||
       (b.property_address || b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
-    const officeMatch = !office || String(b.assigned_office_id || b.office_id || '') === office;
-    return textMatch
-      && officeMatch
-      && (!as  || b.association_abbr === as)
-      && (!st  || b.status === st)
-      && (!loc || b.location_type === loc);
+    const officeMatch = !office || String(b.assigned_office_id || b.office_id || b.location_office_id || '') === office;
+
+    let issueMatch = true;
+    if (issue) {
+      const flag         = (STATE.mlsFlags[b.serial_number] || {}).flag;
+      const isOut        = b.status === 'checked_out';
+      const noMls        = isOut && !b.mls_id;
+      const listingBad   = isOut && (flag === 'closed' || flag === 'not_found');
+      const agentBad     = isOut && b.agent_active === false;
+      if      (issue === 'no_mls')        issueMatch = noMls;
+      else if (issue === 'inactive')      issueMatch = listingBad;
+      else if (issue === 'agent_inactive') issueMatch = agentBad;
+      else if (issue === 'any_issue')     issueMatch = noMls || listingBad || agentBad;
+    }
+
+    return textMatch && officeMatch && issueMatch
+      && (!as || b.association_abbr === as)
+      && (!st || b.status === st);
   }));
 }
 
