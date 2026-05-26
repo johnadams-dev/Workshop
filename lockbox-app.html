@@ -2060,23 +2060,23 @@ function renderInventory(boxes) {
               || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : null)
               || '—'}
           </span>
-          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
+          ${b.status === 'checked_out' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" title="Edit address" style="margin-left:4px;opacity:.5;font-size:10px;float:right"
                 onclick='editInvAddress(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏</button>`
             : ''}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">
           ${b.mls_id || '—'}
-          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
+          ${b.status === 'checked_out' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" title="Edit MLS ID" style="margin-left:4px;opacity:.5;font-size:10px"
                 onclick='editInvMlsId(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✏</button>`
             : ''}
         </td>
         <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${b.checkout_at || '—'}</td>
         <td style="white-space:nowrap">
-          ${b.status === 'checked_out' && STATE.userRole !== 'agent'
+          ${b.status === 'checked_out' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button> `
-            : b.status === 'available' && STATE.userRole !== 'agent'
+            : b.status === 'available' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button> `
             : ''}
           <button class="tbl-link" title="Print QR Label" onclick='showQrModal(${JSON.stringify(b).replace(/'/g,"&#39;")})' style="opacity:.5">QR</button>
@@ -2588,9 +2588,9 @@ function showScanResult(box) {
   const si = SCAN_STATUS_INFO[box.status] || { chip: 'chip-neutral', icon: '◈', label: box.status };
 
   let actionHtml = '';
-  if (box.status === 'checked_out' && STATE.userRole !== 'agent') {
+  if (box.status === 'checked_out' && ['manager', 'staff'].includes(STATE.userRole)) {
     actionHtml = `<button class="btn btn-primary" onclick="openScanCheckin()">↓ Check In</button>`;
-  } else if (['available', 'broken', 'missing'].includes(box.status) && STATE.userRole !== 'agent') {
+  } else if (['available', 'broken', 'missing'].includes(box.status) && ['manager', 'staff'].includes(STATE.userRole)) {
     actionHtml = `<button class="btn btn-primary" onclick="scanCheckOut()">↑ Check Out</button>`;
   } else if (!['checked_out', 'available', 'broken', 'missing'].includes(box.status)) {
     actionHtml = `<div class="alert alert-warn" style="font-size:12px">⚠ No action available — status is <strong>${si.label}</strong>.</div>`;
