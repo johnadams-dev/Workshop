@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    DESIGN TOKENS
@@ -964,8 +965,11 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
                  style="flex:1;font-family:var(--mono);font-size:14px;letter-spacing:.04em"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();doManualScan()}">
           <button class="btn btn-primary" onclick="doManualScan()">↗ Look Up</button>
+          <button class="btn btn-ghost" id="scan-camera-btn" onclick="toggleCamera()">📷 Camera</button>
         </div>
         <div id="scan-hint" style="margin-top:6px;font-size:12px;color:var(--text-muted);min-height:18px"></div>
+
+        <div id="qr-reader" style="display:none;margin-top:16px;border-radius:var(--r);overflow:hidden;border:1px solid var(--ink-border)"></div>
       </div>
 
       <div id="scan-result-panel" class="form-card" style="display:none">
@@ -1481,6 +1485,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 });
 
 function switchPage(name) {
+  if (name !== 'scan') stopCamera();
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.page === name));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   if (name === "settings") loadAssociations();
@@ -2482,6 +2487,38 @@ async function syncAgentDmgIds() {
    SCANNER
 ═══════════════════════════════════════════════════════════════════ */
 let _scannedBox = null;
+let _scanner    = null;
+
+function toggleCamera() {
+  if (_scanner) { stopCamera(); return; }
+  startCamera();
+}
+
+function startCamera() {
+  if (typeof Html5QrcodeScanner === 'undefined') { toast('Camera library not loaded', 'warn'); return; }
+  const el = document.getElementById('qr-reader');
+  el.style.display = 'block';
+  document.getElementById('scan-camera-btn').textContent = '✕ Stop Camera';
+  _scanner = new Html5QrcodeScanner('qr-reader', {
+    fps: 10,
+    qrbox: { width: 280, height: 120 },
+    rememberLastUsedCamera: true,
+    supportedScanTypes: [0],  // camera only, no file upload
+  }, false);
+  _scanner.render(text => {
+    document.getElementById('scan-manual').value = text.trim();
+    stopCamera();
+    scanLookup(text.trim());
+  }, () => {});
+}
+
+function stopCamera() {
+  if (!_scanner) return;
+  _scanner.clear().catch(() => {});
+  _scanner = null;
+  document.getElementById('qr-reader').style.display = 'none';
+  document.getElementById('scan-camera-btn').textContent = '📷 Camera';
+}
 
 function doManualScan() {
   const val = document.getElementById('scan-manual').value.trim();
