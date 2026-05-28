@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
    DESIGN TOKENS
@@ -702,6 +703,22 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div class="stat-num" id="s-cost" style="font-size:22px;color:var(--text-muted)">—</div>
         <div class="stat-label">Replacement Cost</div>
         <div id="s-cost-hint" style="font-size:10px;color:var(--text-dim);margin-top:4px;display:none">Set DBAAR fee in Settings</div>
+      </div>
+    </div>
+
+    <!-- ── Office Assignment Chart ── -->
+    <div id="office-chart-wrap" style="margin-bottom:24px;display:none">
+      <div class="section-head">
+        <div class="section-title">Lockbox Assignment by Office</div>
+      </div>
+      <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;flex-shrink:0"></span>Active MLS</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#EF9F27;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#B4B2A9;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:50%;background:#E24B4A;display:inline-block;flex-shrink:0"></span>Missing boxes</span>
+      </div>
+      <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:var(--r);padding:16px;position:relative">
+        <canvas id="office-chart"></canvas>
       </div>
     </div>
 
@@ -1534,6 +1551,7 @@ function renderDashboard() {
 
   renderActivity();
   renderEvents();
+  renderOfficeChart();
 }
 
 function renderActivity() {
@@ -1588,6 +1606,122 @@ function renderEvents() {
       <td style="font-size:12px;color:var(--text-muted)">${e.admin_name || '—'}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="5" class="empty">No inventory events yet.</td></tr>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OFFICE ASSIGNMENT CHART
+═══════════════════════════════════════════════════════════════════ */
+let _officeChart = null;
+
+function buildOfficeChartData() {
+  const officeMap = {};
+  STATE.offices.forEach(o => {
+    if (o.name === 'Corporate') return;
+    officeMap[String(o.local_id)] = { name: o.name, green: 0, yellow: 0, gray: 0, missing: 0 };
+  });
+
+  STATE.boxes.forEach(b => {
+    const offId = String(b.assigned_office_id || b.office_id || b.location_office_id || '');
+    const entry = officeMap[offId];
+    if (!entry) return;
+    if (b.status === 'checked_out') {
+      const flag = (STATE.mlsFlags[b.serial_number] || {}).flag;
+      if (!b.mls_id)                entry.gray++;
+      else if (flag === 'not_found') entry.yellow++;
+      else                           entry.green++;
+    } else if (b.status === 'missing') {
+      entry.missing++;
+    }
+  });
+
+  return Object.values(officeMap)
+    .filter(o => o.green + o.yellow + o.gray > 0)
+    .sort((a, b) => {
+      const ta = a.green + a.yellow + a.gray;
+      const tb = b.green + b.yellow + b.gray;
+      return (tb > 0 ? b.green / tb : 0) - (ta > 0 ? a.green / ta : 0);
+    });
+}
+
+function renderOfficeChart() {
+  const wrap = document.getElementById('office-chart-wrap');
+  const data = buildOfficeChartData();
+  if (!data.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const canvas  = document.getElementById('office-chart');
+  const chartH  = Math.max(200, data.length * 42 + 40);
+  canvas.parentElement.style.height = chartH + 'px';
+
+  const missingPlugin = {
+    id: 'missingDots',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x: xScale } } = chart;
+      const meta = chart.getDatasetMeta(0);
+      data.forEach((o, i) => {
+        if (!o.missing) return;
+        const bar   = meta.data[i];
+        const total = o.green + o.yellow + o.gray;
+        const cx = xScale.getPixelForValue(total) + 17;
+        const cy = bar.y;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+        ctx.fillStyle = '#E24B4A';
+        ctx.fill();
+        ctx.font = 'bold 10px "IBM Plex Mono", monospace';
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(o.missing), cx, cy);
+        ctx.restore();
+      });
+    }
+  };
+
+  if (_officeChart) { _officeChart.destroy(); _officeChart = null; }
+
+  _officeChart = new Chart(canvas, {
+    type: 'bar',
+    plugins: [missingPlugin],
+    data: {
+      labels: data.map(o => o.name),
+      datasets: [
+        { label: 'Active MLS',   data: data.map(o => o.green),  backgroundColor: '#1D9E75', borderWidth: 0 },
+        { label: 'Inactive MLS', data: data.map(o => o.yellow), backgroundColor: '#EF9F27', borderWidth: 0 },
+        { label: 'No MLS ID',    data: data.map(o => o.gray),   backgroundColor: '#B4B2A9', borderWidth: 0 },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0].label,
+            label: item  => ` ${item.dataset.label}: ${item.raw}`,
+          },
+        },
+      },
+      layout: { padding: { right: 36 } },
+      scales: {
+        x: {
+          stacked: true,
+          grid:   { color: 'rgba(48,54,61,0.6)' },
+          ticks:  { color: '#8b949e', font: { family: '"IBM Plex Mono"', size: 10 } },
+          border: { color: '#30363d' },
+        },
+        y: {
+          stacked: true,
+          grid:   { display: false },
+          ticks:  { color: '#e6edf3', font: { family: '"IBM Plex Sans"', size: 12 } },
+          border: { color: '#30363d' },
+        },
+      },
+    },
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
