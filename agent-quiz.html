@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Recognition Quiz</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        h1 { color: #333; margin-bottom: 10px; text-align: center; font-size: 2.5em; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 1.1em; }
+
+        /* ── Loading ── */
+        .loading-content { text-align: center; padding: 20px 0; }
+        .spinner {
+            width: 56px; height: 56px;
+            border: 5px solid #e8e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-status { color: #888; font-size: 0.95em; margin-top: 12px; min-height: 1.4em; }
+        .progress-bar-wrap {
+            background: #eee; border-radius: 8px;
+            height: 8px; margin: 16px auto; max-width: 320px; overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 8px;
+            transition: width 0.2s ease;
+        }
+        .error-box {
+            background: #fff3f3; border: 1px solid #f5c6cb;
+            border-radius: 10px; padding: 20px; margin-top: 20px;
+            color: #721c24; display: none;
+        }
+        .error-box h3 { margin-bottom: 8px; }
+        .retry-btn { display: inline-block; width: auto !important; padding: 10px 24px !important; margin-top: 14px; }
+
+        /* ── Login ── */
+        .roster-badge {
+            display: inline-block;
+            background: #eef0ff; color: #667eea;
+            border-radius: 20px; padding: 4px 14px;
+            font-size: 0.88em; font-weight: 600;
+            margin-bottom: 24px;
+        }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #555; font-weight: 500; }
+        input[type="text"] {
+            width: 100%; padding: 12px 16px;
+            border: 2px solid #ddd; border-radius: 8px;
+            font-size: 16px; transition: border-color 0.3s;
+        }
+        input[type="text"]:focus { outline: none; border-color: #667eea; }
+
+        /* ── Buttons ── */
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none;
+            padding: 14px 32px; border-radius: 8px;
+            font-size: 16px; font-weight: 600;
+            cursor: pointer; width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.4); }
+        button:active { transform: translateY(0); }
+
+        /* ── Quiz ── */
+        .progress {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; padding: 15px;
+            background: #f8f9fa; border-radius: 10px;
+        }
+        .progress-text { color: #555; font-weight: 500; }
+        .score { color: #667eea; font-weight: 700; font-size: 1.2em; }
+        .question { margin-bottom: 30px; text-align: center; }
+        .question h2 { color: #333; margin-bottom: 30px; font-size: 1.8em; }
+        .photo-display { display: flex; justify-content: center; margin-bottom: 40px; }
+        .agent-photo {
+            width: 100%; max-width: 400px; height: 400px;
+            object-fit: cover; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border: 4px solid #ddd;
+        }
+        .answer-options {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 15px; max-width: 600px; margin: 0 auto;
+        }
+        .answer-button {
+            background: white; color: #333;
+            border: 2px solid #ddd;
+            padding: 18px 24px; border-radius: 8px;
+            font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s; width: 100%;
+        }
+        .answer-button:hover:not(.disabled) {
+            border-color: #667eea; background: #f8f9ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.2);
+        }
+        .answer-button.correct  { background: #d4edda; border-color: #28a745; color: #155724; }
+        .answer-button.incorrect { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+        .answer-button.disabled  { cursor: not-allowed; opacity: 0.6; }
+        .feedback {
+            text-align: center; padding: 15px; border-radius: 8px;
+            margin: 20px 0; font-weight: 600; display: none;
+        }
+        .feedback.correct   { background: #d4edda; color: #155724; display: block; }
+        .feedback.incorrect { background: #f8d7da; color: #721c24; display: block; }
+        .next-button { display: none; margin-top: 20px; max-width: 300px; margin-left: auto; margin-right: auto; }
+        .next-button.show { display: block; }
+
+        /* ── Results ── */
+        .results { text-align: center; }
+        .results h2 { color: #333; margin-bottom: 20px; font-size: 2em; }
+        .final-score { font-size: 4em; color: #667eea; font-weight: 700; margin: 30px 0; }
+        .results-message { color: #555; font-size: 1.3em; margin-bottom: 30px; }
+
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            h1 { font-size: 1.8em; }
+            .agent-photo { max-width: 100%; height: 300px; }
+            .answer-options { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Loading -->
+    <div class="screen active" id="loadingScreen">
+        <h1>Agent Recognition Quiz</h1>
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p class="subtitle" id="loadingHeadline">Loading agent roster…</p>
+            <div class="progress-bar-wrap" id="progressWrap">
+                <div class="progress-bar" id="photoProgressBar"></div>
+            </div>
+            <p class="loading-status" id="loadingStatus"></p>
+            <div class="error-box" id="errorBox">
+                <h3>⚠️ Could not load roster</h3>
+                <p id="errorDetail"></p>
+                <button class="retry-btn" onclick="initApp()">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login -->
+    <div class="screen" id="loginScreen">
+        <h1>Agent Recognition Quiz</h1>
+        <p class="subtitle">Test your knowledge of our team!</p>
+        <div style="text-align:center">
+            <span class="roster-badge" id="rosterBadge">…</span>
+        </div>
+        <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+
+    <!-- Quiz -->
+    <div class="screen" id="quizScreen">
+        <div class="progress">
+            <span class="progress-text">Question <span id="currentQuestion">1</span> of <span id="totalQuestions">20</span></span>
+            <span class="score">Score: <span id="currentScore">0</span>/<span id="totalScore">20</span></span>
+        </div>
+        <div class="question">
+            <h2>Who is this agent?</h2>
+            <div class="photo-display" id="photoDisplay"></div>
+            <div class="answer-options" id="answerOptions"></div>
+        </div>
+        <div class="feedback" id="feedback"></div>
+        <button class="next-button" id="nextButton" onclick="nextQuestion()">Next Question</button>
+    </div>
+
+    <!-- Results -->
+    <div class="screen" id="resultsScreen">
+        <div class="results">
+            <h2>Quiz Complete!</h2>
+            <p class="subtitle">Well done!</p>
+            <div class="final-score" id="finalScore">0/20</div>
+            <p class="results-message" id="resultsMessage"></p>
+            <button onclick="restartQuiz()">Take Quiz Again</button>
+        </div>
+    </div>
+
+</div>
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const PROXY_URL  = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY  = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const MIN_PHOTO_PX = 50;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let validAgents          = [];
+let quizQuestions        = [];
+let currentQuestionIndex = 0;
+let score                = 0;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+function setStatus(headline, status) {
+    document.getElementById('loadingHeadline').textContent = headline;
+    document.getElementById('loadingStatus').textContent   = status || '';
+    document.getElementById('errorBox').style.display      = 'none';
+}
+
+function showError(detail) {
+    document.getElementById('loadingHeadline').textContent = 'Could not load roster';
+    document.getElementById('loadingStatus').textContent   = '';
+    document.getElementById('errorBox').style.display      = 'block';
+    document.getElementById('errorDetail').textContent     = detail;
+}
+
+function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ─── Roster Fetch ─────────────────────────────────────────────────────────────
+async function fetchAllAgents() {
+    const res = await fetch(`${PROXY_URL}/bio/quiz-agents`, {
+        headers: { 'x-proxy-key': PROXY_KEY }
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server returned ${res.status}`);
+    }
+    const rows = await res.json();
+    if (!rows.length) throw new Error('No active agents with photos found in the roster.');
+    // Normalise to the shape the rest of the quiz expects
+    return rows.map(r => ({
+        firstName: r.first_name,
+        lastName:  r.last_name,
+        photo:     r.photo_url,
+    }));
+}
+
+// ─── Photo Validation ─────────────────────────────────────────────────────────
+function validatePhotos(agents) {
+    return new Promise(resolve => {
+        const wrap  = document.getElementById('progressWrap');
+        const bar   = document.getElementById('photoProgressBar');
+        wrap.style.display = 'block';
+        bar.style.width    = '0%';
+
+        const valid = [];
+        let checked = 0;
+        const total = agents.length;
+
+        agents.forEach(agent => {
+            const img = new Image();
+
+            const done = () => {
+                checked++;
+                bar.style.width = Math.round((checked / total) * 100) + '%';
+                document.getElementById('loadingStatus').textContent =
+                    `Verified ${checked} of ${total} photos…`;
+                if (checked === total) resolve(valid);
+            };
+
+            img.onload = () => {
+                if (img.naturalWidth >= MIN_PHOTO_PX && img.naturalHeight >= MIN_PHOTO_PX) {
+                    valid.push(agent);
+                }
+                done();
+            };
+
+            img.onerror = done; // photo 404 or network error — silently skip
+
+            img.src = agent.photo;
+        });
+    });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function initApp() {
+    show('loadingScreen');
+    document.getElementById('progressWrap').style.display = 'none';
+    document.getElementById('photoProgressBar').style.width = '0%';
+    document.getElementById('errorBox').style.display = 'none';
+
+    try {
+        setStatus('Loading agent roster…', 'Fetching from Adams Cameron roster…');
+        const agents = await fetchAllAgents();
+
+        setStatus(`Found ${agents.length} agents — verifying photos…`, 'This may take a moment…');
+        validAgents = await validatePhotos(agents);
+
+        if (validAgents.length < 4) {
+            showError(`Only ${validAgents.length} agents have confirmed working photos. Need at least 4 to run the quiz.`);
+            return;
+        }
+
+        document.getElementById('rosterBadge').textContent = `✓ ${validAgents.length} agents loaded`;
+        show('loginScreen');
+
+    } catch (err) {
+        console.error(err);
+        showError(err.message || 'Unknown error — open the browser console for details.');
+    }
+}
+
+// ─── Quiz ─────────────────────────────────────────────────────────────────────
+function generateQuiz() {
+    const count    = Math.min(20, validAgents.length);
+    const selected = shuffleArray(validAgents).slice(0, count);
+
+    quizQuestions = selected.map(correct => {
+        const others  = shuffleArray(validAgents.filter(a => a !== correct));
+        const options = shuffleArray([correct, ...others.slice(0, 3)]);
+        return { correct, options };
+    });
+
+    return count;
+}
+
+function startQuiz() {
+    currentQuestionIndex = 0;
+    score = 0;
+
+    const count = generateQuiz();
+    document.getElementById('totalQuestions').textContent = count;
+    document.getElementById('totalScore').textContent     = count;
+    document.getElementById('currentScore').textContent   = '0';
+
+    show('quizScreen');
+    displayQuestion();
+}
+
+function displayQuestion() {
+    if (currentQuestionIndex >= quizQuestions.length) { showResults(); return; }
+
+    const q = quizQuestions[currentQuestionIndex];
+    document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+    document.getElementById('currentScore').textContent    = score;
+    document.getElementById('feedback').className          = 'feedback';
+    document.getElementById('nextButton').classList.remove('show');
+
+    const photoDisplay = document.getElementById('photoDisplay');
+    photoDisplay.innerHTML = '';
+    const img = document.createElement('img');
+    img.className = 'agent-photo';
+    img.alt = 'Agent photo';
+    img.src = q.correct.photo;
+    photoDisplay.appendChild(img);
+
+    const answerOptions = document.getElementById('answerOptions');
+    answerOptions.innerHTML = '';
+    q.options.forEach(agent => {
+        const btn       = document.createElement('button');
+        btn.className   = 'answer-button';
+        btn.textContent = `${agent.firstName} ${agent.lastName}`;
+        btn.onclick     = () => selectAnswer(agent, btn);
+        answerOptions.appendChild(btn);
+    });
+}
+
+function selectAnswer(selected, selectedBtn) {
+    document.querySelectorAll('.answer-button').forEach(b => { b.classList.add('disabled'); b.onclick = null; });
+
+    const q           = quizQuestions[currentQuestionIndex];
+    const feedback    = document.getElementById('feedback');
+    const correctName = `${q.correct.firstName} ${q.correct.lastName}`;
+
+    if (selected === q.correct) {
+        selectedBtn.classList.add('correct');
+        feedback.className   = 'feedback correct';
+        feedback.textContent = 'Correct! Well done!';
+        score++;
+        document.getElementById('currentScore').textContent = score;
+    } else {
+        selectedBtn.classList.add('incorrect');
+        feedback.className   = 'feedback incorrect';
+        feedback.textContent = `Incorrect. The correct answer was ${correctName}.`;
+        document.querySelectorAll('.answer-button').forEach(b => {
+            if (b.textContent === correctName) b.classList.add('correct');
+        });
+    }
+
+    document.getElementById('nextButton').classList.add('show');
+}
+
+function nextQuestion() {
+    currentQuestionIndex++;
+    displayQuestion();
+}
+
+function showResults() {
+    show('resultsScreen');
+    const total = quizQuestions.length;
+    const pct   = (score / total) * 100;
+    document.getElementById('finalScore').textContent = `${score}/${total}`;
+    document.getElementById('resultsMessage').textContent =
+        pct === 100 ? 'Perfect score! You know the team incredibly well!'  :
+        pct >= 80   ? 'Excellent! You have great knowledge of the team!'   :
+        pct >= 60   ? 'Good job! You are getting to know the team well!'   :
+        pct >= 40   ? 'Not bad! Keep learning about your colleagues!'      :
+                      "Keep practicing! You'll get better with time!";
+}
+
+function restartQuiz() {
+    show('loginScreen');
+}
+
+// Boot
+window.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>
