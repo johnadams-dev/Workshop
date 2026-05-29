@@ -1062,14 +1062,65 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
     <!-- Sub-tab bar -->
     <div style="display:flex;border-bottom:1px solid var(--ink-border);margin-bottom:20px;background:var(--ink-mid);border-radius:6px 6px 0 0;overflow:hidden;">
-      <button class="maint-tab active" data-mtab="associations" onclick="switchMaintTab('associations')">🏢 Associations</button>
-      <button class="maint-tab" data-mtab="transfer"            onclick="switchMaintTab('transfer')">↔ Transfer</button>
-      <button class="maint-tab" data-mtab="lockboxes"           onclick="switchMaintTab('lockboxes')">📦 Lockboxes</button>
-      <button class="maint-tab" data-mtab="admin-tools"         onclick="switchMaintTab('admin-tools')">🔧 Admin Tools</button>
+      <button class="maint-tab active" data-mtab="transfer"    onclick="switchMaintTab('transfer')">↔ Transfer</button>
+      <button class="maint-tab" data-mtab="add-remove"         onclick="switchMaintTab('add-remove')">📦 Add/Remove</button>
+      <button class="maint-tab" data-mtab="shackle"            onclick="switchMaintTab('shackle')">🔑 Shackle Code</button>
+      <button class="maint-tab" data-mtab="associations"       onclick="switchMaintTab('associations')">🏢 Associations</button>
+      <button class="maint-tab" data-mtab="admin-tools"        onclick="switchMaintTab('admin-tools')">🔧 Admin</button>
     </div>
 
+    <!-- ── Shackle Code ── -->
+    <div class="maint-panel" id="mpanel-shackle" style="display:none">
+      <div class="form-card">
+        <div class="form-title">Update Shackle Code</div>
+        <div class="form-desc">Look up a lockbox by serial number and enter the new shackle code. This is logged under your account.</div>
+
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Serial Number</div>
+              <div class="input-wrap">
+                <input id="sh-serial" type="text" placeholder="e.g. 20033334"
+                       style="font-family:var(--mono)"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();shackleLookup()}">
+              </div>
+            </div>
+            <div class="field" style="justify-content:flex-end">
+              <div class="field-label">&nbsp;</div>
+              <button class="btn btn-ghost" onclick="shackleLookup()">↗ Look Up</button>
+            </div>
+          </div>
+
+          <div class="box-preview" id="sh-preview" style="display:none">
+            <div class="box-preview-label">Lockbox</div>
+            <div class="bp-grid">
+              <div class="bp-field"><div class="bp-key">Serial #</div><div class="bp-val amber" id="sh-p-serial">—</div></div>
+              <div class="bp-field"><div class="bp-key">Current Shackle</div><div class="bp-val mono" id="sh-p-shackle">—</div></div>
+              <div class="bp-field"><div class="bp-key">Status</div><div class="bp-val" id="sh-p-status">—</div></div>
+              <div class="bp-field"><div class="bp-key">Office</div><div class="bp-val" id="sh-p-office">—</div></div>
+            </div>
+          </div>
+
+          <div class="form-row" id="sh-new-row" style="display:none">
+            <div class="field">
+              <div class="field-label req">New Shackle Code</div>
+              <input id="sh-new-code" type="text" placeholder="Enter new code"
+                     style="font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase"
+                     oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" id="sh-btn-row" style="display:none">
+          <button class="btn btn-primary" onclick="submitShackleUpdate()">✓ Update Shackle Code</button>
+          <button class="btn btn-ghost" onclick="resetShackle()">Clear</button>
+        </div>
+        <div id="sh-msg" style="margin-top:14px;"></div>
+      </div>
+    </div><!-- /mpanel-shackle -->
+
     <!-- ── Associations ── -->
-    <div class="maint-panel active" id="mpanel-associations">
+    <div class="maint-panel" id="mpanel-associations" style="display:none">
       <div class="section-head" style="margin-bottom:12px;">
         <div class="section-title">Association Settings</div>
         <div style="font-size:12px;color:var(--text-muted)">Click any row to edit fees and contact information.</div>
@@ -1096,7 +1147,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     </div>
 
     <!-- ── Transfer ── -->
-    <div class="maint-panel" id="mpanel-transfer" style="display:none">
+    <div class="maint-panel active" id="mpanel-transfer">
       <div class="form-card">
         <div class="form-title">Transfer a Lockbox</div>
         <div class="form-desc">Move a lockbox directly between offices without going through checkout and check-in. The box must not be currently checked out. This action is logged under your account.</div>
@@ -1155,8 +1206,8 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       </div>
     </div>
 
-    <!-- ── Lockboxes ── -->
-    <div class="maint-panel" id="mpanel-lockboxes" style="display:none">
+    <!-- ── Add/Remove ── -->
+    <div class="maint-panel" id="mpanel-add-remove" style="display:none">
 
       <!-- Add new lockbox -->
       <div class="form-card" style="margin-bottom:20px;">
@@ -1243,7 +1294,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div id="lb-dcm-msg" style="margin-top:12px;"></div>
       </div>
 
-    </div><!-- /mpanel-lockboxes -->
+    </div><!-- /mpanel-add-remove -->
 
     <!-- ── Admin Tools ── -->
     <div class="maint-panel" id="mpanel-admin-tools" style="display:none">
@@ -1408,8 +1459,9 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-const GET  = (path)       => api(path);
-const POST = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
+const GET   = (path)       => api(path);
+const POST  = (path, body) => api(path, { method: "POST",  body: JSON.stringify(body) });
+const PATCH = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body) });
 
 /* ═══════════════════════════════════════════════════════════════════
    STATE
@@ -2321,7 +2373,7 @@ function switchMaintTab(name) {
     p.style.display = p.id === "mpanel-" + name ? "block" : "none";
   });
   if (name === "associations") loadAssociations();
-  if (name === "lockboxes") { if (!_assocData.length) loadAssociations().then(populateAssocSelect); else populateAssocSelect(); }
+  if (name === "add-remove") { if (!_assocData.length) loadAssociations().then(populateAssocSelect); else populateAssocSelect(); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2498,6 +2550,69 @@ function resetTransfer() {
   document.getElementById("tr-notes").value = "";
   document.getElementById("tr-to-office").value = "";
   document.getElementById("tr-box-preview").classList.remove("on");
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAINTENANCE — Shackle Code
+═══════════════════════════════════════════════════════════════════ */
+let _shackleBox = null;
+
+async function shackleLookup() {
+  const serial = document.getElementById('sh-serial').value.trim();
+  if (!serial) return;
+  const norm = serial.toUpperCase();
+  const box = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+  if (box) { _renderShacklePreview(box); return; }
+  try {
+    const boxes = await GET('/lockbox/inventory');
+    STATE.boxes = boxes || STATE.boxes;
+    const found = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+    if (found) { _renderShacklePreview(found); }
+    else { document.getElementById('sh-msg').textContent = `✗ #${serial} not found`; }
+  } catch (e) { toast('Lookup failed: ' + e.message, 'warn'); }
+}
+
+function _renderShacklePreview(box) {
+  _shackleBox = box;
+  document.getElementById('sh-p-serial').textContent  = box.serial_number;
+  document.getElementById('sh-p-shackle').textContent = box.shackle_code || '—';
+  document.getElementById('sh-p-status').textContent  = box.status?.replace('_', ' ') || '—';
+  document.getElementById('sh-p-office').textContent  = box.assigned_office_name || box.office_name || '—';
+  document.getElementById('sh-preview').style.display  = '';
+  document.getElementById('sh-new-row').style.display  = '';
+  document.getElementById('sh-btn-row').style.display  = '';
+  document.getElementById('sh-msg').textContent = '';
+  document.getElementById('sh-new-code').value = '';
+  document.getElementById('sh-new-code').focus();
+}
+
+async function submitShackleUpdate() {
+  if (!_shackleBox) return;
+  const newCode = document.getElementById('sh-new-code').value.trim();
+  if (!newCode) { document.getElementById('sh-msg').textContent = 'Enter a new shackle code first'; return; }
+  const msgEl = document.getElementById('sh-msg');
+  try {
+    await PATCH(`/lockbox/${_shackleBox.serial_number}/shackle`, { shackle_code: newCode });
+    const box = STATE.boxes.find(b => b.serial_number === _shackleBox.serial_number);
+    if (box) box.shackle_code = newCode;
+    toast(`Shackle code updated for #${_shackleBox.serial_number}`);
+    msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ Shackle code updated to <strong>${newCode}</strong></div>`;
+    document.getElementById('sh-p-shackle').textContent = newCode;
+    _shackleBox.shackle_code = newCode;
+    document.getElementById('sh-new-code').value = '';
+  } catch (e) {
+    msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+function resetShackle() {
+  _shackleBox = null;
+  document.getElementById('sh-serial').value  = '';
+  document.getElementById('sh-new-code').value = '';
+  document.getElementById('sh-msg').textContent = '';
+  document.getElementById('sh-preview').style.display = 'none';
+  document.getElementById('sh-new-row').style.display = 'none';
+  document.getElementById('sh-btn-row').style.display = 'none';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
