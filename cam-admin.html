@@ -517,10 +517,6 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 ═══════════════════════════════════════════════════════════════════ */
 let userEmail = "", proxyKey = "";
 
-google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn });
-google.accounts.id.renderButton(document.querySelector(".g_id_signin"),
-  { theme: "filled_black", size: "large", text: "signin_with" });
-
 async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
@@ -924,6 +920,12 @@ function renderLogs(rows) {
     </tr>`;
   }).join("");
 }
+
+// Init Google sign-in last — after all consts are evaluated — so the callback
+// can't fire into a temporal dead zone if auto-sign-in triggers synchronously.
+google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn });
+google.accounts.id.renderButton(document.querySelector(".g_id_signin"),
+  { theme: "filled_black", size: "large", text: "signin_with" });
 </script>
 </body>
 </html>
