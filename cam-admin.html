@@ -834,7 +834,10 @@ function renderKnowledge(sources) {
     <tr>
       <td>${esc(s.display_name)}</td>
       <td><span style="font-size:12px;color:var(--text-muted)">${esc(s.category || "—")}</span></td>
-      <td><span class="status-badge ${badgeClass(s.index_status)}">${s.index_status}</span></td>
+      <td>
+        <span class="status-badge ${badgeClass(s.index_status)}">${s.index_status}</span>
+        ${s.index_status === 'error' && s.notes ? `<div style="font-size:11px;color:var(--red);margin-top:4px;max-width:220px;word-break:break-word">${esc(s.notes)}</div>` : ''}
+      </td>
       <td style="font-family:var(--mono);font-size:12px">${s.chunk_count ?? "—"}</td>
       <td style="font-family:var(--mono);font-size:12px">${s.word_count ? s.word_count.toLocaleString() : "—"}</td>
       <td style="font-size:12px;color:var(--text-muted)">${fmtTime(s.last_indexed_at)}</td>
@@ -921,11 +924,10 @@ function renderLogs(rows) {
   }).join("");
 }
 
-// Init Google sign-in last — after all consts are evaluated — so the callback
-// can't fire into a temporal dead zone if auto-sign-in triggers synchronously.
-google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn });
-google.accounts.id.renderButton(document.querySelector(".g_id_signin"),
-  { theme: "filled_black", size: "large", text: "signin_with" });
+// No programmatic google.accounts.id.initialize() call needed — the declarative
+// g_id_onload and g_id_signin divs tell the GSI library everything it needs when
+// it finishes loading (async). Calling initialize() inline risks "google is not
+// defined" if the async script hasn't arrived yet.
 </script>
 </body>
 </html>
