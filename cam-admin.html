@@ -557,11 +557,11 @@ async function api(path, opts = {}) {
   }
   return res.json();
 }
-const GET    = p        => api(p);
-const POST   = (p, b)  => api(p, { method: "POST",   body: JSON.stringify(b) });
-const PUT    = (p, b)  => api(p, { method: "PUT",    body: JSON.stringify(b) });
-const PATCH  = (p, b)  => api(p, { method: "PATCH",  body: JSON.stringify(b) });
-const DELETE = p        => api(p, { method: "DELETE" });
+function GET(p)    { return api(p); }
+function POST(p,b) { return api(p, { method: "POST",   body: JSON.stringify(b) }); }
+function PUT(p,b)  { return api(p, { method: "PUT",    body: JSON.stringify(b) }); }
+function PATCH(p,b){ return api(p, { method: "PATCH",  body: JSON.stringify(b) }); }
+function APIDEL(p) { return api(p, { method: "DELETE" }); }
 
 /* ═══════════════════════════════════════════════════════════════════
    TABS
@@ -713,7 +713,7 @@ async function deleteTool() {
   const id = document.getElementById("tool-edit-id").value;
   if (!id || !confirm("Delete this tool?")) return;
   try {
-    await DELETE(`/api/cam/tools/${id}`);
+    await APIDEL(`/api/cam/tools/${id}`);
     closeModals();
     await loadTools();
   } catch (e) { document.getElementById("tool-modal-msg").textContent = e.message; }
@@ -804,7 +804,7 @@ async function deleteApiDoc() {
   const id = document.getElementById("api-edit-id").value;
   if (!id || !confirm("Delete this API doc and all its capabilities?")) return;
   try {
-    await DELETE(`/api/cam/api-docs/${id}`);
+    await APIDEL(`/api/cam/api-docs/${id}`);
     closeModals();
     await loadApiDocs();
   } catch (e) { document.getElementById("api-doc-modal-msg").textContent = e.message; }
@@ -873,7 +873,7 @@ async function reingestSource(sourceId, displayName, category, isSystem) {
 
 async function deleteSource(id, name) {
   if (!confirm(`Remove "${name}" and all its vector chunks?`)) return;
-  try { await DELETE(`/api/cam/knowledge/${id}`); await loadKnowledge(); }
+  try { await APIDEL(`/api/cam/knowledge/${id}`); await loadKnowledge(); }
   catch (e) { alert("Failed: " + e.message); }
 }
 
