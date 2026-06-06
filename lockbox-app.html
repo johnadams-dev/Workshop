@@ -713,9 +713,10 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div class="section-title">Lockbox Assignment by Office</div>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#e6edf3;display:inline-block;flex-shrink:0"></span>Available</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;flex-shrink:0"></span>Active MLS</span>
-        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#EF9F27;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
-        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#B4B2A9;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F5C518;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F97316;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:50%;background:#E24B4A;display:inline-block;flex-shrink:0"></span>Missing boxes</span>
       </div>
       <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:var(--r);padding:16px;position:relative">
@@ -1670,7 +1671,7 @@ function buildOfficeChartData() {
   const officeMap = {};
   STATE.offices.forEach(o => {
     if (o.name === 'Corporate') return;
-    officeMap[String(o.local_id)] = { name: o.name, green: 0, yellow: 0, gray: 0, missing: 0 };
+    officeMap[String(o.local_id)] = { name: o.name, available: 0, green: 0, yellow: 0, gray: 0, missing: 0 };
   });
 
   STATE.boxes.forEach(b => {
@@ -1682,13 +1683,15 @@ function buildOfficeChartData() {
       if (!b.mls_id)                entry.gray++;
       else if (flag === 'not_found') entry.yellow++;
       else                           entry.green++;
+    } else if (b.status === 'available') {
+      entry.available++;
     } else if (b.status === 'missing') {
       entry.missing++;
     }
   });
 
   return Object.values(officeMap)
-    .filter(o => o.green + o.yellow + o.gray > 0)
+    .filter(o => o.available + o.green + o.yellow + o.gray > 0)
     .sort((a, b) => {
       const ta = a.green + a.yellow + a.gray;
       const tb = b.green + b.yellow + b.gray;
@@ -1740,9 +1743,10 @@ function renderOfficeChart() {
     data: {
       labels: data.map(o => o.name),
       datasets: [
-        { label: 'Active MLS',   data: data.map(o => o.green),  backgroundColor: '#1D9E75', borderWidth: 0 },
-        { label: 'Inactive MLS', data: data.map(o => o.yellow), backgroundColor: '#EF9F27', borderWidth: 0 },
-        { label: 'No MLS ID',    data: data.map(o => o.gray),   backgroundColor: '#B4B2A9', borderWidth: 0 },
+        { label: 'Available',    data: data.map(o => o.available), backgroundColor: '#e6edf3', borderWidth: 0 },
+        { label: 'Active MLS',   data: data.map(o => o.green),     backgroundColor: '#1D9E75', borderWidth: 0 },
+        { label: 'No MLS ID',    data: data.map(o => o.gray),      backgroundColor: '#F5C518', borderWidth: 0 },
+        { label: 'Inactive MLS', data: data.map(o => o.yellow),    backgroundColor: '#F97316', borderWidth: 0 },
       ],
     },
     options: {
