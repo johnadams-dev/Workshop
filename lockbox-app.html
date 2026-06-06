@@ -1527,12 +1527,20 @@ async function init() {
 }
 
 function applyRoleRestrictions() {
-  if (STATE.userRole !== "agent") return;
-  // Agents see inventory only — hide operational and settings tabs
-  document.querySelectorAll(".nav-tab").forEach(t => {
-    if (["checkout", "checkin", "scan", "settings"].includes(t.dataset.page)) t.style.display = "none";
-  });
-  switchPage("inventory");
+  if (STATE.userRole === "agent") {
+    // Agents see inventory only — hide operational and settings tabs
+    document.querySelectorAll(".nav-tab").forEach(t => {
+      if (["checkout", "checkin", "scan", "settings"].includes(t.dataset.page)) t.style.display = "none";
+    });
+    switchPage("inventory");
+    return;
+  }
+  if (STATE.userRole === "staff") {
+    // Coordinators/staff: hide Add/Remove and Associations sub-tabs
+    document.querySelectorAll(".maint-tab").forEach(t => {
+      if (["add-remove", "associations"].includes(t.dataset.mtab)) t.style.display = "none";
+    });
+  }
 }
 
 async function loadMlsFlags() {
