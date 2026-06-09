@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
@@ -977,7 +978,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
       <div class="form-card" style="margin-bottom:20px">
         <div class="form-title">Scan a Lockbox</div>
-        <div class="form-desc">Scan the barcode on the lockbox, or type the serial number below.</div>
+        <div class="form-desc">Scan the QR code label on the lockbox, or type the serial number below.</div>
 
         <div style="display:flex;gap:8px;margin-top:16px">
           <input id="scan-manual" type="text" placeholder="Serial number, e.g. 20033334"
@@ -1028,6 +1029,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <option value="any_issue">⚠ Any Issue</option>
       </select>
       <button class="btn btn-ghost" onclick="exportCSV()">↓ CSV</button>
+      <button class="btn btn-ghost" onclick="printLabels(_visibleBoxes)">🏷 Labels</button>
     </div>
     <div id="inv-value-bar" style="display:none;padding:8px 12px;background:var(--ink-mid);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--text-muted)">
       Showing <strong id="inv-value-count">—</strong> lockboxes &nbsp;·&nbsp; Est. replacement value: <strong id="inv-value-total" style="color:var(--text-base)">—</strong>
@@ -2155,7 +2157,10 @@ function invFlagChips(b) {
   return chips.length ? `<div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">${chips.join('')}</div>` : '';
 }
 
+let _visibleBoxes = [];
+
 function renderInventory(boxes) {
+  _visibleBoxes = boxes;
   // Apply sort
   if (STATE.invSort.col) {
     const { col, dir } = STATE.invSort;
@@ -2243,6 +2248,9 @@ function renderInventory(boxes) {
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button> `
             : b.status === 'available' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button> `
+            : ''}
+          ${['manager', 'staff'].includes(STATE.userRole)
+            ? `<button class="tbl-link" style="color:var(--blue);opacity:.7" title="Print QR label" onclick='printSingleLabel(${JSON.stringify(b).replace(/'/g,"&#39;")})'>🏷</button>`
             : ''}
         </td>
       </tr>`;
@@ -2345,6 +2353,88 @@ function exportCSV() {
   a.href = 'data:text/csv,' + encodeURIComponent(csv);
   a.download = 'lockboxes_' + new Date().toISOString().slice(0, 10) + '.csv';
   a.click();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LABEL PRINTING
+═══════════════════════════════════════════════════════════════════ */
+async function printLabels(boxes) {
+  if (!boxes || !boxes.length) { toast('No boxes to print labels for', 'warn'); return; }
+  if (typeof QRCode === 'undefined') { toast('QR library not loaded — try refreshing', 'warn'); return; }
+
+  const items = await Promise.all(boxes.map(async b => {
+    const qrUrl = await QRCode.toDataURL(b.serial_number, {
+      width: 220, margin: 1, errorCorrectionLevel: 'M',
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+    return { ...b, qrUrl };
+  }));
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Lockbox Labels</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { margin: 0.25in; }
+body { background: white; }
+.sheet { display: flex; flex-wrap: wrap; }
+.label {
+  width: 2in; height: 2in;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 3pt;
+  overflow: hidden;
+  break-inside: avoid;
+}
+.label-brand {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 5.5pt; color: #aaa;
+  text-transform: uppercase; letter-spacing: .07em;
+  margin-bottom: 1pt;
+}
+.label-qr { width: 108pt; height: 108pt; display: block; }
+.label-serial {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt; font-weight: bold;
+  letter-spacing: .04em;
+  margin-top: 3pt;
+}
+.label-assoc {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6pt; color: #777;
+  margin-top: 1pt;
+}
+@media print {
+  body { margin: 0; }
+  .label { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+${items.map(b => `
+  <div class="label">
+    <div class="label-brand">Adams Cameron</div>
+    <img class="label-qr" src="${b.qrUrl}">
+    <div class="label-serial">${b.serial_number}</div>
+    <div class="label-assoc">${b.association_abbr || ''}</div>
+  </div>`).join('')}
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast('Pop-up blocked — allow pop-ups and try again', 'warn'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+function printSingleLabel(box) {
+  printLabels([box]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2763,7 +2853,7 @@ function startCamera() {
   document.getElementById('scan-camera-btn').textContent = '✕ Stop Camera';
   _scanner = new Html5QrcodeScanner('qr-reader', {
     fps: 10,
-    qrbox: { width: 280, height: 120 },
+    qrbox: { width: 250, height: 250 },
     rememberLastUsedCamera: true,
     supportedScanTypes: [0],  // camera only, no file upload
   }, false);
@@ -2849,6 +2939,7 @@ function showScanResult(box) {
     <div style="background:rgba(0,0,0,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px">${loc}</div>
     <div class="btn-row" style="margin-top:0">
       ${actionHtml}
+      <button class="btn btn-ghost" onclick="printSingleLabel(_scannedBox)">🏷 Print Label</button>
       <button class="btn btn-ghost" onclick="resetScanResult()">✕ Clear</button>
     </div>`;
 
