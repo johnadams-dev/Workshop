@@ -2378,13 +2378,13 @@ function printLabels(boxes) {
 body { background: white; }
 .sheet {
   width: 8.5in;
-  padding-top: 0.5in;
-  padding-left: 0.75in;
+  padding-top: 0.625in;
+  padding-left: 0.625in;
   display: grid;
   grid-template-columns: repeat(3, 2in);
-  grid-auto-rows: 2in;
-  column-gap: 0.5in;
-  row-gap: 0.5in;
+  grid-template-rows: repeat(4, 2in);
+  column-gap: 0.875in;
+  row-gap: 0.625in;
 }
 .label {
   width: 2in;
@@ -2417,15 +2417,15 @@ body { background: white; }
 </style>
 </head>
 <body>
-<div class="sheet">
-${items.map(b => `
-  <div class="label">
+${Array.from({ length: Math.ceil(items.length / 12) }, (_, i) => items.slice(i * 12, i * 12 + 12)).map((chunk, i, arr) => `
+<div class="sheet" style="${i < arr.length - 1 ? 'page-break-after:always;' : ''}">
+${chunk.map(b => `  <div class="label">
     <div class="label-brand">Adams Cameron</div>
     <img class="label-qr" src="${b.qrUrl}">
     <div class="label-serial">${b.serial_number}</div>
     <div class="label-assoc">${b.association_abbr || ''}</div>
-  </div>`).join('')}
-</div>
+  </div>`).join('\n')}
+</div>`).join('\n')}
 </body>
 </html>`;
 
