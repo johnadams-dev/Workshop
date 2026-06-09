@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
@@ -2358,17 +2358,14 @@ function exportCSV() {
 /* ═══════════════════════════════════════════════════════════════════
    LABEL PRINTING
 ═══════════════════════════════════════════════════════════════════ */
-async function printLabels(boxes) {
+function printLabels(boxes) {
   if (!boxes || !boxes.length) { toast('No boxes to print labels for', 'warn'); return; }
-  if (typeof QRCode === 'undefined') { toast('QR library not loaded — try refreshing', 'warn'); return; }
+  if (typeof QRious === 'undefined') { toast('QR library not loaded — try refreshing', 'warn'); return; }
 
-  const items = await Promise.all(boxes.map(async b => {
-    const qrUrl = await QRCode.toDataURL(b.serial_number, {
-      width: 220, margin: 1, errorCorrectionLevel: 'M',
-      color: { dark: '#000000', light: '#ffffff' },
-    });
+  const items = boxes.map(b => {
+    const qrUrl = new QRious({ value: b.serial_number, size: 220, level: 'M', padding: 4 }).toDataURL();
     return { ...b, qrUrl };
-  }));
+  });
 
   const html = `<!DOCTYPE html>
 <html>
