@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  // Apply saved theme before first paint to avoid a flash of the wrong theme
+  try {
+    const _savedTheme = localStorage.getItem('lbx_theme');
+    if (_savedTheme === 'comfort') document.documentElement.setAttribute('data-theme', 'comfort');
+  } catch (_) {}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lockbox Manager · Adams Cameron & Co.</title>
@@ -36,6 +43,44 @@
   --mono:       'IBM Plex Mono', monospace;
   --sans:       'IBM Plex Sans', sans-serif;
   --r:          6px;
+  --chart-available: #e6edf3;
+  --chart-grid:      rgba(48,54,61,0.6);
+  --chart-tick:      #8b949e;
+  --chart-tick-strong: #e6edf3;
+  --chart-border:    #30363d;
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMFORT THEME — light background, higher contrast,
+   larger overall scale for easier reading
+═══════════════════════════════════════════════════════ */
+:root[data-theme="comfort"] {
+  --ink:        #ffffff;
+  --ink-mid:    #f6f8fa;
+  --ink-light:  #edf0f3;
+  --ink-border: #c9ced6;
+  --amber:      #9a6700;
+  --amber-bg:   rgba(154,103,0,.12);
+  --green:      #1a7f37;
+  --green-bg:   rgba(26,127,55,.12);
+  --red:        #cf222e;
+  --red-bg:     rgba(207,34,46,.10);
+  --blue:       #0969da;
+  --blue-bg:    rgba(9,105,218,.10);
+  --text:       #1a1a1a;
+  --text-muted: #57606a;
+  --text-dim:   #6e7781;
+  --chart-available: #9aa4b2;
+  --chart-grid:      rgba(31,35,40,0.12);
+  --chart-tick:      #57606a;
+  --chart-tick-strong: #1a1a1a;
+  --chart-border:    #c9ced6;
+}
+:root[data-theme="comfort"] body {
+  zoom: 1.15;  /* scales text, spacing and icons together for easier reading */
+}
+:root[data-theme="comfort"] tbody tr:hover td {
+  background: rgba(0,0,0,.04);  /* dark-theme hover overlay is invisible on a light background */
 }
 
 /* ── Reset ── */
@@ -108,6 +153,19 @@ body {
   background: var(--green);
   border-radius: 50%;
 }
+.theme-toggle {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
 
 /* ═══════════════════════════════════════════════════════
    NAV TABS
@@ -642,14 +700,14 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 <body>
 
 <!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
-<div id="auth-gate" style="position:fixed;inset:0;background:#0d1117;display:flex;align-items:center;justify-content:center;z-index:999;">
-  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
-    <div style="width:52px;height:52px;background:#d29922;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🔑</div>
-    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:#d29922;margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
-    <h1 style="font-size:20px;font-weight:600;color:#e6edf3;margin-bottom:6px;">Lockbox Manager</h1>
-    <p style="font-size:13px;color:#8b949e;margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
+<div id="auth-gate" style="position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
+    <div style="width:52px;height:52px;background:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🔑</div>
+    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--amber);margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
+    <h1 style="font-size:20px;font-weight:600;color:var(--text);margin-bottom:6px;">Lockbox Manager</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
     <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
-    <p style="font-size:11px;color:#484f58;margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
   </div>
 </div>
 
@@ -664,6 +722,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     <span style="color:var(--text-muted);font-weight:400">Lockbox Manager</span>
   </div>
   <div class="topbar-right">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Switch to a higher-contrast, larger-text color scheme">☀ Comfort Mode</button>
     <a href="./index.html" style="font-size:12px;color:var(--text-muted);text-decoration:none;margin-right:12px;letter-spacing:.03em">← Tools</a>
     <div class="admin-chip" id="admin-chip">Loading…</div>
   </div>
@@ -714,7 +773,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div class="section-title">Lockbox Assignment by Office</div>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#e6edf3;display:inline-block;flex-shrink:0"></span>Available</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:var(--chart-available);display:inline-block;flex-shrink:0"></span>Available</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;flex-shrink:0"></span>Active MLS</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F5C518;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F97316;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
@@ -1034,7 +1093,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     <div id="inv-value-bar" style="display:none;padding:8px 12px;background:var(--ink-mid);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--text-muted)">
       Showing <strong id="inv-value-count">—</strong> lockboxes &nbsp;·&nbsp; Est. replacement value: <strong id="inv-value-total" style="color:var(--text-base)">—</strong>
     </div>
-    <div id="inv-recall-bar" style="display:none;padding:10px 14px;background:#3d1a1a;border:1px solid var(--red);border-radius:6px;margin-bottom:10px;font-size:13px;color:#f87171">
+    <div id="inv-recall-bar" style="display:none;padding:10px 14px;background:var(--red-bg);border:1px solid var(--red);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--red)">
       <strong>⚠ Recall needed:</strong> <span id="inv-recall-msg"></span>
     </div>
     <div class="table-wrap">
@@ -1393,6 +1452,31 @@ const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
 /* ═══════════════════════════════════════════════════════════════════
+   THEME (Comfort Mode — higher contrast, larger text for easier reading)
+═══════════════════════════════════════════════════════════════════ */
+function updateThemeToggleLabel() {
+  const btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  const isComfort = document.documentElement.getAttribute("data-theme") === "comfort";
+  btn.textContent = isComfort ? "🌙 Standard View" : "☀ Comfort Mode";
+}
+
+function toggleTheme() {
+  const isComfort = document.documentElement.getAttribute("data-theme") === "comfort";
+  if (isComfort) {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem("lbx_theme", "default");
+  } else {
+    document.documentElement.setAttribute("data-theme", "comfort");
+    localStorage.setItem("lbx_theme", "comfort");
+  }
+  updateThemeToggleLabel();
+  if (_officeChart) renderOfficeChart();  // re-render with theme-appropriate colors
+}
+
+document.addEventListener("DOMContentLoaded", updateThemeToggleLabel);
+
+/* ═══════════════════════════════════════════════════════════════════
    AUTH STATE
 ═══════════════════════════════════════════════════════════════════ */
 let userEmail   = "";
@@ -1747,6 +1831,8 @@ function renderOfficeChart() {
 
   if (_officeChart) { _officeChart.destroy(); _officeChart = null; }
 
+  const themeVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
   _officeChart = new Chart(canvas, {
     type: 'bar',
     plugins: [missingPlugin],
@@ -1756,7 +1842,7 @@ function renderOfficeChart() {
         { label: 'Active MLS',   data: data.map(o => o.green),     backgroundColor: '#1D9E75', borderWidth: 0 },
         { label: 'No MLS ID',    data: data.map(o => o.gray),      backgroundColor: '#F5C518', borderWidth: 0 },
         { label: 'Inactive MLS', data: data.map(o => o.yellow),    backgroundColor: '#F97316', borderWidth: 0 },
-        { label: 'Available',    data: data.map(o => o.available), backgroundColor: '#e6edf3', borderWidth: 0 },
+        { label: 'Available',    data: data.map(o => o.available), backgroundColor: themeVar('--chart-available'), borderWidth: 0 },
       ],
     },
     options: {
@@ -1776,15 +1862,15 @@ function renderOfficeChart() {
       scales: {
         x: {
           stacked: true,
-          grid:   { color: 'rgba(48,54,61,0.6)' },
-          ticks:  { color: '#8b949e', font: { family: '"IBM Plex Mono"', size: 10 } },
-          border: { color: '#30363d' },
+          grid:   { color: themeVar('--chart-grid') },
+          ticks:  { color: themeVar('--chart-tick'), font: { family: '"IBM Plex Mono"', size: 10 } },
+          border: { color: themeVar('--chart-border') },
         },
         y: {
           stacked: true,
           grid:   { display: false },
-          ticks:  { color: '#e6edf3', font: { family: '"IBM Plex Sans"', size: 12 } },
-          border: { color: '#30363d' },
+          ticks:  { color: themeVar('--chart-tick-strong'), font: { family: '"IBM Plex Sans"', size: 12 } },
+          border: { color: themeVar('--chart-border') },
         },
       },
     },
