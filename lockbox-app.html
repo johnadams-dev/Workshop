@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+  // Apply saved theme before first paint to avoid a flash of the wrong theme
+  try {
+    const _savedTheme = localStorage.getItem('lbx_theme');
+    if (_savedTheme === 'comfort') document.documentElement.setAttribute('data-theme', 'comfort');
+  } catch (_) {}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lockbox Manager · Adams Cameron & Co.</title>
@@ -10,6 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 /* ═══════════════════════════════════════════════════════
@@ -35,6 +43,44 @@
   --mono:       'IBM Plex Mono', monospace;
   --sans:       'IBM Plex Sans', sans-serif;
   --r:          6px;
+  --chart-available: #e6edf3;
+  --chart-grid:      rgba(48,54,61,0.6);
+  --chart-tick:      #8b949e;
+  --chart-tick-strong: #e6edf3;
+  --chart-border:    #30363d;
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMFORT THEME — light background, higher contrast,
+   larger overall scale for easier reading
+═══════════════════════════════════════════════════════ */
+:root[data-theme="comfort"] {
+  --ink:        #ffffff;
+  --ink-mid:    #f6f8fa;
+  --ink-light:  #edf0f3;
+  --ink-border: #c9ced6;
+  --amber:      #9a6700;
+  --amber-bg:   rgba(154,103,0,.12);
+  --green:      #1a7f37;
+  --green-bg:   rgba(26,127,55,.12);
+  --red:        #cf222e;
+  --red-bg:     rgba(207,34,46,.10);
+  --blue:       #0969da;
+  --blue-bg:    rgba(9,105,218,.10);
+  --text:       #1a1a1a;
+  --text-muted: #57606a;
+  --text-dim:   #6e7781;
+  --chart-available: #9aa4b2;
+  --chart-grid:      rgba(31,35,40,0.12);
+  --chart-tick:      #57606a;
+  --chart-tick-strong: #1a1a1a;
+  --chart-border:    #c9ced6;
+}
+:root[data-theme="comfort"] body {
+  zoom: 1.15;  /* scales text, spacing and icons together for easier reading */
+}
+:root[data-theme="comfort"] tbody tr:hover td {
+  background: rgba(0,0,0,.04);  /* dark-theme hover overlay is invisible on a light background */
 }
 
 /* ── Reset ── */
@@ -107,6 +153,19 @@ body {
   background: var(--green);
   border-radius: 50%;
 }
+.theme-toggle {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
 
 /* ═══════════════════════════════════════════════════════
    NAV TABS
@@ -641,14 +700,14 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 <body>
 
 <!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
-<div id="auth-gate" style="position:fixed;inset:0;background:#0d1117;display:flex;align-items:center;justify-content:center;z-index:999;">
-  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
-    <div style="width:52px;height:52px;background:#d29922;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🔑</div>
-    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:#d29922;margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
-    <h1 style="font-size:20px;font-weight:600;color:#e6edf3;margin-bottom:6px;">Lockbox Manager</h1>
-    <p style="font-size:13px;color:#8b949e;margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
+<div id="auth-gate" style="position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
+    <div style="width:52px;height:52px;background:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🔑</div>
+    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--amber);margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
+    <h1 style="font-size:20px;font-weight:600;color:var(--text);margin-bottom:6px;">Lockbox Manager</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
     <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
-    <p style="font-size:11px;color:#484f58;margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
   </div>
 </div>
 
@@ -663,6 +722,8 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     <span style="color:var(--text-muted);font-weight:400">Lockbox Manager</span>
   </div>
   <div class="topbar-right">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Switch to a higher-contrast, larger-text color scheme">☀ Comfort Mode</button>
+    <a href="./index.html" style="font-size:12px;color:var(--text-muted);text-decoration:none;margin-right:12px;letter-spacing:.03em">← Tools</a>
     <div class="admin-chip" id="admin-chip">Loading…</div>
   </div>
 </header>
@@ -712,9 +773,10 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div class="section-title">Lockbox Assignment by Office</div>
       </div>
       <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:var(--chart-available);display:inline-block;flex-shrink:0"></span>Available</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;flex-shrink:0"></span>Active MLS</span>
-        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#EF9F27;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
-        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#B4B2A9;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F5C518;display:inline-block;flex-shrink:0"></span>No MLS ID</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:2px;background:#F97316;display:inline-block;flex-shrink:0"></span>Inactive MLS</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted)"><span style="width:10px;height:10px;border-radius:50%;background:#E24B4A;display:inline-block;flex-shrink:0"></span>Missing boxes</span>
       </div>
       <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:var(--r);padding:16px;position:relative">
@@ -975,7 +1037,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
       <div class="form-card" style="margin-bottom:20px">
         <div class="form-title">Scan a Lockbox</div>
-        <div class="form-desc">Scan the barcode on the lockbox, or type the serial number below.</div>
+        <div class="form-desc">Scan the QR code label on the lockbox, or type the serial number below.</div>
 
         <div style="display:flex;gap:8px;margin-top:16px">
           <input id="scan-manual" type="text" placeholder="Serial number, e.g. 20033334"
@@ -1026,11 +1088,12 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <option value="any_issue">⚠ Any Issue</option>
       </select>
       <button class="btn btn-ghost" onclick="exportCSV()">↓ CSV</button>
+      <button class="btn btn-ghost" onclick="printLabels(_visibleBoxes)">🏷 Labels</button>
     </div>
     <div id="inv-value-bar" style="display:none;padding:8px 12px;background:var(--ink-mid);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--text-muted)">
       Showing <strong id="inv-value-count">—</strong> lockboxes &nbsp;·&nbsp; Est. replacement value: <strong id="inv-value-total" style="color:var(--text-base)">—</strong>
     </div>
-    <div id="inv-recall-bar" style="display:none;padding:10px 14px;background:#3d1a1a;border:1px solid var(--red);border-radius:6px;margin-bottom:10px;font-size:13px;color:#f87171">
+    <div id="inv-recall-bar" style="display:none;padding:10px 14px;background:var(--red-bg);border:1px solid var(--red);border-radius:6px;margin-bottom:10px;font-size:13px;color:var(--red)">
       <strong>⚠ Recall needed:</strong> <span id="inv-recall-msg"></span>
     </div>
     <div class="table-wrap">
@@ -1062,14 +1125,65 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
 
     <!-- Sub-tab bar -->
     <div style="display:flex;border-bottom:1px solid var(--ink-border);margin-bottom:20px;background:var(--ink-mid);border-radius:6px 6px 0 0;overflow:hidden;">
-      <button class="maint-tab active" data-mtab="associations" onclick="switchMaintTab('associations')">🏢 Associations</button>
-      <button class="maint-tab" data-mtab="transfer"            onclick="switchMaintTab('transfer')">↔ Transfer</button>
-      <button class="maint-tab" data-mtab="lockboxes"           onclick="switchMaintTab('lockboxes')">📦 Lockboxes</button>
-      <button class="maint-tab" data-mtab="admin-tools"         onclick="switchMaintTab('admin-tools')">🔧 Admin Tools</button>
+      <button class="maint-tab active" data-mtab="transfer"    onclick="switchMaintTab('transfer')">↔ Transfer</button>
+      <button class="maint-tab" data-mtab="add-remove"         onclick="switchMaintTab('add-remove')">📦 Add/Remove</button>
+      <button class="maint-tab" data-mtab="shackle"            onclick="switchMaintTab('shackle')">🔑 Shackle Code</button>
+      <button class="maint-tab" data-mtab="associations"       onclick="switchMaintTab('associations')">🏢 Associations</button>
+      <button class="maint-tab" data-mtab="admin-tools"        onclick="switchMaintTab('admin-tools')">🔧 Admin</button>
     </div>
 
+    <!-- ── Shackle Code ── -->
+    <div class="maint-panel" id="mpanel-shackle" style="display:none">
+      <div class="form-card">
+        <div class="form-title">Update Shackle Code</div>
+        <div class="form-desc">Look up a lockbox by serial number and enter the new shackle code. This is logged under your account.</div>
+
+        <div class="form-grid">
+          <div class="form-row">
+            <div class="field">
+              <div class="field-label req">Serial Number</div>
+              <div class="input-wrap">
+                <input id="sh-serial" type="text" placeholder="e.g. 20033334"
+                       style="font-family:var(--mono)"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();shackleLookup()}">
+              </div>
+            </div>
+            <div class="field" style="justify-content:flex-end">
+              <div class="field-label">&nbsp;</div>
+              <button class="btn btn-ghost" onclick="shackleLookup()">↗ Look Up</button>
+            </div>
+          </div>
+
+          <div class="box-preview" id="sh-preview" style="display:none">
+            <div class="box-preview-label">Lockbox</div>
+            <div class="bp-grid">
+              <div class="bp-field"><div class="bp-key">Serial #</div><div class="bp-val amber" id="sh-p-serial">—</div></div>
+              <div class="bp-field"><div class="bp-key">Current Shackle</div><div class="bp-val mono" id="sh-p-shackle">—</div></div>
+              <div class="bp-field"><div class="bp-key">Status</div><div class="bp-val" id="sh-p-status">—</div></div>
+              <div class="bp-field"><div class="bp-key">Office</div><div class="bp-val" id="sh-p-office">—</div></div>
+            </div>
+          </div>
+
+          <div class="form-row" id="sh-new-row" style="display:none">
+            <div class="field">
+              <div class="field-label req">New Shackle Code</div>
+              <input id="sh-new-code" type="text" placeholder="Enter new code"
+                     style="font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase"
+                     oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" id="sh-btn-row" style="display:none">
+          <button class="btn btn-primary" onclick="submitShackleUpdate()">✓ Update Shackle Code</button>
+          <button class="btn btn-ghost" onclick="resetShackle()">Clear</button>
+        </div>
+        <div id="sh-msg" style="margin-top:14px;"></div>
+      </div>
+    </div><!-- /mpanel-shackle -->
+
     <!-- ── Associations ── -->
-    <div class="maint-panel active" id="mpanel-associations">
+    <div class="maint-panel" id="mpanel-associations" style="display:none">
       <div class="section-head" style="margin-bottom:12px;">
         <div class="section-title">Association Settings</div>
         <div style="font-size:12px;color:var(--text-muted)">Click any row to edit fees and contact information.</div>
@@ -1096,7 +1210,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
     </div>
 
     <!-- ── Transfer ── -->
-    <div class="maint-panel" id="mpanel-transfer" style="display:none">
+    <div class="maint-panel active" id="mpanel-transfer">
       <div class="form-card">
         <div class="form-title">Transfer a Lockbox</div>
         <div class="form-desc">Move a lockbox directly between offices without going through checkout and check-in. The box must not be currently checked out. This action is logged under your account.</div>
@@ -1155,8 +1269,8 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
       </div>
     </div>
 
-    <!-- ── Lockboxes ── -->
-    <div class="maint-panel" id="mpanel-lockboxes" style="display:none">
+    <!-- ── Add/Remove ── -->
+    <div class="maint-panel" id="mpanel-add-remove" style="display:none">
 
       <!-- Add new lockbox -->
       <div class="form-card" style="margin-bottom:20px;">
@@ -1243,7 +1357,7 @@ input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
         <div id="lb-dcm-msg" style="margin-top:12px;"></div>
       </div>
 
-    </div><!-- /mpanel-lockboxes -->
+    </div><!-- /mpanel-add-remove -->
 
     <!-- ── Admin Tools ── -->
     <div class="maint-panel" id="mpanel-admin-tools" style="display:none">
@@ -1338,6 +1452,31 @@ const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
 /* ═══════════════════════════════════════════════════════════════════
+   THEME (Comfort Mode — higher contrast, larger text for easier reading)
+═══════════════════════════════════════════════════════════════════ */
+function updateThemeToggleLabel() {
+  const btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  const isComfort = document.documentElement.getAttribute("data-theme") === "comfort";
+  btn.textContent = isComfort ? "🌙 Standard View" : "☀ Comfort Mode";
+}
+
+function toggleTheme() {
+  const isComfort = document.documentElement.getAttribute("data-theme") === "comfort";
+  if (isComfort) {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem("lbx_theme", "default");
+  } else {
+    document.documentElement.setAttribute("data-theme", "comfort");
+    localStorage.setItem("lbx_theme", "comfort");
+  }
+  updateThemeToggleLabel();
+  if (_officeChart) renderOfficeChart();  // re-render with theme-appropriate colors
+}
+
+document.addEventListener("DOMContentLoaded", updateThemeToggleLabel);
+
+/* ═══════════════════════════════════════════════════════════════════
    AUTH STATE
 ═══════════════════════════════════════════════════════════════════ */
 let userEmail   = "";
@@ -1408,8 +1547,9 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-const GET  = (path)       => api(path);
-const POST = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
+const GET   = (path)       => api(path);
+const POST  = (path, body) => api(path, { method: "POST",  body: JSON.stringify(body) });
+const PATCH = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body) });
 
 /* ═══════════════════════════════════════════════════════════════════
    STATE
@@ -1473,12 +1613,20 @@ async function init() {
 }
 
 function applyRoleRestrictions() {
-  if (STATE.userRole !== "agent") return;
-  // Agents see inventory only — hide operational and settings tabs
-  document.querySelectorAll(".nav-tab").forEach(t => {
-    if (["checkout", "checkin", "scan", "settings"].includes(t.dataset.page)) t.style.display = "none";
-  });
-  switchPage("inventory");
+  if (STATE.userRole === "agent") {
+    // Agents see inventory only — hide operational and settings tabs
+    document.querySelectorAll(".nav-tab").forEach(t => {
+      if (["checkout", "checkin", "scan", "settings"].includes(t.dataset.page)) t.style.display = "none";
+    });
+    switchPage("inventory");
+    return;
+  }
+  if (STATE.userRole === "staff") {
+    // Coordinators/staff: hide Add/Remove and Associations sub-tabs
+    document.querySelectorAll(".maint-tab").forEach(t => {
+      if (["add-remove", "associations"].includes(t.dataset.mtab)) t.style.display = "none";
+    });
+  }
 }
 
 async function loadMlsFlags() {
@@ -1617,7 +1765,7 @@ function buildOfficeChartData() {
   const officeMap = {};
   STATE.offices.forEach(o => {
     if (o.name === 'Corporate') return;
-    officeMap[String(o.local_id)] = { name: o.name, green: 0, yellow: 0, gray: 0, missing: 0 };
+    officeMap[String(o.local_id)] = { name: o.name, available: 0, green: 0, yellow: 0, gray: 0, missing: 0 };
   });
 
   STATE.boxes.forEach(b => {
@@ -1629,13 +1777,15 @@ function buildOfficeChartData() {
       if (!b.mls_id)                entry.gray++;
       else if (flag === 'not_found') entry.yellow++;
       else                           entry.green++;
+    } else if (b.status === 'available') {
+      entry.available++;
     } else if (b.status === 'missing') {
       entry.missing++;
     }
   });
 
   return Object.values(officeMap)
-    .filter(o => o.green + o.yellow + o.gray > 0)
+    .filter(o => o.available + o.green + o.yellow + o.gray > 0)
     .sort((a, b) => {
       const ta = a.green + a.yellow + a.gray;
       const tb = b.green + b.yellow + b.gray;
@@ -1681,15 +1831,18 @@ function renderOfficeChart() {
 
   if (_officeChart) { _officeChart.destroy(); _officeChart = null; }
 
+  const themeVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
   _officeChart = new Chart(canvas, {
     type: 'bar',
     plugins: [missingPlugin],
     data: {
       labels: data.map(o => o.name),
       datasets: [
-        { label: 'Active MLS',   data: data.map(o => o.green),  backgroundColor: '#1D9E75', borderWidth: 0 },
-        { label: 'Inactive MLS', data: data.map(o => o.yellow), backgroundColor: '#EF9F27', borderWidth: 0 },
-        { label: 'No MLS ID',    data: data.map(o => o.gray),   backgroundColor: '#B4B2A9', borderWidth: 0 },
+        { label: 'Active MLS',   data: data.map(o => o.green),     backgroundColor: '#1D9E75', borderWidth: 0 },
+        { label: 'No MLS ID',    data: data.map(o => o.gray),      backgroundColor: '#F5C518', borderWidth: 0 },
+        { label: 'Inactive MLS', data: data.map(o => o.yellow),    backgroundColor: '#F97316', borderWidth: 0 },
+        { label: 'Available',    data: data.map(o => o.available), backgroundColor: themeVar('--chart-available'), borderWidth: 0 },
       ],
     },
     options: {
@@ -1709,15 +1862,15 @@ function renderOfficeChart() {
       scales: {
         x: {
           stacked: true,
-          grid:   { color: 'rgba(48,54,61,0.6)' },
-          ticks:  { color: '#8b949e', font: { family: '"IBM Plex Mono"', size: 10 } },
-          border: { color: '#30363d' },
+          grid:   { color: themeVar('--chart-grid') },
+          ticks:  { color: themeVar('--chart-tick'), font: { family: '"IBM Plex Mono"', size: 10 } },
+          border: { color: themeVar('--chart-border') },
         },
         y: {
           stacked: true,
           grid:   { display: false },
-          ticks:  { color: '#e6edf3', font: { family: '"IBM Plex Sans"', size: 12 } },
-          border: { color: '#30363d' },
+          ticks:  { color: themeVar('--chart-tick-strong'), font: { family: '"IBM Plex Sans"', size: 12 } },
+          border: { color: themeVar('--chart-border') },
         },
       },
     },
@@ -2090,7 +2243,10 @@ function invFlagChips(b) {
   return chips.length ? `<div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">${chips.join('')}</div>` : '';
 }
 
+let _visibleBoxes = [];
+
 function renderInventory(boxes) {
+  _visibleBoxes = boxes;
   // Apply sort
   if (STATE.invSort.col) {
     const { col, dir } = STATE.invSort;
@@ -2178,6 +2334,9 @@ function renderInventory(boxes) {
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button> `
             : b.status === 'available' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button> `
+            : ''}
+          ${['manager', 'staff'].includes(STATE.userRole)
+            ? `<button class="tbl-link" style="color:var(--blue);opacity:.7" title="Print QR label" onclick='printSingleLabel(${JSON.stringify(b).replace(/'/g,"&#39;")})'>🏷</button>`
             : ''}
         </td>
       </tr>`;
@@ -2283,6 +2442,92 @@ function exportCSV() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   LABEL PRINTING
+═══════════════════════════════════════════════════════════════════ */
+function printLabels(boxes) {
+  if (!boxes || !boxes.length) { toast('No boxes to print labels for', 'warn'); return; }
+  if (typeof QRious === 'undefined') { toast('QR library not loaded — try refreshing', 'warn'); return; }
+
+  const items = boxes.map(b => {
+    const qrUrl = new QRious({ value: b.serial_number, size: 220, level: 'M', padding: 4 }).toDataURL();
+    return { ...b, qrUrl };
+  });
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Lockbox Labels</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+@page { size: letter portrait; margin: 0; }
+body { background: white; }
+.sheet {
+  width: 8.5in;
+  padding-top: 0.625in;
+  padding-left: 0.375in;
+  display: grid;
+  grid-template-columns: repeat(3, 2in);
+  grid-template-rows: repeat(4, 2in);
+  column-gap: 0.875in;
+  row-gap: 0.625in;
+}
+.label {
+  width: 2in;
+  height: 2in;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3pt;
+  overflow: hidden;
+}
+.label-brand {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 5.5pt; color: #aaa;
+  text-transform: uppercase; letter-spacing: .07em;
+  margin-bottom: 1pt;
+}
+.label-qr { width: 108pt; height: 108pt; display: block; }
+.label-serial {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt; font-weight: bold;
+  letter-spacing: .04em;
+  margin-top: 3pt;
+}
+.label-assoc {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6pt; color: #777;
+  margin-top: 1pt;
+}
+</style>
+</head>
+<body>
+${Array.from({ length: Math.ceil(items.length / 12) }, (_, i) => items.slice(i * 12, i * 12 + 12)).map((chunk, i, arr) => `
+<div class="sheet" style="${i < arr.length - 1 ? 'page-break-after:always;' : ''}">
+${chunk.map(b => `  <div class="label">
+    <div class="label-brand">Adams Cameron</div>
+    <img class="label-qr" src="${b.qrUrl}">
+    <div class="label-serial">${b.serial_number}</div>
+    <div class="label-assoc">${b.association_abbr || ''}</div>
+  </div>`).join('\n')}
+</div>`).join('\n')}
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast('Pop-up blocked — allow pop-ups and try again', 'warn'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+function printSingleLabel(box) {
+  printLabels([box]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    UTILITIES
 ═══════════════════════════════════════════════════════════════════ */
 function modalRows(rows) {
@@ -2321,7 +2566,7 @@ function switchMaintTab(name) {
     p.style.display = p.id === "mpanel-" + name ? "block" : "none";
   });
   if (name === "associations") loadAssociations();
-  if (name === "lockboxes") { if (!_assocData.length) loadAssociations().then(populateAssocSelect); else populateAssocSelect(); }
+  if (name === "add-remove") { if (!_assocData.length) loadAssociations().then(populateAssocSelect); else populateAssocSelect(); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2501,6 +2746,69 @@ function resetTransfer() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   MAINTENANCE — Shackle Code
+═══════════════════════════════════════════════════════════════════ */
+let _shackleBox = null;
+
+async function shackleLookup() {
+  const serial = document.getElementById('sh-serial').value.trim();
+  if (!serial) return;
+  const norm = serial.toUpperCase();
+  const box = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+  if (box) { _renderShacklePreview(box); return; }
+  try {
+    const boxes = await GET('/lockbox/inventory');
+    STATE.boxes = boxes || STATE.boxes;
+    const found = STATE.boxes.find(b => b.serial_number === serial || b.serial_number.toUpperCase() === norm);
+    if (found) { _renderShacklePreview(found); }
+    else { document.getElementById('sh-msg').textContent = `✗ #${serial} not found`; }
+  } catch (e) { toast('Lookup failed: ' + e.message, 'warn'); }
+}
+
+function _renderShacklePreview(box) {
+  _shackleBox = box;
+  document.getElementById('sh-p-serial').textContent  = box.serial_number;
+  document.getElementById('sh-p-shackle').textContent = box.shackle_code || '—';
+  document.getElementById('sh-p-status').textContent  = box.status?.replace('_', ' ') || '—';
+  document.getElementById('sh-p-office').textContent  = box.assigned_office_name || box.office_name || '—';
+  document.getElementById('sh-preview').style.display  = '';
+  document.getElementById('sh-new-row').style.display  = '';
+  document.getElementById('sh-btn-row').style.display  = '';
+  document.getElementById('sh-msg').textContent = '';
+  document.getElementById('sh-new-code').value = '';
+  document.getElementById('sh-new-code').focus();
+}
+
+async function submitShackleUpdate() {
+  if (!_shackleBox) return;
+  const newCode = document.getElementById('sh-new-code').value.trim();
+  if (!newCode) { document.getElementById('sh-msg').textContent = 'Enter a new shackle code first'; return; }
+  const msgEl = document.getElementById('sh-msg');
+  try {
+    await PATCH(`/lockbox/${_shackleBox.serial_number}/shackle`, { shackle_code: newCode });
+    const box = STATE.boxes.find(b => b.serial_number === _shackleBox.serial_number);
+    if (box) box.shackle_code = newCode;
+    toast(`Shackle code updated for #${_shackleBox.serial_number}`);
+    msgEl.innerHTML = `<div style="background:var(--green-bg);border:1px solid rgba(63,185,80,.25);color:var(--green);padding:10px 14px;border-radius:6px;font-size:13px;">✓ Shackle code updated to <strong>${newCode}</strong></div>`;
+    document.getElementById('sh-p-shackle').textContent = newCode;
+    _shackleBox.shackle_code = newCode;
+    document.getElementById('sh-new-code').value = '';
+  } catch (e) {
+    msgEl.innerHTML = `<div style="background:var(--red-bg);border:1px solid rgba(248,81,73,.2);color:var(--red);padding:10px 14px;border-radius:6px;font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+function resetShackle() {
+  _shackleBox = null;
+  document.getElementById('sh-serial').value  = '';
+  document.getElementById('sh-new-code').value = '';
+  document.getElementById('sh-msg').textContent = '';
+  document.getElementById('sh-preview').style.display = 'none';
+  document.getElementById('sh-new-row').style.display = 'none';
+  document.getElementById('sh-btn-row').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    SETTINGS — Lockbox Management
 ═══════════════════════════════════════════════════════════════════ */
 function populateAssocSelect() {
@@ -2635,7 +2943,7 @@ function startCamera() {
   document.getElementById('scan-camera-btn').textContent = '✕ Stop Camera';
   _scanner = new Html5QrcodeScanner('qr-reader', {
     fps: 10,
-    qrbox: { width: 280, height: 120 },
+    qrbox: { width: 250, height: 250 },
     rememberLastUsedCamera: true,
     supportedScanTypes: [0],  // camera only, no file upload
   }, false);
@@ -2721,6 +3029,7 @@ function showScanResult(box) {
     <div style="background:rgba(0,0,0,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px">${loc}</div>
     <div class="btn-row" style="margin-top:0">
       ${actionHtml}
+      <button class="btn btn-ghost" onclick="printSingleLabel(_scannedBox)">🏷 Print Label</button>
       <button class="btn btn-ghost" onclick="resetScanResult()">✕ Clear</button>
     </div>`;
 

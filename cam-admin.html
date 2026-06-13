@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ask Cameron — Admin</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --ink:        #0d1117;
+  --ink-mid:    #161b22;
+  --ink-light:  #21262d;
+  --ink-border: #30363d;
+  --text:       #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim:   #484f58;
+  --gold:       #c9a84c;
+  --gold-dim:   #7d6630;
+  --green:      #3fb950;
+  --green-bg:   #0d1117;
+  --red:        #f85149;
+  --red-bg:     #160b0b;
+  --amber:      #d29922;
+  --blue:       #58a6ff;
+  --mono:       "IBM Plex Mono", monospace;
+  --sans:       "IBM Plex Sans", sans-serif;
+  --r:          6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--ink); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+/* ── Shell ── */
+.shell { display: grid; grid-template-rows: 52px 1fr; height: 100%; }
+.topbar { background: var(--ink-mid); border-bottom: 1px solid var(--ink-border);
+          display: flex; align-items: center; padding: 0 20px; gap: 16px; }
+.topbar-brand { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+.topbar-sub   { font-size: 12px; color: var(--text-muted); }
+.topbar-user  { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+
+/* ── Auth gate ── */
+#auth-gate { display: flex; align-items: center; justify-content: center; height: 100%; }
+.auth-card  { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: 12px;
+              padding: 40px 48px; text-align: center; max-width: 380px; }
+.auth-logo  { font-size: 22px; font-weight: 600; color: var(--gold); margin-bottom: 4px; }
+.auth-sub   { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+
+/* ── Main layout ── */
+#app { display: none; grid-template-rows: 44px 1fr; height: 100%; overflow: hidden; }
+.tab-bar { background: var(--ink-mid); border-bottom: 1px solid var(--ink-border);
+           display: flex; align-items: stretch; padding: 0 20px; gap: 2px; }
+.tab { padding: 0 18px; font-size: 13px; font-weight: 500; cursor: pointer; border: none;
+       background: none; color: var(--text-muted); border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.panels { overflow-y: auto; padding: 24px; }
+
+/* ── Section head ── */
+.section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.section-title { font-size: 16px; font-weight: 600; }
+.section-sub   { font-size: 12px; color: var(--text-muted); }
+.btn { padding: 7px 14px; border-radius: var(--r); border: none; cursor: pointer; font-size: 13px; font-weight: 500; font-family: var(--sans); }
+.btn-primary { background: var(--gold); color: #000; }
+.btn-primary:hover { background: #b8963e; }
+.btn-ghost   { background: var(--ink-light); color: var(--text); border: 1px solid var(--ink-border); }
+.btn-ghost:hover { border-color: var(--text-muted); }
+.btn-danger  { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* ── Table ── */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--ink-border); border-radius: var(--r); margin-bottom: 24px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 9px 12px; background: var(--ink-mid); color: var(--text-muted); font-weight: 600;
+     font-size: 11px; letter-spacing: .06em; text-transform: uppercase; text-align: left; white-space: nowrap; }
+td { padding: 9px 12px; border-top: 1px solid var(--ink-border); vertical-align: top; }
+tr:hover td { background: rgba(255,255,255,.02); }
+.mono { font-family: var(--mono); font-size: 12px; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.chip-green  { background: rgba(63,185,80,.15);  color: var(--green); }
+.chip-amber  { background: rgba(210,153,34,.15); color: var(--amber); }
+.chip-red    { background: rgba(248,81,73,.15);  color: var(--red); }
+.chip-blue   { background: rgba(88,166,255,.12); color: var(--blue); }
+.chip-muted  { background: var(--ink-light); color: var(--text-muted); }
+.tbl-link { background: none; border: none; color: var(--blue); cursor: pointer; font-size: 12px; padding: 0 4px; }
+.empty td { text-align: center; color: var(--text-muted); padding: 28px; }
+
+/* ── Modal / overlay ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100;
+           display: none; align-items: center; justify-content: center; padding: 20px; }
+.overlay.open { display: flex; }
+.modal { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: 10px;
+         width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 28px; }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.modal-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
+.form-grid { display: grid; gap: 14px; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+               color: var(--text-muted); margin-bottom: 5px; }
+input[type=text], input[type=url], input[type=date], select, textarea {
+  width: 100%; background: var(--ink-light); border: 1px solid var(--ink-border);
+  border-radius: var(--r); padding: 8px 10px; color: var(--text); font-family: var(--sans); font-size: 13px;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+textarea { resize: vertical; min-height: 70px; }
+.hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.btn-row { display: flex; gap: 8px; margin-top: 20px; }
+.toggle { position: relative; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--ink-border); border-radius: 20px; cursor: pointer; transition: .2s; }
+.toggle input:checked + .toggle-slider { background: var(--gold); }
+.toggle-slider:before { content: ""; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px;
+                         background: #fff; border-radius: 50%; transition: .2s; }
+.toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+
+/* ── Stat row (Logs) ── */
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r);
+        padding: 14px 16px; text-align: center; }
+.stat-num   { font-size: 26px; font-weight: 700; }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+
+/* ── Knowledge ingest ── */
+.ingest-card { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r);
+               padding: 20px; margin-bottom: 20px; }
+.ingest-title { font-weight: 600; margin-bottom: 4px; }
+.ingest-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+.status-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+.badge-current  { background: rgba(63,185,80,.15); color: var(--green); }
+.badge-pending  { background: rgba(210,153,34,.15); color: var(--amber); }
+.badge-error    { background: rgba(248,81,73,.15); color: var(--red); }
+.badge-stale    { background: var(--ink-light); color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="topbar-brand">Adams, Cameron &amp; Co.</div>
+    <div class="topbar-sub">Ask Cameron — Admin</div>
+    <div class="topbar-user" id="topbar-user"></div>
+  </div>
+
+  <div id="auth-gate">
+    <div class="auth-card">
+      <div class="auth-logo">Ask Cameron</div>
+      <div class="auth-sub">Sign in with your @adamscameron.com account to continue</div>
+      <div id="g_id_onload" data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+           data-callback="handleGoogleSignIn" data-auto_prompt="false"></div>
+      <div class="g_id_signin" data-type="standard" data-theme="filled_black"
+           data-text="signin_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="tab-bar">
+      <button class="tab active" data-tab="tools"     onclick="switchTab('tools')">🔧 Tools</button>
+      <button class="tab"        data-tab="api-docs"  onclick="switchTab('api-docs')">🔌 API Docs</button>
+      <button class="tab"        data-tab="knowledge" onclick="switchTab('knowledge')">📚 Knowledge Base</button>
+      <button class="tab"        data-tab="logs"      onclick="switchTab('logs')">📋 Interaction Log</button>
+    </div>
+
+    <div class="panels">
+
+      <!-- ══ TOOLS ══ -->
+      <div class="panel active" id="panel-tools">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Tool Registry</div>
+            <div class="section-sub">Everything Cameron can call — categories, coverage status, stub messages</div>
+          </div>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="openToolModal()">+ Add Tool</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="tools-table">
+            <thead><tr>
+              <th>Tool Name</th>
+              <th>Display Name</th>
+              <th>Category</th>
+              <th>Coverage</th>
+              <th>Sensitivity</th>
+              <th>Enabled</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="tools-tbody"><tr class="empty"><td colspan="7">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ API DOCS ══ -->
+      <div class="panel" id="panel-api-docs" style="display:none">
+        <div class="section-head">
+          <div>
+            <div class="section-title">API Documentation</div>
+            <div class="section-sub">Integration reference — auth methods, rate limits, coverage status</div>
+          </div>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="openApiDocModal()">+ Add API</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="api-docs-table">
+            <thead><tr>
+              <th>API Name</th>
+              <th>Auth Method</th>
+              <th>Coverage</th>
+              <th>Sandbox</th>
+              <th>Capabilities</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="api-docs-tbody"><tr class="empty"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ KNOWLEDGE BASE ══ -->
+      <div class="panel" id="panel-knowledge" style="display:none">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Knowledge Base</div>
+            <div class="section-sub">Google Drive sources ingested into the vector store</div>
+          </div>
+        </div>
+
+        <div class="ingest-card">
+          <div class="ingest-title">Ingest from Google Drive</div>
+          <div class="ingest-sub">Enter a Drive file ID or folder ID. Google Docs and plain text files are supported. The server ingests in the background — refresh the table to see status.</div>
+          <div class="form-row2" style="margin-bottom:12px">
+            <div>
+              <div class="field-label">Drive File or Folder ID</div>
+              <input id="ing-source-id" type="text" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs…" style="font-family:var(--mono)">
+            </div>
+            <div>
+              <div class="field-label">Display Name</div>
+              <input id="ing-display-name" type="text" placeholder="Company Policy Manual">
+            </div>
+          </div>
+          <div class="form-row2" style="margin-bottom:14px">
+            <div>
+              <div class="field-label">Category (optional)</div>
+              <select id="ing-category">
+                <option value="">— none —</option>
+                <option>policy</option>
+                <option>procedures</option>
+                <option>market_data</option>
+                <option>coaching</option>
+                <option>listings</option>
+                <option>transactions</option>
+                <option>onboarding</option>
+              </select>
+            </div>
+            <div>
+              <div class="field-label">System Prompt Doc?</div>
+              <div class="toggle-row" style="margin-top:8px">
+                <label class="toggle"><input type="checkbox" id="ing-system-prompt"><span class="toggle-slider"></span></label>
+                <span style="font-size:12px;color:var(--text-muted)">Use as "Who We Are" context</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="ingestSource()">↑ Ingest</button>
+          <span id="ing-msg" style="margin-left:12px;font-size:12px;color:var(--text-muted)"></span>
+        </div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Display Name</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Chunks</th>
+              <th>Words</th>
+              <th>Last Indexed</th>
+              <th>System Prompt</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="knowledge-tbody"><tr class="empty"><td colspan="8">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══ LOGS ══ -->
+      <div class="panel" id="panel-logs" style="display:none">
+        <div class="section-head">
+          <div>
+            <div class="section-title">Interaction Log</div>
+            <div class="section-sub">Every question asked of Cameron</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+              <input type="checkbox" id="log-oos-filter" onchange="loadLogs()"> Out-of-scope only
+            </label>
+            <button class="btn btn-ghost btn-sm" onclick="loadLogs()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="stat-row" id="log-stats">
+          <div class="stat"><div class="stat-num" id="ls-total">—</div><div class="stat-label">Total</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--green)" id="ls-up">—</div><div class="stat-label">👍 Helpful</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--red)" id="ls-down">—</div><div class="stat-label">👎 Unhelpful</div></div>
+          <div class="stat"><div class="stat-num" style="color:var(--amber)" id="ls-oos">—</div><div class="stat-label">Out of Scope</div></div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>When</th>
+              <th>Agent</th>
+              <th>Question</th>
+              <th>Tools</th>
+              <th>Source</th>
+              <th>Feedback</th>
+              <th>ms</th>
+            </tr></thead>
+            <tbody id="logs-tbody"><tr class="empty"><td colspan="7">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /panels -->
+  </div><!-- /app -->
+</div><!-- /shell -->
+
+<!-- ══ TOOL MODAL ══ -->
+<div class="overlay" id="tool-modal">
+  <div class="modal">
+    <div class="modal-title" id="tool-modal-title">Add Tool</div>
+    <div class="modal-sub">Define what Cameron can call and how it should behave</div>
+    <input type="hidden" id="tool-edit-id">
+    <div class="form-grid">
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Tool Name <span style="color:var(--red)">*</span></div>
+          <input id="t-tool-name" type="text" placeholder="get_listing_status" style="font-family:var(--mono)">
+        </div>
+        <div>
+          <div class="field-label">Display Name <span style="color:var(--red)">*</span></div>
+          <input id="t-display-name" type="text" placeholder="Listing Status Lookup">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Category</div>
+          <select id="t-category">
+            <option value="">— none —</option>
+            <option>listings</option><option>transactions</option><option>coaching</option>
+            <option>market_data</option><option>documents</option><option>reporting</option>
+          </select>
+        </div>
+        <div>
+          <div class="field-label">Coverage Status</div>
+          <select id="t-coverage">
+            <option value="stub">stub</option>
+            <option value="design_needed">design_needed</option>
+            <option value="partial">partial</option>
+            <option value="full">full</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Description</div>
+        <textarea id="t-description" rows="2" placeholder="What this tool does for Cameron…"></textarea>
+      </div>
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Data Sensitivity</div>
+          <select id="t-sensitivity">
+            <option value="shared">shared</option>
+            <option value="private">private</option>
+            <option value="manager_only">manager_only</option>
+          </select>
+        </div>
+        <div>
+          <div class="field-label">API Source</div>
+          <input id="t-api-source" type="text" placeholder="DeltaNet, Dotloop, internal…">
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Fallback Message (shown when stub)</div>
+        <textarea id="t-fallback" rows="2" placeholder="This information isn't connected yet. Please contact…"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Capabilities <span class="hint" style="text-transform:none;letter-spacing:0">(one per line)</span></div>
+        <textarea id="t-capabilities" rows="3" placeholder="Look up listing status&#10;Get days on market&#10;Check price history"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Limitations <span class="hint" style="text-transform:none;letter-spacing:0">(one per line)</span></div>
+        <textarea id="t-limitations" rows="2" placeholder="Does not include off-market data"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Do Not Use When <span class="hint" style="text-transform:none;letter-spacing:0">(one per line)</span></div>
+        <textarea id="t-do-not-use" rows="2" placeholder="User asks about rental listings"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Example Questions <span class="hint" style="text-transform:none;letter-spacing:0">(one per line)</span></div>
+        <textarea id="t-examples" rows="2" placeholder="What's the status of 123 Main St?"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Notes</div>
+        <textarea id="t-notes" rows="2"></textarea>
+      </div>
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Data Owner</div>
+          <input id="t-data-owner" type="text" placeholder="MLS team, broker…">
+        </div>
+        <div>
+          <div class="field-label">Last Reviewed</div>
+          <input id="t-last-reviewed" type="date">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="t-enabled" checked><span class="toggle-slider"></span></label>
+        <span style="font-size:13px">Enabled</span>
+        <span style="margin-left:20px"></span>
+        <label class="toggle"><input type="checkbox" id="t-requires-agent"><span class="toggle-slider"></span></label>
+        <span style="font-size:13px">Requires agent context</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveTool()">Save Tool</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="tool-delete-btn" style="display:none;margin-left:auto" onclick="deleteTool()">Delete</button>
+    </div>
+    <div id="tool-modal-msg" style="margin-top:10px;font-size:12px;color:var(--red)"></div>
+  </div>
+</div>
+
+<!-- ══ API DOC MODAL ══ -->
+<div class="overlay" id="api-doc-modal">
+  <div class="modal">
+    <div class="modal-title" id="api-doc-modal-title">Add API Doc</div>
+    <div class="modal-sub">Developer reference for an integration or data source</div>
+    <input type="hidden" id="api-edit-id">
+    <div class="form-grid">
+      <div class="form-row2">
+        <div>
+          <div class="field-label">API Name <span style="color:var(--red)">*</span></div>
+          <input id="a-api-name" type="text" placeholder="deltanet" style="font-family:var(--mono)">
+        </div>
+        <div>
+          <div class="field-label">Display Name</div>
+          <input id="a-display-name" type="text" placeholder="DeltaNet MLS API">
+        </div>
+      </div>
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Base URL</div>
+          <input id="a-base-url" type="text" placeholder="https://apis.deltagroup.com">
+        </div>
+        <div>
+          <div class="field-label">Auth Method</div>
+          <select id="a-auth-method">
+            <option value="">— select —</option>
+            <option value="oauth2">oauth2</option>
+            <option value="api_key">api_key</option>
+            <option value="service_account">service_account</option>
+            <option value="internal">internal</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Auth Notes</div>
+        <textarea id="a-auth-notes" rows="2" placeholder="Client credentials flow, tokens expire in 3600s…"></textarea>
+      </div>
+      <div class="form-row2">
+        <div>
+          <div class="field-label">Coverage Status</div>
+          <select id="a-coverage">
+            <option value="design_needed">design_needed</option>
+            <option value="partial">partial</option>
+            <option value="full">full</option>
+          </select>
+        </div>
+        <div>
+          <div class="field-label">Primary Contact</div>
+          <input id="a-contact" type="text" placeholder="Name or email">
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Rate Limit Notes</div>
+        <input id="a-rate-limit" type="text" placeholder="100 req/min per token…">
+      </div>
+      <div>
+        <div class="field-label">External Docs URL</div>
+        <input id="a-docs-url" type="url" placeholder="https://…">
+      </div>
+      <div>
+        <div class="field-label">Contract / Access Notes</div>
+        <textarea id="a-contract" rows="2"></textarea>
+      </div>
+      <div>
+        <div class="field-label">Notes</div>
+        <textarea id="a-notes" rows="2"></textarea>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="a-sandbox"><span class="toggle-slider"></span></label>
+        <span style="font-size:13px">Sandbox available</span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveApiDoc()">Save</button>
+      <button class="btn btn-ghost" onclick="closeModals()">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="api-delete-btn" style="display:none;margin-left:auto" onclick="deleteApiDoc()">Delete</button>
+    </div>
+    <div id="api-doc-modal-msg" style="margin-top:10px;font-size:12px;color:var(--red)"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════════════════════════════ */
+let userEmail = "", proxyKey = "";
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail = payload.email || "";
+  } catch { userEmail = ""; }
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || "Sign-in failed."); return; }
+    proxyKey = data.proxyKey || "";
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display = "grid";
+    document.getElementById("topbar-user").textContent = userEmail;
+    await Promise.all([loadTools(), loadApiDocs(), loadKnowledge(), loadLogs()]);
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════════════════════════════ */
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type":  "application/json",
+    "x-proxy-key":   proxyKey,
+    "x-user-email":  userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+function GET(p)    { return api(p); }
+function POST(p,b) { return api(p, { method: "POST",   body: JSON.stringify(b) }); }
+function PUT(p,b)  { return api(p, { method: "PUT",    body: JSON.stringify(b) }); }
+function PATCH(p,b){ return api(p, { method: "PATCH",  body: JSON.stringify(b) }); }
+function APIDEL(p) { return api(p, { method: "DELETE" }); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════════════ */
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach(p => {
+    p.style.display = p.id === "panel-" + name ? "" : "none";
+  });
+}
+
+function closeModals() {
+  document.querySelectorAll(".overlay").forEach(o => o.classList.remove("open"));
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModals(); });
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════════ */
+const coverageChip = s => ({
+  full:          '<span class="chip chip-green">full</span>',
+  partial:       '<span class="chip chip-amber">partial</span>',
+  stub:          '<span class="chip chip-blue">stub</span>',
+  design_needed: '<span class="chip chip-muted">design needed</span>',
+}[s] || `<span class="chip chip-muted">${s || "—"}</span>`);
+
+const sourceChip = s => ({
+  internal:     '<span class="chip chip-green">internal</span>',
+  external:     '<span class="chip chip-blue">external</span>',
+  mixed:        '<span class="chip chip-amber">mixed</span>',
+  out_of_scope: '<span class="chip chip-red">out of scope</span>',
+}[s] || "—");
+
+function fmtDate(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+}
+function fmtTime(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("en-US", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+}
+function lines(s) { return (s || "").split("\n").map(l => l.trim()).filter(Boolean); }
+function fromLines(arr) { return (arr || []).join("\n"); }
+function esc(s) { return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function truncate(s, n=80) { s = s || ""; return s.length > n ? s.slice(0,n) + "…" : s; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOOLS
+═══════════════════════════════════════════════════════════════════ */
+let _tools = [];
+
+async function loadTools() {
+  try {
+    _tools = await GET("/api/cam/tools");
+    renderTools();
+  } catch (e) {
+    document.getElementById("tools-tbody").innerHTML =
+      `<tr class="empty"><td colspan="7">Failed to load: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderTools() {
+  const tbody = document.getElementById("tools-tbody");
+  if (!_tools.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="7">No tools yet — add one to get started</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _tools.map(t => `
+    <tr>
+      <td class="mono">${esc(t.tool_name)}</td>
+      <td>${esc(t.display_name)}</td>
+      <td><span style="font-size:12px;color:var(--text-muted)">${esc(t.category || "—")}</span></td>
+      <td>${coverageChip(t.coverage_status)}</td>
+      <td><span style="font-size:12px;color:var(--text-muted)">${esc(t.data_sensitivity || "—")}</span></td>
+      <td>
+        <label class="toggle" title="${t.enabled ? "Disable" : "Enable"}">
+          <input type="checkbox" ${t.enabled ? "checked" : ""} onchange="toggleTool(${t.id}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+      <td><button class="tbl-link" onclick="openToolModal(${t.id})">Edit</button></td>
+    </tr>`).join("");
+}
+
+async function toggleTool(id, enabled) {
+  try { await PUT(`/api/cam/tools/${id}`, { enabled }); }
+  catch (e) { alert("Failed: " + e.message); await loadTools(); }
+}
+
+function openToolModal(id) {
+  const t = id ? _tools.find(x => x.id === id) : null;
+  document.getElementById("tool-edit-id").value    = t?.id || "";
+  document.getElementById("tool-modal-title").textContent = t ? "Edit Tool" : "Add Tool";
+  document.getElementById("t-tool-name").value     = t?.tool_name || "";
+  document.getElementById("t-display-name").value  = t?.display_name || "";
+  document.getElementById("t-category").value      = t?.category || "";
+  document.getElementById("t-coverage").value      = t?.coverage_status || "stub";
+  document.getElementById("t-sensitivity").value   = t?.data_sensitivity || "shared";
+  document.getElementById("t-api-source").value    = t?.api_source || "";
+  document.getElementById("t-description").value   = t?.description || "";
+  document.getElementById("t-fallback").value      = t?.fallback_message || "";
+  document.getElementById("t-capabilities").value  = fromLines(t?.capabilities);
+  document.getElementById("t-limitations").value   = fromLines(t?.limitations);
+  document.getElementById("t-do-not-use").value    = fromLines(t?.do_not_use_when);
+  document.getElementById("t-examples").value      = fromLines(t?.example_questions);
+  document.getElementById("t-notes").value         = t?.notes || "";
+  document.getElementById("t-data-owner").value    = t?.data_owner || "";
+  document.getElementById("t-last-reviewed").value = t?.last_reviewed?.split("T")[0] || "";
+  document.getElementById("t-enabled").checked     = t ? t.enabled : true;
+  document.getElementById("t-requires-agent").checked = t?.requires_agent_context || false;
+  document.getElementById("tool-delete-btn").style.display = t ? "" : "none";
+  document.getElementById("tool-modal-msg").textContent = "";
+  document.getElementById("tool-modal").classList.add("open");
+  document.getElementById("t-tool-name").focus();
+}
+
+async function saveTool() {
+  const id  = document.getElementById("tool-edit-id").value;
+  const body = {
+    tool_name:              document.getElementById("t-tool-name").value.trim(),
+    display_name:           document.getElementById("t-display-name").value.trim(),
+    category:               document.getElementById("t-category").value || null,
+    coverage_status:        document.getElementById("t-coverage").value,
+    data_sensitivity:       document.getElementById("t-sensitivity").value,
+    api_source:             document.getElementById("t-api-source").value.trim() || null,
+    description:            document.getElementById("t-description").value.trim() || null,
+    fallback_message:       document.getElementById("t-fallback").value.trim() || null,
+    capabilities:           lines(document.getElementById("t-capabilities").value),
+    limitations:            lines(document.getElementById("t-limitations").value),
+    do_not_use_when:        lines(document.getElementById("t-do-not-use").value),
+    example_questions:      lines(document.getElementById("t-examples").value),
+    notes:                  document.getElementById("t-notes").value.trim() || null,
+    data_owner:             document.getElementById("t-data-owner").value.trim() || null,
+    last_reviewed:          document.getElementById("t-last-reviewed").value || null,
+    enabled:                document.getElementById("t-enabled").checked,
+    requires_agent_context: document.getElementById("t-requires-agent").checked,
+  };
+  const msgEl = document.getElementById("tool-modal-msg");
+  if (!body.tool_name || !body.display_name) { msgEl.textContent = "Tool name and display name are required."; return; }
+  try {
+    if (id) await PUT(`/api/cam/tools/${id}`, body);
+    else    await POST("/api/cam/tools", body);
+    closeModals();
+    await loadTools();
+  } catch (e) { msgEl.textContent = e.message; }
+}
+
+async function deleteTool() {
+  const id = document.getElementById("tool-edit-id").value;
+  if (!id || !confirm("Delete this tool?")) return;
+  try {
+    await APIDEL(`/api/cam/tools/${id}`);
+    closeModals();
+    await loadTools();
+  } catch (e) { document.getElementById("tool-modal-msg").textContent = e.message; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API DOCS
+═══════════════════════════════════════════════════════════════════ */
+let _apiDocs = [];
+
+async function loadApiDocs() {
+  try {
+    _apiDocs = await GET("/api/cam/api-docs");
+    renderApiDocs();
+  } catch (e) {
+    document.getElementById("api-docs-tbody").innerHTML =
+      `<tr class="empty"><td colspan="6">Failed: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderApiDocs() {
+  const tbody = document.getElementById("api-docs-tbody");
+  if (!_apiDocs.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="6">No API docs yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _apiDocs.map(d => `
+    <tr>
+      <td><strong class="mono">${esc(d.api_name)}</strong><br>
+          <span style="font-size:12px;color:var(--text-muted)">${esc(d.display_name || "")}</span></td>
+      <td><span style="font-size:12px;color:var(--text-muted)">${esc(d.auth_method || "—")}</span></td>
+      <td>${coverageChip(d.coverage_status)}</td>
+      <td>${d.sandbox_available ? '<span class="chip chip-green">yes</span>' : '<span class="chip chip-muted">no</span>'}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${(d.capabilities||[]).length} defined</td>
+      <td><button class="tbl-link" onclick="openApiDocModal(${d.id})">Edit</button></td>
+    </tr>`).join("");
+}
+
+function openApiDocModal(id) {
+  const d = id ? _apiDocs.find(x => x.id === id) : null;
+  document.getElementById("api-edit-id").value        = d?.id || "";
+  document.getElementById("api-doc-modal-title").textContent = d ? "Edit API Doc" : "Add API Doc";
+  document.getElementById("a-api-name").value          = d?.api_name || "";
+  document.getElementById("a-display-name").value      = d?.display_name || "";
+  document.getElementById("a-base-url").value          = d?.base_url || "";
+  document.getElementById("a-auth-method").value       = d?.auth_method || "";
+  document.getElementById("a-auth-notes").value        = d?.auth_notes || "";
+  document.getElementById("a-coverage").value          = d?.coverage_status || "design_needed";
+  document.getElementById("a-contact").value           = d?.primary_contact || "";
+  document.getElementById("a-rate-limit").value        = d?.rate_limit_notes || "";
+  document.getElementById("a-docs-url").value          = d?.docs_external_url || "";
+  document.getElementById("a-contract").value          = d?.contract_notes || "";
+  document.getElementById("a-notes").value             = d?.notes || "";
+  document.getElementById("a-sandbox").checked         = d?.sandbox_available || false;
+  document.getElementById("api-delete-btn").style.display = d ? "" : "none";
+  document.getElementById("api-doc-modal-msg").textContent = "";
+  document.getElementById("api-doc-modal").classList.add("open");
+  document.getElementById("a-api-name").focus();
+}
+
+async function saveApiDoc() {
+  const id   = document.getElementById("api-edit-id").value;
+  const body = {
+    api_name:         document.getElementById("a-api-name").value.trim(),
+    display_name:     document.getElementById("a-display-name").value.trim() || null,
+    base_url:         document.getElementById("a-base-url").value.trim() || null,
+    auth_method:      document.getElementById("a-auth-method").value || null,
+    auth_notes:       document.getElementById("a-auth-notes").value.trim() || null,
+    coverage_status:  document.getElementById("a-coverage").value,
+    primary_contact:  document.getElementById("a-contact").value.trim() || null,
+    rate_limit_notes: document.getElementById("a-rate-limit").value.trim() || null,
+    docs_external_url:document.getElementById("a-docs-url").value.trim() || null,
+    contract_notes:   document.getElementById("a-contract").value.trim() || null,
+    notes:            document.getElementById("a-notes").value.trim() || null,
+    sandbox_available:document.getElementById("a-sandbox").checked,
+  };
+  const msgEl = document.getElementById("api-doc-modal-msg");
+  if (!body.api_name) { msgEl.textContent = "API name is required."; return; }
+  try {
+    if (id) await PUT(`/api/cam/api-docs/${id}`, body);
+    else    await POST("/api/cam/api-docs", body);
+    closeModals();
+    await loadApiDocs();
+  } catch (e) { msgEl.textContent = e.message; }
+}
+
+async function deleteApiDoc() {
+  const id = document.getElementById("api-edit-id").value;
+  if (!id || !confirm("Delete this API doc and all its capabilities?")) return;
+  try {
+    await APIDEL(`/api/cam/api-docs/${id}`);
+    closeModals();
+    await loadApiDocs();
+  } catch (e) { document.getElementById("api-doc-modal-msg").textContent = e.message; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   KNOWLEDGE BASE
+═══════════════════════════════════════════════════════════════════ */
+async function loadKnowledge() {
+  try {
+    const sources = await GET("/api/cam/knowledge");
+    renderKnowledge(sources);
+  } catch (e) {
+    document.getElementById("knowledge-tbody").innerHTML =
+      `<tr class="empty"><td colspan="8">Failed: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderKnowledge(sources) {
+  const tbody = document.getElementById("knowledge-tbody");
+  if (!sources.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="8">No sources ingested yet</td></tr>';
+    return;
+  }
+  const badgeClass = s => ({ current:"badge-current", pending:"badge-pending", error:"badge-error", stale:"badge-stale" }[s] || "badge-stale");
+  tbody.innerHTML = sources.map(s => `
+    <tr>
+      <td>${esc(s.display_name)}</td>
+      <td><span style="font-size:12px;color:var(--text-muted)">${esc(s.category || "—")}</span></td>
+      <td>
+        <span class="status-badge ${badgeClass(s.index_status)}">${s.index_status}</span>
+        ${s.index_status === 'error' ? `<div style="font-size:11px;color:var(--red);margin-top:4px;max-width:220px;word-break:break-word">${esc(s.notes) || 'No detail — check Cloud Run logs'}</div>` : ''}
+      </td>
+      <td style="font-family:var(--mono);font-size:12px">${s.chunk_count ?? "—"}</td>
+      <td style="font-family:var(--mono);font-size:12px">${s.word_count ? s.word_count.toLocaleString() : "—"}</td>
+      <td style="font-size:12px;color:var(--text-muted)">${fmtTime(s.last_indexed_at)}</td>
+      <td style="text-align:center">${s.is_system_prompt ? "✓" : ""}</td>
+      <td>
+        <button class="tbl-link" onclick="reingestSource('${esc(s.source_id)}','${esc(s.display_name)}','${esc(s.category||'')}',${s.is_system_prompt})">↻ Re-ingest</button>
+        <button class="tbl-link" style="color:var(--red)" onclick="deleteSource(${s.id}, '${esc(s.display_name)}')">✕</button>
+      </td>
+    </tr>`).join("");
+}
+
+async function ingestSource() {
+  const sourceId   = document.getElementById("ing-source-id").value.trim();
+  const displayName = document.getElementById("ing-display-name").value.trim();
+  const category   = document.getElementById("ing-category").value;
+  const isSystem   = document.getElementById("ing-system-prompt").checked;
+  const msgEl      = document.getElementById("ing-msg");
+  if (!sourceId || !displayName) { msgEl.textContent = "Drive ID and display name are required."; return; }
+  try {
+    msgEl.textContent = "Starting ingestion…";
+    await POST("/api/cam/knowledge/ingest", { source_id: sourceId, display_name: displayName, category: category || null, is_system_prompt: isSystem });
+    msgEl.textContent = "✓ Ingestion started — status will update in the table";
+    document.getElementById("ing-source-id").value = "";
+    document.getElementById("ing-display-name").value = "";
+    await loadKnowledge();
+  } catch (e) { msgEl.textContent = "Failed: " + e.message; }
+}
+
+async function reingestSource(sourceId, displayName, category, isSystem) {
+  try {
+    await POST("/api/cam/knowledge/ingest", { source_id: sourceId, display_name: displayName, category: category || null, is_system_prompt: isSystem });
+    alert("Re-ingestion started. Refresh in a moment to see updated status.");
+    await loadKnowledge();
+  } catch (e) { alert("Failed: " + e.message); }
+}
+
+async function deleteSource(id, name) {
+  if (!confirm(`Remove "${name}" and all its vector chunks?`)) return;
+  try { await APIDEL(`/api/cam/knowledge/${id}`); await loadKnowledge(); }
+  catch (e) { alert("Failed: " + e.message); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INTERACTION LOG
+═══════════════════════════════════════════════════════════════════ */
+async function loadLogs() {
+  const oos = document.getElementById("log-oos-filter")?.checked;
+  try {
+    const rows = await GET(`/api/cam/interactions?limit=200${oos ? "&out_of_scope=true" : ""}`);
+    renderLogs(rows);
+  } catch (e) {
+    document.getElementById("logs-tbody").innerHTML =
+      `<tr class="empty"><td colspan="7">Failed: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderLogs(rows) {
+  const total = rows.length;
+  const up   = rows.filter(r => r.feedback_score === 1).length;
+  const down = rows.filter(r => r.feedback_score === -1).length;
+  const oos  = rows.filter(r => r.out_of_scope).length;
+  document.getElementById("ls-total").textContent = total;
+  document.getElementById("ls-up").textContent    = up;
+  document.getElementById("ls-down").textContent  = down;
+  document.getElementById("ls-oos").textContent   = oos;
+
+  const tbody = document.getElementById("logs-tbody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr class="empty"><td colspan="7">No interactions yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const tools = (r.tools_called || []).join(", ") || "—";
+    const fb = r.feedback_score === 1 ? "👍" : r.feedback_score === -1 ? "👎" : "—";
+    return `<tr style="${r.out_of_scope ? "opacity:.6" : ""}">
+      <td style="font-size:12px;white-space:nowrap;color:var(--text-muted)">${fmtTime(r.created_at)}</td>
+      <td style="font-size:12px">${esc(r.agent_name || "—")}</td>
+      <td style="max-width:340px"><span title="${esc(r.question)}">${esc(truncate(r.question,90))}</span></td>
+      <td style="font-size:11px;color:var(--text-muted);max-width:140px">${esc(truncate(tools,60))}</td>
+      <td>${sourceChip(r.source_tier)}</td>
+      <td style="text-align:center">${fb}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">${r.response_ms ?? "—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+// No programmatic google.accounts.id.initialize() call needed — the declarative
+// g_id_onload and g_id_signin divs tell the GSI library everything it needs when
+// it finishes loading (async). Calling initialize() inline risks "google is not
+// defined" if the async script hasn't arrived yet.
+</script>
+</body>
+</html>

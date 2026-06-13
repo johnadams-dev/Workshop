@@ -559,6 +559,16 @@
   </div>
 </section>
 
+<!-- Sign-in fallback modal — shown when the silent Google prompt is blocked/skipped -->
+<div id="signinModal" style="display:none; position:fixed; inset:0; background:rgba(26,26,46,0.6); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:12px; padding:2.5rem 2rem; text-align:center; max-width:320px; box-shadow:var(--shadow-hover);">
+    <h3 style="font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--ink); margin-bottom:0.5rem;">Sign in required</h3>
+    <p style="font-size:0.85rem; color:var(--slate); margin-bottom:1.5rem; line-height:1.6;">Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex; justify-content:center;"></div>
+    <button onclick="document.getElementById('signinModal').style.display='none'" style="margin-top:1.2rem; background:none; border:none; color:var(--muted); font-size:0.8rem; cursor:pointer; text-decoration:underline;">Cancel</button>
+  </div>
+</div>
+
 <footer>
   <div class="footer-name">John Adams</div>
   <p>Questions or bug reports? Email <a href="mailto:johnadams@adamscameron.com">johnadams@adamscameron.com</a></p>
@@ -573,6 +583,9 @@ const SESSION_KEY  = 'ac_proxy_key';
 let _pendingHotsheet = false;
 
 async function handleCredential(cred) {
+  // Close the fallback sign-in modal if it was open
+  document.getElementById('signinModal').style.display = 'none';
+
   // Always check manager status on sign-in
   try {
     const r = await fetch(PROXY_BASE + '/auth/is-manager', {
@@ -618,6 +631,11 @@ function initGoogleSignIn() {
   });
   // Silent prompt — auto-selects if signed in, no visible UI for non-managers
   google.accounts.id.prompt();
+  // Pre-render a visible Sign-In button as a fallback for when the silent
+  // prompt is blocked or skipped (third-party cookies disabled, FedCM, etc.)
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
+  });
 }
 
 function openHotsheet() {
@@ -631,8 +649,9 @@ function openHotsheet() {
   const doPrompt = () => {
     google.accounts.id.prompt((n) => {
       if (n.isNotDisplayed() || n.isSkippedMoment()) {
-        _pendingHotsheet = false;
-        if (arrow) arrow.textContent = 'Sign in required — check Google popup';
+        // Silent sign-in didn't work — fall back to an interactive Google sign-in button
+        if (arrow) { arrow.innerHTML = 'Open Hotsheet <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>'; }
+        document.getElementById('signinModal').style.display = 'flex';
       }
     });
   };
