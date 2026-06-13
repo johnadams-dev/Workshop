@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Records — Adams Cameron & Co.</title>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --red:#C0392B;  --green:#1A7A4C; --bg:#F4F6F9; --surface:#FFFFFF;
+  --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  --ok:#D1FAE5; --ok-b:#065F46; --ok-t:#059669;
+  --warn:#FEF3C7; --warn-b:#D97706; --warn-t:#B45309;
+  --miss:#FEE2E2; --miss-b:#DC2626; --miss-t:#991B1B;
+  --info:#EFF6FF; --info-b:#2563EB;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* topbar */
+.topbar{background:var(--navy);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:50px;position:sticky;top:0;z-index:100;border-bottom:2px solid var(--gold)}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-title{color:#fff;font-size:14px;font-weight:500;margin-left:14px}
+.topbar-left{display:flex;align-items:center}
+.topbar-right{display:flex;gap:8px;align-items:center}
+
+/* layout */
+.layout{display:flex;height:calc(100vh - 50px)}
+
+/* list panel */
+.list-panel{width:300px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.list-toolbar{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px}
+.search-wrap{position:relative}
+.search-wrap input{width:100%;padding:6px 10px 6px 30px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);outline:none}
+.search-wrap input:focus{border-color:var(--blue)}
+.search-icon{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.filter-row{display:flex;gap:5px;flex-wrap:wrap}
+.filter-btn{padding:3px 9px;border-radius:10px;border:1px solid var(--border);font-size:11px;cursor:pointer;background:var(--bg);color:var(--muted);font-weight:600;white-space:nowrap}
+.filter-btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.filter-btn.f-issues.active{background:var(--warn-b);border-color:var(--warn-b)}
+.list-count{padding:5px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg)}
+.agent-list{overflow-y:auto;flex:1}
+.agent-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .1s}
+.agent-item:hover{background:#F0F4FA}
+.agent-item.selected{background:#E8F0FB;border-left:3px solid var(--blue)}
+.agent-item.has-issues{background:var(--warn)}
+.agent-item.has-issues.selected{background:#FDE68A;border-left-color:var(--warn-b)}
+.agent-item.inactive{opacity:.55}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--navy);color:var(--gold);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.agent-info{flex:1;min-width:0}
+.agent-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot-row{display:flex;gap:3px;flex-shrink:0}
+.dot{width:7px;height:7px;border-radius:50%}
+
+/* detail panel */
+.detail-panel{flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)}
+.detail-empty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:6px}
+.detail-empty-icon{font-size:40px;opacity:.2}
+
+/* agent header */
+.agent-header{background:var(--surface);border-radius:10px;padding:18px 22px;border:1px solid var(--border);display:flex;align-items:flex-start;gap:16px;margin-bottom:14px}
+.photo-wrap{position:relative;flex-shrink:0}
+.photo-lg{width:64px;height:64px;border-radius:50%;background:var(--navy);color:var(--gold);font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid var(--border)}
+.photo-lg img{width:100%;height:100%;object-fit:cover}
+.header-info{flex:1}
+.header-name{font-size:19px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.header-email{font-size:12px;color:var(--muted);margin-bottom:6px}
+.header-badges{display:flex;gap:5px;flex-wrap:wrap}
+.badge{padding:2px 7px;border-radius:9px;font-size:11px;font-weight:600;border:1px solid transparent}
+.badge-active{background:var(--ok);color:var(--ok-b)}
+.badge-inactive{background:#F3F4F6;color:var(--muted)}
+.badge-office{background:var(--info);color:var(--info-b)}
+.badge-sms{background:#F0FDF4;color:var(--green);border-color:#86EFAC}
+.badge-issue{background:var(--warn);color:var(--warn-t);border-color:#FCD34D}
+.badge-missing{background:var(--miss);color:var(--miss-t);border-color:#FECACA}
+.header-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+
+/* save bar */
+.save-bar{display:none;background:var(--navy);color:#fff;padding:9px 16px;border-radius:8px;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:13px;gap:10px}
+.save-bar.on{display:flex}
+
+/* reconciliation panel */
+.recon-panel{background:var(--surface);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;overflow:hidden}
+.recon-head{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.recon-title{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.recon-body{padding:0}
+
+.recon-row{display:grid;grid-template-columns:160px 1fr 1fr 1fr;border-bottom:1px solid var(--border);font-size:12px}
+.recon-row:last-child{border-bottom:none}
+.recon-row.header-row{background:var(--bg);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.recon-cell{padding:8px 12px;display:flex;align-items:center;gap:6px;min-width:0;word-break:break-word}
+.recon-cell.field-name{font-weight:600;color:var(--text);font-size:12px}
+.recon-cell.src-db{background:#FAFBFF}
+
+.val-ok   {color:var(--ok-t)}
+.val-warn {color:var(--warn-t)}
+.val-miss {color:var(--miss-t);font-style:italic}
+.val-mismatch{color:var(--warn-t);font-weight:600}
+.val-neutral{color:var(--muted);font-style:italic}
+
+.status-icon{font-size:13px;flex-shrink:0}
+
+/* cards */
+.card{background:var(--surface);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;overflow:hidden}
+.card-head{padding:11px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+.card-body{padding:14px 16px}
+
+/* fields */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:11px 14px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.ff{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:4px}
+.field input,.field select{padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);background:var(--surface);outline:none;font-family:inherit}
+.field input:focus,.field select:focus{border-color:var(--blue)}
+.field input[readonly]{background:var(--bg);color:var(--muted);cursor:default}
+.field input.f-warn{border-color:var(--warn-b);background:var(--warn)}
+.field input.f-miss{border-color:var(--miss-b);background:var(--miss)}
+.field-hint{font-size:10px;color:var(--muted)}
+.field-hint.h-warn{color:var(--warn-t)}
+.field-hint.h-miss{color:var(--miss-t)}
+
+/* id wrap */
+.id-wrap{display:flex;gap:5px;align-items:center}
+.id-wrap input{flex:1}
+.src{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:800;flex-shrink:0;letter-spacing:.3px}
+.src-dn{background:#EFF6FF;color:var(--info-b)}
+.src-pp{background:#FFF7ED;color:#C2410C}
+.src-nar{background:#F0FDF4;color:var(--green)}
+
+/* toggles */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px}
+.toggle-label small{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.toggle{position:relative;width:34px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;border-radius:9px;background:var(--border);cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--blue)}
+.toggle-track::after{content:'';position:absolute;width:15px;height:15px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.toggle input:checked+.toggle-track::after{transform:translateX(15px)}
+
+/* buttons */
+.btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;white-space:nowrap;font-family:inherit}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#1E5F9A}
+.btn-secondary{background:var(--surface);color:var(--navy);border-color:var(--border)}
+.btn-secondary:hover{background:var(--bg)}
+.btn-danger{background:#FEF2F2;color:var(--red);border-color:#FECACA}
+.btn-sm{padding:4px 9px;font-size:11px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* stats */
+.stat-row{display:flex;gap:8px}
+.stat{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center}
+.stat-val{font-size:20px;font-weight:700;color:var(--navy)}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:.3px}
+
+/* toast */
+.toast-area{position:fixed;top:60px;right:14px;z-index:200;display:flex;flex-direction:column;gap:6px}
+.toast{background:var(--navy);color:#fff;padding:9px 14px;border-radius:7px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:tin .2s ease;max-width:280px}
+.toast.err{background:var(--red)}.toast.ok{background:var(--green)}
+@keyframes tin{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:12px;width:440px;max-width:96vw;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;color:var(--navy);display:flex;justify-content:space-between;align-items:center}
+.modal-body{padding:18px;display:flex;flex-direction:column;gap:10px}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:7px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">ACC</span>
+    <span class="topbar-title">Agent Records</span>
+  </div>
+  <div class="topbar-right">
+    <span id="issue-summary" style="font-size:11px;color:#8ab4cc"></span>
+    <button class="btn btn-secondary btn-sm" onclick="openNewAgent()">+ Add Agent</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportCsv()">Export</button>
+  </div>
+</div>
+
+<div class="toast-area" id="toasts"></div>
+
+<div class="layout">
+  <div class="list-panel">
+    <div class="list-toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="search" placeholder="Name, email, office, ID…" oninput="filterList()">
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-btn" onclick="setFilter('active',this)">Active</button>
+        <button class="filter-btn f-issues" onclick="setFilter('issues',this)">⚠ Issues</button>
+        <button class="filter-btn" onclick="setFilter('inactive',this)">Inactive</button>
+      </div>
+    </div>
+    <div class="list-count" id="list-count">Loading…</div>
+    <div class="agent-list" id="agent-list">
+      <div style="padding:24px;text-align:center;color:var(--muted)">
+        <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-empty" id="detail-empty">
+      <div class="detail-empty-icon">👤</div>
+      <div>Select an agent to view their record</div>
+    </div>
+    <div id="detail-content" style="display:none"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="new-modal">
+  <div class="modal">
+    <div class="modal-head">Add Agent <button onclick="closeNewAgent()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Email (@adamscameron.com)</label><input type="email" id="na-email" placeholder="firstlast@adamscameron.com"></div>
+      <div class="fg"><div class="field"><label>First name</label><input type="text" id="na-first"></div><div class="field"><label>Last name</label><input type="text" id="na-last"></div></div>
+      <div class="field"><label>Office</label><select id="na-office"><option value="">— Select —</option></select></div>
+      <div class="field"><label>Cell phone</label><input type="tel" id="na-phone" placeholder="(386) 555-0100"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeNewAgent()">Cancel</button>
+      <button class="btn btn-primary" onclick="createAgent()">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const PROXY_URL  = (localStorage.getItem('acc_proxy_url')  || prompt('Proxy URL:') || '').replace(/\/$/,'');
+const PROXY_KEY  = localStorage.getItem('acc_proxy_key')   || prompt('Proxy key:') || '';
+const USER_EMAIL = localStorage.getItem('acc_user_email')  || prompt('Your ACC email:') || '';
+if (PROXY_URL)  localStorage.setItem('acc_proxy_url', PROXY_URL);
+if (PROXY_KEY)  localStorage.setItem('acc_proxy_key', PROXY_KEY);
+if (USER_EMAIL) localStorage.setItem('acc_user_email', USER_EMAIL);
+
+// Google snapshot — place google_snapshot.json in the same folder as this file
+// or embed inline. Falls back to empty if not found.
+let googleSnap = {};
+fetch('./google_snapshot.json').then(r => r.json()).then(d => { googleSnap = d; }).catch(() => {});
+
+const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let allAgents = [], offices = [], currentId = null, pending = {}, currentFilter = 'all';
+
+// ── Issue detection (DB-only, runs on every agent in the list) ───────────────
+function issues(a) {
+  const ii = [];
+  if (!a.dmg_id)   ii.push({ key:'dmg_id',  sev:'warn', msg:'Missing DeltaNet ID' });
+  if (!a.pp_id)    ii.push({ key:'pp_id',   sev:'warn', msg:'Missing Profit Power ID' });
+  if (!a.nrds_id)  ii.push({ key:'nrds_id', sev:'info', msg:'No NRDS / license number' });
+  if (!a.cell_e164 && !a.cell_raw) ii.push({ key:'phone', sev:'info', msg:'No phone on file' });
+  if (!a.office_id) ii.push({ key:'office', sev:'warn', msg:'No office assigned' });
+  if (a.email && (a.email.includes('hyperlink')||a.email.includes('mailto')||a.email.startsWith('=')))
+    ii.push({ key:'email', sev:'error', msg:'Email contains a spreadsheet formula — fix immediately' });
+  return ii;
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/agents`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allAgents = await r.json();
+    // Build office list from data
+    const om = {};
+    allAgents.forEach(a => { if (a.office_id && a.office) om[a.office_id] = a.office; });
+    offices = Object.entries(om).map(([id,name]) => ({id:+id,name})).sort((a,b) => a.name.localeCompare(b.name));
+    const sel = document.getElementById('na-office');
+    offices.forEach(o => sel.innerHTML += `<option value="${o.name}">${o.name}</option>`);
+    filterList();
+    const ic = allAgents.filter(a => a.active && issues(a).length).length;
+    document.getElementById('issue-summary').textContent = ic ? `${ic} agents need attention` : '';
+    toast(`${allAgents.length} agents`, 'ok');
+  } catch(e) { toast('Load failed: '+e.message,'err'); }
+}
+
+// ── List ─────────────────────────────────────────────────────────────────────
+const ini = a => ((a.first_name||'?')[0]+(a.last_name||'?')[0]).toUpperCase();
+const match = (a,q) => !q || [a.first_name,a.last_name,a.email,a.office,a.pp_id,a.dmg_id,a.nrds_id].some(v => (v||'').toLowerCase().includes(q.toLowerCase()));
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterList();
+}
+
+function filterList() {
+  const q = document.getElementById('search').value.trim();
+  let list = allAgents.filter(a => match(a, q));
+  if (currentFilter==='active')   list = list.filter(a => a.active);
+  if (currentFilter==='inactive') list = list.filter(a => !a.active);
+  if (currentFilter==='issues')   list = list.filter(a => a.active && issues(a).length);
+  list.sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''));
+
+  const ic = allAgents.filter(a => a.active && issues(a).length).length;
+  document.getElementById('list-count').textContent = `${list.length} shown · ${ic} with issues`;
+
+  const el = document.getElementById('agent-list');
+  if (!list.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">None match</div>'; return; }
+
+  el.innerHTML = list.map(a => {
+    const ii = issues(a), hasissue = a.active && ii.length>0;
+    const cls = ['agent-item', currentId===a.id?'selected':'', hasissue?'has-issues':'', !a.active?'inactive':''].filter(Boolean).join(' ');
+    const ph = a.photo_url ? `<img src="${a.photo_url}" alt="" onerror="this.style.display='none'">` : ini(a);
+
+    // Status dots: blue=dmg, orange=pp, green=nrds, grey=inactive, red=issue
+    const dots = [
+      a.dmg_id  ? `<span class="dot" style="background:var(--blue)"   title="DeltaNet ID"></span>` : '',
+      a.pp_id   ? `<span class="dot" style="background:#C2410C"        title="Profit Power ID"></span>` : '',
+      a.nrds_id ? `<span class="dot" style="background:var(--green)"   title="NRDS/License"></span>` : '',
+      !a.active ? `<span class="dot" style="background:var(--muted)"   title="Inactive"></span>` : '',
+      hasissue  ? `<span class="dot" style="background:var(--miss-b)"  title="${ii.length} issue(s)"></span>` : '',
+    ].join('');
+
+    return `<div class="${cls}" onclick="selectAgent(${a.id})">
+      <div class="avatar">${ph}</div>
+      <div class="agent-info">
+        <div class="agent-name">${a.last_name}, ${a.first_name}</div>
+        <div class="agent-meta">${a.office||'No office'}</div>
+      </div>
+      <div class="dot-row">${dots}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Detail ────────────────────────────────────────────────────────────────────
+async function selectAgent(id) {
+  currentId = id; pending = {};
+  filterList();
+  document.getElementById('detail-empty').style.display = 'none';
+  const c = document.getElementById('detail-content');
+  c.style.display = 'block';
+
+  // Load full detail from /agent/detail/:id (includes dmg_id, pp_id, nrds_id, etc.)
+  // Falls back to allAgents data if endpoint not yet deployed
+  let a = allAgents.find(x => x.id===id);
+  try {
+    const r = await fetch(`${PROXY_URL}/agent/detail/${id}`, { headers: H() });
+    if (r.ok) { a = await r.json(); /* update local cache */ const idx = allAgents.findIndex(x=>x.id===id); if(idx>=0) Object.assign(allAgents[idx], a); }
+  } catch(_) {}
+
+  renderDetail(a);
+}
+
+function renderDetail(a) {
+  const ii = issues(a);
+  const goog = googleSnap[a.email?.toLowerCase()] || null;
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="save-bar" id="save-bar"><span>Unsaved changes</span>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-secondary btn-sm" onclick="discard()">Discard</button>
+        <button class="btn btn-primary btn-sm" id="save-btn" onclick="save()">Save</button>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <div class="agent-header">
+      <div class="photo-wrap">
+        <div class="photo-lg" id="aph-${a.id}">${a.photo_url?`<img src="${a.photo_url}" alt="" onerror="this.style.display='none'">`:(ini(a))}</div>
+      </div>
+      <div class="header-info">
+        <div class="header-name">${a.first_name} ${a.last_name}</div>
+        <div class="header-email">${a.email}</div>
+        <div class="header-badges">
+          <span class="badge ${a.active?'badge-active':'badge-inactive'}">${a.active?'Active':'Inactive'}</span>
+          ${a.office?`<span class="badge badge-office">${a.office}</span>`:''}
+          ${a.sms_opted_in?`<span class="badge badge-sms">SMS on</span>`:''}
+          ${a.enrollment_id?`<span class="badge" style="background:#F5F3FF;color:#5B21B6;border-color:#C4B5FD">Pathfinder</span>`:''}
+          ${ii.length?`<span class="badge badge-issue">${ii.length} issue${ii.length>1?'s':''}</span>`:'<span class="badge badge-active">✓ Complete</span>'}
+        </div>
+      </div>
+      <div class="header-actions">
+        ${a.active
+          ?`<button class="btn btn-danger btn-sm" onclick="deactivate(${a.id})">Deactivate</button>`
+          :`<button class="btn btn-secondary btn-sm" onclick="reactivate(${a.id})">Reactivate</button>`}
+      </div>
+    </div>
+
+    <!-- Reconciliation panel -->
+    <div class="recon-panel">
+      <div class="recon-head">
+        <span class="recon-title">Data reconciliation</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span id="recon-status" style="font-size:11px;color:var(--muted)">
+            ${a.dmg_id ? '<span class="spin"></span> Checking DeltaNet…' : 'No DeltaNet ID — enter dmg_id below to enable'}
+          </span>
+          ${a.dmg_id?`<button class="btn btn-secondary btn-sm" onclick="runRecon(${a.id},'${esc(a.dmg_id)}')">Refresh</button>`:''}
+        </div>
+      </div>
+      <div class="recon-body">
+        <div class="recon-row header-row">
+          <div class="recon-cell">Field</div>
+          <div class="recon-cell src-db">Database</div>
+          <div class="recon-cell">DeltaNet</div>
+          <div class="recon-cell">Google Workspace</div>
+        </div>
+        ${reconRow('Name', `${a.first_name||''} ${a.last_name||''}`.trim(), null, goog?`${goog.first_name||''} ${goog.last_name||''}`.trim():null)}
+        ${reconRow('Email', a.email, null, goog?a.email:null, true)}
+        ${reconRow('Phone', fmtPhone(a.cell_e164)||a.cell_raw||null, null, goog?.mobile||goog?.work_phone||null)}
+        ${reconRow('Office', a.office||null, null, goog?.department||null)}
+        ${reconRow('Active', a.active?'Yes':'No', null, goog?(goog.status==='Active'?'Yes':'No ('+goog.status+')'):null)}
+        ${reconRow('Google last sign-in', null, null, goog?.last_sign_in||null, false, true)}
+        <div class="recon-row" id="recon-extra-${a.id}">
+          <div class="recon-cell field-name" style="grid-column:1/-1;color:var(--muted);font-style:italic;font-size:11px">
+            ${a.dmg_id ? 'DeltaNet data loading…' : 'Add a DeltaNet ID (dmg_id) to enable DeltaNet comparison'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit form -->
+    <div class="card">
+      <div class="card-head">Contact &amp; identity</div>
+      <div class="card-body">
+        <div class="fg">
+          <div class="field"><label>First name</label><input type="text" value="${esc(a.first_name)}" onchange="chg('firstName',this.value)"></div>
+          <div class="field"><label>Last name</label><input type="text" value="${esc(a.last_name)}" onchange="chg('lastName',this.value)"></div>
+          <div class="field">
+            <label>Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(Google primary — auth key)</span></label>
+            <input type="email" value="${esc(a.email)}" readonly title="Change via Google Workspace admin, then update here">
+          </div>
+          <div class="field">
+            <label>Office</label>
+            <select onchange="chg('office',this.value)">
+              <option value="">— None —</option>
+              ${offices.map(o=>`<option value="${esc(o.name)}" ${(a.office===o.name)?'selected':''}>${esc(o.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Cell phone</label>
+            <input type="tel" value="${esc(a.cell_raw||fmtPhone(a.cell_e164))}" onchange="chg('phone',this.value)"
+              placeholder="(386) 555-0100" class="${!a.cell_e164&&!a.cell_raw?'f-warn':''}">
+            ${!a.cell_e164&&!a.cell_raw?`<span class="field-hint h-warn">Missing</span>`:''}
+          </div>
+          <div class="field"><label>Website</label><input type="url" value="${esc(a.website)}" onchange="chg('website',this.value)" placeholder="https://…"></div>
+          <div class="field ff"><label>Designations</label><input type="text" value="${esc(a.designations)}" onchange="chg('designations',this.value)" placeholder="GRI, ABR, CRS"></div>
+          <div class="field"><label>Languages</label><input type="text" value="${esc(a.languages)}" onchange="chg('languages',this.value)" placeholder="English, Spanish"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">External system IDs</div>
+      <div class="card-body">
+        <div class="fg fg3">
+          <div class="field">
+            <label>DeltaNet ID (dmg_id)</label>
+            <div class="id-wrap">
+              <input type="text" value="${esc(a.dmg_id)}" onchange="chg('dmg_id',this.value)"
+                placeholder="e.g. 81500018" class="${!a.dmg_id?'f-warn':''}">
+              <span class="src src-dn">DN</span>
+            </div>
+            ${!a.dmg_id?`<span class="field-hint h-warn">Required for bio, photo &amp; DeltaNet reconciliation</span>`:''}
+          </div>
+          <div class="field">
+            <label>Profit Power ID (pp_id)</label>
+            <div class="id-wrap">
+              <input type="text" value="${esc(a.pp_id)}" onchange="chg('pp_id',this.value)"
+                placeholder="e.g. 9426" class="${!a.pp_id?'f-warn':''}">
+              <span class="src src-pp">PP</span>
+            </div>
+            ${!a.pp_id?`<span class="field-hint h-warn">Required for commission data</span>`:''}
+          </div>
+          <div class="field">
+            <label>NRDS / FL License #</label>
+            <div class="id-wrap">
+              <input type="text" value="${esc(a.nrds_id)}" onchange="chg('nrds_id',this.value)" placeholder="e.g. BK-3010591">
+              <span class="src src-nar">NAR</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Notifications &amp; status</div>
+      <div class="card-body">
+        <div class="toggle-row"><div class="toggle-label">Active agent<small>Inactive agents cannot log in</small></div>
+          <label class="toggle"><input type="checkbox" ${a.active?'checked':''} onchange="chg('active',this.checked)"><span class="toggle-track"></span></label></div>
+        <div class="toggle-row"><div class="toggle-label">SMS notifications<small>Check-in reminders and coaching alerts</small></div>
+          <label class="toggle"><input type="checkbox" ${a.sms_opted_in?'checked':''} onchange="chg('sms_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
+        <div class="toggle-row"><div class="toggle-label">Email notifications<small>Coaching digests and system alerts</small></div>
+          <label class="toggle"><input type="checkbox" ${a.email_opted_in?'checked':''} onchange="chg('email_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Activity snapshot</div>
+      <div class="card-body">
+        <div class="stat-row">
+          <div class="stat"><div class="stat-val" id="st-ci-${a.id}">—</div><div class="stat-lbl">Check-ins</div></div>
+          <div class="stat"><div class="stat-val" id="st-lb-${a.id}">—</div><div class="stat-lbl">Lockboxes out</div></div>
+          <div class="stat"><div class="stat-val">${a.checkin_count??'—'}</div><div class="stat-lbl">Total check-ins (DB)</div></div>
+          <div class="stat"><div class="stat-val">${a.lockboxes_out??'—'}</div><div class="stat-lbl">Active checkouts (DB)</div></div>
+          <div class="stat"><div class="stat-val">${a.enrollment_id?'✓':'—'}</div><div class="stat-lbl">Pathfinder</div></div>
+        </div>
+      </div>
+    </div>`;
+
+  // Kick off DeltaNet reconciliation
+  if (a.dmg_id) runRecon(a.id, a.dmg_id, a);
+}
+
+// ── Reconciliation row helper ─────────────────────────────────────────────────
+function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false) {
+  const cell = (val, src) => {
+    if (val === null || val === undefined || val === '') {
+      return `<div class="recon-cell"><span class="val-miss">—</span></div>`;
+    }
+    if (isAuthKey) return `<div class="recon-cell"><span class="val-ok">✓</span> ${esc(val)}</div>`;
+    if (infoOnly)  return `<div class="recon-cell"><span style="color:var(--muted)">${esc(val)}</span></div>`;
+    return `<div class="recon-cell">${esc(val)}</div>`;
+  };
+
+  // Check for mismatch between db and other sources
+  let dbCell = cell(dbVal);
+  if (dbVal && dnVal && dnVal !== dbVal) dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from DeltaNet: ${esc(dnVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (dbVal && googVal && googVal !== dbVal && !isAuthKey) dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from Google: ${esc(googVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (!dbVal) dbCell = `<div class="recon-cell src-db"><span class="val-miss">Missing</span></div>`;
+  else dbCell = `<div class="recon-cell src-db"><span class="val-ok">✓</span> ${esc(dbVal)}</div>`;
+
+  const dnCell  = dnVal   ? `<div class="recon-cell">${dbVal&&dnVal!==dbVal?`<span class="val-mismatch">${esc(dnVal)}</span>`:esc(dnVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
+  const gCell   = googVal ? `<div class="recon-cell">${dbVal&&googVal!==dbVal&&!isAuthKey?`<span class="val-mismatch">${esc(googVal)}</span>`:esc(googVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
+
+  return `<div class="recon-row">
+    <div class="recon-cell field-name">${label}</div>
+    ${dbCell}${dnCell}${gCell}
+  </div>`;
+}
+
+// ── DeltaNet reconciliation ───────────────────────────────────────────────────
+async function runRecon(agentId, dmgId, agentData) {
+  if (!dmgId) return;
+  const statusEl = document.getElementById('recon-status');
+  const extraEl  = document.getElementById(`recon-extra-${agentId}`);
+  if (statusEl) statusEl.innerHTML = '<span class="spin"></span> Checking DeltaNet…';
+
+  try {
+    const r = await fetch(`${PROXY_URL}/agent/deltanet-bio?dmg_id=${encodeURIComponent(dmgId)}`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+
+    // raw is the full DeltaNet user object (requires enhanced endpoint)
+    // Falls back to bio-only if raw not present
+    const dn = data.raw || {};
+    const a  = agentData || allAgents.find(x=>x.id===agentId) || {};
+    const g  = googleSnap[a.email?.toLowerCase()] || {};
+
+    // Map DeltaNet field names — actual names confirmed after first live response
+    // Common DeltaNet v2 user field names (adjust after seeing live response):
+    const dnName   = [dn.FirstName, dn.LastName].filter(Boolean).join(' ') || dn.full_name || null;
+    const dnPhone  = dn.CellPhone || dn.Phone || dn.cell_phone || dn.phone || null;
+    const dnEmail  = dn.Email || dn.email || null;
+    const dnLicense= dn.License || dn.LicenseNumber || dn.nrds_id || dn.PublicID || null;
+    const dnActive = dn.ActiveFlag != null ? (dn.ActiveFlag ? 'Yes' : 'No') : (dn.Status || null);
+    const dnPhoto  = dn.PhotoUrl || dn.photo_url || dn.headshot_url || null;
+
+    // Update photo if DeltaNet has one and DB doesn't
+    if (dnPhoto) {
+      const phEl = document.getElementById(`aph-${agentId}`);
+      if (phEl && !a.photo_url) phEl.innerHTML = `<img src="${dnPhoto}" alt="" onerror="this.style.display='none'">`;
+    }
+
+    // Build reconciliation rows with DeltaNet data
+    const dbName   = `${a.first_name||''} ${a.last_name||''}`.trim();
+    const dbPhone  = fmtPhone(a.cell_e164) || a.cell_raw || null;
+    const gName    = g.first_name ? `${g.first_name} ${g.last_name}`.trim() : null;
+    const gPhone   = g.mobile || g.work_phone || null;
+    const gActive  = g.status ? (g.status==='Active'?'Yes':'No ('+g.status+')') : null;
+    const gSignIn  = g.last_sign_in || null;
+
+    const rows = [
+      reconRow('Name',        dbName,       dnName,    gName),
+      reconRow('Email',       a.email,      dnEmail,   a.email, true),
+      reconRow('Phone',       dbPhone,      dnPhone,   gPhone),
+      reconRow('Office',      a.office||null, null,    g.department||null),
+      reconRow('License / NRDS', a.nrds_id||null, dnLicense, null),
+      reconRow('Active',      a.active?'Yes':'No', dnActive, gActive),
+      reconRow('Bio',         data.bio?'Present':'Missing', data.bio?'Present':null, null),
+      reconRow('Photo',       a.photo_url?'Present':'Missing', dnPhoto?'Present':null, null),
+      reconRow('Google last sign-in', null, null, gSignIn, false, true),
+    ];
+
+    // Count mismatches
+    const mismatches = rows.filter(r => r.includes('val-mismatch')).length;
+    const missing    = rows.filter(r => r.includes('val-miss')).length;
+
+    if (statusEl) {
+      if (mismatches+missing === 0) statusEl.innerHTML = '<span style="color:var(--ok-t)">✓ All sources match</span>';
+      else statusEl.innerHTML = `<span style="color:var(--warn-t)">${mismatches} mismatch${mismatches!==1?'es':''}, ${missing} missing</span>`;
+    }
+
+    // Re-render the reconciliation table
+    const recon = document.querySelector('.recon-body');
+    if (recon) {
+      recon.innerHTML = `
+        <div class="recon-row header-row">
+          <div class="recon-cell">Field</div>
+          <div class="recon-cell src-db">Database</div>
+          <div class="recon-cell">DeltaNet</div>
+          <div class="recon-cell">Google Workspace</div>
+        </div>
+        ${rows.join('')}
+        ${dnLicense && !a.nrds_id ? `<div class="recon-row" style="background:var(--warn)">
+          <div class="recon-cell" style="grid-column:1/-1;font-size:11px;color:var(--warn-t)">
+            ⚠ DeltaNet has a license number (${esc(dnLicense)}) not stored in the database.
+            <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="applyDnLicense(${agentId},'${esc(dnLicense)}')">Apply to record</button>
+          </div>
+        </div>` : ''}`;
+    }
+
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:var(--miss-t)">DeltaNet unavailable: ${esc(e.message)}</span>`;
+  }
+}
+
+async function applyDnLicense(id, license) {
+  pending['nrds_id'] = license;
+  document.getElementById('save-bar')?.classList.add('on');
+  // Update the input visually
+  const inputs = document.querySelectorAll(`input[onchange*="nrds_id"]`);
+  inputs.forEach(i => i.value = license);
+  toast('License number staged — click Save to apply', '');
+}
+
+// ── Edit / Save ───────────────────────────────────────────────────────────────
+function chg(f, v) { pending[f] = v; document.getElementById('save-bar')?.classList.add('on'); }
+function discard() { pending = {}; document.getElementById('save-bar')?.classList.remove('on'); selectAgent(currentId); }
+
+async function save() {
+  if (!currentId || !Object.keys(pending).length) return;
+  const btn = document.getElementById('save-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Saving…'; }
+
+  try {
+    const core = {}, ext = {};
+    ['firstName','lastName','office','phone','active'].forEach(k => { if (k in pending) core[k]=pending[k]; });
+    ['dmg_id','pp_id','nrds_id','designations','languages','website','sms_opted_in','email_opted_in'].forEach(k => { if (k in pending) ext[k]=pending[k]; });
+
+    if (Object.keys(core).length) {
+      const r = await fetch(`${PROXY_URL}/agent/${currentId}`, { method:'PUT', headers:H(), body:JSON.stringify(core) });
+      if (!r.ok) throw new Error('Core save: HTTP '+r.status);
+    }
+
+    if (Object.keys(ext).length) {
+      const a = allAgents.find(x=>x.id===currentId);
+      const r = await fetch(`${PROXY_URL}/agent/sync`, {
+        method:'POST', headers:H(),
+        body: JSON.stringify({ action:'update', email:a?.email, ...ext }),
+      });
+      if (!r.ok) throw new Error('Extended save: HTTP '+r.status);
+    }
+
+    // Update cache
+    const idx = allAgents.findIndex(x=>x.id===currentId);
+    if (idx>=0) {
+      const map = { firstName:'first_name', lastName:'last_name', phone:'cell_raw' };
+      Object.entries(pending).forEach(([k,v]) => { allAgents[idx][map[k]||k] = v; });
+    }
+
+    pending = {};
+    document.getElementById('save-bar')?.classList.remove('on');
+    toast('Saved', 'ok');
+    await selectAgent(currentId);
+    filterList();
+  } catch(e) {
+    toast('Save failed: '+e.message, 'err');
+    if (btn) { btn.disabled=false; btn.textContent='Save'; }
+  }
+}
+
+async function deactivate(id) {
+  if (!confirm('Deactivate this agent?')) return;
+  const r = await fetch(`${PROXY_URL}/agent/${id}/deactivate`, { method:'POST', headers:H() });
+  if (r.ok) { const idx=allAgents.findIndex(x=>x.id===id); if(idx>=0) allAgents[idx].active=false; toast('Deactivated','ok'); selectAgent(id); filterList(); }
+  else toast('Failed: HTTP '+r.status,'err');
+}
+
+async function reactivate(id) {
+  const r = await fetch(`${PROXY_URL}/agent/${id}/reactivate`, { method:'POST', headers:H() });
+  if (r.ok) { const idx=allAgents.findIndex(x=>x.id===id); if(idx>=0) allAgents[idx].active=true; toast('Reactivated','ok'); selectAgent(id); filterList(); }
+  else toast('Failed: HTTP '+r.status,'err');
+}
+
+function openNewAgent()  { document.getElementById('new-modal').classList.add('open'); }
+function closeNewAgent() { document.getElementById('new-modal').classList.remove('open'); }
+
+async function createAgent() {
+  const email  = document.getElementById('na-email').value.trim().toLowerCase();
+  const first  = document.getElementById('na-first').value.trim();
+  const last   = document.getElementById('na-last').value.trim();
+  const office = document.getElementById('na-office').value;
+  const phone  = document.getElementById('na-phone').value.trim();
+  if (!email.endsWith('@adamscameron.com')) { toast('Must be @adamscameron.com','err'); return; }
+  if (!first||!last) { toast('Name required','err'); return; }
+  const r = await fetch(`${PROXY_URL}/agent/register`, { method:'POST', headers:H(), body:JSON.stringify({email,firstName:first,lastName:last,office,phone}) });
+  if (r.ok) { closeNewAgent(); toast('Agent created','ok'); await load(); } else toast('Failed: HTTP '+r.status,'err');
+}
+
+function exportCsv() {
+  const q = document.getElementById('search').value.trim();
+  let list = allAgents.filter(a=>match(a,q));
+  if (currentFilter==='active')   list=list.filter(a=>a.active);
+  if (currentFilter==='inactive') list=list.filter(a=>!a.active);
+  if (currentFilter==='issues')   list=list.filter(a=>a.active&&issues(a).length);
+  const cols=['id','email','first_name','last_name','office','active','dmg_id','pp_id','nrds_id','cell_e164','sms_opted_in','email_opted_in'];
+  const rows=[cols.join(','),...list.map(a=>cols.map(c=>JSON.stringify(a[c]??'')).join(','))];
+  const el=document.createElement('a');
+  el.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+  el.download=`agents_${new Date().toISOString().slice(0,10)}.csv`;
+  el.click();
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtPhone(e){if(!e)return '';const d=e.replace(/\D/g,'');if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;return e}
+function toast(msg,type){const a=document.getElementById('toasts');const el=document.createElement('div');el.className=`toast${type?' '+type:''}`;el.textContent=msg;a.appendChild(el);setTimeout(()=>el.remove(),3500)}
+
+load();
+</script>
+</body>
+</html>
