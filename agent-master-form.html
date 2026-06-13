@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Records — Adams Cameron & Co.</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
@@ -190,6 +191,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="toast-area" id="toasts"></div>
 
+<!-- Sign-in fallback modal — shown when the silent Google prompt is blocked/skipped -->
+<div id="signinModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1000; align-items:center; justify-content:center">
+  <div style="background:#fff; border-radius:12px; padding:2.5rem 2rem; text-align:center; max-width:320px; box-shadow:0 20px 60px rgba(0,0,0,.2)">
+    <h3 style="font-size:16px; color:var(--navy); margin-bottom:8px">Sign in required</h3>
+    <p style="font-size:13px; color:var(--muted); margin-bottom:18px; line-height:1.6">Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex; justify-content:center"></div>
+  </div>
+</div>
+
 <div class="layout">
   <div class="list-panel">
     <div class="list-toolbar">
@@ -239,12 +249,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const PROXY_URL  = (localStorage.getItem('acc_proxy_url')  || prompt('Proxy URL:') || '').replace(/\/$/,'');
-const PROXY_KEY  = localStorage.getItem('acc_proxy_key')   || prompt('Proxy key:') || '';
-const USER_EMAIL = localStorage.getItem('acc_user_email')  || prompt('Your ACC email:') || '';
-if (PROXY_URL)  localStorage.setItem('acc_proxy_url', PROXY_URL);
-if (PROXY_KEY)  localStorage.setItem('acc_proxy_key', PROXY_KEY);
-if (USER_EMAIL) localStorage.setItem('acc_user_email', USER_EMAIL);
+const PROXY_URL    = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
 
 // Google snapshot — place google_snapshot.json in the same folder as this file
 // or embed inline. Falls back to empty if not found.
@@ -261,7 +269,7 @@ function issues(a) {
   const ii = [];
   if (!a.dmg_id)   ii.push({ key:'dmg_id',  sev:'warn', msg:'Missing DeltaNet ID' });
   if (!a.pp_id)    ii.push({ key:'pp_id',   sev:'warn', msg:'Missing Profit Power ID' });
-  if (!a.nrds_id)  ii.push({ key:'nrds_id', sev:'info', msg:'No NRDS / license number' });
+  if (!a.nrds_id)  ii.push({ key:'nrds_id', sev:'info', msg:'No NRDS' });
   if (!a.cell_e164 && !a.cell_raw) ii.push({ key:'phone', sev:'info', msg:'No phone on file' });
   if (!a.office_id) ii.push({ key:'office', sev:'warn', msg:'No office assigned' });
   if (a.email && (a.email.includes('hyperlink')||a.email.includes('mailto')||a.email.startsWith('=')))
@@ -564,13 +572,14 @@ async function runRecon(agentId, dmgId, agentData) {
 
     // Map DeltaNet field names — actual names confirmed after first live response
     // Common DeltaNet v2 user field names (adjust after seeing live response):
-    const dnName   = [dn.FirstName, dn.LastName].filter(Boolean).join(' ') || dn.full_name || null;
-    const dnPhone  = dn.CellPhone || dn.Phone || dn.cell_phone || dn.phone || null;
-    const dnEmail  = dn.Email || dn.email || null;
-    const dnLicense= dn.License || dn.LicenseNumber || dn.nrds_id || dn.PublicID || null;
-    const dnActive = dn.ActiveFlag != null ? (dn.ActiveFlag ? 'Yes' : 'No') : (dn.Status || null);
-    const dnPhoto  = dn.PhotoUrl || dn.photo_url || dn.headshot_url || null;
-
+    const dnName    = [dn.FirstName, dn.LastName].filter(Boolean).join(' ') || null;
+    const dnPhone   = dn.CellPhone || dn.OfficePhone || null;
+    const dnEmail   = dn.PublicEmail || dn.UsernameThirdParty || null;
+    const dnLicense = dn.NRDSNumber ? String(dn.NRDSNumber) : null;
+    const dnActive  = dn.Status ? (dn.Status === 'active' ? 'Yes' : 'No (' + dn.Status + ')') : null;
+    const dnPhoto   = dn.PhotoURL || null;
+    const dnDesig   = dn.Designation || null;
+    const dnWebsite = dn.WebsiteURL || null;
     // Update photo if DeltaNet has one and DB doesn't
     if (dnPhoto) {
       const phEl = document.getElementById(`aph-${agentId}`);
@@ -585,16 +594,18 @@ async function runRecon(agentId, dmgId, agentData) {
     const gActive  = g.status ? (g.status==='Active'?'Yes':'No ('+g.status+')') : null;
     const gSignIn  = g.last_sign_in || null;
 
-    const rows = [
-      reconRow('Name',        dbName,       dnName,    gName),
-      reconRow('Email',       a.email,      dnEmail,   a.email, true),
-      reconRow('Phone',       dbPhone,      dnPhone,   gPhone),
-      reconRow('Office',      a.office||null, null,    g.department||null),
-      reconRow('License / NRDS', a.nrds_id||null, dnLicense, null),
-      reconRow('Active',      a.active?'Yes':'No', dnActive, gActive),
-      reconRow('Bio',         data.bio?'Present':'Missing', data.bio?'Present':null, null),
-      reconRow('Photo',       a.photo_url?'Present':'Missing', dnPhoto?'Present':null, null),
-      reconRow('Google last sign-in', null, null, gSignIn, false, true),
+   const rows = [
+      reconRow('Name',           dbName,                    dnName,                  gName),
+      reconRow('Email',          a.email,                   dnEmail,                 a.email, true),
+      reconRow('Phone',          dbPhone,                   dnPhone,                 gPhone),
+      reconRow('Office',         a.office||null,            null,                    g.department||null),
+      reconRow('NRDS / License', a.nrds_id||null,           dnLicense,               null),
+      reconRow('Designations',   a.designations||null,      dnDesig,                 null),
+      reconRow('Website',        a.website||null,           dnWebsite,               null),
+      reconRow('Active',         a.active?'Yes':'No',       dnActive,                gActive),
+      reconRow('Bio',            data.bio?'Present':'—',    data.bio?'Present':null, null),
+      reconRow('Photo',          a.photo_url?'Present':'—', dnPhoto?'Present':null,  null),
+      reconRow('Google sign-in', null,                      null,                    gSignIn, false, true),
     ];
 
     // Count mismatches
@@ -732,7 +743,34 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function fmtPhone(e){if(!e)return '';const d=e.replace(/\D/g,'');if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;return e}
 function toast(msg,type){const a=document.getElementById('toasts');const el=document.createElement('div');el.className=`toast${type?' '+type:''}`;el.textContent=msg;a.appendChild(el);setTimeout(()=>el.remove(),3500)}
 
-load();
+// ── Sign-in (auto, falls back to Google prompt) ────────────────────────────────
+function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    USER_EMAIL = payload.email || '';
+    if (USER_EMAIL) sessionStorage.setItem('ac_user_email', USER_EMAIL);
+  } catch(_) {}
+  document.getElementById('signinModal').style.display = 'none';
+  if (USER_EMAIL) load(); else toast('Sign-in failed', 'err');
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt((n) => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) {
+      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large', text:'signin_with', shape:'rectangular' });
+      document.getElementById('signinModal').style.display = 'flex';
+    }
+  });
+}
+
+if (USER_EMAIL) {
+  load();
+} else if (window.google?.accounts?.id) {
+  initGoogleSignIn();
+} else {
+  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+}
 </script>
 </body>
 </html>
