@@ -924,35 +924,13 @@ tbody tr.clickable { cursor: pointer; }
       <div id="nl-step-fs-picker" style="display:none">
         <div class="fs-search">
           <div class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Agent</div>
-          <select style="width:100%; padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
-            <option>Ashlee Selman</option>
-            <option>Cyndi Ritchey</option>
-            <option>Charles Kelly</option>
+          <select id="nl-fs-agent" onchange="nlLoadFsTransactions()" style="width:100%; padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+            <option value="">Select agent…</option>
           </select>
         </div>
-        <div class="divider">Recent Form Simplicity Files</div>
-        <div class="fs-list">
-          <div class="fs-item" onclick="selectFsTransaction('1223802')">
-            <div>
-              <div class="fs-item-main">3259 Silas Drive</div>
-              <div class="fs-item-sub">Updated 06/09/2026 &middot; New Smyrna Beach, FL</div>
-            </div>
-            <span class="chip chip-neutral">New</span>
-          </div>
-          <div class="fs-item" onclick="selectFsTransaction('1222687')">
-            <div>
-              <div class="fs-item-main">6291 W Fallsgrove Lane</div>
-              <div class="fs-item-sub">Updated 06/08/2026 &middot; Port Orange, FL</div>
-            </div>
-            <span class="chip chip-neutral">New</span>
-          </div>
-          <div class="fs-item" onclick="selectFsTransaction('1221460')">
-            <div>
-              <div class="fs-item-main">2290 Ocean Shore Boulevard</div>
-              <div class="fs-item-sub">Updated 06/05/2026 &middot; Ormond Beach, FL</div>
-            </div>
-            <span class="chip chip-neutral">New</span>
-          </div>
+        <div class="divider">Form Simplicity Files</div>
+        <div class="fs-list" id="nl-fs-list">
+          <div class="empty">Select an agent to load their Form Simplicity files.</div>
         </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
@@ -960,36 +938,46 @@ tbody tr.clickable { cursor: pointer; }
         </div>
       </div>
 
-      <!-- Step 2b: Manual form (simplified placeholder) -->
+      <!-- Step 2b: Manual form -->
       <div id="nl-step-manual" style="display:none">
+        <input type="hidden" id="nl-fs-trans-id" value="">
         <div class="form-grid" style="display:grid; gap:14px;">
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Address</span>
-              <input type="text" placeholder="123 Main St">
+              <input type="text" id="nl-addr" placeholder="123 Main St">
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
-              <input type="text" placeholder="Ormond Beach">
+              <input type="text" id="nl-city" placeholder="Ormond Beach">
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
-              <input type="text" placeholder="Start typing a name…">
+              <select id="nl-agent" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+                <option value="">Select agent…</option>
+              </select>
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">List Price</span>
-              <input type="text" placeholder="$0">
+              <input type="text" id="nl-price" placeholder="$0">
             </div>
           </div>
-          <div style="font-size:11px; color:var(--text-dim); font-style:italic;">
-            Full form fields (MLS #, dates, commission, source, etc.) match the existing hotsheet entry — shown abbreviated in this mockup.
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">List Date</span>
+              <input type="date" id="nl-list-date">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Expiration Date</span>
+              <input type="date" id="nl-exp-date">
+            </div>
           </div>
         </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
-          <button class="btn btn-primary btn-sm" onclick="closeNewModal()">Save Listing</button>
+          <button class="btn btn-primary btn-sm" onclick="nlSaveListing()">Save Listing</button>
         </div>
       </div>
 
@@ -1351,7 +1339,7 @@ function renderListingsTable(rows) {
               <td>${fmtMoney(t.current_price)}</td>
               <td>List ${fmtDate(t.list_date)}</td>
               <td><span class="chip ${chipClass}">${chipLabel}</span></td>
-              <td><button class="row-action" onclick="openActionModal('${escapeJs(t.property_address)}','listing','${dStatus}')">Actions ▾</button></td>
+              <td><button class="row-action" onclick="openActionModal('${t.id}','${escapeJs(t.property_address)}','listing','${dStatus}')">Actions ▾</button></td>
             </tr>`;
   }).join('');
 }
@@ -1377,7 +1365,7 @@ function renderContractsTable(rows) {
               <td>${fmtMoney(t.current_price)}</td>
               <td>List ${fmtDate(t.list_date)}</td>
               <td><span class="chip ${chipClass}">${chipLabel}</span></td>
-              <td><button class="row-action" onclick="openActionModal('${escapeJs(t.property_address)}','contract','${dStatus}')">Actions ▾</button></td>
+              <td><button class="row-action" onclick="openActionModal('${t.id}','${escapeJs(t.property_address)}','contract','${dStatus}')">Actions ▾</button></td>
             </tr>`;
   }).join('');
 }
@@ -1425,18 +1413,45 @@ async function setItemState(btn, state) {
 
 /* ── Add modal flow ── */
 /* ═══ NEW LISTING MODAL ═══ */
-function openNewModal() {
+let nlAgents = [];
+let nlFsTransactions = [];
+
+async function nlLoadAgents() {
+  const officeId = document.getElementById('officeSelect').value;
+  const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
+  try {
+    nlAgents = await GET(`/daily-desk/agents${qs}`);
+  } catch (e) {
+    console.error('Failed to load agents:', e);
+    nlAgents = [];
+  }
+  const opts = '<option value="">Select agent…</option>' +
+    nlAgents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+  document.getElementById('nl-agent').innerHTML = opts;
+  document.getElementById('nl-fs-agent').innerHTML = opts;
+}
+
+async function openNewModal() {
   document.getElementById('newListingModal').classList.add('open');
-  nlReset();
+  await nlReset();
 }
 function closeNewModal() {
   document.getElementById('newListingModal').classList.remove('open');
 }
-function nlReset() {
+async function nlReset() {
   document.getElementById('nl-step-source').style.display = 'block';
   document.getElementById('nl-step-fs-picker').style.display = 'none';
   document.getElementById('nl-step-manual').style.display = 'none';
   document.getElementById('newListingTitle').textContent = 'New Listing';
+  document.getElementById('nl-addr').value = '';
+  document.getElementById('nl-city').value = '';
+  document.getElementById('nl-price').value = '';
+  document.getElementById('nl-list-date').value = '';
+  document.getElementById('nl-exp-date').value = '';
+  document.getElementById('nl-fs-trans-id').value = '';
+  document.getElementById('nl-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
+  nlFsTransactions = [];
+  await nlLoadAgents();
 }
 function nlShowFsPicker() {
   document.getElementById('nl-step-source').style.display = 'none';
@@ -1450,11 +1465,106 @@ function nlShowManualForm() {
   document.getElementById('newListingTitle').textContent = 'New Listing — Manual Entry';
 }
 function nlBackToSource() {
-  nlReset();
+  document.getElementById('nl-step-source').style.display = 'block';
+  document.getElementById('nl-step-fs-picker').style.display = 'none';
+  document.getElementById('nl-step-manual').style.display = 'none';
+  document.getElementById('newListingTitle').textContent = 'New Listing';
 }
-function selectFsTransaction(transId) {
-  alert('Mockup: would call /fs/list-transactions with full_details for transId=' + transId + ' and pre-fill the form.');
-  closeNewModal();
+
+// Pulls the selected agent's Form Simplicity files via the existing
+// /fs/list-transactions route. NOTE: the exact field names in FS's
+// listTrans response need live verification — several common variants
+// are tried below.
+async function nlLoadFsTransactions() {
+  const agentId = document.getElementById('nl-fs-agent').value;
+  const listEl = document.getElementById('nl-fs-list');
+  nlFsTransactions = [];
+
+  if (!agentId) {
+    listEl.innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
+    return;
+  }
+  const agent = nlAgents.find(a => String(a.id) === String(agentId));
+  if (!agent || !agent.nrds_id) {
+    listEl.innerHTML = '<div class="empty">No NRDS ID on file for this agent.</div>';
+    return;
+  }
+
+  listEl.innerHTML = '<div class="empty">Loading…</div>';
+  let data;
+  try {
+    data = await POST('/fs/list-transactions', { agentNRDSID: agent.nrds_id, fullDetails: false });
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  const list = data.transactions || data.Transactions || data.results || (Array.isArray(data) ? data : []);
+  nlFsTransactions = list.map((tx, i) => ({
+    id:      tx.transId || tx.TransID || tx.id || String(i),
+    address: tx.address || tx.Address || tx.streetAddress || tx.propertyAddress || tx.name || 'Unknown address',
+    city:    tx.city || tx.City || '',
+    updated: tx.lastUpdated || tx.LastUpdated || tx.modified || tx.dateModified || '',
+  }));
+
+  if (!nlFsTransactions.length) {
+    listEl.innerHTML = '<div class="empty">No Form Simplicity files found for this agent.</div>';
+    return;
+  }
+
+  listEl.innerHTML = nlFsTransactions.map((tx, i) => `
+    <div class="fs-item" onclick="selectFsTransaction(${i})">
+      <div>
+        <div class="fs-item-main">${escapeHtml(tx.address)}</div>
+        <div class="fs-item-sub">${escapeHtml(tx.city)}${tx.updated ? ' &middot; Updated ' + escapeHtml(tx.updated) : ''}</div>
+      </div>
+      <span class="chip chip-neutral">New</span>
+    </div>
+  `).join('');
+}
+
+function selectFsTransaction(index) {
+  const tx = nlFsTransactions[index];
+  if (!tx) return;
+  const agentId = document.getElementById('nl-fs-agent').value;
+
+  nlShowManualForm();
+  document.getElementById('nl-addr').value = tx.address !== 'Unknown address' ? tx.address : '';
+  document.getElementById('nl-city').value = tx.city || '';
+  document.getElementById('nl-fs-trans-id').value = tx.id || '';
+  if (agentId) document.getElementById('nl-agent').value = agentId;
+}
+
+async function nlSaveListing() {
+  const address = document.getElementById('nl-addr').value.trim();
+  if (!address) {
+    alert('Property address is required.');
+    return;
+  }
+
+  const officeId = document.getElementById('officeSelect').value;
+  const agentId = document.getElementById('nl-agent').value;
+  const agent = nlAgents.find(a => String(a.id) === String(agentId));
+
+  const body = {
+    transaction_type: 'seller',
+    property_address: address,
+    city: document.getElementById('nl-city').value.trim() || null,
+    office_id: officeId !== 'all' ? officeId : (agent ? agent.office_id : null),
+    agent_id: agentId || null,
+    current_price: amParseMoney(document.getElementById('nl-price').value),
+    list_date: document.getElementById('nl-list-date').value || null,
+    expiration_date: document.getElementById('nl-exp-date').value || null,
+    fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
+  };
+
+  try {
+    await POST('/daily-desk/transactions', body);
+    closeNewModal();
+    await renderAll();
+  } catch (e) {
+    alert('Failed to save listing: ' + e.message);
+  }
 }
 
 /* ═══ ROW ACTION MODAL — Change/Expired/Withdrawn/Close ═══ */
@@ -1464,6 +1574,7 @@ function selectFsTransaction(transId) {
 const LISTING_ACTIONS = {
   active: [
     { key: 'change',    icon: '✎', title: 'Change',    desc: 'Price change, extension, or other update.' },
+    { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed (recorded directly from Active).' },
     { key: 'expired',   icon: '⏳', title: 'Expired',   desc: "Listing's term ended without a sale." },
     { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Seller is pulling the listing early.' },
   ],
@@ -1515,10 +1626,10 @@ const ACTION_TITLES = {
   closing:   'Closing',
 };
 
-let amState = { addr: null, kind: null, status: null, actionKey: null };
+let amState = { id: null, addr: null, kind: null, status: null, actionKey: null };
 
-function openActionModal(addr, kind, status) {
-  amState = { addr, kind, status, actionKey: null };
+function openActionModal(id, addr, kind, status) {
+  amState = { id, addr, kind, status, actionKey: null };
   document.getElementById('actionModalAddr').textContent = addr;
   document.getElementById('actionModalTitle').textContent = 'Actions';
   document.getElementById('actionModal').classList.add('open');
@@ -1561,49 +1672,71 @@ function amChooseAction(key) {
   const fieldsEl = document.getElementById('amConfirmFields');
   let fieldsHtml = '';
 
-  if (key === 'change') {
+  if (key === 'change' && amState.status === 'closed') {
+    fieldsHtml = `
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
+        <textarea id="am-notes" rows="3" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px; resize:vertical;" placeholder="Describe the correction or update"></textarea>
+      </div>`;
+  } else if (key === 'change') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Change Type</span>
-          <select style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
-            <option>Price Change</option>
-            <option>Back on Market</option>
-            <option>Extension</option>
-            <option>Other</option>
+          <select id="am-change-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+            <option value="price">Price Change</option>
+            <option value="back_on_market">Back on Market</option>
+            <option value="extension">Extension</option>
+            <option value="other">Other</option>
           </select>
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">New Price (if applicable)</span>
-          <input type="text" placeholder="$0">
+          <input type="text" id="am-new-price" placeholder="$0">
+        </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">New Expiration Date (if extension)</span>
+          <input type="date" id="am-expiration-date">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
+          <input type="text" id="am-notes" placeholder="Optional">
         </div>
       </div>`;
   } else if (key === 'expired' || key === 'withdrawn') {
     fieldsHtml = `
-      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
-        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Effective Date</span>
-        <input type="date">
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Effective Date</span>
+          <input type="date" id="am-effective-date">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
+          <input type="text" id="am-notes" placeholder="Optional">
+        </div>
       </div>`;
   } else if (key === 'closing') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Sale Price</span>
-          <input type="text" placeholder="$0">
+          <input type="text" id="am-sale-price" placeholder="$0">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Close Date</span>
-          <input type="date">
+          <input type="date" id="am-close-date">
         </div>
       </div>
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Title Company</span>
-          <input type="text" placeholder="Adams Cameron Title">
+          <input type="text" id="am-title-company" placeholder="Adams Cameron Title">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Mortgage Company</span>
-          <input type="text" placeholder="Optional">
+          <input type="text" id="am-mortgage-company" placeholder="Optional">
         </div>
       </div>`;
   }
@@ -1621,11 +1754,43 @@ function amChooseAction(key) {
       `).join('')
     : `<div style="font-size:12px; color:var(--text-dim);">No checklist items will be added.</div>`;
 }
-function amSubmit() {
-  const label = ACTION_TITLES[amState.actionKey] || amState.actionKey;
-  alert('Mockup: would record a "' + label + '" event for ' + amState.addr +
-        ', update its status, and append the checklist items shown above (status = incomplete).');
-  closeActionModal();
+function amParseMoney(v) {
+  const digits = String(v || '').replace(/[^0-9.]/g, '');
+  return digits ? Number(digits) : null;
+}
+
+async function amSubmit() {
+  const key = amState.actionKey;
+  const fields = {};
+
+  if (key === 'change' && amState.status === 'closed') {
+    fields.notes = document.getElementById('am-notes').value || null;
+  } else if (key === 'change') {
+    const newPrice = amParseMoney(document.getElementById('am-new-price').value);
+    if (newPrice != null) fields.newPrice = newPrice;
+    const expirationDate = document.getElementById('am-expiration-date').value;
+    if (expirationDate) fields.expirationDate = expirationDate;
+    fields.notes = document.getElementById('am-notes').value || null;
+  } else if (key === 'expired' || key === 'withdrawn') {
+    const effectiveDate = document.getElementById('am-effective-date').value;
+    if (effectiveDate) fields.effectiveDate = effectiveDate;
+    fields.notes = document.getElementById('am-notes').value || null;
+  } else if (key === 'closing') {
+    const salePrice = amParseMoney(document.getElementById('am-sale-price').value);
+    if (salePrice != null) fields.salePrice = salePrice;
+    const closeDate = document.getElementById('am-close-date').value;
+    if (closeDate) fields.closeDate = closeDate;
+    fields.titleCompany = document.getElementById('am-title-company').value || null;
+    fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
+  }
+
+  try {
+    await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, fields });
+    closeActionModal();
+    await renderAll();
+  } catch (e) {
+    alert('Failed to record action: ' + e.message);
+  }
 }
 
 /* ═══ Listings / Contracts filtering ═══ */
