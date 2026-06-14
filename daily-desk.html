@@ -1911,7 +1911,7 @@ function renderDrawer(t) {
   chip.className = 'chip ' + chipClass;
   chip.textContent = chipLabel;
 
-  const primaryRole = t.transaction_type === 'buyer' ? 'buyers_agent' : 'listing_agent';
+  const primaryRole = t.represents_seller ? 'listing_agent' : 'buyers_agent';
   const agent = (t.participants || []).find(p => p.role === primaryRole) || (t.participants || [])[0];
   document.getElementById('drawer-agent').textContent = agent
     ? (agent.first_name ? `${agent.first_name} ${agent.last_name}` : (agent.external_name || '—'))
