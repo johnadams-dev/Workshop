@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+  try {
+    const _savedTheme = localStorage.getItem('txn_theme');
+    if (_savedTheme === 'comfort') document.documentElement.setAttribute('data-theme', 'comfort');
+  } catch (_) {}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transaction Desk · Adams Cameron & Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:        #0d1117;
+  --ink-mid:    #161b22;
+  --ink-light:  #21262d;
+  --ink-border: #30363d;
+  --amber:      #d29922;
+  --amber-bg:   rgba(210,153,34,.12);
+  --green:      #3fb950;
+  --green-bg:   rgba(63,185,80,.1);
+  --red:        #f85149;
+  --red-bg:     rgba(248,81,73,.1);
+  --blue:       #58a6ff;
+  --blue-bg:    rgba(88,166,255,.1);
+  --purple:     #bc8cff;
+  --purple-bg:  rgba(188,140,255,.1);
+  --text:       #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim:   #484f58;
+  --mono:       'IBM Plex Mono', monospace;
+  --sans:       'IBM Plex Sans', sans-serif;
+  --r:          6px;
+}
+:root[data-theme="comfort"] {
+  --ink:        #ffffff;
+  --ink-mid:    #f6f8fa;
+  --ink-light:  #edf0f3;
+  --ink-border: #c9ced6;
+  --amber:      #9a6700;
+  --amber-bg:   rgba(154,103,0,.12);
+  --green:      #1a7f37;
+  --green-bg:   rgba(26,127,55,.12);
+  --red:        #cf222e;
+  --red-bg:     rgba(207,34,46,.10);
+  --blue:       #0969da;
+  --blue-bg:    rgba(9,105,218,.10);
+  --purple:     #8250df;
+  --purple-bg:  rgba(130,80,223,.10);
+  --text:       #1a1a1a;
+  --text-muted: #57606a;
+  --text-dim:   #6e7781;
+}
+:root[data-theme="comfort"] body { zoom: 1.15; }
+:root[data-theme="comfort"] tbody tr:hover td { background: rgba(0,0,0,.04); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+.shell { display: grid; grid-template-rows: 48px 44px 40px 1fr; min-height: 100vh; }
+
+/* ═══ TOPBAR ═══ */
+.topbar {
+  background: var(--ink-mid);
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text);
+}
+.brand-icon {
+  width: 26px; height: 26px;
+  background: var(--amber);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.brand-sep { color: var(--text-dim); margin: 0 2px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.admin-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 20px;
+  padding: 3px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-chip::before { content: ''; width: 6px; height: 6px; background: var(--green); border-radius: 50%; }
+.theme-toggle {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
+
+/* ═══ OFFICE BAR — persistent context, pinned ═══ */
+.office-bar {
+  background: var(--ink-light);
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  position: sticky;
+  top: 48px;
+  z-index: 190;
+}
+.office-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  flex-shrink: 0;
+}
+.office-select {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 6px 32px 6px 12px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b949e'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  min-width: 220px;
+}
+.office-select:focus { border-color: var(--amber); }
+.office-meta { font-size: 12px; color: var(--text-muted); }
+.office-meta b { color: var(--text); font-weight: 600; }
+
+/* ═══ NAV TABS ═══ */
+.nav {
+  background: var(--ink-mid);
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: stretch;
+  padding: 0 20px;
+  gap: 0;
+  overflow-x: auto;
+}
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  user-select: none;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--text); border-bottom-color: var(--amber); }
+.nav-tab .tab-icon { font-size: 13px; }
+.nav-tab .tab-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: 10px;
+  padding: 0px 6px;
+  color: var(--text-muted);
+}
+.nav-tab.active .tab-count { color: var(--amber); border-color: var(--amber); }
+.nav-tab.alert .tab-count { background: var(--red-bg); color: var(--red); border-color: rgba(248,81,73,.3); }
+.nav-spacer { flex: 1; }
+.nav-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+/* ═══ MAIN CONTENT ═══ */
+.content { overflow-y: auto; }
+.page { display: none; padding: 24px; max-width: 1200px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ═══ ALERT BANNER — DeltaNet not tracked ═══ */
+.alert-banner {
+  background: var(--red-bg);
+  border: 1px solid rgba(248,81,73,.3);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.alert-banner.clear {
+  background: var(--green-bg);
+  border-color: rgba(63,185,80,.25);
+}
+.alert-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--red);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.alert-banner.clear .alert-icon { background: var(--green); }
+.alert-text { flex: 1; }
+.alert-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.alert-sub { font-size: 12px; color: var(--text-muted); }
+.alert-banner.clear .alert-title { color: var(--green); }
+.alert-banner:not(.clear) .alert-title { color: var(--red); }
+
+/* ═══ STAT CARDS ═══ */
+.stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+.stat {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+}
+.stat-num {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-num.amber { color: var(--amber); }
+.stat-num.green { color: var(--green); }
+.stat-num.red   { color: var(--red);   }
+.stat-num.blue  { color: var(--blue);  }
+.stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+
+/* ═══ SECTION HEADER ═══ */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  margin-top: 28px;
+}
+.section-head:first-of-type { margin-top: 0; }
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+
+/* ═══ TABLES ═══ */
+.table-wrap {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  overflow: auto;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  text-align: left;
+  padding: 9px 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  background: rgba(0,0,0,.2);
+  border-bottom: 1px solid var(--ink-border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(48,54,61,.5);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(255,255,255,.02); }
+tbody tr.clickable { cursor: pointer; }
+
+/* ═══ CHIPS ═══ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.chip-amber   { background: var(--amber-bg); color: var(--amber); }
+.chip-green   { background: var(--green-bg); color: var(--green); }
+.chip-red     { background: var(--red-bg);   color: var(--red);   }
+.chip-blue    { background: var(--blue-bg);  color: var(--blue);  }
+.chip-purple  { background: var(--purple-bg); color: var(--purple); }
+.chip-neutral { background: var(--ink-light); color: var(--text-muted); border: 1px solid var(--ink-border); }
+
+.attn-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.addr-cell { font-weight: 500; }
+.addr-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
+
+/* ═══ BUTTONS ═══ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r);
+  border: none;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.98); }
+.btn-primary { background: var(--amber); color: var(--ink); }
+.btn-primary:hover { opacity: .9; }
+.btn-ghost {
+  background: var(--ink-light);
+  color: var(--text-muted);
+  border: 1px solid var(--ink-border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-row { display: flex; align-items: center; gap: 10px; }
+
+.tbl-link {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--amber);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.tbl-link:hover { text-decoration: underline; }
+
+/* ═══ SEARCH/FILTER BAR (matches lockbox inventory) ═══ */
+.inv-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.inv-bar input  { flex: 1; min-width: 180px; }
+.inv-bar select { width: 170px; flex-shrink: 0; }
+.inv-bar input, .inv-bar select {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 8px 11px;
+  outline: none;
+}
+.inv-bar input:focus, .inv-bar select:focus { border-color: var(--amber); }
+.inv-bar input::placeholder { color: var(--text-dim); }
+
+/* ═══ TODAY PAGE — three-state checklist controls ═══ */
+.cl-controls { display: flex; gap: 4px; }
+.cl-btn {
+  width: 26px; height: 26px;
+  border-radius: var(--r);
+  border: 1px solid var(--ink-border);
+  background: var(--ink-light);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cl-btn.done:hover { border-color: var(--green); color: var(--green); }
+.cl-btn.na:hover   { border-color: var(--text-dim); color: var(--text); }
+.cl-btn.active.done { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.cl-btn.active.na   { background: var(--ink-light); border-color: var(--text-dim); color: var(--text-dim); }
+.cl-link-placeholder { color: var(--text-dim); font-size: 12px; }
+.today-row.resolved { opacity: .35; }
+.today-row.resolved .tbl-link { pointer-events: none; }
+.row-action {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.row-action:hover { color: var(--amber); border-color: var(--amber); }
+
+/* ═══ ACTION CHOICE MODAL ═══ */
+.action-list { display: flex; flex-direction: column; gap: 8px; }
+.action-item {
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: border-color .15s, background .15s;
+}
+.action-item:hover { border-color: var(--amber); background: rgba(210,153,34,.06); }
+.action-item-icon { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; }
+.action-item-text { flex: 1; }
+.action-item-title { font-size: 13px; font-weight: 600; }
+.action-item-desc { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ═══ MODAL — Add New chooser ═══ */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  width: 640px;
+  max-width: 92vw;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.modal-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--ink-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-title { font-size: 15px; font-weight: 600; }
+.modal-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 18px; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 22px; }
+
+/* Branch choice cards */
+.choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .choice-grid { grid-template-columns: 1fr; } }
+.choice-card {
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.choice-card:hover { border-color: var(--amber); background: rgba(210,153,34,.06); }
+.choice-icon {
+  width: 36px; height: 36px;
+  border-radius: var(--r);
+  background: var(--amber-bg);
+  color: var(--amber);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.choice-text { flex: 1; }
+.choice-title { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.choice-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+/* ═══ FS PICKER LIST (inside modal) ═══ */
+.fs-search { margin-bottom: 14px; }
+.fs-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.fs-item {
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fs-item:hover { border-color: var(--amber); }
+.fs-item-main { font-size: 13px; font-weight: 500; }
+.fs-item-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
+
+/* ═══ TRANSACTION DETAIL DRAWER ═══ */
+.drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 400;
+}
+.drawer-overlay.open { display: block; }
+.drawer {
+  position: fixed;
+  top: 0; right: 0;
+  width: 460px;
+  max-width: 92vw;
+  height: 100vh;
+  background: var(--ink-mid);
+  border-left: 1px solid var(--ink-border);
+  overflow-y: auto;
+  z-index: 410;
+  transform: translateX(100%);
+  transition: transform .2s ease;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head {
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--ink-border);
+  position: sticky; top: 0;
+  background: var(--ink-mid);
+  z-index: 1;
+}
+.drawer-head-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.drawer-addr { font-size: 16px; font-weight: 600; }
+.drawer-sub { font-size: 12px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
+.drawer-body { padding: 20px 22px; }
+
+.dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 20px; }
+.dfield-key { font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+.dfield-val { font-size: 13px; }
+
+.checklist { display: flex; flex-direction: column; gap: 6px; }
+.cl-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  font-size: 13px;
+}
+.cl-item.done { opacity: .55; }
+.cl-item.done .cl-label { text-decoration: line-through; }
+.cl-item.dismissed { opacity: .4; }
+.cl-check {
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--ink-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.cl-check.checked { background: var(--green); border-color: var(--green); color: var(--ink); }
+.cl-check.dismissed-x { background: var(--text-dim); border-color: var(--text-dim); color: var(--ink); }
+.cl-label { flex: 1; }
+.cl-action {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cl-action:hover { color: var(--amber); }
+
+.divider {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .08em;
+  margin: 18px 0 12px;
+}
+.divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--ink-border); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">🏠</div>
+      <span>ADAMS CAMERON</span>
+      <span class="brand-sep">/</span>
+      <span style="color:var(--text-muted)">Transaction Desk</span>
+    </div>
+    <div class="topbar-right">
+      <div class="admin-chip">Cora Thompson</div>
+      <button class="theme-toggle" onclick="toggleTheme()">☀ Comfort Mode</button>
+    </div>
+  </div>
+
+  <!-- OFFICE BAR — persistent, sticky -->
+  <div class="office-bar">
+    <span class="office-label">Working in</span>
+    <select class="office-select" id="officeSelect" onchange="renderAll()">
+      <option value="all">All Offices</option>
+      <option value="ormond-mainland" selected>Ormond Mainland</option>
+      <option value="ormond-beachside">Ormond Beachside</option>
+      <option value="daytona">Daytona</option>
+      <option value="port-orange">Port Orange</option>
+      <option value="ponce-inlet">Ponce Inlet</option>
+      <option value="palm-coast">Palm Coast</option>
+      <option value="deland">DeLand</option>
+    </select>
+    <span class="office-meta">12 active &middot; 4 under contract &middot; <b>2 not yet tracked</b></span>
+  </div>
+
+  <!-- NAV TABS -->
+  <div class="nav">
+    <div class="nav-tab active" data-page="today" onclick="showPage('today',this)">
+      <span class="tab-icon">☑</span> Today <span class="tab-count">8</span>
+    </div>
+    <div class="nav-tab" data-page="listings" onclick="showPage('listings',this)">
+      <span class="tab-icon">🏷</span> Listings <span class="tab-count">12</span>
+    </div>
+    <div class="nav-tab" data-page="contracts" onclick="showPage('contracts',this)">
+      <span class="tab-icon">📝</span> Contracts <span class="tab-count">4</span>
+    </div>
+    <div class="nav-tab alert" data-page="untracked" onclick="showPage('untracked',this)">
+      <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count">2</span>
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="nav-add">
+      <button class="btn btn-primary btn-sm" onclick="openNewModal()">+ New Listing</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ═══ TODAY / ACTION ITEMS PAGE ═══ -->
+    <div class="page active" id="page-today">
+
+      <div class="inv-bar">
+        <input id="today-q" type="text" placeholder="Search address, agent, item…" oninput="filterToday()">
+        <select id="today-type" onchange="filterToday()">
+          <option value="">All Item Types</option>
+          <option value="Sign installed">Sign installed</option>
+          <option value="Lockbox assigned">Lockbox assigned</option>
+          <option value="Recover lockbox">Recover lockbox</option>
+          <option value="Recover sign">Recover sign</option>
+          <option value="Photos uploaded">Photos uploaded</option>
+          <option value="Withdrawal paperwork uploaded to Form Simplicity">FS withdrawal paperwork</option>
+          <option value="Send thank-you letter">Send thank-you letter</option>
+        </select>
+        <select id="today-sort" onchange="filterToday()">
+          <option value="age">Sort: Oldest First</option>
+          <option value="address">Sort: Address</option>
+          <option value="type">Sort: Item Type</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Item</th>
+              <th>Type</th>
+              <th>Age</th>
+              <th style="width:1%"></th>
+              <th style="width:1%"></th>
+            </tr>
+          </thead>
+          <tbody id="today-tbody">
+
+            <tr class="today-row" data-age="8" data-type="Photos uploaded" data-addr="2711 N Halifax Avenue">
+              <td><span class="tbl-link" onclick="openDrawer('2711 N Halifax Avenue')">2711 N Halifax Avenue</span></td>
+              <td>Photos uploaded</td>
+              <td><span class="chip chip-amber">Listing</span></td>
+              <td>8 days</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="3" data-type="Sign installed" data-addr="317 Shore Drive E">
+              <td><span class="tbl-link" onclick="openDrawer('317 Shore Drive E')">317 Shore Drive E</span></td>
+              <td>Sign installed</td>
+              <td><span class="chip chip-amber">Listing</span></td>
+              <td>3 days</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="3" data-type="Lockbox assigned" data-addr="317 Shore Drive E">
+              <td><span class="tbl-link" onclick="openDrawer('317 Shore Drive E')">317 Shore Drive E</span></td>
+              <td>Lockbox assigned</td>
+              <td><span class="chip chip-amber">Listing</span></td>
+              <td>3 days</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="tbl-link" onclick="alert('Mockup: would open the Lockbox Manager app, pre-filtered to this address, to assign a box.')">Open Lockbox App →</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="1" data-type="Recover lockbox" data-addr="39 Sea Island Drive N">
+              <td><span class="tbl-link" onclick="openDrawer('39 Sea Island Drive N')">39 Sea Island Drive N</span></td>
+              <td>Recover lockbox</td>
+              <td><span class="chip chip-blue">Under Contract</span></td>
+              <td>1 day</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="tbl-link" onclick="alert('Mockup: would open the Lockbox Manager app, pre-filtered to this address, to record check-in.')">Open Lockbox App →</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="2" data-type="Send thank-you letter" data-addr="66 Ocean Shore Drive">
+              <td><span class="tbl-link" onclick="openDrawer('66 Ocean Shore Drive')">66 Ocean Shore Drive</span></td>
+              <td>Send thank-you letter to buyer/seller</td>
+              <td><span class="chip chip-green">Closed</span></td>
+              <td>2 days</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="1" data-type="Confirm commission split in Profit Power" data-addr="66 Ocean Shore Drive">
+              <td><span class="tbl-link" onclick="openDrawer('66 Ocean Shore Drive')">66 Ocean Shore Drive</span></td>
+              <td>Confirm commission split in Profit Power</td>
+              <td><span class="chip chip-green">Closed</span></td>
+              <td>1 day</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="0" data-type="Withdrawal paperwork uploaded to Form Simplicity" data-addr="14 Wheeldon Lane">
+              <td><span class="tbl-link" onclick="openDrawer('14 Wheeldon Lane')">14 Wheeldon Lane</span></td>
+              <td>Withdrawal paperwork uploaded to Form Simplicity</td>
+              <td><span class="chip chip-neutral">Withdrawn</span></td>
+              <td>Today</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="tbl-link" onclick="alert('Mockup: would open Form Simplicity file for this transaction.')">Open in FS →</span></td>
+            </tr>
+
+            <tr class="today-row" data-age="0" data-type="Recover sign" data-addr="14 Wheeldon Lane">
+              <td><span class="tbl-link" onclick="openDrawer('14 Wheeldon Lane')">14 Wheeldon Lane</span></td>
+              <td>Recover sign</td>
+              <td><span class="chip chip-neutral">Withdrawn</span></td>
+              <td>Today</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-head" style="margin-top:28px;">
+        <div class="section-title">Recently Marked Not Applicable</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-muted); font-size:12px; padding:10px 14px;">
+                <span class="chip chip-neutral" style="margin-right:8px;">— N/A</span>
+                317 Shore Drive E — "Add to caravan" — marked N/A by Cora Thompson, 06/13/2026
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- ═══ LISTINGS PAGE ═══ -->
+    <div class="page" id="page-listings">
+
+      <div class="inv-bar">
+        <input id="lst-q" type="text" placeholder="Search address, agent, MLS #…" oninput="filterListings()">
+        <select id="lst-status" onchange="filterListings()">
+          <option value="">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="under_contract">Under Contract</option>
+          <option value="closed">Closed</option>
+          <option value="expired">Expired</option>
+          <option value="withdrawn">Withdrawn</option>
+        </select>
+        <select id="lst-attn" onchange="filterListings()">
+          <option value="">All</option>
+          <option value="attn">⚠ Needs Attention</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Agent</th>
+              <th>Price</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="listings-tbody">
+            <tr class="lst-row" data-status="active" data-attn="1">
+              <td>
+                <div class="addr-cell"><span class="attn-dot"></span>317 Shore Drive E</div>
+                <div class="addr-sub">Oldsmar, FL 34677 &middot; FC315737</div>
+              </td>
+              <td>Charles Kelly</td>
+              <td>$484,700</td>
+              <td>List 06/10/2026</td>
+              <td><span class="chip chip-amber">Active</span></td>
+              <td><button class="row-action" onclick="openActionModal('317 Shore Drive E','listing','active')">Actions ▾</button></td>
+            </tr>
+            <tr class="lst-row" data-status="active" data-attn="0">
+              <td>
+                <div class="addr-cell">5 Sunny Beach Drive</div>
+                <div class="addr-sub">Ormond Beach, FL 32176 &middot; 1225539</div>
+              </td>
+              <td>Amy Potter</td>
+              <td>$689,000</td>
+              <td>List 06/08/2026</td>
+              <td><span class="chip chip-amber">Active</span></td>
+              <td><button class="row-action" onclick="openActionModal('5 Sunny Beach Drive','listing','active')">Actions ▾</button></td>
+            </tr>
+            <tr class="lst-row" data-status="active" data-attn="1">
+              <td>
+                <div class="addr-cell"><span class="attn-dot"></span>2711 N Halifax Avenue</div>
+                <div class="addr-sub">Daytona Beach, FL 32118 &middot; 1225579</div>
+              </td>
+              <td>Toni Wright</td>
+              <td>$139,900</td>
+              <td>List 06/05/2026</td>
+              <td><span class="chip chip-amber">Active</span></td>
+              <td><button class="row-action" onclick="openActionModal('2711 N Halifax Avenue','listing','active')">Actions ▾</button></td>
+            </tr>
+            <tr class="lst-row" data-status="under_contract" data-attn="1">
+              <td>
+                <div class="addr-cell"><span class="attn-dot"></span>39 Sea Island Drive N</div>
+                <div class="addr-sub">Ormond Beach, FL 32176 &middot; FC313120</div>
+              </td>
+              <td>Debra Callahan</td>
+              <td>$475,000</td>
+              <td>Contract 06/11/2026</td>
+              <td><span class="chip chip-blue">Under Contract</span></td>
+              <td><button class="row-action" onclick="openActionModal('39 Sea Island Drive N','listing','under_contract')">Actions ▾</button></td>
+            </tr>
+            <tr class="lst-row" data-status="closed" data-attn="1">
+              <td>
+                <div class="addr-cell"><span class="attn-dot"></span>66 Ocean Shore Drive</div>
+                <div class="addr-sub">Ormond Beach, FL 32176 &middot; 1224279</div>
+              </td>
+              <td>Tasha Sollowen</td>
+              <td>$207,500</td>
+              <td>Closed 04/21/2026</td>
+              <td><span class="chip chip-green">Closed</span></td>
+              <td><button class="row-action" onclick="openActionModal('66 Ocean Shore Drive','listing','closed')">Actions ▾</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ CONTRACTS PAGE ═══ -->
+    <div class="page" id="page-contracts">
+      <div class="form-desc" style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+        Contracts where we represent the buyer on a co-broke listing — the listing itself lives with another brokerage.
+      </div>
+
+      <div class="inv-bar">
+        <input id="ctr-q" type="text" placeholder="Search address, agent…" oninput="filterContracts()">
+        <select id="ctr-status" onchange="filterContracts()">
+          <option value="">All Statuses</option>
+          <option value="under_contract">Under Contract</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Buyer's Agent</th>
+              <th>Listing Brokerage</th>
+              <th>Price</th>
+              <th>Contract Date</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="contracts-tbody">
+            <tr class="ctr-row" data-status="under_contract">
+              <td>
+                <div class="addr-cell"><span class="attn-dot"></span>3259 Silas Drive</div>
+                <div class="addr-sub">New Smyrna Beach, FL 32168 &middot; 1223802</div>
+              </td>
+              <td>Ashlee Selman</td>
+              <td>RE/MAX Signature</td>
+              <td>$389,000</td>
+              <td>06/09/2026</td>
+              <td><span class="chip chip-blue">Under Contract</span></td>
+              <td><button class="row-action" onclick="openActionModal('3259 Silas Drive','contract','under_contract')">Actions ▾</button></td>
+            </tr>
+            <tr class="ctr-row" data-status="under_contract">
+              <td>
+                <div class="addr-cell">6291 W Fallsgrove Lane</div>
+                <div class="addr-sub">Port Orange, FL 32128 &middot; V4947143</div>
+              </td>
+              <td>Karen Dignam</td>
+              <td>Watson Realty Corp</td>
+              <td>$634,000</td>
+              <td>06/08/2026</td>
+              <td><span class="chip chip-blue">Under Contract</span></td>
+              <td><button class="row-action" onclick="openActionModal('6291 W Fallsgrove Lane','contract','under_contract')">Actions ▾</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ NOT YET TRACKED PAGE ═══ -->
+    <div class="page" id="page-untracked">
+
+      <div class="alert-banner">
+        <div class="alert-icon">!</div>
+        <div class="alert-text">
+          <div class="alert-title">2 DeltaNet listings for Ormond Mainland aren't tracked yet</div>
+          <div class="alert-sub">These agents have active MLS listings with no transaction record. Start tracking to pull details automatically.</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">DeltaNet Listings — No Transaction Record</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Agent</th>
+              <th>List Price</th>
+              <th>Bed/Bath</th>
+              <th>List Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="addr-cell">4421 S Atlantic Avenue</div>
+                <div class="addr-sub">Ponce Inlet, FL 32127 &middot; V4948654</div>
+              </td>
+              <td>Cyndi Ritchey</td>
+              <td>$599,000</td>
+              <td>3 / 2.5</td>
+              <td>06/12/2026</td>
+              <td><button class="btn btn-primary btn-sm" onclick="startTracking('4421 S Atlantic Avenue')">Start Tracking</button></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="addr-cell">6 Westgrill Drive</div>
+                <div class="addr-sub">Palm Coast, FL 32164 &middot; FC316585</div>
+              </td>
+              <td>Alicia Delgado</td>
+              <td>$365,000</td>
+              <td>3 / 2.0</td>
+              <td>06/11/2026</td>
+              <td><button class="btn btn-primary btn-sm" onclick="startTracking('6 Westgrill Drive')">Start Tracking</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">Recently Resolved</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-muted); font-size:12px;">
+                <span class="chip chip-green" style="margin-right:8px;">✓ Tracked</span>
+                2850 Ocean Shore Boulevard — added 06/13/2026 by Cora Thompson
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ ADD NEW MODAL ═══ -->
+<!-- ═══ NEW LISTING MODAL ═══ -->
+<div class="modal-overlay" id="newListingModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="newListingTitle">New Listing</div>
+      <button class="modal-close" onclick="closeNewModal()">✕</button>
+    </div>
+    <div class="modal-body" id="newListingBody">
+
+      <!-- Step 1: Listing source -->
+      <div id="nl-step-source">
+        <div class="choice-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="choice-card" onclick="nlShowFsPicker()">
+            <div class="choice-icon">⚡</div>
+            <div class="choice-text">
+              <div class="choice-title">Pull from Form Simplicity</div>
+              <div class="choice-desc">Agent has already started the listing package. We'll fetch the details for you.</div>
+            </div>
+          </div>
+          <div class="choice-card" onclick="nlShowManualForm()">
+            <div class="choice-icon">✎</div>
+            <div class="choice-text">
+              <div class="choice-title">Enter Manually</div>
+              <div class="choice-desc">Not in Form Simplicity yet, or you'd rather type it in directly.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2a: FS Picker -->
+      <div id="nl-step-fs-picker" style="display:none">
+        <div class="fs-search">
+          <div class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Agent</div>
+          <select style="width:100%; padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+            <option>Ashlee Selman</option>
+            <option>Cyndi Ritchey</option>
+            <option>Charles Kelly</option>
+          </select>
+        </div>
+        <div class="divider">Recent Form Simplicity Files</div>
+        <div class="fs-list">
+          <div class="fs-item" onclick="selectFsTransaction('1223802')">
+            <div>
+              <div class="fs-item-main">3259 Silas Drive</div>
+              <div class="fs-item-sub">Updated 06/09/2026 &middot; New Smyrna Beach, FL</div>
+            </div>
+            <span class="chip chip-neutral">New</span>
+          </div>
+          <div class="fs-item" onclick="selectFsTransaction('1222687')">
+            <div>
+              <div class="fs-item-main">6291 W Fallsgrove Lane</div>
+              <div class="fs-item-sub">Updated 06/08/2026 &middot; Port Orange, FL</div>
+            </div>
+            <span class="chip chip-neutral">New</span>
+          </div>
+          <div class="fs-item" onclick="selectFsTransaction('1221460')">
+            <div>
+              <div class="fs-item-main">2290 Ocean Shore Boulevard</div>
+              <div class="fs-item-sub">Updated 06/05/2026 &middot; Ormond Beach, FL</div>
+            </div>
+            <span class="chip chip-neutral">New</span>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
+          <span style="font-size:11px; color:var(--text-dim)">Don't see it? <span class="tbl-link" onclick="nlShowManualForm()">Enter manually instead</span></span>
+        </div>
+      </div>
+
+      <!-- Step 2b: Manual form (simplified placeholder) -->
+      <div id="nl-step-manual" style="display:none">
+        <div class="form-grid" style="display:grid; gap:14px;">
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Address</span>
+              <input type="text" placeholder="123 Main St">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
+              <input type="text" placeholder="Ormond Beach">
+            </div>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
+              <input type="text" placeholder="Start typing a name…">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">List Price</span>
+              <input type="text" placeholder="$0">
+            </div>
+          </div>
+          <div style="font-size:11px; color:var(--text-dim); font-style:italic;">
+            Full form fields (MLS #, dates, commission, source, etc.) match the existing hotsheet entry — shown abbreviated in this mockup.
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
+          <button class="btn btn-primary btn-sm" onclick="closeNewModal()">Save Listing</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ROW ACTION MODAL — Change/Expired/Withdrawn/Close ═══ -->
+<div class="modal-overlay" id="actionModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="actionModalTitle">Actions</div>
+        <div style="font-size:12px; color:var(--text-muted); font-family:var(--mono); margin-top:2px;" id="actionModalAddr">—</div>
+      </div>
+      <button class="modal-close" onclick="closeActionModal()">✕</button>
+    </div>
+    <div class="modal-body" id="actionModalBody">
+
+      <!-- Step 1: pick the action -->
+      <div id="am-step-choose" class="action-list"></div>
+
+      <!-- Step 2: confirm + checklist preview -->
+      <div id="am-step-confirm" style="display:none">
+        <div id="amConfirmFields"></div>
+        <div class="divider">Checklist additions</div>
+        <div class="checklist" id="amChecklistPreview"></div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-ghost btn-sm" onclick="amBackToChoose()">← Back</button>
+          <button class="btn btn-primary btn-sm" onclick="amSubmit()">Confirm</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRANSACTION DETAIL DRAWER ═══ -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-head-top">
+      <div>
+        <div class="drawer-addr" id="drawerAddr">317 Shore Drive E</div>
+        <div class="drawer-sub" id="drawerSub">Oldsmar, FL 34677 &middot; FC315737</div>
+      </div>
+      <button class="modal-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <span class="chip chip-amber">Active Listing</span>
+  </div>
+  <div class="drawer-body">
+
+    <div class="dgrid">
+      <div>
+        <div class="dfield-key">Agent</div>
+        <div class="dfield-val">Charles Kelly</div>
+      </div>
+      <div>
+        <div class="dfield-key">Office</div>
+        <div class="dfield-val">Ormond Mainland</div>
+      </div>
+      <div>
+        <div class="dfield-key">List Price</div>
+        <div class="dfield-val">$484,700</div>
+      </div>
+      <div>
+        <div class="dfield-key">List Date</div>
+        <div class="dfield-val">06/10/2026</div>
+      </div>
+      <div>
+        <div class="dfield-key">MLS ID</div>
+        <div class="dfield-val">FC315737</div>
+      </div>
+      <div>
+        <div class="dfield-key">Form Simplicity</div>
+        <div class="dfield-val"><span class="tbl-link">View file →</span></div>
+      </div>
+    </div>
+
+    <div class="divider">Checklist</div>
+    <div class="checklist">
+      <div class="cl-item done">
+        <div class="cl-check checked">✓</div>
+        <div class="cl-label">Listing entered in MLS</div>
+      </div>
+      <div class="cl-item done">
+        <div class="cl-check checked">✓</div>
+        <div class="cl-label">Listing agreement uploaded to Form Simplicity</div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-check"></div>
+        <div class="cl-label">Sign installed</div>
+        <div class="cl-action">Mark done</div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-check"></div>
+        <div class="cl-label">Lockbox assigned</div>
+        <div class="cl-action">Mark done</div>
+      </div>
+      <div class="cl-item dismissed">
+        <div class="cl-check dismissed-x">✕</div>
+        <div class="cl-label">Add to caravan</div>
+        <div class="cl-action">Restore</div>
+      </div>
+      <div class="cl-item">
+        <div class="cl-check"></div>
+        <div class="cl-label">Photos uploaded</div>
+        <div class="cl-action">Mark done</div>
+      </div>
+    </div>
+
+    <div class="divider">Activity</div>
+    <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;">
+      <div>06/13/2026 — Listing agreement uploaded to Form Simplicity</div>
+      <div>06/10/2026 — Listing entered, MLS# FC315737</div>
+      <div>06/10/2026 — Transaction created by Cora Thompson</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggleTheme() {
+  const root = document.documentElement;
+  const isComfort = root.getAttribute('data-theme') === 'comfort';
+  if (isComfort) {
+    root.removeAttribute('data-theme');
+    localStorage.setItem('txn_theme', 'dark');
+  } else {
+    root.setAttribute('data-theme', 'comfort');
+    localStorage.setItem('txn_theme', 'comfort');
+  }
+}
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+function renderAll() {
+  // In the real app: re-fetch transactions/DeltaNet data scoped to selected office
+}
+
+/* ── Today / Action Items page ── */
+function filterToday() {
+  const q = document.getElementById('today-q').value.toLowerCase();
+  const type = document.getElementById('today-type').value;
+  const sort = document.getElementById('today-sort').value;
+  const tbody = document.getElementById('today-tbody');
+  const rows = Array.from(tbody.querySelectorAll('.today-row'));
+
+  rows.forEach(row => {
+    const addr = row.dataset.addr.toLowerCase();
+    const itemType = row.dataset.type;
+    const text = row.textContent.toLowerCase();
+    const matchesQ = !q || text.includes(q);
+    const matchesType = !type || itemType === type;
+    row.style.display = (matchesQ && matchesType) ? '' : 'none';
+  });
+
+  rows.sort((a, b) => {
+    if (sort === 'age') return Number(b.dataset.age) - Number(a.dataset.age);
+    if (sort === 'address') return a.dataset.addr.localeCompare(b.dataset.addr);
+    if (sort === 'type') return a.dataset.type.localeCompare(b.dataset.type);
+    return 0;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// Three-state toggle: neither -> done -> neither, neither -> N/A -> neither
+// "done" and "na" are mutually exclusive on the same item
+function setItemState(btn, state) {
+  const row = btn.closest('tr');
+  const doneBtn = row.querySelector('.cl-btn.done');
+  const naBtn   = row.querySelector('.cl-btn.na');
+
+  const alreadyActive = btn.classList.contains('active');
+
+  doneBtn.classList.remove('active');
+  naBtn.classList.remove('active');
+  row.classList.remove('resolved');
+
+  if (!alreadyActive) {
+    btn.classList.add('active');
+    row.classList.add('resolved');
+    // Mockup: would PATCH the checklist item status to 'complete' or 'dismissed'
+    // (dismissed items still record who/when for the "Recently Marked N/A" log)
+  }
+  // Mockup: clicking the same button again reverts to 'incomplete'
+}
+
+/* ── Add modal flow ── */
+/* ═══ NEW LISTING MODAL ═══ */
+function openNewModal() {
+  document.getElementById('newListingModal').classList.add('open');
+  nlReset();
+}
+function closeNewModal() {
+  document.getElementById('newListingModal').classList.remove('open');
+}
+function nlReset() {
+  document.getElementById('nl-step-source').style.display = 'block';
+  document.getElementById('nl-step-fs-picker').style.display = 'none';
+  document.getElementById('nl-step-manual').style.display = 'none';
+  document.getElementById('newListingTitle').textContent = 'New Listing';
+}
+function nlShowFsPicker() {
+  document.getElementById('nl-step-source').style.display = 'none';
+  document.getElementById('nl-step-fs-picker').style.display = 'block';
+  document.getElementById('newListingTitle').textContent = 'Pull from Form Simplicity';
+}
+function nlShowManualForm() {
+  document.getElementById('nl-step-source').style.display = 'none';
+  document.getElementById('nl-step-fs-picker').style.display = 'none';
+  document.getElementById('nl-step-manual').style.display = 'block';
+  document.getElementById('newListingTitle').textContent = 'New Listing — Manual Entry';
+}
+function nlBackToSource() {
+  nlReset();
+}
+function selectFsTransaction(transId) {
+  alert('Mockup: would call /fs/list-transactions with full_details for transId=' + transId + ' and pre-fill the form.');
+  closeNewModal();
+}
+
+/* ═══ ROW ACTION MODAL — Change/Expired/Withdrawn/Close ═══ */
+
+// Action definitions per status/kind. Each action has a label, icon, description,
+// optional form fields (rendered in the confirm step), and checklist items added on confirm.
+const LISTING_ACTIONS = {
+  active: [
+    { key: 'change',    icon: '✎', title: 'Change',    desc: 'Price change, extension, or other update.' },
+    { key: 'expired',   icon: '⏳', title: 'Expired',   desc: "Listing's term ended without a sale." },
+    { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Seller is pulling the listing early.' },
+  ],
+  under_contract: [
+    { key: 'closing',   icon: '🔑', title: 'Closing', desc: 'The contract closed.' },
+    { key: 'withdrawn', icon: '🚫', title: 'Contract Fell Through — Withdraw', desc: 'Buyer backed out; return listing to active or withdraw.' },
+  ],
+  closed: [
+    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+  ],
+};
+
+const CONTRACT_ACTIONS = {
+  under_contract: [
+    { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed.' },
+    { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Contract fell through.' },
+  ],
+  closed: [
+    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+  ],
+};
+
+// Checklist items auto-added per action key
+const ACTION_CHECKLIST = {
+  change: [
+    'Confirm change reflected in Form Simplicity',
+  ],
+  expired: [
+    'Recover lockbox',
+    'Recover sign',
+  ],
+  withdrawn: [
+    'Recover lockbox',
+    'Recover sign',
+    'Withdrawal paperwork uploaded to Form Simplicity',
+  ],
+  closing: [
+    'Confirm commission split in Profit Power',
+    'Confirm title company on file',
+    'Recover lockbox',
+    'Send thank-you letter to buyer/seller',
+  ],
+};
+
+const ACTION_TITLES = {
+  change:    'Change',
+  expired:   'Expired',
+  withdrawn: 'Withdrawn',
+  closing:   'Closing',
+};
+
+let amState = { addr: null, kind: null, status: null, actionKey: null };
+
+function openActionModal(addr, kind, status) {
+  amState = { addr, kind, status, actionKey: null };
+  document.getElementById('actionModalAddr').textContent = addr;
+  document.getElementById('actionModalTitle').textContent = 'Actions';
+  document.getElementById('actionModal').classList.add('open');
+  amShowChoose();
+}
+function closeActionModal() {
+  document.getElementById('actionModal').classList.remove('open');
+}
+function amShowChoose() {
+  document.getElementById('am-step-choose').style.display = 'flex';
+  document.getElementById('am-step-confirm').style.display = 'none';
+
+  const actions = (amState.kind === 'contract' ? CONTRACT_ACTIONS : LISTING_ACTIONS)[amState.status] || [];
+  const listEl = document.getElementById('am-step-choose');
+
+  if (!actions.length) {
+    listEl.innerHTML = `<div class="empty">No actions available for this status.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = actions.map(a => `
+    <div class="action-item" onclick="amChooseAction('${a.key}')">
+      <div class="action-item-icon">${a.icon}</div>
+      <div class="action-item-text">
+        <div class="action-item-title">${a.title}</div>
+        <div class="action-item-desc">${a.desc}</div>
+      </div>
+    </div>
+  `).join('');
+}
+function amBackToChoose() {
+  amShowChoose();
+}
+function amChooseAction(key) {
+  amState.actionKey = key;
+  document.getElementById('actionModalTitle').textContent = ACTION_TITLES[key] || 'Confirm';
+  document.getElementById('am-step-choose').style.display = 'none';
+  document.getElementById('am-step-confirm').style.display = 'block';
+
+  const fieldsEl = document.getElementById('amConfirmFields');
+  let fieldsHtml = '';
+
+  if (key === 'change') {
+    fieldsHtml = `
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Change Type</span>
+          <select style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+            <option>Price Change</option>
+            <option>Back on Market</option>
+            <option>Extension</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">New Price (if applicable)</span>
+          <input type="text" placeholder="$0">
+        </div>
+      </div>`;
+  } else if (key === 'expired' || key === 'withdrawn') {
+    fieldsHtml = `
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Effective Date</span>
+        <input type="date">
+      </div>`;
+  } else if (key === 'closing') {
+    fieldsHtml = `
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Sale Price</span>
+          <input type="text" placeholder="$0">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Close Date</span>
+          <input type="date">
+        </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Title Company</span>
+          <input type="text" placeholder="Adams Cameron Title">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Mortgage Company</span>
+          <input type="text" placeholder="Optional">
+        </div>
+      </div>`;
+  }
+  fieldsEl.innerHTML = fieldsHtml;
+
+  const clEl = document.getElementById('amChecklistPreview');
+  const items = ACTION_CHECKLIST[key] || [];
+  clEl.innerHTML = items.length
+    ? items.map(label => `
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-label">${label}</div>
+          <span class="chip chip-neutral" style="font-size:9px;">will be added</span>
+        </div>
+      `).join('')
+    : `<div style="font-size:12px; color:var(--text-dim);">No checklist items will be added.</div>`;
+}
+function amSubmit() {
+  const label = ACTION_TITLES[amState.actionKey] || amState.actionKey;
+  alert('Mockup: would record a "' + label + '" event for ' + amState.addr +
+        ', update its status, and append the checklist items shown above (status = incomplete).');
+  closeActionModal();
+}
+
+/* ═══ Listings / Contracts filtering ═══ */
+function filterListings() {
+  const q = document.getElementById('lst-q').value.toLowerCase();
+  const status = document.getElementById('lst-status').value;
+  const attn = document.getElementById('lst-attn').value;
+
+  document.querySelectorAll('#listings-tbody .lst-row').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const matchesQ = !q || text.includes(q);
+    const matchesStatus = !status || row.dataset.status === status;
+    const matchesAttn = !attn || row.dataset.attn === '1';
+    row.style.display = (matchesQ && matchesStatus && matchesAttn) ? '' : 'none';
+  });
+}
+function filterContracts() {
+  const q = document.getElementById('ctr-q').value.toLowerCase();
+  const status = document.getElementById('ctr-status').value;
+
+  document.querySelectorAll('#contracts-tbody .ctr-row').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const matchesQ = !q || text.includes(q);
+    const matchesStatus = !status || row.dataset.status === status;
+    row.style.display = (matchesQ && matchesStatus) ? '' : 'none';
+  });
+}
+
+/* ── DeltaNet "start tracking" ── */
+function startTracking(addr) {
+  alert('Mockup: would open the New Listing form pre-filled from DeltaNet for "' + addr + '" — agent, office, address, price, bed/bath, list date already populated.');
+}
+
+/* ── Transaction detail drawer ── */
+function openDrawer(addr) {
+  document.getElementById('drawerAddr').textContent = addr;
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+</script>
+
+</body>
+</html>
