@@ -691,6 +691,9 @@ tbody tr.clickable { cursor: pointer; }
     <div class="nav-tab alert" data-page="untracked" onclick="showPage('untracked',this)">
       <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count" id="untracked-count">—</span>
     </div>
+    <div class="nav-tab" data-page="admin" id="admin-nav-tab" onclick="showPage('admin',this)" style="display:none">
+      <span class="tab-icon">⚙</span> Admin
+    </div>
     <div class="nav-spacer"></div>
     <div class="nav-add">
       <button class="btn btn-primary btn-sm" onclick="openNewModal()">+ New Listing</button>
@@ -846,6 +849,36 @@ tbody tr.clickable { cursor: pointer; }
             <tr><td colspan="6" class="empty">Loading…</td></tr>
           </tbody>
         </table>
+      </div>
+
+    </div>
+
+    <!-- ═══ ADMIN PAGE ═══ -->
+    <div class="page" id="page-admin">
+
+      <div class="section-head">
+        <div class="section-title">Checklist Templates</div>
+        <button class="btn btn-primary btn-sm" onclick="adminShowNewTemplateForm()">+ New Template</button>
+      </div>
+
+      <div id="admin-new-template" style="display:none; border:1px solid var(--ink-border); border-radius:var(--r); padding:14px; margin-bottom:20px;">
+        <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; align-items:end; margin-bottom:10px;">
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Name</span>
+            <input type="text" id="admin-tpl-name" placeholder="e.g. Seller Listing Checklist" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+          </div>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-seller"> Seller</label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-buyer"> Buyer</label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-closing"> Closing</label>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-sm" onclick="adminCreateTemplate()">Create</button>
+          <button class="btn btn-ghost btn-sm" onclick="adminHideNewTemplateForm()">Cancel</button>
+        </div>
+      </div>
+
+      <div id="admin-templates">
+        <div class="empty">Loading…</div>
       </div>
 
     </div>
@@ -1121,6 +1154,7 @@ async function api(path, opts = {}) {
 const GET   = (path)       => api(path);
 const POST  = (path, body) => api(path, { method: "POST",  body: JSON.stringify(body) });
 const PATCH = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body) });
+const PUT   = (path, body) => api(path, { method: "PUT",   body: JSON.stringify(body) });
 
 /* ═══════════════════════════════════════════════════════════════════
    FORMATTING HELPERS
@@ -1194,6 +1228,11 @@ async function init() {
     STATE.userRole = (me || {}).role || 'unknown';
   } catch (e) {
     console.error('Failed to load role:', e);
+  }
+
+  if (STATE.userRole === 'manager') {
+    document.getElementById('admin-nav-tab').style.display = 'flex';
+    adminLoadTemplates();
   }
 
   await renderAll();
@@ -1913,6 +1952,198 @@ function renderDrawer(t) {
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
   document.getElementById('drawer').classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADMIN — checklist template / item management
+═══════════════════════════════════════════════════════════════════ */
+let adminTemplates = [];
+
+function adminFieldLabel(text) {
+  return `<span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${text}</span>`;
+}
+
+function adminItemFieldsHtml(item) {
+  return `
+    <div class="form-row" style="display:grid; grid-template-columns:80px 1fr 160px; gap:10px; margin-bottom:8px;">
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Order')}
+        <input type="number" class="ai-sort" value="${item.sort_order ?? 0}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Title')}
+        <input type="text" class="ai-title" value="${escapeHtml(item.title || '')}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Requirement')}
+        <select class="ai-requirement" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+          <option value="always" ${item.requirement_type === 'always' ? 'selected' : ''}>Always</option>
+          <option value="conditional" ${item.requirement_type === 'conditional' ? 'selected' : ''}>Conditional</option>
+          <option value="optional" ${item.requirement_type === 'optional' ? 'selected' : ''}>Optional</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">
+      ${adminFieldLabel('Description')}
+      <input type="text" class="ai-description" value="${escapeHtml(item.description || '')}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+    </div>
+    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:8px;">
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Tool Key')}
+        <input type="text" class="ai-tool-key" value="${escapeHtml(item.tool_key || '')}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Resource URL')}
+        <input type="text" class="ai-resource-url" value="${escapeHtml(item.resource_url || '')}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Resource Label')}
+        <input type="text" class="ai-resource-label" value="${escapeHtml(item.resource_label || '')}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+      </div>
+    </div>
+    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
+      <input type="checkbox" class="ai-active" ${item.is_active !== false ? 'checked' : ''}> Active
+    </label>`;
+}
+
+function adminItemBlockHtml(item) {
+  return `
+    <div class="admin-item" data-item-id="${item.id}" style="border:1px solid var(--ink-border); border-radius:var(--r); padding:12px; margin-bottom:10px;">
+      ${adminItemFieldsHtml(item)}
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-primary btn-sm" onclick="adminSaveItem(${item.id}, this)">Save Item</button>
+      </div>
+    </div>`;
+}
+
+async function adminLoadTemplates() {
+  const container = document.getElementById('admin-templates');
+  container.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    adminTemplates = await GET('/daily-desk/checklist-templates');
+  } catch (e) {
+    container.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  adminRenderTemplates();
+}
+
+function adminRenderTemplates() {
+  const container = document.getElementById('admin-templates');
+  if (!adminTemplates.length) {
+    container.innerHTML = '<div class="empty">No checklist templates found.</div>';
+    return;
+  }
+  container.innerHTML = adminTemplates.map(t => {
+    const appliesTo = t.applies_to || [];
+    return `
+      <div class="admin-template" data-template-id="${t.id}" style="margin-bottom:28px;">
+        <div class="section-head">
+          <input type="text" class="at-name" value="${escapeHtml(t.name)}" style="background:transparent; border:none; border-bottom:1px solid var(--ink-border); color:var(--text); font-size:15px; font-weight:600; padding:4px 0; min-width:240px;">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-seller" ${appliesTo.includes('seller') ? 'checked' : ''}> Seller</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-buyer" ${appliesTo.includes('buyer') ? 'checked' : ''}> Buyer</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-closing" ${appliesTo.includes('closing') ? 'checked' : ''}> Closing</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-active" ${t.is_active ? 'checked' : ''}> Active</label>
+            <button class="btn btn-ghost btn-sm" onclick="adminSaveTemplate(${t.id}, this)">Save</button>
+          </div>
+        </div>
+        <div class="admin-items">
+          ${(t.items || []).map(item => adminItemBlockHtml(item)).join('') || '<div class="empty">No items yet.</div>'}
+        </div>
+        <div class="admin-new-item" id="admin-new-item-${t.id}" style="display:none; margin-top:10px;">
+          ${adminItemFieldsHtml({ sort_order: (t.items || []).length, title: '', description: '', requirement_type: 'always', tool_key: '', resource_url: '', resource_label: '', is_active: true })}
+          <div class="btn-row" style="margin-top:10px;">
+            <button class="btn btn-primary btn-sm" onclick="adminCreateItem(${t.id}, this)">Add Item</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('admin-new-item-${t.id}').style.display='none'">Cancel</button>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px;" onclick="document.getElementById('admin-new-item-${t.id}').style.display='block'">+ Add Item</button>
+      </div>`;
+  }).join('');
+}
+
+function adminReadItemFields(container) {
+  return {
+    sort_order: Number(container.querySelector('.ai-sort').value) || 0,
+    title: container.querySelector('.ai-title').value.trim(),
+    description: container.querySelector('.ai-description').value.trim() || null,
+    requirement_type: container.querySelector('.ai-requirement').value,
+    tool_key: container.querySelector('.ai-tool-key').value.trim() || null,
+    resource_url: container.querySelector('.ai-resource-url').value.trim() || null,
+    resource_label: container.querySelector('.ai-resource-label').value.trim() || null,
+    is_active: container.querySelector('.ai-active').checked,
+  };
+}
+
+async function adminSaveItem(itemId, btn) {
+  const container = btn.closest('.admin-item');
+  const fields = adminReadItemFields(container);
+  if (!fields.title) { alert('Title is required.'); return; }
+  try {
+    await PUT(`/daily-desk/checklist-items/${itemId}`, fields);
+    await adminLoadTemplates();
+  } catch (e) {
+    alert('Failed to save item: ' + e.message);
+  }
+}
+
+async function adminCreateItem(templateId, btn) {
+  const container = btn.closest('.admin-new-item');
+  const fields = adminReadItemFields(container);
+  if (!fields.title) { alert('Title is required.'); return; }
+  try {
+    await POST(`/daily-desk/checklist-templates/${templateId}/items`, fields);
+    await adminLoadTemplates();
+  } catch (e) {
+    alert('Failed to add item: ' + e.message);
+  }
+}
+
+async function adminSaveTemplate(templateId, btn) {
+  const container = btn.closest('.admin-template');
+  const name = container.querySelector('.at-name').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+  const appliesTo = [];
+  if (container.querySelector('.at-seller').checked) appliesTo.push('seller');
+  if (container.querySelector('.at-buyer').checked) appliesTo.push('buyer');
+  if (container.querySelector('.at-closing').checked) appliesTo.push('closing');
+  const isActive = container.querySelector('.at-active').checked;
+
+  try {
+    await PUT(`/daily-desk/checklist-templates/${templateId}`, { name, applies_to: appliesTo, is_active: isActive });
+    await adminLoadTemplates();
+  } catch (e) {
+    alert('Failed to save template: ' + e.message);
+  }
+}
+
+function adminShowNewTemplateForm() {
+  document.getElementById('admin-new-template').style.display = 'block';
+}
+function adminHideNewTemplateForm() {
+  document.getElementById('admin-new-template').style.display = 'none';
+  document.getElementById('admin-tpl-name').value = '';
+  document.getElementById('admin-tpl-seller').checked = false;
+  document.getElementById('admin-tpl-buyer').checked = false;
+  document.getElementById('admin-tpl-closing').checked = false;
+}
+async function adminCreateTemplate() {
+  const name = document.getElementById('admin-tpl-name').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+  const appliesTo = [];
+  if (document.getElementById('admin-tpl-seller').checked) appliesTo.push('seller');
+  if (document.getElementById('admin-tpl-buyer').checked) appliesTo.push('buyer');
+  if (document.getElementById('admin-tpl-closing').checked) appliesTo.push('closing');
+  if (!appliesTo.length) { alert('Select at least one "Applies To" option.'); return; }
+
+  try {
+    await POST('/daily-desk/checklist-templates', { name, applies_to: appliesTo });
+    adminHideNewTemplateForm();
+    await adminLoadTemplates();
+  } catch (e) {
+    alert('Failed to create template: ' + e.message);
+  }
 }
 </script>
 
