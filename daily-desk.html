@@ -819,10 +819,10 @@ tbody tr.clickable { cursor: pointer; }
     <!-- ═══ NOT YET TRACKED PAGE ═══ -->
     <div class="page" id="page-untracked">
 
-      <div class="alert-banner">
+      <div class="alert-banner" id="untracked-banner" style="display:none">
         <div class="alert-icon">!</div>
         <div class="alert-text">
-          <div class="alert-title">2 DeltaNet listings for Ormond Mainland aren't tracked yet</div>
+          <div class="alert-title" id="untracked-banner-title"></div>
           <div class="alert-sub">These agents have active MLS listings with no transaction record. Start tracking to pull details automatically.</div>
         </div>
       </div>
@@ -838,49 +838,12 @@ tbody tr.clickable { cursor: pointer; }
               <th>Agent</th>
               <th>List Price</th>
               <th>Bed/Bath</th>
-              <th>List Date</th>
+              <th>Cached</th>
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>
-                <div class="addr-cell">4421 S Atlantic Avenue</div>
-                <div class="addr-sub">Ponce Inlet, FL 32127 &middot; V4948654</div>
-              </td>
-              <td>Cyndi Ritchey</td>
-              <td>$599,000</td>
-              <td>3 / 2.5</td>
-              <td>06/12/2026</td>
-              <td><button class="btn btn-primary btn-sm" onclick="startTracking('4421 S Atlantic Avenue')">Start Tracking</button></td>
-            </tr>
-            <tr>
-              <td>
-                <div class="addr-cell">6 Westgrill Drive</div>
-                <div class="addr-sub">Palm Coast, FL 32164 &middot; FC316585</div>
-              </td>
-              <td>Alicia Delgado</td>
-              <td>$365,000</td>
-              <td>3 / 2.0</td>
-              <td>06/11/2026</td>
-              <td><button class="btn btn-primary btn-sm" onclick="startTracking('6 Westgrill Drive')">Start Tracking</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section-head">
-        <div class="section-title">Recently Resolved</div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr>
-              <td style="color:var(--text-muted); font-size:12px;">
-                <span class="chip chip-green" style="margin-right:8px;">✓ Tracked</span>
-                2850 Ocean Shore Boulevard — added 06/13/2026 by Cora Thompson
-              </td>
-            </tr>
+          <tbody id="untracked-tbody">
+            <tr><td colspan="6" class="empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1087,6 +1050,7 @@ let STATE = {
   listings:  [],
   contracts: [],
   today:     [],
+  untracked: [],
   userRole:  "unknown",
 };
 
@@ -1258,13 +1222,14 @@ async function renderAll() {
   const officeId = document.getElementById('officeSelect').value;
   const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
 
-  let summary = {}, listings = [], contracts = [], today = [];
+  let summary = {}, listings = [], contracts = [], today = [], untracked = [];
   try {
-    [summary, listings, contracts, today] = await Promise.all([
+    [summary, listings, contracts, today, untracked] = await Promise.all([
       GET(`/daily-desk/summary${qs}`),
       GET(`/daily-desk/listings${qs}`),
       GET(`/daily-desk/contracts${qs}`),
       GET(`/daily-desk/today${qs}`),
+      GET(`/daily-desk/untracked${qs}`),
     ]);
   } catch (e) {
     console.error('renderAll failed:', e);
@@ -1274,6 +1239,7 @@ async function renderAll() {
   STATE.listings  = listings  || [];
   STATE.contracts = contracts || [];
   STATE.today     = today     || [];
+  STATE.untracked = untracked || [];
 
   document.getElementById('office-meta').innerHTML =
     `${summary.active_listings ?? 0} active &middot; ${summary.under_contract ?? 0} under contract &middot; <b>${summary.untracked ?? 0} not yet tracked</b>`;
@@ -1285,6 +1251,7 @@ async function renderAll() {
   renderTodayTable(STATE.today);
   renderListingsTable(STATE.listings);
   renderContractsTable(STATE.contracts);
+  renderUntrackedTable(STATE.untracked);
 
   filterToday();
   filterListings();
@@ -1819,9 +1786,58 @@ function filterContracts() {
   });
 }
 
-/* ── DeltaNet "start tracking" ── */
-function startTracking(addr) {
-  alert('Mockup: would open the New Listing form pre-filled from DeltaNet for "' + addr + '" — agent, office, address, price, bed/bath, list date already populated.');
+/* ── DeltaNet "Not Yet Tracked" page ── */
+function renderUntrackedTable(rows) {
+  const tbody = document.getElementById('untracked-tbody');
+  const banner = document.getElementById('untracked-banner');
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No untracked DeltaNet listings found.</td></tr>';
+    banner.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'flex';
+  document.getElementById('untracked-banner-title').textContent =
+    `${rows.length} DeltaNet listing${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? "isn't" : "aren't"} tracked yet`;
+
+  tbody.innerHTML = rows.map(r => {
+    const sub = [r.city, (r.mls_ids || [])[0]].filter(Boolean).join(' &middot; ');
+    const bedBath = (r.bedrooms != null || r.bathrooms != null)
+      ? `${r.bedrooms ?? '—'} / ${r.bathrooms ?? '—'}`
+      : '—';
+    return `
+            <tr>
+              <td>
+                <div class="addr-cell">${escapeHtml(r.address) || 'Unknown address'}</div>
+                <div class="addr-sub">${sub || '—'}</div>
+              </td>
+              <td>${escapeHtml(r.agent_name) || '—'}</td>
+              <td>${fmtMoney(r.price_asking)}</td>
+              <td>${bedBath}</td>
+              <td>${fmtDate(r.cached_at)}</td>
+              <td><button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button></td>
+            </tr>`;
+  }).join('');
+}
+
+async function startTracking(deltaListingId) {
+  const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
+  if (!row) return;
+
+  if (!confirm(`Start tracking "${row.address}"? This creates a new listing transaction.`)) return;
+
+  const officeId = document.getElementById('officeSelect').value;
+  try {
+    await POST('/daily-desk/start-tracking', {
+      delta_listing_id: row.delta_listing_id,
+      agent_id: row.agent_id || null,
+      office_id: row.office_id || (officeId !== 'all' ? officeId : null),
+    });
+    await renderAll();
+  } catch (e) {
+    alert('Failed to start tracking: ' + e.message);
+  }
 }
 
 /* ── Transaction detail drawer ── */
