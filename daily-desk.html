@@ -1051,6 +1051,14 @@ tbody tr.clickable { cursor: pointer; }
         <div class="dfield-key">Form Simplicity</div>
         <div class="dfield-val" id="drawer-fs">—</div>
       </div>
+      <div>
+        <div class="dfield-key">Buyer's Agent</div>
+        <div class="dfield-val" id="drawer-buyer-agent">—</div>
+      </div>
+      <div>
+        <div class="dfield-key">Buyer's Brokerage</div>
+        <div class="dfield-val" id="drawer-buyer-brokerage">—</div>
+      </div>
     </div>
 
     <div class="divider">Checklist</div>
@@ -1923,6 +1931,14 @@ function renderDrawer(t) {
   document.getElementById('drawer-mlsid').textContent    = mlsLink ? mlsLink.external_id : '—';
 
   document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
+
+  const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
+  document.getElementById('drawer-buyer-agent').textContent = buyerAgent
+    ? (buyerAgent.first_name ? `${buyerAgent.first_name} ${buyerAgent.last_name}` : (buyerAgent.external_name || '—'))
+    : '—';
+  document.getElementById('drawer-buyer-brokerage').textContent = buyerAgent
+    ? (buyerAgent.is_acc_agent ? "Adams Cameron & Co." : (buyerAgent.external_brokerage || '—'))
+    : '—';
 
   const clEl = document.getElementById('drawer-checklist');
   const items = t.checklist || [];
