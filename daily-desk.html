@@ -12,6 +12,7 @@
 <title>Daily Desk · Adams Cameron & Co.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root {
   --ink:        #0d1117;
@@ -639,7 +640,19 @@ tbody tr.clickable { cursor: pointer; }
 </head>
 <body>
 
-<div class="shell">
+<!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
+<div id="auth-gate" style="position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:999;">
+  <div style="background:var(--ink-mid);border:1px solid var(--ink-border);border-radius:8px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.6);">
+    <div style="width:52px;height:52px;background:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 20px;">🗂️</div>
+    <div style="font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--amber);margin-bottom:8px;">ADAMS CAMERON &amp; CO.</div>
+    <h1 style="font-size:20px;font-weight:600;color:var(--text);margin-bottom:6px;">Daily Desk</h1>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:28px;line-height:1.5;">Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:16px;">Access restricted to @adamscameron.com accounts.</p>
+  </div>
+</div>
+
+<div class="shell" id="app" style="display:none">
 
   <!-- TOPBAR -->
   <div class="topbar">
@@ -650,7 +663,7 @@ tbody tr.clickable { cursor: pointer; }
       <span style="color:var(--text-muted)">Daily Desk</span>
     </div>
     <div class="topbar-right">
-      <div class="admin-chip">Cora Thompson</div>
+      <div class="admin-chip" id="admin-chip">Loading…</div>
       <button class="theme-toggle" onclick="toggleTheme()">☀ Comfort Mode</button>
     </div>
   </div>
@@ -660,30 +673,23 @@ tbody tr.clickable { cursor: pointer; }
     <span class="office-label">Working in</span>
     <select class="office-select" id="officeSelect" onchange="renderAll()">
       <option value="all">All Offices</option>
-      <option value="ormond-mainland" selected>Ormond Mainland</option>
-      <option value="ormond-beachside">Ormond Beachside</option>
-      <option value="daytona">Daytona</option>
-      <option value="port-orange">Port Orange</option>
-      <option value="ponce-inlet">Ponce Inlet</option>
-      <option value="palm-coast">Palm Coast</option>
-      <option value="deland">DeLand</option>
     </select>
-    <span class="office-meta">12 active &middot; 4 under contract &middot; <b>2 not yet tracked</b></span>
+    <span class="office-meta" id="office-meta">—</span>
   </div>
 
   <!-- NAV TABS -->
   <div class="nav">
     <div class="nav-tab active" data-page="today" onclick="showPage('today',this)">
-      <span class="tab-icon">☑</span> Today <span class="tab-count">8</span>
+      <span class="tab-icon">☑</span> Today <span class="tab-count" id="today-count">—</span>
     </div>
     <div class="nav-tab" data-page="listings" onclick="showPage('listings',this)">
-      <span class="tab-icon">🏷</span> Listings <span class="tab-count">12</span>
+      <span class="tab-icon">🏷</span> Listings <span class="tab-count" id="listings-count">—</span>
     </div>
     <div class="nav-tab" data-page="contracts" onclick="showPage('contracts',this)">
-      <span class="tab-icon">📝</span> Contracts <span class="tab-count">4</span>
+      <span class="tab-icon">📝</span> Contracts <span class="tab-count" id="contracts-count">—</span>
     </div>
     <div class="nav-tab alert" data-page="untracked" onclick="showPage('untracked',this)">
-      <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count">2</span>
+      <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count" id="untracked-count">—</span>
     </div>
     <div class="nav-spacer"></div>
     <div class="nav-add">
@@ -729,135 +735,7 @@ tbody tr.clickable { cursor: pointer; }
             </tr>
           </thead>
           <tbody id="today-tbody">
-
-            <tr class="today-row" data-age="8" data-type="Photos uploaded" data-addr="2711 N Halifax Avenue">
-              <td><span class="tbl-link" onclick="openDrawer('2711 N Halifax Avenue')">2711 N Halifax Avenue</span></td>
-              <td>Photos uploaded</td>
-              <td><span class="chip chip-amber">Listing</span></td>
-              <td>8 days</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="cl-link-placeholder">—</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="3" data-type="Sign installed" data-addr="317 Shore Drive E">
-              <td><span class="tbl-link" onclick="openDrawer('317 Shore Drive E')">317 Shore Drive E</span></td>
-              <td>Sign installed</td>
-              <td><span class="chip chip-amber">Listing</span></td>
-              <td>3 days</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="cl-link-placeholder">—</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="3" data-type="Lockbox assigned" data-addr="317 Shore Drive E">
-              <td><span class="tbl-link" onclick="openDrawer('317 Shore Drive E')">317 Shore Drive E</span></td>
-              <td>Lockbox assigned</td>
-              <td><span class="chip chip-amber">Listing</span></td>
-              <td>3 days</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="tbl-link" onclick="alert('Mockup: would open the Lockbox Manager app, pre-filtered to this address, to assign a box.')">Open Lockbox App →</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="1" data-type="Recover lockbox" data-addr="39 Sea Island Drive N">
-              <td><span class="tbl-link" onclick="openDrawer('39 Sea Island Drive N')">39 Sea Island Drive N</span></td>
-              <td>Recover lockbox</td>
-              <td><span class="chip chip-blue">Under Contract</span></td>
-              <td>1 day</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="tbl-link" onclick="alert('Mockup: would open the Lockbox Manager app, pre-filtered to this address, to record check-in.')">Open Lockbox App →</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="2" data-type="Send thank-you letter" data-addr="66 Ocean Shore Drive">
-              <td><span class="tbl-link" onclick="openDrawer('66 Ocean Shore Drive')">66 Ocean Shore Drive</span></td>
-              <td>Send thank-you letter to buyer/seller</td>
-              <td><span class="chip chip-green">Closed</span></td>
-              <td>2 days</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="cl-link-placeholder">—</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="1" data-type="Confirm commission split in Profit Power" data-addr="66 Ocean Shore Drive">
-              <td><span class="tbl-link" onclick="openDrawer('66 Ocean Shore Drive')">66 Ocean Shore Drive</span></td>
-              <td>Confirm commission split in Profit Power</td>
-              <td><span class="chip chip-green">Closed</span></td>
-              <td>1 day</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="cl-link-placeholder">—</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="0" data-type="Withdrawal paperwork uploaded to Form Simplicity" data-addr="14 Wheeldon Lane">
-              <td><span class="tbl-link" onclick="openDrawer('14 Wheeldon Lane')">14 Wheeldon Lane</span></td>
-              <td>Withdrawal paperwork uploaded to Form Simplicity</td>
-              <td><span class="chip chip-neutral">Withdrawn</span></td>
-              <td>Today</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="tbl-link" onclick="alert('Mockup: would open Form Simplicity file for this transaction.')">Open in FS →</span></td>
-            </tr>
-
-            <tr class="today-row" data-age="0" data-type="Recover sign" data-addr="14 Wheeldon Lane">
-              <td><span class="tbl-link" onclick="openDrawer('14 Wheeldon Lane')">14 Wheeldon Lane</span></td>
-              <td>Recover sign</td>
-              <td><span class="chip chip-neutral">Withdrawn</span></td>
-              <td>Today</td>
-              <td>
-                <div class="cl-controls">
-                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
-                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
-                </div>
-              </td>
-              <td><span class="cl-link-placeholder">—</span></td>
-            </tr>
-
-          </tbody>
-        </table>
-      </div>
-
-      <div class="section-head" style="margin-top:28px;">
-        <div class="section-title">Recently Marked Not Applicable</div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr>
-              <td style="color:var(--text-muted); font-size:12px; padding:10px 14px;">
-                <span class="chip chip-neutral" style="margin-right:8px;">— N/A</span>
-                317 Shore Drive E — "Add to caravan" — marked N/A by Cora Thompson, 06/13/2026
-              </td>
-            </tr>
+            <tr><td colspan="6" class="empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -871,6 +749,7 @@ tbody tr.clickable { cursor: pointer; }
         <input id="lst-q" type="text" placeholder="Search address, agent, MLS #…" oninput="filterListings()">
         <select id="lst-status" onchange="filterListings()">
           <option value="">All Statuses</option>
+          <option value="coming_soon">Coming Soon</option>
           <option value="active">Active</option>
           <option value="under_contract">Under Contract</option>
           <option value="closed">Closed</option>
@@ -896,61 +775,7 @@ tbody tr.clickable { cursor: pointer; }
             </tr>
           </thead>
           <tbody id="listings-tbody">
-            <tr class="lst-row" data-status="active" data-attn="1">
-              <td>
-                <div class="addr-cell"><span class="attn-dot"></span>317 Shore Drive E</div>
-                <div class="addr-sub">Oldsmar, FL 34677 &middot; FC315737</div>
-              </td>
-              <td>Charles Kelly</td>
-              <td>$484,700</td>
-              <td>List 06/10/2026</td>
-              <td><span class="chip chip-amber">Active</span></td>
-              <td><button class="row-action" onclick="openActionModal('317 Shore Drive E','listing','active')">Actions ▾</button></td>
-            </tr>
-            <tr class="lst-row" data-status="active" data-attn="0">
-              <td>
-                <div class="addr-cell">5 Sunny Beach Drive</div>
-                <div class="addr-sub">Ormond Beach, FL 32176 &middot; 1225539</div>
-              </td>
-              <td>Amy Potter</td>
-              <td>$689,000</td>
-              <td>List 06/08/2026</td>
-              <td><span class="chip chip-amber">Active</span></td>
-              <td><button class="row-action" onclick="openActionModal('5 Sunny Beach Drive','listing','active')">Actions ▾</button></td>
-            </tr>
-            <tr class="lst-row" data-status="active" data-attn="1">
-              <td>
-                <div class="addr-cell"><span class="attn-dot"></span>2711 N Halifax Avenue</div>
-                <div class="addr-sub">Daytona Beach, FL 32118 &middot; 1225579</div>
-              </td>
-              <td>Toni Wright</td>
-              <td>$139,900</td>
-              <td>List 06/05/2026</td>
-              <td><span class="chip chip-amber">Active</span></td>
-              <td><button class="row-action" onclick="openActionModal('2711 N Halifax Avenue','listing','active')">Actions ▾</button></td>
-            </tr>
-            <tr class="lst-row" data-status="under_contract" data-attn="1">
-              <td>
-                <div class="addr-cell"><span class="attn-dot"></span>39 Sea Island Drive N</div>
-                <div class="addr-sub">Ormond Beach, FL 32176 &middot; FC313120</div>
-              </td>
-              <td>Debra Callahan</td>
-              <td>$475,000</td>
-              <td>Contract 06/11/2026</td>
-              <td><span class="chip chip-blue">Under Contract</span></td>
-              <td><button class="row-action" onclick="openActionModal('39 Sea Island Drive N','listing','under_contract')">Actions ▾</button></td>
-            </tr>
-            <tr class="lst-row" data-status="closed" data-attn="1">
-              <td>
-                <div class="addr-cell"><span class="attn-dot"></span>66 Ocean Shore Drive</div>
-                <div class="addr-sub">Ormond Beach, FL 32176 &middot; 1224279</div>
-              </td>
-              <td>Tasha Sollowen</td>
-              <td>$207,500</td>
-              <td>Closed 04/21/2026</td>
-              <td><span class="chip chip-green">Closed</span></td>
-              <td><button class="row-action" onclick="openActionModal('66 Ocean Shore Drive','listing','closed')">Actions ▾</button></td>
-            </tr>
+            <tr><td colspan="6" class="empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -985,30 +810,7 @@ tbody tr.clickable { cursor: pointer; }
             </tr>
           </thead>
           <tbody id="contracts-tbody">
-            <tr class="ctr-row" data-status="under_contract">
-              <td>
-                <div class="addr-cell"><span class="attn-dot"></span>3259 Silas Drive</div>
-                <div class="addr-sub">New Smyrna Beach, FL 32168 &middot; 1223802</div>
-              </td>
-              <td>Ashlee Selman</td>
-              <td>RE/MAX Signature</td>
-              <td>$389,000</td>
-              <td>06/09/2026</td>
-              <td><span class="chip chip-blue">Under Contract</span></td>
-              <td><button class="row-action" onclick="openActionModal('3259 Silas Drive','contract','under_contract')">Actions ▾</button></td>
-            </tr>
-            <tr class="ctr-row" data-status="under_contract">
-              <td>
-                <div class="addr-cell">6291 W Fallsgrove Lane</div>
-                <div class="addr-sub">Port Orange, FL 32128 &middot; V4947143</div>
-              </td>
-              <td>Karen Dignam</td>
-              <td>Watson Realty Corp</td>
-              <td>$634,000</td>
-              <td>06/08/2026</td>
-              <td><span class="chip chip-blue">Under Contract</span></td>
-              <td><button class="row-action" onclick="openActionModal('6291 W Fallsgrove Lane','contract','under_contract')">Actions ▾</button></td>
-            </tr>
+            <tr><td colspan="7" class="empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1231,85 +1033,220 @@ tbody tr.clickable { cursor: pointer; }
   <div class="drawer-head">
     <div class="drawer-head-top">
       <div>
-        <div class="drawer-addr" id="drawerAddr">317 Shore Drive E</div>
-        <div class="drawer-sub" id="drawerSub">Oldsmar, FL 34677 &middot; FC315737</div>
+        <div class="drawer-addr" id="drawerAddr">—</div>
+        <div class="drawer-sub" id="drawerSub"></div>
       </div>
       <button class="modal-close" onclick="closeDrawer()">✕</button>
     </div>
-    <span class="chip chip-amber">Active Listing</span>
+    <span class="chip chip-amber" id="drawer-status-chip">—</span>
   </div>
   <div class="drawer-body">
 
     <div class="dgrid">
       <div>
         <div class="dfield-key">Agent</div>
-        <div class="dfield-val">Charles Kelly</div>
+        <div class="dfield-val" id="drawer-agent">—</div>
       </div>
       <div>
         <div class="dfield-key">Office</div>
-        <div class="dfield-val">Ormond Mainland</div>
+        <div class="dfield-val" id="drawer-office">—</div>
       </div>
       <div>
-        <div class="dfield-key">List Price</div>
-        <div class="dfield-val">$484,700</div>
+        <div class="dfield-key">Price</div>
+        <div class="dfield-val" id="drawer-price">—</div>
       </div>
       <div>
         <div class="dfield-key">List Date</div>
-        <div class="dfield-val">06/10/2026</div>
+        <div class="dfield-val" id="drawer-listdate">—</div>
       </div>
       <div>
         <div class="dfield-key">MLS ID</div>
-        <div class="dfield-val">FC315737</div>
+        <div class="dfield-val" id="drawer-mlsid">—</div>
       </div>
       <div>
         <div class="dfield-key">Form Simplicity</div>
-        <div class="dfield-val"><span class="tbl-link">View file →</span></div>
+        <div class="dfield-val" id="drawer-fs">—</div>
       </div>
     </div>
 
     <div class="divider">Checklist</div>
-    <div class="checklist">
-      <div class="cl-item done">
-        <div class="cl-check checked">✓</div>
-        <div class="cl-label">Listing entered in MLS</div>
-      </div>
-      <div class="cl-item done">
-        <div class="cl-check checked">✓</div>
-        <div class="cl-label">Listing agreement uploaded to Form Simplicity</div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-check"></div>
-        <div class="cl-label">Sign installed</div>
-        <div class="cl-action">Mark done</div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-check"></div>
-        <div class="cl-label">Lockbox assigned</div>
-        <div class="cl-action">Mark done</div>
-      </div>
-      <div class="cl-item dismissed">
-        <div class="cl-check dismissed-x">✕</div>
-        <div class="cl-label">Add to caravan</div>
-        <div class="cl-action">Restore</div>
-      </div>
-      <div class="cl-item">
-        <div class="cl-check"></div>
-        <div class="cl-label">Photos uploaded</div>
-        <div class="cl-action">Mark done</div>
-      </div>
+    <div class="checklist" id="drawer-checklist">
+      <div class="empty">Loading…</div>
     </div>
 
     <div class="divider">Activity</div>
-    <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;">
-      <div>06/13/2026 — Listing agreement uploaded to Form Simplicity</div>
-      <div>06/10/2026 — Listing entered, MLS# FC315737</div>
-      <div>06/10/2026 — Transaction created by Cora Thompson</div>
+    <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;" id="drawer-activity">
     </div>
 
   </div>
 </div>
 
 <script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH STATE
+═══════════════════════════════════════════════════════════════════ */
+let userEmail   = "";
+let userDisplay = "";
+let proxyKey    = "";
+
+let STATE = {
+  listings:  [],
+  contracts: [],
+  today:     [],
+  userRole:  "unknown",
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   GOOGLE SIGN-IN
+═══════════════════════════════════════════════════════════════════ */
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail   = payload.email || "";
+    userDisplay = payload.name  || userEmail;
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "grid";
+
+    await init();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════════════════════════════ */
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+const GET   = (path)       => api(path);
+const POST  = (path, body) => api(path, { method: "POST",  body: JSON.stringify(body) });
+const PATCH = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body) });
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORMATTING HELPERS
+═══════════════════════════════════════════════════════════════════ */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeJs(str) {
+  return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+function fmtMoney(v) {
+  if (v == null || v === '') return '—';
+  return '$' + Number(v).toLocaleString();
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return '—';
+  return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+const STATUS_CHIP = {
+  coming_soon:    ['chip-neutral', 'Coming Soon'],
+  active_listing: ['chip-amber',   'Active'],
+  under_contract: ['chip-blue',    'Under Contract'],
+  closed:         ['chip-green',   'Closed'],
+  expired:        ['chip-neutral', 'Expired'],
+  withdrawn:      ['chip-neutral', 'Withdrawn'],
+  cancelled:      ['chip-neutral', 'Cancelled'],
+};
+function statusChip(status) {
+  return STATUS_CHIP[status] || ['chip-neutral', status || '—'];
+}
+
+const STATUS_TO_DATA_STATUS = {
+  coming_soon:    'coming_soon',
+  active_listing: 'active',
+  under_contract: 'under_contract',
+  closed:         'closed',
+  expired:        'expired',
+  withdrawn:      'withdrawn',
+  cancelled:      'withdrawn',
+};
+function dataStatus(status) {
+  return STATUS_TO_DATA_STATUS[status] || status;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+async function loadOffices() {
+  let offices = [];
+  try {
+    offices = await GET('/daily-desk/offices');
+  } catch (e) {
+    console.error('Failed to load offices:', e);
+  }
+  const sel = document.getElementById('officeSelect');
+  sel.innerHTML = '<option value="all">All Offices</option>' +
+    (offices || []).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+}
+
+async function init() {
+  document.getElementById('admin-chip').textContent = userDisplay || userEmail;
+
+  await loadOffices();
+
+  try {
+    const me = await GET('/lockbox/me');
+    STATE.userRole = (me || {}).role || 'unknown';
+  } catch (e) {
+    console.error('Failed to load role:', e);
+  }
+
+  await renderAll();
+}
+
 function toggleTheme() {
   const root = document.documentElement;
   const isComfort = root.getAttribute('data-theme') === 'comfort';
@@ -1329,8 +1266,120 @@ function showPage(name, el) {
   el.classList.add('active');
 }
 
-function renderAll() {
-  // In the real app: re-fetch transactions/DeltaNet data scoped to selected office
+async function renderAll() {
+  const officeId = document.getElementById('officeSelect').value;
+  const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
+
+  let summary = {}, listings = [], contracts = [], today = [];
+  try {
+    [summary, listings, contracts, today] = await Promise.all([
+      GET(`/daily-desk/summary${qs}`),
+      GET(`/daily-desk/listings${qs}`),
+      GET(`/daily-desk/contracts${qs}`),
+      GET(`/daily-desk/today${qs}`),
+    ]);
+  } catch (e) {
+    console.error('renderAll failed:', e);
+    return;
+  }
+
+  STATE.listings  = listings  || [];
+  STATE.contracts = contracts || [];
+  STATE.today     = today     || [];
+
+  document.getElementById('office-meta').innerHTML =
+    `${summary.active_listings ?? 0} active &middot; ${summary.under_contract ?? 0} under contract &middot; <b>${summary.untracked ?? 0} not yet tracked</b>`;
+  document.getElementById('today-count').textContent     = STATE.today.length;
+  document.getElementById('listings-count').textContent  = STATE.listings.length;
+  document.getElementById('contracts-count').textContent = STATE.contracts.length;
+  document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
+
+  renderTodayTable(STATE.today);
+  renderListingsTable(STATE.listings);
+  renderContractsTable(STATE.contracts);
+
+  filterToday();
+  filterListings();
+  filterContracts();
+}
+
+function renderTodayTable(rows) {
+  const tbody = document.getElementById('today-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Nothing pending.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(item => {
+    const [chipClass, chipLabel] = statusChip(item.transaction_status);
+    const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000));
+    const ageLabel = ageDays === 0 ? 'Today' : (ageDays === 1 ? '1 day' : `${ageDays} days`);
+    return `
+            <tr class="today-row" data-age="${ageDays}" data-type="${escapeHtml(item.title)}" data-addr="${escapeHtml(item.property_address)}" data-progress-id="${item.progress_id}">
+              <td><span class="tbl-link" onclick="openDrawer('${item.transaction_id}')">${escapeHtml(item.property_address)}</span></td>
+              <td>${escapeHtml(item.title)}</td>
+              <td><span class="chip ${chipClass}">${chipLabel}</span></td>
+              <td>${ageLabel}</td>
+              <td>
+                <div class="cl-controls">
+                  <button class="cl-btn done" title="Mark complete" onclick="setItemState(this,'done')">✓</button>
+                  <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
+                </div>
+              </td>
+              <td><span class="cl-link-placeholder">—</span></td>
+            </tr>`;
+  }).join('');
+}
+
+function renderListingsTable(rows) {
+  const tbody = document.getElementById('listings-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No listings found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(t => {
+    const [chipClass, chipLabel] = statusChip(t.status);
+    const dStatus = dataStatus(t.status);
+    const attnDot = t.needs_attention ? '<span class="attn-dot"></span>' : '';
+    const sub = [t.city, t.mls_id].filter(Boolean).join(' &middot; ') || '—';
+    return `
+            <tr class="lst-row" data-status="${dStatus}" data-attn="${t.needs_attention ? '1' : '0'}">
+              <td>
+                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span></div>
+                <div class="addr-sub">${sub}</div>
+              </td>
+              <td>${escapeHtml(t.agent_name) || '—'}</td>
+              <td>${fmtMoney(t.current_price)}</td>
+              <td>List ${fmtDate(t.list_date)}</td>
+              <td><span class="chip ${chipClass}">${chipLabel}</span></td>
+              <td><button class="row-action" onclick="openActionModal('${escapeJs(t.property_address)}','listing','${dStatus}')">Actions ▾</button></td>
+            </tr>`;
+  }).join('');
+}
+
+function renderContractsTable(rows) {
+  const tbody = document.getElementById('contracts-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">No contracts found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(t => {
+    const [chipClass, chipLabel] = statusChip(t.status);
+    const dStatus = dataStatus(t.status);
+    const attnDot = t.needs_attention ? '<span class="attn-dot"></span>' : '';
+    return `
+            <tr class="ctr-row" data-status="${dStatus}">
+              <td>
+                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span></div>
+                <div class="addr-sub">${escapeHtml(t.city) || '—'}</div>
+              </td>
+              <td>${escapeHtml(t.agent_name) || '—'}</td>
+              <td>—</td>
+              <td>${fmtMoney(t.current_price)}</td>
+              <td>List ${fmtDate(t.list_date)}</td>
+              <td><span class="chip ${chipClass}">${chipLabel}</span></td>
+              <td><button class="row-action" onclick="openActionModal('${escapeJs(t.property_address)}','contract','${dStatus}')">Actions ▾</button></td>
+            </tr>`;
+  }).join('');
 }
 
 /* ── Today / Action Items page ── */
@@ -1359,26 +1408,19 @@ function filterToday() {
   rows.forEach(r => tbody.appendChild(r));
 }
 
-// Three-state toggle: neither -> done -> neither, neither -> N/A -> neither
-// "done" and "na" are mutually exclusive on the same item
-function setItemState(btn, state) {
+// Marks a checklist item complete or not-applicable. Pending items disappear
+// from Today once resolved, so a successful PATCH just re-renders the page.
+async function setItemState(btn, state) {
   const row = btn.closest('tr');
-  const doneBtn = row.querySelector('.cl-btn.done');
-  const naBtn   = row.querySelector('.cl-btn.na');
+  const progressId = row.dataset.progressId;
+  const newStatus = state === 'done' ? 'completed' : 'not_applicable';
 
-  const alreadyActive = btn.classList.contains('active');
-
-  doneBtn.classList.remove('active');
-  naBtn.classList.remove('active');
-  row.classList.remove('resolved');
-
-  if (!alreadyActive) {
-    btn.classList.add('active');
-    row.classList.add('resolved');
-    // Mockup: would PATCH the checklist item status to 'complete' or 'dismissed'
-    // (dismissed items still record who/when for the "Recently Marked N/A" log)
+  try {
+    await PATCH(`/daily-desk/checklist-progress/${progressId}`, { status: newStatus });
+    await renderAll();
+  } catch (e) {
+    alert('Failed to update item: ' + e.message);
   }
-  // Mockup: clicking the same button again reverts to 'incomplete'
 }
 
 /* ── Add modal flow ── */
@@ -1618,11 +1660,75 @@ function startTracking(addr) {
 }
 
 /* ── Transaction detail drawer ── */
-function openDrawer(addr) {
-  document.getElementById('drawerAddr').textContent = addr;
+async function openDrawer(id) {
   document.getElementById('drawerOverlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerAddr').textContent = 'Loading…';
+  document.getElementById('drawerSub').textContent  = '';
+  document.getElementById('drawer-checklist').innerHTML = '<div class="empty">Loading…</div>';
+  document.getElementById('drawer-activity').innerHTML  = '';
+
+  try {
+    const t = await GET(`/daily-desk/transactions/${id}`);
+    renderDrawer(t);
+  } catch (e) {
+    document.getElementById('drawerAddr').textContent = 'Error loading transaction';
+    document.getElementById('drawer-checklist').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  }
 }
+
+function renderDrawer(t) {
+  document.getElementById('drawerAddr').textContent = t.property_address || '—';
+
+  const mlsLink = (t.id_links || []).find(l => ['mls_stellar','mls_beaches','mls_fcmls'].includes(l.system) && l.id_type === 'listing');
+  const fsLink  = (t.id_links || []).find(l => l.system === 'form_simplicity');
+
+  document.getElementById('drawerSub').textContent =
+    [t.city, mlsLink ? mlsLink.external_id : null].filter(Boolean).join(' · ');
+
+  const [chipClass, chipLabel] = statusChip(t.status);
+  const chip = document.getElementById('drawer-status-chip');
+  chip.className = 'chip ' + chipClass;
+  chip.textContent = chipLabel;
+
+  const primaryRole = t.transaction_type === 'buyer' ? 'buyers_agent' : 'listing_agent';
+  const agent = (t.participants || []).find(p => p.role === primaryRole) || (t.participants || [])[0];
+  document.getElementById('drawer-agent').textContent = agent
+    ? (agent.first_name ? `${agent.first_name} ${agent.last_name}` : (agent.external_name || '—'))
+    : '—';
+
+  document.getElementById('drawer-office').textContent   = t.office_name || '—';
+  document.getElementById('drawer-price').textContent    = fmtMoney(t.current_price);
+  document.getElementById('drawer-listdate').textContent = fmtDate(t.list_date);
+  document.getElementById('drawer-mlsid').textContent    = mlsLink ? mlsLink.external_id : '—';
+
+  document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
+
+  const clEl = document.getElementById('drawer-checklist');
+  const items = t.checklist || [];
+  clEl.innerHTML = items.length ? items.map(item => {
+    let cls = '', checkHtml, actionHtml = '';
+    if (item.status === 'completed') {
+      cls = 'done'; checkHtml = '<div class="cl-check checked">✓</div>';
+    } else if (item.status === 'not_applicable') {
+      cls = 'dismissed'; checkHtml = '<div class="cl-check dismissed-x">✕</div>';
+      actionHtml = '<div class="cl-action">Restore</div>';
+    } else if (item.status === 'skipped') {
+      cls = 'dismissed'; checkHtml = '<div class="cl-check dismissed-x">—</div>';
+    } else {
+      checkHtml = '<div class="cl-check"></div>';
+      actionHtml = '<div class="cl-action">Mark done</div>';
+    }
+    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${actionHtml}</div>`;
+  }).join('') : '<div class="empty">No checklist items.</div>';
+
+  const actEl = document.getElementById('drawer-activity');
+  const events = t.events || [];
+  actEl.innerHTML = events.length ? events.map(ev =>
+    `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`
+  ).join('') : '<div>No activity recorded.</div>';
+}
+
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
   document.getElementById('drawer').classList.remove('open');
