@@ -1028,7 +1028,7 @@ tbody tr.clickable { cursor: pointer; }
 
     <div class="dgrid">
       <div>
-        <div class="dfield-key">Agent</div>
+        <div class="dfield-key" id="drawer-agent-label">Agent</div>
         <div class="dfield-val" id="drawer-agent">—</div>
       </div>
       <div>
@@ -1040,7 +1040,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="dfield-val" id="drawer-price">—</div>
       </div>
       <div>
-        <div class="dfield-key">List Date</div>
+        <div class="dfield-key" id="drawer-date-label">List Date</div>
         <div class="dfield-val" id="drawer-listdate">—</div>
       </div>
       <div>
@@ -1052,11 +1052,11 @@ tbody tr.clickable { cursor: pointer; }
         <div class="dfield-val" id="drawer-fs">—</div>
       </div>
       <div>
-        <div class="dfield-key">Buyer's Agent</div>
+        <div class="dfield-key" id="drawer-buyer-agent-label">Buyer's Agent</div>
         <div class="dfield-val" id="drawer-buyer-agent">—</div>
       </div>
       <div>
-        <div class="dfield-key">Buyer's Brokerage</div>
+        <div class="dfield-key" id="drawer-buyer-brokerage-label">Buyer's Brokerage</div>
         <div class="dfield-val" id="drawer-buyer-brokerage">—</div>
       </div>
     </div>
@@ -2037,22 +2037,46 @@ function renderDrawer(t) {
   chip.className = 'chip ' + chipClass;
   chip.textContent = chipLabel;
 
-  const primaryRole = t.represents_seller ? 'listing_agent' : 'buyers_agent';
+  const isContractView = !t.represents_seller && t.represents_buyer;
+
+  const primaryRole = isContractView ? 'buyers_agent' : 'listing_agent';
   const agent = (t.participants || []).find(p => p.role === primaryRole) || (t.participants || [])[0];
+  document.getElementById('drawer-agent-label').textContent = isContractView ? "Buyer's Agent" : 'Agent';
   document.getElementById('drawer-agent').textContent = agent
     ? (agent.first_name ? `${agent.first_name} ${agent.last_name}` : (agent.external_name || '—'))
     : '—';
 
-  document.getElementById('drawer-office').textContent   = t.office_name || '—';
-  document.getElementById('drawer-price').textContent    = fmtMoney(t.current_price);
-  document.getElementById('drawer-listdate').textContent = fmtDate(t.list_date);
-  document.getElementById('drawer-mlsid').textContent    = mlsLink ? mlsLink.external_id : '—';
+  document.getElementById('drawer-office').textContent = t.office_name || '—';
+  document.getElementById('drawer-price').textContent  = fmtMoney(t.current_price);
+
+  if (isContractView) {
+    const contractEvent = (t.events || []).find(ev => ev.event_type === 'went_under_contract');
+    document.getElementById('drawer-date-label').textContent = 'Contract Date';
+    document.getElementById('drawer-listdate').textContent = contractEvent
+      ? fmtDate(contractEvent.contract_date || contractEvent.event_date)
+      : '—';
+  } else {
+    document.getElementById('drawer-date-label').textContent = 'List Date';
+    document.getElementById('drawer-listdate').textContent = fmtDate(t.list_date);
+  }
+
+  document.getElementById('drawer-mlsid').textContent = mlsLink ? mlsLink.external_id : '—';
 
   document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
 
-  const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
-  document.getElementById('drawer-buyer-agent').textContent      = buyerAgent ? (buyerAgent.external_name || '—') : '—';
-  document.getElementById('drawer-buyer-brokerage').textContent  = buyerAgent ? (buyerAgent.external_brokerage || '—') : '—';
+  if (isContractView) {
+    const listingAgent = (t.participants || []).find(p => p.role === 'listing_agent' || p.role === 'co_listing_agent');
+    document.getElementById('drawer-buyer-agent-label').textContent = 'Listing Agent';
+    document.getElementById('drawer-buyer-agent').textContent = listingAgent ? (listingAgent.external_name || '—') : '—';
+    document.getElementById('drawer-buyer-brokerage-label').textContent = 'Listing Brokerage';
+    document.getElementById('drawer-buyer-brokerage').textContent = listingAgent ? (listingAgent.external_brokerage || '—') : '—';
+  } else {
+    const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
+    document.getElementById('drawer-buyer-agent-label').textContent = "Buyer's Agent";
+    document.getElementById('drawer-buyer-agent').textContent = buyerAgent ? (buyerAgent.external_name || '—') : '—';
+    document.getElementById('drawer-buyer-brokerage-label').textContent = "Buyer's Brokerage";
+    document.getElementById('drawer-buyer-brokerage').textContent = buyerAgent ? (buyerAgent.external_brokerage || '—') : '—';
+  }
 
   const clEl = document.getElementById('drawer-checklist');
   const items = t.checklist || [];
