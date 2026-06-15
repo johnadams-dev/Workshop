@@ -1093,6 +1093,7 @@ let STATE = {
   today:     [],
   untracked: [],
   userRole:  "unknown",
+  offices:   [],
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1221,6 +1222,7 @@ async function loadOffices() {
   } catch (e) {
     console.error('Failed to load offices:', e);
   }
+  STATE.offices = offices || [];
   const sel = document.getElementById('officeSelect');
   sel.innerHTML = '<option value="all">All Offices</option>' +
     (offices || []).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
@@ -1587,10 +1589,11 @@ async function nlSaveListing() {
 // optional form fields (rendered in the confirm step), and checklist items added on confirm.
 const LISTING_ACTIONS = {
   active: [
-    { key: 'change',    icon: '✎', title: 'Change',    desc: 'Price change, extension, or other update.' },
-    { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed (recorded directly from Active).' },
-    { key: 'expired',   icon: '⏳', title: 'Expired',   desc: "Listing's term ended without a sale." },
-    { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Seller is pulling the listing early.' },
+    { key: 'change',         icon: '✎', title: 'Change',         desc: 'Price change, extension, or other update.' },
+    { key: 'under_contract', icon: '🤝', title: 'Under Contract', desc: 'A buyer has been found for this listing.' },
+    { key: 'closing',        icon: '🔑', title: 'Closing',        desc: 'The contract closed (recorded directly from Active).' },
+    { key: 'expired',        icon: '⏳', title: 'Expired',        desc: "Listing's term ended without a sale." },
+    { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',      desc: 'Seller is pulling the listing early.' },
   ],
   under_contract: [
     { key: 'closing',   icon: '🔑', title: 'Closing', desc: 'The contract closed.' },
@@ -1631,13 +1634,18 @@ const ACTION_CHECKLIST = {
     'Recover lockbox',
     'Send thank-you letter to buyer/seller',
   ],
+  under_contract: [
+    'Update MLS status to Pending',
+    'Confirm contract uploaded to Form Simplicity',
+  ],
 };
 
 const ACTION_TITLES = {
-  change:    'Change',
-  expired:   'Expired',
-  withdrawn: 'Withdrawn',
-  closing:   'Closing',
+  change:         'Change',
+  expired:        'Expired',
+  withdrawn:      'Withdrawn',
+  closing:        'Closing',
+  under_contract: 'Under Contract',
 };
 
 let amState = { id: null, addr: null, kind: null, status: null, actionKey: null };
@@ -1753,8 +1761,32 @@ function amChooseAction(key) {
           <input type="text" id="am-mortgage-company" placeholder="Optional">
         </div>
       </div>`;
+  } else if (key === 'under_contract') {
+    fieldsHtml = `
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Contract Date</span>
+          <input type="date" id="am-contract-date">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Contract Price</span>
+          <input type="text" id="am-contract-price" placeholder="$0">
+        </div>
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Representation</span>
+        <select id="am-rep-type" onchange="amUpdateRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+          <option value="in_house">In-House (Adams Cameron agent)</option>
+          <option value="co_broke">Co-Broke (outside brokerage)</option>
+        </select>
+      </div>
+      <div id="am-rep-fields"></div>`;
   }
   fieldsEl.innerHTML = fieldsHtml;
+
+  if (key === 'under_contract') {
+    amUpdateRepFields();
+  }
 
   const clEl = document.getElementById('amChecklistPreview');
   const items = ACTION_CHECKLIST[key] || [];
@@ -1771,6 +1803,66 @@ function amChooseAction(key) {
 function amParseMoney(v) {
   const digits = String(v || '').replace(/[^0-9.]/g, '');
   return digits ? Number(digits) : null;
+}
+
+function amUpdateRepFields() {
+  const repType = document.getElementById('am-rep-type').value;
+  const el = document.getElementById('am-rep-fields');
+  const selectStyle = 'padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;';
+  const labelStyle = 'font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
+
+  if (repType === 'in_house') {
+    const officeSel = document.getElementById('officeSelect').value;
+    const officeOpts = (STATE.offices || []).map(o =>
+      `<option value="${o.id}" ${String(o.id) === officeSel ? 'selected' : ''}>${escapeHtml(o.name)}</option>`
+    ).join('');
+    el.innerHTML = `
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${labelStyle}">Buyer's Office</span>
+          <select id="am-buyer-office" onchange="amLoadBuyerAgents()" style="${selectStyle}">${officeOpts}</select>
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${labelStyle}">Buyer's Agent</span>
+          <select id="am-buyer-agent" style="${selectStyle}"><option value="">Loading…</option></select>
+        </div>
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <span class="field-label" style="${labelStyle}">Source of Buyer</span>
+        <input type="text" id="am-source-of-buyer" placeholder="e.g. Sign call, referral, website">
+      </div>`;
+    amLoadBuyerAgents();
+  } else {
+    el.innerHTML = `
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${labelStyle}">Cooperating Brokerage</span>
+          <input type="text" id="am-coop-brokerage" placeholder="Brokerage name">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${labelStyle}">Cooperating Agent</span>
+          <input type="text" id="am-coop-agent" placeholder="Agent name">
+        </div>
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <span class="field-label" style="${labelStyle}">Cooperating Agent Email</span>
+        <input type="email" id="am-coop-email" placeholder="agent@brokerage.com">
+      </div>`;
+  }
+}
+
+async function amLoadBuyerAgents() {
+  const officeId = document.getElementById('am-buyer-office').value;
+  const sel = document.getElementById('am-buyer-agent');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const agents = await GET(`/daily-desk/agents?office_id=${officeId}`);
+    sel.innerHTML = '<option value="">Select agent…</option>' +
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Failed to load</option>';
+  }
 }
 
 async function amSubmit() {
@@ -1796,6 +1888,32 @@ async function amSubmit() {
     if (closeDate) fields.closeDate = closeDate;
     fields.titleCompany = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
+  } else if (key === 'under_contract') {
+    const contractDate = document.getElementById('am-contract-date').value;
+    if (contractDate) fields.contractDate = contractDate;
+    const contractPrice = amParseMoney(document.getElementById('am-contract-price').value);
+    if (contractPrice != null) fields.contractPrice = contractPrice;
+
+    const repType = document.getElementById('am-rep-type').value;
+    fields.representationType = repType;
+
+    if (repType === 'in_house') {
+      fields.officeId = document.getElementById('am-buyer-office').value || null;
+      fields.agentId = document.getElementById('am-buyer-agent').value || null;
+      fields.sourceOfBuyer = document.getElementById('am-source-of-buyer').value || null;
+      if (!fields.agentId) {
+        alert("Please select the buyer's agent.");
+        return;
+      }
+    } else {
+      fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
+      fields.cooperatingAgentName = document.getElementById('am-coop-agent').value || null;
+      fields.cooperatingAgentEmail = document.getElementById('am-coop-email').value || null;
+      if (!fields.cooperatingBrokerage || !fields.cooperatingAgentName) {
+        alert('Please enter the cooperating brokerage and agent.');
+        return;
+      }
+    }
   }
 
   try {
