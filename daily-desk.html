@@ -1011,6 +1011,10 @@ tbody tr.clickable { cursor: pointer; }
   </div>
 </div>
 
+<!-- Closing form autocomplete sources (populated from /closing-suggestions) -->
+<datalist id="dl-title-companies"></datalist>
+<datalist id="dl-mortgage-companies"></datalist>
+
 <!-- ═══ TRANSACTION DETAIL DRAWER ═══ -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
@@ -1088,12 +1092,13 @@ let userDisplay = "";
 let proxyKey    = "";
 
 let STATE = {
-  listings:  [],
-  contracts: [],
-  today:     [],
-  untracked: [],
-  userRole:  "unknown",
-  offices:   [],
+  listings:          [],
+  contracts:         [],
+  today:             [],
+  untracked:         [],
+  userRole:          "unknown",
+  offices:           [],
+  closingSuggestions: null,
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1761,12 +1766,22 @@ function amChooseAction(key) {
       </div>
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller's Name</span>
+          <input type="text" id="am-seller-name" placeholder="Full name">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller's Email</span>
+          <input type="email" id="am-seller-email" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Title Company</span>
-          <input type="text" id="am-title-company" placeholder="Adams Cameron Title">
+          <input type="text" id="am-title-company" list="dl-title-companies" placeholder="Start typing…">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Mortgage Company</span>
-          <input type="text" id="am-mortgage-company" placeholder="Optional">
+          <input type="text" id="am-mortgage-company" list="dl-mortgage-companies" placeholder="Optional">
         </div>
       </div>`;
   } else if (key === 'under_contract') {
@@ -1795,6 +1810,9 @@ function amChooseAction(key) {
   if (key === 'under_contract') {
     amUpdateRepFields();
   }
+  if (key === 'closing') {
+    amLoadClosingSuggestions();
+  }
 
   const clEl = document.getElementById('amChecklistPreview');
   const items = ACTION_CHECKLIST[key] || [];
@@ -1811,6 +1829,19 @@ function amChooseAction(key) {
 function amParseMoney(v) {
   const digits = String(v || '').replace(/[^0-9.]/g, '');
   return digits ? Number(digits) : null;
+}
+
+async function amLoadClosingSuggestions() {
+  if (STATE.closingSuggestions) return;
+  try {
+    STATE.closingSuggestions = await GET('/daily-desk/closing-suggestions');
+  } catch (e) {
+    STATE.closingSuggestions = { titleCompanies: [], mortgageCompanies: [] };
+  }
+  document.getElementById('dl-title-companies').innerHTML =
+    (STATE.closingSuggestions.titleCompanies || []).map(v => `<option value="${escapeHtml(v)}">`).join('');
+  document.getElementById('dl-mortgage-companies').innerHTML =
+    (STATE.closingSuggestions.mortgageCompanies || []).map(v => `<option value="${escapeHtml(v)}">`).join('');
 }
 
 function amUpdateRepFields() {
@@ -1894,7 +1925,9 @@ async function amSubmit() {
     if (salePrice != null) fields.salePrice = salePrice;
     const closeDate = document.getElementById('am-close-date').value;
     if (closeDate) fields.closeDate = closeDate;
-    fields.titleCompany = document.getElementById('am-title-company').value || null;
+    fields.sellerName      = document.getElementById('am-seller-name').value || null;
+    fields.sellerEmail     = document.getElementById('am-seller-email').value || null;
+    fields.titleCompany    = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
   } else if (key === 'under_contract') {
     const contractDate = document.getElementById('am-contract-date').value;
