@@ -718,7 +718,7 @@ tbody tr.clickable { cursor: pointer; }
           <option value="Withdrawal paperwork uploaded to Form Simplicity">FS withdrawal paperwork</option>
           <option value="Send thank-you letter">Send thank-you letter</option>
         </select>
-        <select id="today-sort" onchange="filterToday()">
+        <select id="today-sort" onchange="sortAndRenderToday()">
           <option value="age">Sort: Oldest First</option>
           <option value="address">Sort: Address</option>
           <option value="type">Sort: Item Type</option>
@@ -731,10 +731,10 @@ tbody tr.clickable { cursor: pointer; }
             <tr>
               <th>Property</th>
               <th>Item</th>
-              <th>Type</th>
+              <th>Status</th>
               <th>Age</th>
               <th style="width:1%"></th>
-              <th style="width:1%"></th>
+              <th>Tool</th>
             </tr>
           </thead>
           <tbody id="today-tbody">
@@ -970,6 +970,29 @@ tbody tr.clickable { cursor: pointer; }
               <input type="date" id="nl-exp-date">
             </div>
           </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Source of Seller</span>
+              <input type="text" id="nl-source" placeholder="e.g. sign call, referral, website">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">MLS ID(s)</span>
+              <div id="nl-mls-wrap" style="display:flex; flex-direction:column; gap:6px;">
+                <input type="text" class="nl-mls-id" placeholder="MLS # (optional)">
+              </div>
+              <span class="tbl-link" style="font-size:11px; margin-top:4px;" onclick="nlAddMlsId()">+ Add another MLS #</span>
+            </div>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Total Commission %</span>
+              <input type="text" id="nl-commission" placeholder="e.g. 6">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission %</span>
+              <input type="text" id="nl-coop-commission" placeholder="e.g. 3">
+            </div>
+          </div>
         </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
@@ -1100,6 +1123,13 @@ tbody tr.clickable { cursor: pointer; }
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Expected Close Date</span>
               <input type="date" id="nc-ext-close-date">
             </div>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission %</span>
+              <input type="text" id="nc-ext-coop-commission" placeholder="e.g. 3">
+            </div>
+            <div></div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -1455,7 +1485,7 @@ async function renderAll() {
   document.getElementById('contracts-count').textContent = STATE.contracts.length;
   document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
 
-  renderTodayTable(STATE.today);
+  renderTodayTable(getSortedToday());
   renderListingsTable(STATE.listings);
   renderContractsTable(STATE.contracts);
   renderUntrackedTable(STATE.untracked);
@@ -1465,18 +1495,49 @@ async function renderAll() {
   filterContracts();
 }
 
+function getSortedToday() {
+  const sort = document.getElementById('today-sort').value;
+  const cmp = sort === 'address'
+    ? (a, b) => a.property_address.localeCompare(b.property_address)
+    : sort === 'type'
+    ? (a, b) => a.title.localeCompare(b.title)
+    : (a, b) => new Date(a.created_at) - new Date(b.created_at); // oldest first
+  // Group by office name (backend already orders by office, but re-group for sort-within)
+  const groups = new Map();
+  STATE.today.forEach(item => {
+    const key = item.office_name || 'No Office Assigned';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  const result = [];
+  [...groups.keys()].sort().forEach(office => {
+    result.push(...groups.get(office).sort(cmp));
+  });
+  return result;
+}
+
 function renderTodayTable(rows) {
   const tbody = document.getElementById('today-tbody');
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">Nothing pending.</td></tr>';
     return;
   }
-  tbody.innerHTML = rows.map(item => {
+  let html = '';
+  let lastOffice = null;
+  rows.forEach(item => {
+    const office = item.office_name || 'No Office Assigned';
+    if (office !== lastOffice) {
+      html += `<tr class="today-office-hdr"><td colspan="6" style="background:var(--ink-border); color:var(--text-muted); font-family:var(--mono); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; padding:6px 12px;">${escapeHtml(office)}</td></tr>`;
+      lastOffice = office;
+    }
     const [chipClass, chipLabel] = statusChip(item.transaction_status);
     const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000));
     const ageLabel = ageDays === 0 ? 'Today' : (ageDays === 1 ? '1 day' : `${ageDays} days`);
-    return `
-            <tr class="today-row" data-age="${ageDays}" data-type="${escapeHtml(item.title)}" data-addr="${escapeHtml(item.property_address)}" data-progress-id="${item.progress_id}">
+    const linkCell = item.resource_url
+      ? `<a href="${escapeHtml(item.resource_url)}" target="_blank" rel="noopener" class="tbl-link" style="font-size:12px;">${escapeHtml(item.resource_label || 'Open')}</a>`
+      : '—';
+    html += `
+            <tr class="today-row" data-age="${ageDays}" data-type="${escapeHtml(item.title)}" data-addr="${escapeHtml(item.property_address)}" data-progress-id="${item.progress_id}" data-office="${escapeHtml(office)}">
               <td><span class="tbl-link" onclick="openDrawer('${item.transaction_id}')">${escapeHtml(item.property_address)}</span></td>
               <td>${escapeHtml(item.title)}</td>
               <td><span class="chip ${chipClass}">${chipLabel}</span></td>
@@ -1487,9 +1548,10 @@ function renderTodayTable(rows) {
                   <button class="cl-btn na" title="Mark not applicable / dismiss" onclick="setItemState(this,'na')">—</button>
                 </div>
               </td>
-              <td><span class="cl-link-placeholder">—</span></td>
+              <td>${linkCell}</td>
             </tr>`;
-  }).join('');
+  });
+  tbody.innerHTML = html;
 }
 
 function renderListingsTable(rows) {
@@ -1548,26 +1610,28 @@ function renderContractsTable(rows) {
 function filterToday() {
   const q = document.getElementById('today-q').value.toLowerCase();
   const type = document.getElementById('today-type').value;
-  const sort = document.getElementById('today-sort').value;
   const tbody = document.getElementById('today-tbody');
-  const rows = Array.from(tbody.querySelectorAll('.today-row'));
 
-  rows.forEach(row => {
-    const addr = row.dataset.addr.toLowerCase();
-    const itemType = row.dataset.type;
-    const text = row.textContent.toLowerCase();
-    const matchesQ = !q || text.includes(q);
-    const matchesType = !type || itemType === type;
-    row.style.display = (matchesQ && matchesType) ? '' : 'none';
+  let lastHdr = null;
+  let hdrHasVisible = false;
+  Array.from(tbody.children).forEach(row => {
+    if (row.classList.contains('today-office-hdr')) {
+      if (lastHdr) lastHdr.style.display = hdrHasVisible ? '' : 'none';
+      lastHdr = row;
+      hdrHasVisible = false;
+    } else {
+      const text = row.textContent.toLowerCase();
+      const visible = (!q || text.includes(q)) && (!type || row.dataset.type === type);
+      row.style.display = visible ? '' : 'none';
+      if (visible) hdrHasVisible = true;
+    }
   });
+  if (lastHdr) lastHdr.style.display = hdrHasVisible ? '' : 'none';
+}
 
-  rows.sort((a, b) => {
-    if (sort === 'age') return Number(b.dataset.age) - Number(a.dataset.age);
-    if (sort === 'address') return a.dataset.addr.localeCompare(b.dataset.addr);
-    if (sort === 'type') return a.dataset.type.localeCompare(b.dataset.type);
-    return 0;
-  });
-  rows.forEach(r => tbody.appendChild(r));
+function sortAndRenderToday() {
+  renderTodayTable(getSortedToday());
+  filterToday();
 }
 
 // Marks a checklist item complete or not-applicable. Pending items disappear
@@ -1622,7 +1686,12 @@ async function nlReset() {
   document.getElementById('nl-price').value = '';
   document.getElementById('nl-list-date').value = '';
   document.getElementById('nl-exp-date').value = '';
+  document.getElementById('nl-source').value = '';
+  document.getElementById('nl-commission').value = '';
+  document.getElementById('nl-coop-commission').value = '';
   document.getElementById('nl-fs-trans-id').value = '';
+  document.getElementById('nl-mls-wrap').innerHTML =
+    '<input type="text" class="nl-mls-id" placeholder="MLS # (optional)">';
   document.getElementById('nl-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
   nlFsTransactions = [];
   await nlLoadAgents();
@@ -1638,6 +1707,15 @@ function nlShowManualForm() {
   document.getElementById('nl-step-manual').style.display = 'block';
   document.getElementById('newListingTitle').textContent = 'New Listing — Manual Entry';
 }
+function nlAddMlsId() {
+  const wrap = document.getElementById('nl-mls-wrap');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:6px; align-items:center;';
+  row.innerHTML = '<input type="text" class="nl-mls-id" placeholder="MLS #" style="flex:1;">' +
+    '<span style="cursor:pointer; color:var(--text-dim); font-size:16px; line-height:1;" onclick="this.parentNode.remove()">×</span>';
+  wrap.appendChild(row);
+}
+
 function nlBackToSource() {
   document.getElementById('nl-step-source').style.display = 'block';
   document.getElementById('nl-step-fs-picker').style.display = 'none';
@@ -1720,6 +1798,9 @@ async function nlSaveListing() {
   const agentId = document.getElementById('nl-agent').value;
   const agent = nlAgents.find(a => String(a.id) === String(agentId));
 
+  const mls_ids = [...document.querySelectorAll('#nl-mls-wrap .nl-mls-id')]
+    .map(el => el.value.trim()).filter(Boolean);
+
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -1729,6 +1810,10 @@ async function nlSaveListing() {
     current_price: amParseMoney(document.getElementById('nl-price').value),
     list_date: document.getElementById('nl-list-date').value || null,
     expiration_date: document.getElementById('nl-exp-date').value || null,
+    source: document.getElementById('nl-source').value.trim() || null,
+    mls_ids,
+    commission_rate: parseFloat(document.getElementById('nl-commission').value.replace(/[^0-9.]/g, '')) || null,
+    cooperating_commission: parseFloat(document.getElementById('nl-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
   };
 
@@ -2321,9 +2406,10 @@ async function ncSaveExternalContract() {
       list_price:          amParseMoney(document.getElementById('nc-ext-list-price').value),
       contract_price:      amParseMoney(document.getElementById('nc-ext-contract-price').value),
       contract_date:       document.getElementById('nc-ext-contract-date').value || null,
-      expected_close_date: document.getElementById('nc-ext-close-date').value || null,
-      office_id:           document.getElementById('nc-ext-office').value || null,
-      agent_id:            agentId,
+      expected_close_date:     document.getElementById('nc-ext-close-date').value || null,
+      cooperating_commission:  parseFloat(document.getElementById('nc-ext-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
+      office_id:               document.getElementById('nc-ext-office').value || null,
+      agent_id:                agentId,
     });
     closeNewContractModal();
     await renderAll();
