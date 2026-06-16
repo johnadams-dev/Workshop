@@ -1015,7 +1015,7 @@ tbody tr.clickable { cursor: pointer; }
 
       <!-- Step 1: choose listing source -->
       <div id="nc-step-source">
-        <div class="choice-grid">
+        <div class="choice-grid" style="grid-template-columns: 1fr 1fr 1fr;">
           <div class="choice-card" onclick="ncShowAccForm()">
             <div class="choice-icon">🏠</div>
             <div class="choice-text">
@@ -1028,6 +1028,13 @@ tbody tr.clickable { cursor: pointer; }
             <div class="choice-text">
               <div class="choice-title">External Listing</div>
               <div class="choice-desc">We represent the buyer on another brokerage's listing.</div>
+            </div>
+          </div>
+          <div class="choice-card" onclick="ncShowFsPicker()">
+            <div class="choice-icon">⚡</div>
+            <div class="choice-text">
+              <div class="choice-title">Form Simplicity</div>
+              <div class="choice-desc">Buyer's agent has the contract started in Form Simplicity. We'll pull the details.</div>
             </div>
           </div>
         </div>
@@ -1156,6 +1163,24 @@ tbody tr.clickable { cursor: pointer; }
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="ncBackToSource()">← Back</button>
           <button class="btn btn-primary btn-sm" onclick="ncSaveExternalContract()">Save Contract</button>
+        </div>
+      </div>
+
+      <!-- Step 2c: Form Simplicity picker -->
+      <div id="nc-step-fs" style="display:none">
+        <div class="fs-search">
+          <div class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;">Buyer's Agent</div>
+          <select id="nc-fs-agent" onchange="ncLoadFsTransactions()" style="width:100%; padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+            <option value="">Select agent…</option>
+          </select>
+        </div>
+        <div class="divider">Form Simplicity Files</div>
+        <div class="fs-list" id="nc-fs-list">
+          <div class="empty">Select an agent to load their Form Simplicity files.</div>
+        </div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-ghost btn-sm" onclick="ncBackToSource()">← Back</button>
+          <span style="font-size:11px; color:var(--text-dim)">Don't see it? <span class="tbl-link" onclick="ncShowExternalForm()">Enter manually instead</span></span>
         </div>
       </div>
 
@@ -2216,9 +2241,12 @@ let ncAllListings = [];
 
 function openNewContractModal() {
   ncAllListings = [];
-  document.getElementById('nc-step-source').style.display = 'block';
-  document.getElementById('nc-step-acc').style.display    = 'none';
+  document.getElementById('nc-step-source').style.display   = 'block';
+  document.getElementById('nc-step-acc').style.display      = 'none';
   document.getElementById('nc-step-external').style.display = 'none';
+  document.getElementById('nc-step-fs').style.display       = 'none';
+  document.getElementById('nc-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
+  document.getElementById('nc-fs-agent').value = '';
   document.getElementById('ncTitle').textContent = 'New Contract';
   document.getElementById('newContractModal').classList.add('open');
 }
@@ -2229,6 +2257,7 @@ function ncBackToSource() {
   document.getElementById('nc-step-source').style.display   = 'block';
   document.getElementById('nc-step-acc').style.display      = 'none';
   document.getElementById('nc-step-external').style.display = 'none';
+  document.getElementById('nc-step-fs').style.display       = 'none';
   document.getElementById('ncTitle').textContent = 'New Contract';
 }
 
@@ -2423,6 +2452,96 @@ async function ncSaveExternalContract() {
     await renderAll();
   } catch (e) {
     alert('Failed to save contract: ' + e.message);
+  }
+}
+
+/* ═══ New Contract — Form Simplicity picker ═══ */
+let ncFsTransactions = [];
+let ncFsAgents = [];
+
+async function ncShowFsPicker() {
+  document.getElementById('nc-step-source').style.display = 'none';
+  document.getElementById('nc-step-fs').style.display     = 'block';
+  document.getElementById('ncTitle').textContent = 'New Contract — Form Simplicity';
+
+  const officeId = document.getElementById('officeSelect').value;
+  const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
+  try {
+    ncFsAgents = await GET(`/daily-desk/agents${qs}`);
+    const sel = document.getElementById('nc-fs-agent');
+    sel.innerHTML = '<option value="">Select agent…</option>' +
+      ncFsAgents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+  } catch (e) {
+    console.error('ncShowFsPicker: failed to load agents', e);
+  }
+}
+
+async function ncLoadFsTransactions() {
+  const agentId = document.getElementById('nc-fs-agent').value;
+  const listEl  = document.getElementById('nc-fs-list');
+  ncFsTransactions = [];
+
+  if (!agentId) {
+    listEl.innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="empty">Loading…</div>';
+
+  const agent = ncFsAgents.find(a => String(a.id) === agentId);
+  if (!agent?.nrds_id) {
+    listEl.innerHTML = '<div class="empty">Agent has no NRDS ID on file.</div>';
+    return;
+  }
+
+  let data;
+  try {
+    data = await POST('/fs/list-transactions', { agentNRDSID: agent.nrds_id, fullDetails: false });
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+
+  const list = Array.isArray(data) ? data : (data?.transactions || data?.data || []);
+  ncFsTransactions = list.map((tx, i) => ({
+    id:      tx.transId   || tx.TransID   || tx.id            || String(i),
+    address: tx.address   || tx.Address   || tx.streetAddress || tx.propertyAddress || tx.name || 'Unknown address',
+    city:    tx.city      || tx.City      || '',
+    price:   tx.listPrice || tx.ListPrice || tx.salePrice     || tx.price            || null,
+    updated: tx.lastUpdated || tx.LastUpdated || tx.modified  || tx.dateModified     || '',
+  }));
+
+  if (!ncFsTransactions.length) {
+    listEl.innerHTML = '<div class="empty">No Form Simplicity files found for this agent.</div>';
+    return;
+  }
+
+  listEl.innerHTML = ncFsTransactions.map((tx, i) => `
+    <div class="fs-item" onclick="ncSelectFsTransaction(${i})">
+      <div>
+        <div class="fs-item-main">${escapeHtml(tx.address)}</div>
+        <div class="fs-item-sub">${escapeHtml(tx.city)}${tx.updated ? ' &middot; Updated ' + escapeHtml(tx.updated) : ''}</div>
+      </div>
+      <span class="chip chip-neutral">Select</span>
+    </div>`).join('');
+}
+
+async function ncSelectFsTransaction(index) {
+  const tx    = ncFsTransactions[index];
+  if (!tx) return;
+  const agentId = document.getElementById('nc-fs-agent').value;
+  const agent   = ncFsAgents.find(a => String(a.id) === agentId);
+
+  ncShowExternalForm(); // navigates to external step, seeds office/agent dropdowns
+
+  if (tx.address !== 'Unknown address') document.getElementById('nc-ext-addr').value = tx.address;
+  document.getElementById('nc-ext-city').value = tx.city || '';
+  if (tx.price) document.getElementById('nc-ext-list-price').value = tx.price;
+
+  // Pre-select the ACC buyer's agent
+  if (agent?.office_id) {
+    document.getElementById('nc-ext-office').value = String(agent.office_id);
+    await ncLoadExtAgents();
+    document.getElementById('nc-ext-agent').value = agentId;
   }
 }
 
