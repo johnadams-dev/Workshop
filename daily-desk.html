@@ -1596,8 +1596,9 @@ const LISTING_ACTIONS = {
     { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',      desc: 'Seller is pulling the listing early.' },
   ],
   under_contract: [
-    { key: 'closing',   icon: '🔑', title: 'Closing', desc: 'The contract closed.' },
-    { key: 'withdrawn', icon: '🚫', title: 'Contract Fell Through — Withdraw', desc: 'Buyer backed out; return listing to active or withdraw.' },
+    { key: 'closing',      icon: '🔑', title: 'Closing',      desc: 'The contract closed.' },
+    { key: 'fall_through', icon: '↩',  title: 'Fall Through', desc: 'Contract fell through — listing returns to Active.' },
+    { key: 'withdrawn',    icon: '🚫', title: 'Withdrawn',    desc: 'Pull the listing off market (can be returned to Active).' },
   ],
   closed: [
     { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
@@ -1623,6 +1624,12 @@ const ACTION_CHECKLIST = {
     'Recover lockbox',
     'Recover sign',
   ],
+  fall_through: [
+    'Notify seller of fall through',
+    'Return listing to Active in MLS',
+    'Confirm lockbox and sign are still in place',
+    'Review price and strategy with seller',
+  ],
   withdrawn: [
     'Recover lockbox',
     'Recover sign',
@@ -1644,6 +1651,7 @@ const ACTION_TITLES = {
   change:         'Change',
   expired:        'Expired',
   withdrawn:      'Withdrawn',
+  fall_through:   'Fall Through',
   closing:        'Closing',
   under_contract: 'Under Contract',
 };
@@ -1727,7 +1735,7 @@ function amChooseAction(key) {
           <input type="text" id="am-notes" placeholder="Optional">
         </div>
       </div>`;
-  } else if (key === 'expired' || key === 'withdrawn') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -1877,7 +1885,7 @@ async function amSubmit() {
     const expirationDate = document.getElementById('am-expiration-date').value;
     if (expirationDate) fields.expirationDate = expirationDate;
     fields.notes = document.getElementById('am-notes').value || null;
-  } else if (key === 'expired' || key === 'withdrawn') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
     const effectiveDate = document.getElementById('am-effective-date').value;
     if (effectiveDate) fields.effectiveDate = effectiveDate;
     fields.notes = document.getElementById('am-notes').value || null;
