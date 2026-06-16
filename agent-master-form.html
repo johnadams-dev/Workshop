@@ -408,7 +408,8 @@ function renderDetail(a) {
           <span id="recon-status" style="font-size:11px;color:var(--muted)">
             ${a.dmg_id ? '<span class="spin"></span> Checking DeltaNet…' : 'No DeltaNet ID — enter dmg_id below to enable'}
           </span>
-          ${a.dmg_id?`<button class="btn btn-secondary btn-sm" onclick="runRecon(${a.id},'${esc(a.dmg_id)}')">Refresh</button>`:''}
+          ${a.dmg_id?`<button class="btn btn-secondary btn-sm" onclick="runRecon(${a.id},'${esc(a.dmg_id)}')">Refresh</button>
+          <button id="dn-sync-btn" class="btn btn-primary btn-sm" onclick="syncDeltanet(${a.id})">Push to DeltaNet</button>`:``}
         </div>
       </div>
       <div class="recon-body">
@@ -660,25 +661,12 @@ async function save() {
   if (btn) { btn.disabled=true; btn.textContent='Saving…'; }
 
   try {
-    const core = {}, ext = {};
-    ['firstName','lastName','office','phone','active'].forEach(k => { if (k in pending) core[k]=pending[k]; });
-    ['dmg_id','pp_id','nrds_id','designations','languages','website','sms_opted_in','email_opted_in'].forEach(k => { if (k in pending) ext[k]=pending[k]; });
+    const r = await fetch(`${PROXY_URL}/agent/${currentId}`, {
+      method:'PUT', headers:H(), body:JSON.stringify(pending),
+    });
+    if (!r.ok) throw new Error('HTTP '+r.status);
 
-    if (Object.keys(core).length) {
-      const r = await fetch(`${PROXY_URL}/agent/${currentId}`, { method:'PUT', headers:H(), body:JSON.stringify(core) });
-      if (!r.ok) throw new Error('Core save: HTTP '+r.status);
-    }
-
-    if (Object.keys(ext).length) {
-      const a = allAgents.find(x=>x.id===currentId);
-      const r = await fetch(`${PROXY_URL}/agent/sync`, {
-        method:'POST', headers:H(),
-        body: JSON.stringify({ action:'update', email:a?.email, ...ext }),
-      });
-      if (!r.ok) throw new Error('Extended save: HTTP '+r.status);
-    }
-
-    // Update cache
+    // Update local cache
     const idx = allAgents.findIndex(x=>x.id===currentId);
     if (idx>=0) {
       const map = { firstName:'first_name', lastName:'last_name', phone:'cell_raw' };
@@ -693,6 +681,23 @@ async function save() {
   } catch(e) {
     toast('Save failed: '+e.message, 'err');
     if (btn) { btn.disabled=false; btn.textContent='Save'; }
+  }
+}
+
+async function syncDeltanet(id) {
+  const btn = document.getElementById('dn-sync-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Syncing…'; }
+  try {
+    const r = await fetch(`${PROXY_URL}/agent/${id}/deltanet-sync`, { method:'POST', headers:H() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+    toast('DeltaNet updated', 'ok');
+    const a = allAgents.find(x=>x.id===id);
+    if (a?.dmg_id) runRecon(id, a.dmg_id, a);
+  } catch(e) {
+    toast('DeltaNet sync failed: '+e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='Push to DeltaNet'; }
   }
 }
 
