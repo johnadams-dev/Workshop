@@ -1793,10 +1793,9 @@ async function nlLoadFsTransactions() {
   let data;
   try {
     const account = await POST('/fs/get-account', { email: agentEmail });
-    console.log('[FS getAccount NL]', JSON.stringify(account));
-    const nrdsId = account.agentNRDSID || account.nrdsId || account.NRDSID || account.NRDSId;
+    const nrdsId = account.agentNRDSID;
     if (!nrdsId) {
-      listEl.innerHTML = `<div class="empty">FS getAccount response:<br><pre style="font-size:10px;text-align:left;white-space:pre-wrap">${escapeHtml(JSON.stringify(account, null, 2))}</pre></div>`;
+      listEl.innerHTML = '<div class="empty">Form Simplicity did not return an NRDS ID for this agent.</div>';
       return;
     }
     data = await POST('/fs/list-transactions', { agentNRDSID: nrdsId, fullDetails: false });
@@ -2519,7 +2518,7 @@ async function ncLoadFsTransactions() {
   let data;
   try {
     const account = await POST('/fs/get-account', { email: agentEmail });
-    const nrdsId = account.agentNRDSID || account.nrdsId || account.NRDSID || account.NRDSId;
+    const nrdsId = account.agentNRDSID;
     if (!nrdsId) {
       listEl.innerHTML = '<div class="empty">Form Simplicity did not return an NRDS ID for this agent.</div>';
       return;
