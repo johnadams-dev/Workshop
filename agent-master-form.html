@@ -241,10 +241,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="fg"><div class="field"><label>First name</label><input type="text" id="na-first"></div><div class="field"><label>Last name</label><input type="text" id="na-last"></div></div>
       <div class="field"><label>Office</label><select id="na-office"><option value="">— Select —</option></select></div>
       <div class="field"><label>Cell phone</label><input type="tel" id="na-phone" placeholder="(386) 555-0100"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 0">
+        <input type="checkbox" id="na-provision-google" checked>
+        Also create Google Workspace account
+      </label>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewAgent()">Cancel</button>
-      <button class="btn btn-primary" onclick="createAgent()">Create</button>
+      <button class="btn btn-primary" id="na-create-btn" onclick="createAgent()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Temp password display after Google account provisioning -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal">
+    <div class="modal-head">Google Account Created <button onclick="document.getElementById('pw-modal').classList.remove('open')" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--muted);line-height:1.6">Share these credentials with the new agent. They will be prompted to set a new password on first sign-in.</p>
+      <div class="field"><label>Email</label><input type="text" id="pw-email" readonly style="font-family:monospace"></div>
+      <div class="field">
+        <label>Temporary password</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="pw-pass" readonly style="font-family:monospace;font-size:15px;font-weight:600;letter-spacing:.04em">
+          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('pw-pass').value);toast('Copied','ok')">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="document.getElementById('pw-modal').classList.remove('open')">Done</button>
     </div>
   </div>
 </div>
@@ -256,10 +281,14 @@ const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
 
-// Google snapshot — place google_snapshot.json in the same folder as this file
-// or embed inline. Falls back to empty if not found.
+// Live Google Workspace data — loaded after sign-in via Admin SDK
 let googleSnap = {};
-fetch('./google_snapshot.json').then(r => r.json()).then(d => { googleSnap = d; }).catch(() => {});
+async function loadGoogleUsers() {
+  try {
+    const r = await fetch(`${PROXY_URL}/google-admin/users`, { headers: H() });
+    if (r.ok) googleSnap = await r.json();
+  } catch(_) {}
+}
 
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
 
@@ -300,6 +329,8 @@ async function load() {
     const ic = allAgents.filter(a => a.active && issues(a).length).length;
     document.getElementById('issue-summary').textContent = ic ? `${ic} agents need attention` : '';
     toast(`${allAgents.length} agents`, 'ok');
+
+    loadGoogleUsers(); // background — populates googleSnap for reconciliation panel
   } catch(e) { toast('Load failed: '+e.message,'err'); }
 }
 
@@ -716,20 +747,48 @@ async function syncDeltanet(id) {
 }
 
 async function deactivate(id) {
-  if (!confirm('Deactivate this agent?')) return;
+  const a = allAgents.find(x => x.id === id);
+  if (!confirm(`Deactivate ${a?.first_name} ${a?.last_name}? Their Google Workspace account will also be suspended.`)) return;
   const r = await fetch(`${PROXY_URL}/agent/${id}/deactivate`, { method:'POST', headers:H() });
-  if (r.ok) { const idx=allAgents.findIndex(x=>x.id===id); if(idx>=0) allAgents[idx].active=false; toast('Deactivated','ok'); selectAgent(id); filterList(); }
-  else toast('Failed: HTTP '+r.status,'err');
+  if (!r.ok) { toast('Failed: HTTP '+r.status,'err'); return; }
+  const idx = allAgents.findIndex(x=>x.id===id);
+  if (idx>=0) allAgents[idx].active = false;
+  if (a?.email) {
+    const gr = await fetch(`${PROXY_URL}/google-admin/users/${encodeURIComponent(a.email)}`, {
+      method:'PATCH', headers:H(), body:JSON.stringify({ suspended:true }),
+    });
+    toast(gr.ok ? 'Deactivated — Google account suspended' : 'Deactivated in DB; Google suspend failed — check Workspace admin', gr.ok?'ok':'err');
+  } else {
+    toast('Deactivated','ok');
+  }
+  selectAgent(id); filterList();
 }
 
 async function reactivate(id) {
   const r = await fetch(`${PROXY_URL}/agent/${id}/reactivate`, { method:'POST', headers:H() });
-  if (r.ok) { const idx=allAgents.findIndex(x=>x.id===id); if(idx>=0) allAgents[idx].active=true; toast('Reactivated','ok'); selectAgent(id); filterList(); }
-  else toast('Failed: HTTP '+r.status,'err');
+  if (!r.ok) { toast('Failed: HTTP '+r.status,'err'); return; }
+  const a   = allAgents.find(x => x.id === id);
+  const idx = allAgents.findIndex(x=>x.id===id);
+  if (idx>=0) allAgents[idx].active = true;
+  if (a?.email) {
+    const gr = await fetch(`${PROXY_URL}/google-admin/users/${encodeURIComponent(a.email)}`, {
+      method:'PATCH', headers:H(), body:JSON.stringify({ suspended:false }),
+    });
+    toast(gr.ok ? 'Reactivated — Google account unsuspended' : 'Reactivated in DB; Google unsuspend failed — check Workspace admin', gr.ok?'ok':'err');
+  } else {
+    toast('Reactivated','ok');
+  }
+  selectAgent(id); filterList();
 }
 
 function openNewAgent()  { document.getElementById('new-modal').classList.add('open'); }
 function closeNewAgent() { document.getElementById('new-modal').classList.remove('open'); }
+
+function showTempPassword(email, tempPassword) {
+  document.getElementById('pw-email').value = email;
+  document.getElementById('pw-pass').value  = tempPassword;
+  document.getElementById('pw-modal').classList.add('open');
+}
 
 async function createAgent() {
   const email    = document.getElementById('na-email').value.trim().toLowerCase();
@@ -737,13 +796,40 @@ async function createAgent() {
   const last     = document.getElementById('na-last').value.trim();
   const officeId = document.getElementById('na-office').value;
   const phone    = document.getElementById('na-phone').value.trim();
+  const provisionGoogle = document.getElementById('na-provision-google').checked;
   if (!email.endsWith('@adamscameron.com')) { toast('Must be @adamscameron.com','err'); return; }
   if (!first||!last) { toast('Name required','err'); return; }
-  const r = await fetch(`${PROXY_URL}/agent/register`, {
-    method:'POST', headers:H(),
-    body: JSON.stringify({ email, firstName:first, lastName:last, office_id: officeId ? +officeId : null, phone }),
-  });
-  if (r.ok) { closeNewAgent(); toast('Agent created','ok'); await load(); } else toast('Failed: HTTP '+r.status,'err');
+
+  const btn = document.getElementById('na-create-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  try {
+    const r = await fetch(`${PROXY_URL}/agent/register`, {
+      method:'POST', headers:H(),
+      body: JSON.stringify({ email, firstName:first, lastName:last, office_id: officeId ? +officeId : null, phone }),
+    });
+    if (!r.ok) { toast('Failed: HTTP '+r.status,'err'); return; }
+
+    closeNewAgent();
+    await load();
+
+    if (provisionGoogle) {
+      const gr = await fetch(`${PROXY_URL}/google-admin/users`, {
+        method:'POST', headers:H(),
+        body: JSON.stringify({ email, firstName:first, lastName:last }),
+      });
+      const gd = await gr.json();
+      if (gr.ok) {
+        showTempPassword(gd.email, gd.tempPassword);
+      } else {
+        toast(`Agent created — Google account failed: ${gd.error}`, 'err');
+      }
+    } else {
+      toast('Agent created','ok');
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create';
+  }
 }
 
 function exportCsv() {
