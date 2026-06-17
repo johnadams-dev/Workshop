@@ -1707,6 +1707,27 @@ async function nlLoadAgents() {
   document.getElementById('nl-agent').innerHTML = opts;
 }
 
+function normalizeFsTransactions(data) {
+  const raw = data?.data || data?.transactions || data?.results || (Array.isArray(data) ? data : []);
+  const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+  return raw.filter(tx => {
+    if (!tx.transactionType && !tx.propertyType) return false;       // admin / licensing files
+    if (tx.propertyStatus === 'Closed/Sold') return false;
+    const d = tx.lastUpdateDate || tx.lastUpdated || '';
+    if (d) {
+      const [m, day, y] = d.split('/');
+      if (new Date(+y, +m - 1, +day).getTime() < cutoff) return false;
+    }
+    return true;
+  }).map((tx, i) => ({
+    id:      tx.transId || String(i),
+    address: tx.transName || tx.address || tx.streetAddress || 'Unknown address',
+    type:    tx.transactionType || tx.propertyType || '',
+    status:  tx.propertyStatus || '',
+    updated: tx.lastUpdateDate || '',
+  }));
+}
+
 async function nlLoadFsAgents() {
   const sel = document.getElementById('nl-fs-agent');
   sel.innerHTML = '<option value="">Loading agents…</option>';
@@ -1804,20 +1825,10 @@ async function nlLoadFsTransactions() {
     return;
   }
 
-  const list = data.transactions || data.Transactions || data.result || data.results || (Array.isArray(data) ? data : []);
-  if (!list.length) {
-    listEl.innerHTML = `<div class="empty">Raw FS response (no list found):<br><pre style="font-size:10px;text-align:left;white-space:pre-wrap">${escapeHtml(JSON.stringify(data, null, 2).slice(0, 1500))}</pre></div>`;
-    return;
-  }
-  nlFsTransactions = list.map((tx, i) => ({
-    id:      tx.transId || tx.TransID || tx.id || String(i),
-    address: tx.address || tx.Address || tx.streetAddress || tx.propertyAddress || tx.name || 'Unknown address',
-    city:    tx.city || tx.City || '',
-    updated: tx.lastUpdated || tx.LastUpdated || tx.modified || tx.dateModified || '',
-  }));
+  nlFsTransactions = normalizeFsTransactions(data);
 
   if (!nlFsTransactions.length) {
-    listEl.innerHTML = '<div class="empty">No Form Simplicity files found for this agent.</div>';
+    listEl.innerHTML = '<div class="empty">No active listings or contracts in the last 45 days for this agent.</div>';
     return;
   }
 
@@ -1825,9 +1836,9 @@ async function nlLoadFsTransactions() {
     <div class="fs-item" onclick="selectFsTransaction(${i})">
       <div>
         <div class="fs-item-main">${escapeHtml(tx.address)}</div>
-        <div class="fs-item-sub">${escapeHtml(tx.city)}${tx.updated ? ' &middot; Updated ' + escapeHtml(tx.updated) : ''}</div>
+        <div class="fs-item-sub">${escapeHtml(tx.type)}${tx.updated ? ' &middot; ' + escapeHtml(tx.updated) : ''}</div>
       </div>
-      <span class="chip chip-neutral">New</span>
+      <span class="chip chip-neutral">${escapeHtml(tx.status)}</span>
     </div>
   `).join('');
 }
@@ -2533,17 +2544,10 @@ async function ncLoadFsTransactions() {
     return;
   }
 
-  const list = Array.isArray(data) ? data : (data?.transactions || data?.data || []);
-  ncFsTransactions = list.map((tx, i) => ({
-    id:      tx.transId   || tx.TransID   || tx.id            || String(i),
-    address: tx.address   || tx.Address   || tx.streetAddress || tx.propertyAddress || tx.name || 'Unknown address',
-    city:    tx.city      || tx.City      || '',
-    price:   tx.listPrice || tx.ListPrice || tx.salePrice     || tx.price            || null,
-    updated: tx.lastUpdated || tx.LastUpdated || tx.modified  || tx.dateModified     || '',
-  }));
+  ncFsTransactions = normalizeFsTransactions(data);
 
   if (!ncFsTransactions.length) {
-    listEl.innerHTML = '<div class="empty">No Form Simplicity files found for this agent.</div>';
+    listEl.innerHTML = '<div class="empty">No active listings or contracts in the last 45 days for this agent.</div>';
     return;
   }
 
@@ -2551,9 +2555,9 @@ async function ncLoadFsTransactions() {
     <div class="fs-item" onclick="ncSelectFsTransaction(${i})">
       <div>
         <div class="fs-item-main">${escapeHtml(tx.address)}</div>
-        <div class="fs-item-sub">${escapeHtml(tx.city)}${tx.updated ? ' &middot; Updated ' + escapeHtml(tx.updated) : ''}</div>
+        <div class="fs-item-sub">${escapeHtml(tx.type)}${tx.updated ? ' &middot; ' + escapeHtml(tx.updated) : ''}</div>
       </div>
-      <span class="chip chip-neutral">Select</span>
+      <span class="chip chip-neutral">${escapeHtml(tx.status)}</span>
     </div>`).join('');
 }
 
