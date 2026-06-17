@@ -1804,7 +1804,11 @@ async function nlLoadFsTransactions() {
     return;
   }
 
-  const list = data.transactions || data.Transactions || data.results || (Array.isArray(data) ? data : []);
+  const list = data.transactions || data.Transactions || data.result || data.results || (Array.isArray(data) ? data : []);
+  if (!list.length) {
+    listEl.innerHTML = `<div class="empty">Raw FS response (no list found):<br><pre style="font-size:10px;text-align:left;white-space:pre-wrap">${escapeHtml(JSON.stringify(data, null, 2).slice(0, 1500))}</pre></div>`;
+    return;
+  }
   nlFsTransactions = list.map((tx, i) => ({
     id:      tx.transId || tx.TransID || tx.id || String(i),
     address: tx.address || tx.Address || tx.streetAddress || tx.propertyAddress || tx.name || 'Unknown address',
