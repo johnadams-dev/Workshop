@@ -1709,8 +1709,10 @@ async function nlLoadAgents() {
 
 function normalizeFsTransactions(data) {
   const raw = data?.data || data?.transactions || data?.results || (Array.isArray(data) ? data : []);
+  const parseDate = s => { if (!s) return 0; const [m,d,y] = s.split('/'); return new Date(+y, +m-1, +d).getTime(); };
   return raw
     .filter(tx => tx.propertyStatus !== 'Closed/Sold')
+    .sort((a, b) => parseDate(b.lastUpdateDate) - parseDate(a.lastUpdateDate))
     .map((tx, i) => ({
       id:      tx.transId || String(i),
       address: tx.transName || tx.address || tx.streetAddress || 'Unknown address',
