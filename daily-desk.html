@@ -1711,7 +1711,6 @@ function normalizeFsTransactions(data) {
   const raw = data?.data || data?.transactions || data?.results || (Array.isArray(data) ? data : []);
   const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
   return raw.filter(tx => {
-    if (!tx.transactionType && !tx.propertyType) return false;       // admin / licensing files
     if (tx.propertyStatus === 'Closed/Sold') return false;
     const d = tx.lastUpdateDate || tx.lastUpdated || '';
     if (d) {
