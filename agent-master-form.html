@@ -263,6 +263,7 @@ const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, '
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let allAgents = [], offices = [], currentId = null, pending = {}, currentFilter = 'all';
+// offices: [{ id, name, deltanet_office_id }] — fetched from /offices
 
 // ── Issue detection (DB-only, runs on every agent in the list) ───────────────
 function issues(a) {
@@ -280,15 +281,19 @@ function issues(a) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
   try {
-    const r = await fetch(`${PROXY_URL}/admin/agents`, { headers: H() });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    allAgents = await r.json();
-    // Build office list from data
-    const om = {};
-    allAgents.forEach(a => { if (a.office_id && a.office) om[a.office_id] = a.office; });
-    offices = Object.entries(om).map(([id,name]) => ({id:+id,name})).sort((a,b) => a.name.localeCompare(b.name));
+    const [agentsRes, officesRes] = await Promise.all([
+      fetch(`${PROXY_URL}/admin/agents`, { headers: H() }),
+      fetch(`${PROXY_URL}/offices`,      { headers: H() }),
+    ]);
+    if (!agentsRes.ok)  throw new Error('Agents HTTP ' + agentsRes.status);
+    if (!officesRes.ok) throw new Error('Offices HTTP ' + officesRes.status);
+    allAgents = await agentsRes.json();
+    offices   = await officesRes.json();  // [{ id, name, deltanet_office_id }]
+
     const sel = document.getElementById('na-office');
-    offices.forEach(o => sel.innerHTML += `<option value="${o.name}">${o.name}</option>`);
+    sel.innerHTML = '<option value="">— Select —</option>' +
+      offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+
     filterList();
     const ic = allAgents.filter(a => a.active && issues(a).length).length;
     document.getElementById('issue-summary').textContent = ic ? `${ic} agents need attention` : '';
@@ -446,9 +451,9 @@ function renderDetail(a) {
           </div>
           <div class="field">
             <label>Office</label>
-            <select onchange="chg('office',this.value)">
+            <select onchange="chg('office_id', this.value ? +this.value : null)">
               <option value="">— None —</option>
-              ${offices.map(o=>`<option value="${esc(o.name)}" ${(a.office===o.name)?'selected':''}>${esc(o.name)}</option>`).join('')}
+              ${offices.map(o=>`<option value="${o.id}" ${(a.office_id===o.id)?'selected':''}>${esc(o.name)}</option>`).join('')}
             </select>
           </div>
           <div class="field">
@@ -671,6 +676,10 @@ async function save() {
     if (idx>=0) {
       const map = { firstName:'first_name', lastName:'last_name', phone:'cell_raw' };
       Object.entries(pending).forEach(([k,v]) => { allAgents[idx][map[k]||k] = v; });
+      if (pending.office_id !== undefined) {
+        const o = offices.find(o => o.id === pending.office_id);
+        allAgents[idx].office = o ? o.name : null;
+      }
     }
 
     pending = {};
@@ -718,14 +727,17 @@ function openNewAgent()  { document.getElementById('new-modal').classList.add('o
 function closeNewAgent() { document.getElementById('new-modal').classList.remove('open'); }
 
 async function createAgent() {
-  const email  = document.getElementById('na-email').value.trim().toLowerCase();
-  const first  = document.getElementById('na-first').value.trim();
-  const last   = document.getElementById('na-last').value.trim();
-  const office = document.getElementById('na-office').value;
-  const phone  = document.getElementById('na-phone').value.trim();
+  const email    = document.getElementById('na-email').value.trim().toLowerCase();
+  const first    = document.getElementById('na-first').value.trim();
+  const last     = document.getElementById('na-last').value.trim();
+  const officeId = document.getElementById('na-office').value;
+  const phone    = document.getElementById('na-phone').value.trim();
   if (!email.endsWith('@adamscameron.com')) { toast('Must be @adamscameron.com','err'); return; }
   if (!first||!last) { toast('Name required','err'); return; }
-  const r = await fetch(`${PROXY_URL}/agent/register`, { method:'POST', headers:H(), body:JSON.stringify({email,firstName:first,lastName:last,office,phone}) });
+  const r = await fetch(`${PROXY_URL}/agent/register`, {
+    method:'POST', headers:H(),
+    body: JSON.stringify({ email, firstName:first, lastName:last, office_id: officeId ? +officeId : null, phone }),
+  });
   if (r.ok) { closeNewAgent(); toast('Agent created','ok'); await load(); } else toast('Failed: HTTP '+r.status,'err');
 }
 
