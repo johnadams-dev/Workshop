@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Records — Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 :root {
@@ -532,11 +534,11 @@ function renderDetail(a) {
 }
 
 // ── Reconciliation row helper ─────────────────────────────────────────────────
-function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false, normalize=v=>v) {
+function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false, normalize=v=>v, optional=false) {
   const n = v => normalize(v || '') || v;  // normalize for comparison only; display raw
   const cell = (val) => {
     if (val === null || val === undefined || val === '') {
-      return `<div class="recon-cell"><span class="val-miss">—</span></div>`;
+      return `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
     }
     if (isAuthKey) return `<div class="recon-cell"><span class="val-ok">✓</span> ${esc(val)}</div>`;
     if (infoOnly)  return `<div class="recon-cell"><span style="color:var(--muted)">${esc(val)}</span></div>`;
@@ -547,10 +549,11 @@ function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false,
   const gMismatch  = dbVal && googVal && n(googVal) !== n(dbVal) && !isAuthKey;
 
   let dbCell;
-  if (dnMismatch)       dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from DeltaNet: ${esc(dnVal)}">⚠ ${esc(dbVal)}</span></div>`;
-  else if (gMismatch)   dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from Google: ${esc(googVal)}">⚠ ${esc(dbVal)}</span></div>`;
-  else if (!dbVal)      dbCell = `<div class="recon-cell src-db"><span class="val-miss">Missing</span></div>`;
-  else                  dbCell = `<div class="recon-cell src-db"><span class="val-ok">✓</span> ${esc(dbVal)}</div>`;
+  if (dnMismatch)         dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from DeltaNet: ${esc(dnVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (gMismatch)     dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from Google: ${esc(googVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (!dbVal && !optional) dbCell = `<div class="recon-cell src-db"><span class="val-miss">Missing</span></div>`;
+  else if (!dbVal)        dbCell = `<div class="recon-cell src-db"><span class="val-neutral">—</span></div>`;
+  else                    dbCell = `<div class="recon-cell src-db"><span class="val-ok">✓</span> ${esc(dbVal)}</div>`;
 
   const dnCell  = dnVal   ? `<div class="recon-cell">${dnMismatch?`<span class="val-mismatch">${esc(dnVal)}</span>`:esc(dnVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
   const gCell   = googVal ? `<div class="recon-cell">${gMismatch?`<span class="val-mismatch">${esc(googVal)}</span>`:esc(googVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
@@ -609,12 +612,12 @@ async function runRecon(agentId, dmgId, agentData) {
       reconRow('Phone',          dbPhone,                   dnPhone,                 gPhone,  false, false, v => (v||'').replace(/\D/g,'')),
       reconRow('Office',         a.office||null,            null,                    null),
       reconRow('NRDS ID',        a.nrds_id||null,           dnLicense,               null),
-      reconRow('Designations',   a.designations||null,      dnDesig,                 null),
-      reconRow('Website',        a.website||null,           dnWebsite,               null, false, false, v => (v||'').replace(/^https?:\/\//i,'')),
+      reconRow('Designations',   a.designations||null,      dnDesig,                 null,  false, false, v=>v, true),
+      reconRow('Website',        a.website||null,           dnWebsite,               null,  false, false, v => (v||'').replace(/^https?:\/\//i,'').replace(/\/$/,'')),
       reconRow('Active',         a.active?'Yes':'No',       dnActive,                gActive),
       reconRow('Bio',            data.bio?'Present':'—',    data.bio?'Present':null, null),
-      reconRow('Photo',          a.photo_url?'Present':'—', dnPhoto?'Present':null,  null),
-      reconRow('Google sign-in', null,                      null,                    gSignIn, false, true),
+      reconRow('Photo',          null,                      dnPhoto?'Present':null,  null,  false, false, v=>v, true),
+      reconRow('Last Google sign-in', null,                 null,                    gSignIn, false, true, v=>v, true),
     ];
 
     // Count mismatches
