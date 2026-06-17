@@ -1789,16 +1789,16 @@ async function nlLoadFsTransactions() {
     listEl.innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
     return;
   }
-  const agent = nlFsAgents.find(a => a.email === agentEmail);
-  if (!agent?.nrdsId) {
-    listEl.innerHTML = '<div class="empty">No NRDS ID found for this agent in Form Simplicity.</div>';
-    return;
-  }
-
   listEl.innerHTML = '<div class="empty">Loading…</div>';
   let data;
   try {
-    data = await POST('/fs/list-transactions', { agentNRDSID: agent.nrdsId, fullDetails: false });
+    const account = await POST('/fs/get-account', { email: agentEmail });
+    const nrdsId = account.agentNRDSID || account.nrdsId || account.NRDSID || account.NRDSId;
+    if (!nrdsId) {
+      listEl.innerHTML = '<div class="empty">Form Simplicity did not return an NRDS ID for this agent.</div>';
+      return;
+    }
+    data = await POST('/fs/list-transactions', { agentNRDSID: nrdsId, fullDetails: false });
   } catch (e) {
     listEl.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
     return;
@@ -1832,17 +1832,14 @@ function selectFsTransaction(index) {
   const tx = nlFsTransactions[index];
   if (!tx) return;
   const agentEmail = document.getElementById('nl-fs-agent').value;
-  const fsAgent = nlFsAgents.find(a => a.email === agentEmail);
 
   nlShowManualForm();
   document.getElementById('nl-addr').value = tx.address !== 'Unknown address' ? tx.address : '';
   document.getElementById('nl-city').value = tx.city || '';
   document.getElementById('nl-fs-trans-id').value = tx.id || '';
-  // Match FS agent to internal agent by NRDS ID to pre-select the listing agent dropdown
-  if (fsAgent?.nrdsId) {
-    const internal = nlAgents.find(a => String(a.nrds_id) === String(fsAgent.nrdsId));
-    if (internal) document.getElementById('nl-agent').value = String(internal.id);
-  }
+  // Match FS agent to internal agent by email to pre-select the listing agent dropdown
+  const internal = nlAgents.find(a => a.email?.toLowerCase() === agentEmail?.toLowerCase());
+  if (internal) document.getElementById('nl-agent').value = String(internal.id);
 }
 
 async function nlSaveListing() {
@@ -2518,15 +2515,15 @@ async function ncLoadFsTransactions() {
   }
   listEl.innerHTML = '<div class="empty">Loading…</div>';
 
-  const agent = ncFsAgents.find(a => a.email === agentEmail);
-  if (!agent?.nrdsId) {
-    listEl.innerHTML = '<div class="empty">No NRDS ID found for this agent in Form Simplicity.</div>';
-    return;
-  }
-
   let data;
   try {
-    data = await POST('/fs/list-transactions', { agentNRDSID: agent.nrdsId, fullDetails: false });
+    const account = await POST('/fs/get-account', { email: agentEmail });
+    const nrdsId = account.agentNRDSID || account.nrdsId || account.NRDSID || account.NRDSId;
+    if (!nrdsId) {
+      listEl.innerHTML = '<div class="empty">Form Simplicity did not return an NRDS ID for this agent.</div>';
+      return;
+    }
+    data = await POST('/fs/list-transactions', { agentNRDSID: nrdsId, fullDetails: false });
   } catch (e) {
     listEl.innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
     return;
@@ -2560,7 +2557,6 @@ async function ncSelectFsTransaction(index) {
   const tx       = ncFsTransactions[index];
   if (!tx) return;
   const agentEmail = document.getElementById('nc-fs-agent').value;
-  const fsAgent    = ncFsAgents.find(a => a.email === agentEmail);
 
   ncShowExternalForm(); // navigates to external step, seeds office/agent dropdowns
 
@@ -2568,14 +2564,12 @@ async function ncSelectFsTransaction(index) {
   document.getElementById('nc-ext-city').value = tx.city || '';
   if (tx.price) document.getElementById('nc-ext-list-price').value = tx.price;
 
-  // Match FS agent to internal agent by NRDS ID to pre-select office/agent dropdowns
-  if (fsAgent?.nrdsId) {
-    const internal = ncDbAgents.find(a => String(a.nrds_id) === String(fsAgent.nrdsId));
-    if (internal?.office_id) {
-      document.getElementById('nc-ext-office').value = String(internal.office_id);
-      await ncLoadExtAgents();
-      document.getElementById('nc-ext-agent').value = String(internal.id);
-    }
+  // Match FS agent to internal agent by email to pre-select office/agent dropdowns
+  const internal = ncDbAgents.find(a => a.email?.toLowerCase() === agentEmail?.toLowerCase());
+  if (internal?.office_id) {
+    document.getElementById('nc-ext-office').value = String(internal.office_id);
+    await ncLoadExtAgents();
+    document.getElementById('nc-ext-agent').value = String(internal.id);
   }
 }
 
