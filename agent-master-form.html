@@ -335,7 +335,7 @@ function filterList() {
     const dots = [
       a.dmg_id  ? `<span class="dot" style="background:var(--blue)"   title="DeltaNet ID"></span>` : '',
       a.pp_id   ? `<span class="dot" style="background:#C2410C"        title="Profit Power ID"></span>` : '',
-      a.nrds_id ? `<span class="dot" style="background:var(--green)"   title="NRDS/License"></span>` : '',
+      a.nrds_id ? `<span class="dot" style="background:var(--green)"   title="NRDS ID"></span>` : '',
       !a.active ? `<span class="dot" style="background:var(--muted)"   title="Inactive"></span>` : '',
       hasissue  ? `<span class="dot" style="background:var(--miss-b)"  title="${ii.length} issue(s)"></span>` : '',
     ].join('');
@@ -492,9 +492,9 @@ function renderDetail(a) {
             ${!a.pp_id?`<span class="field-hint h-warn">Required for commission data</span>`:''}
           </div>
           <div class="field">
-            <label>NRDS / FL License #</label>
+            <label>NRDS ID</label>
             <div class="id-wrap">
-              <input type="text" value="${esc(a.nrds_id)}" onchange="chg('nrds_id',this.value)" placeholder="e.g. BK-3010591">
+              <input type="text" value="${esc(a.nrds_id)}" onchange="chg('nrds_id',this.value)" placeholder="e.g. 123456789">
               <span class="src src-nar">NAR</span>
             </div>
           </div>
@@ -605,7 +605,7 @@ async function runRecon(agentId, dmgId, agentData) {
       reconRow('Email',          a.email,                   dnEmail,                 a.email, true),
       reconRow('Phone',          dbPhone,                   dnPhone,                 gPhone),
       reconRow('Office',         a.office||null,            null,                    g.department||null),
-      reconRow('NRDS / License', a.nrds_id||null,           dnLicense,               null),
+      reconRow('NRDS ID',        a.nrds_id||null,           dnLicense,               null),
       reconRow('Designations',   a.designations||null,      dnDesig,                 null),
       reconRow('Website',        a.website||null,           dnWebsite,               null),
       reconRow('Active',         a.active?'Yes':'No',       dnActive,                gActive),
@@ -636,8 +636,8 @@ async function runRecon(agentId, dmgId, agentData) {
         ${rows.join('')}
         ${dnLicense && !a.nrds_id ? `<div class="recon-row" style="background:var(--warn)">
           <div class="recon-cell" style="grid-column:1/-1;font-size:11px;color:var(--warn-t)">
-            ⚠ DeltaNet has a license number (${esc(dnLicense)}) not stored in the database.
-            <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="applyDnLicense(${agentId},'${esc(dnLicense)}')">Apply to record</button>
+            ⚠ DeltaNet has an NRDS ID (${esc(dnLicense)}) not stored in the database.
+            <button class="btn btn-sm btn-secondary" style="margin-left:8px" onclick="applyDnNrds(${agentId},'${esc(dnLicense)}')">Apply to record</button>
           </div>
         </div>` : ''}`;
     }
@@ -647,13 +647,12 @@ async function runRecon(agentId, dmgId, agentData) {
   }
 }
 
-async function applyDnLicense(id, license) {
-  pending['nrds_id'] = license;
+async function applyDnNrds(id, nrdsId) {
+  pending['nrds_id'] = nrdsId;
   document.getElementById('save-bar')?.classList.add('on');
-  // Update the input visually
   const inputs = document.querySelectorAll(`input[onchange*="nrds_id"]`);
-  inputs.forEach(i => i.value = license);
-  toast('License number staged — click Save to apply', '');
+  inputs.forEach(i => i.value = nrdsId);
+  toast('NRDS ID staged — click Save to apply', '');
 }
 
 // ── Edit / Save ───────────────────────────────────────────────────────────────
