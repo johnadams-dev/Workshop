@@ -1709,22 +1709,15 @@ async function nlLoadAgents() {
 
 function normalizeFsTransactions(data) {
   const raw = data?.data || data?.transactions || data?.results || (Array.isArray(data) ? data : []);
-  const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
-  return raw.filter(tx => {
-    if (tx.propertyStatus === 'Closed/Sold') return false;
-    const d = tx.lastUpdateDate || tx.lastUpdated || '';
-    if (d) {
-      const [m, day, y] = d.split('/');
-      if (new Date(+y, +m - 1, +day).getTime() < cutoff) return false;
-    }
-    return true;
-  }).map((tx, i) => ({
-    id:      tx.transId || String(i),
-    address: tx.transName || tx.address || tx.streetAddress || 'Unknown address',
-    type:    tx.transactionType || tx.propertyType || '',
-    status:  tx.propertyStatus || '',
-    updated: tx.lastUpdateDate || '',
-  }));
+  return raw
+    .filter(tx => tx.propertyStatus !== 'Closed/Sold')
+    .map((tx, i) => ({
+      id:      tx.transId || String(i),
+      address: tx.transName || tx.address || tx.streetAddress || 'Unknown address',
+      type:    tx.transactionType || tx.propertyType || '',
+      status:  tx.propertyStatus || '',
+      updated: tx.lastUpdateDate || '',
+    }));
 }
 
 async function nlLoadFsAgents() {
