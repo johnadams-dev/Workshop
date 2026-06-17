@@ -532,8 +532,9 @@ function renderDetail(a) {
 }
 
 // ── Reconciliation row helper ─────────────────────────────────────────────────
-function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false) {
-  const cell = (val, src) => {
+function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false, normalize=v=>v) {
+  const n = v => normalize(v || '') || v;  // normalize for comparison only; display raw
+  const cell = (val) => {
     if (val === null || val === undefined || val === '') {
       return `<div class="recon-cell"><span class="val-miss">—</span></div>`;
     }
@@ -542,15 +543,17 @@ function reconRow(label, dbVal, dnVal, googVal, isAuthKey=false, infoOnly=false)
     return `<div class="recon-cell">${esc(val)}</div>`;
   };
 
-  // Check for mismatch between db and other sources
-  let dbCell = cell(dbVal);
-  if (dbVal && dnVal && dnVal !== dbVal) dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from DeltaNet: ${esc(dnVal)}">⚠ ${esc(dbVal)}</span></div>`;
-  else if (dbVal && googVal && googVal !== dbVal && !isAuthKey) dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from Google: ${esc(googVal)}">⚠ ${esc(dbVal)}</span></div>`;
-  else if (!dbVal) dbCell = `<div class="recon-cell src-db"><span class="val-miss">Missing</span></div>`;
-  else dbCell = `<div class="recon-cell src-db"><span class="val-ok">✓</span> ${esc(dbVal)}</div>`;
+  const dnMismatch = dbVal && dnVal && n(dnVal) !== n(dbVal);
+  const gMismatch  = dbVal && googVal && n(googVal) !== n(dbVal) && !isAuthKey;
 
-  const dnCell  = dnVal   ? `<div class="recon-cell">${dbVal&&dnVal!==dbVal?`<span class="val-mismatch">${esc(dnVal)}</span>`:esc(dnVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
-  const gCell   = googVal ? `<div class="recon-cell">${dbVal&&googVal!==dbVal&&!isAuthKey?`<span class="val-mismatch">${esc(googVal)}</span>`:esc(googVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
+  let dbCell;
+  if (dnMismatch)       dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from DeltaNet: ${esc(dnVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (gMismatch)   dbCell = `<div class="recon-cell src-db"><span class="val-mismatch" title="Differs from Google: ${esc(googVal)}">⚠ ${esc(dbVal)}</span></div>`;
+  else if (!dbVal)      dbCell = `<div class="recon-cell src-db"><span class="val-miss">Missing</span></div>`;
+  else                  dbCell = `<div class="recon-cell src-db"><span class="val-ok">✓</span> ${esc(dbVal)}</div>`;
+
+  const dnCell  = dnVal   ? `<div class="recon-cell">${dnMismatch?`<span class="val-mismatch">${esc(dnVal)}</span>`:esc(dnVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
+  const gCell   = googVal ? `<div class="recon-cell">${gMismatch?`<span class="val-mismatch">${esc(googVal)}</span>`:esc(googVal)}</div>` : `<div class="recon-cell"><span class="val-neutral">—</span></div>`;
 
   return `<div class="recon-row">
     <div class="recon-cell field-name">${label}</div>
@@ -607,7 +610,7 @@ async function runRecon(agentId, dmgId, agentData) {
       reconRow('Office',         a.office||null,            null,                    g.department||null),
       reconRow('NRDS ID',        a.nrds_id||null,           dnLicense,               null),
       reconRow('Designations',   a.designations||null,      dnDesig,                 null),
-      reconRow('Website',        a.website||null,           dnWebsite,               null),
+      reconRow('Website',        a.website||null,           dnWebsite,               null, false, false, v => (v||'').replace(/^https?:\/\//i,'')),
       reconRow('Active',         a.active?'Yes':'No',       dnActive,                gActive),
       reconRow('Bio',            data.bio?'Present':'—',    data.bio?'Present':null, null),
       reconRow('Photo',          a.photo_url?'Present':'—', dnPhoto?'Present':null,  null),
