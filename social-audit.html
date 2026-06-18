@@ -273,8 +273,9 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
           <div class="score-flags" id="report-flags"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:7px;flex-shrink:0">
-          <button class="btn btn-ghost" onclick="copyReport()">Copy Report</button>
-          <button class="btn btn-gold" onclick="rerunAudit()">Re-run Audit</button>
+          <button class="btn btn-gold" id="export-btn" onclick="exportDoc()">Export to Google Doc</button>
+          <button class="btn btn-ghost" onclick="copyReport()">Copy Text</button>
+          <button class="btn btn-ghost" onclick="rerunAudit()">Re-run Audit</button>
         </div>
       </div>
 
@@ -669,6 +670,35 @@ function rerunAudit() {
 function copyReport() {
   const text = document.getElementById('report-body').innerText;
   navigator.clipboard.writeText(text).then(() => toast('Report copied to clipboard', 'ok'));
+}
+
+async function exportDoc() {
+  if (!currentAuditId) return;
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin spin-dark"></span> Exporting…';
+  try {
+    const r = await fetch(`${PROXY}/api/audits/${currentAuditId}/export-doc`, { method:'POST', headers:H() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+    if (data.fallback) {
+      // Service account not configured — trigger browser download
+      const blob = new Blob([data.html], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = data.filename;
+      a.click();
+      toast('Downloaded as HTML (no Drive configured)', 'ok');
+    } else {
+      window.open(data.url, '_blank');
+      toast('Google Doc created — opening…', 'ok');
+    }
+  } catch(e) {
+    toast('Export failed: '+e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Export to Google Doc';
+  }
 }
 
 // ── Sign-in ───────────────────────────────────────────────────────────────────
