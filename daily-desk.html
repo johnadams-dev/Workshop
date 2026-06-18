@@ -691,6 +691,9 @@ tbody tr.clickable { cursor: pointer; }
     <div class="nav-tab alert" data-page="untracked" onclick="showPage('untracked',this)">
       <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count" id="untracked-count">—</span>
     </div>
+    <div class="nav-tab" data-page="notices" onclick="showPage('notices',this)">
+      <span class="tab-icon">📢</span> Notices <span class="tab-count" id="notices-count">—</span>
+    </div>
     <div class="nav-tab" data-page="admin" id="admin-nav-tab" onclick="showPage('admin',this)" style="display:none">
       <span class="tab-icon">⚙</span> Admin
     </div>
@@ -851,6 +854,69 @@ tbody tr.clickable { cursor: pointer; }
       </div>
 
     </div>
+
+    <!-- ═══ NOTICES PAGE ═══ -->
+    <div class="page" id="page-notices">
+
+      <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div class="section-title">Market Notices</div>
+        <a href="agent-notices.html" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none">Open Submission Form ↗</a>
+      </div>
+
+      <!-- Upcoming Listings -->
+      <div style="margin-bottom:22px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">
+          Upcoming Listings
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="notices-upcoming-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Address / City</th>
+                <th>Beds / Baths</th>
+                <th>Price Range</th>
+                <th>Expected On Market</th>
+                <th>Agreement</th>
+                <th>Contact</th>
+                <th>Expires</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="notices-upcoming-body">
+              <tr><td colspan="9" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Buyer Needs -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">
+          Buyer Needs
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="notices-buyer-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Area</th>
+                <th>Min Beds</th>
+                <th>Min Baths</th>
+                <th>Max Price</th>
+                <th>Comments</th>
+                <th>Expires</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="notices-buyer-body">
+              <tr><td colspan="8" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /page-notices -->
 
     <!-- ═══ ADMIN PAGE ═══ -->
     <div class="page" id="page-admin">
@@ -1516,36 +1582,45 @@ async function renderAll() {
   const officeId = document.getElementById('officeSelect').value;
   const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
 
-  let summary = {}, listings = [], contracts = [], today = [], untracked = [];
+  let summary = {}, listings = [], contracts = [], today = [], untracked = [],
+      noticesUpcoming = [], noticesBuyer = [];
   try {
-    [summary, listings, contracts, today, untracked] = await Promise.all([
+    [summary, listings, contracts, today, untracked, noticesUpcoming, noticesBuyer] = await Promise.all([
       GET(`/daily-desk/summary${qs}`),
       GET(`/daily-desk/listings${qs}`),
       GET(`/daily-desk/contracts${qs}`),
       GET(`/daily-desk/today${qs}`),
       GET(`/daily-desk/untracked${qs}`),
+      GET('/notices/upcoming'),
+      GET('/notices/buyer-needs'),
     ]);
   } catch (e) {
     console.error('renderAll failed:', e);
     return;
   }
 
-  STATE.listings  = listings  || [];
-  STATE.contracts = contracts || [];
-  STATE.today     = today     || [];
-  STATE.untracked = untracked || [];
+  STATE.listings         = listings         || [];
+  STATE.contracts        = contracts        || [];
+  STATE.today            = today            || [];
+  STATE.untracked        = untracked        || [];
+  STATE.noticesUpcoming  = noticesUpcoming  || [];
+  STATE.noticesBuyer     = noticesBuyer     || [];
 
+  const noticesTotal = STATE.noticesUpcoming.length + STATE.noticesBuyer.length;
   document.getElementById('office-meta').innerHTML =
     `${summary.active_listings ?? 0} active &middot; ${summary.under_contract ?? 0} under contract &middot; <b>${summary.untracked ?? 0} not yet tracked</b>`;
   document.getElementById('today-count').textContent     = STATE.today.length;
   document.getElementById('listings-count').textContent  = STATE.listings.length;
   document.getElementById('contracts-count').textContent = STATE.contracts.length;
   document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
+  document.getElementById('notices-count').textContent   = noticesTotal || '—';
 
   renderTodayTable(getSortedToday());
   renderListingsTable(STATE.listings);
   renderContractsTable(STATE.contracts);
   renderUntrackedTable(STATE.untracked);
+  renderNoticesUpcoming(STATE.noticesUpcoming);
+  renderNoticesBuyer(STATE.noticesBuyer);
 
   filterToday();
   filterListings();
@@ -2739,6 +2814,78 @@ async function confirmMatch(transactionId) {
     await renderAll();
   } catch (e) {
     alert('Failed to save match: ' + e.message);
+  }
+}
+
+/* ── Market Notices ── */
+function renderNoticesUpcoming(rows) {
+  const tbody = document.getElementById('notices-upcoming-body');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No active upcoming listings.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const addr = r.has_agreement
+      ? escapeHtml(r.address || r.city || '—')
+      : `<span style="color:var(--text-muted);font-style:italic">${escapeHtml(r.city || '—')} (no agreement)</span>`;
+    const bedBath = [r.bedrooms != null ? r.bedrooms : null, r.bathrooms != null ? r.bathrooms : null]
+      .map((v, i) => v != null ? v + (i === 1 ? ' ba' : ' bd') : '—').join(' / ');
+    const contact = r.contact_method === 'email'
+      ? `<a href="mailto:${escapeHtml(r.contact_value)}" style="color:var(--blue)">${escapeHtml(r.contact_value)}</a>`
+      : escapeHtml(r.contact_value);
+    const exp = r.expires_at ? fmtDate(r.expires_at) : '—';
+    return `<tr>
+      <td>
+        <div style="font-weight:600">${escapeHtml(r.agent_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(r.office_name || '')}</div>
+      </td>
+      <td>${addr}</td>
+      <td>${bedBath}</td>
+      <td>${escapeHtml(r.price_range || '—')}</td>
+      <td>${r.expected_date ? fmtDate(r.expected_date) : '—'}</td>
+      <td>${r.has_agreement ? '<span style="color:var(--status-active)">Yes</span>' : '<span style="color:var(--text-muted)">No</span>'}</td>
+      <td>${contact}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${exp}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="removeNotice('upcoming',${r.id})">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderNoticesBuyer(rows) {
+  const tbody = document.getElementById('notices-buyer-body');
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No active buyer needs.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const exp = r.expires_at ? fmtDate(r.expires_at) : '—';
+    return `<tr>
+      <td>
+        <div style="font-weight:600">${escapeHtml(r.agent_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(r.office_name || '')}</div>
+      </td>
+      <td>${escapeHtml(r.area || '—')}</td>
+      <td>${r.min_bedrooms != null ? r.min_bedrooms : '—'}</td>
+      <td>${r.min_bathrooms != null ? r.min_bathrooms : '—'}</td>
+      <td>${r.max_price != null ? fmtMoney(r.max_price) : '—'}</td>
+      <td style="max-width:220px;white-space:normal">${escapeHtml(r.comments || '—')}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${exp}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="removeNotice('buyer-needs',${r.id})">Remove</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function removeNotice(type, id) {
+  const label = type === 'upcoming' ? 'upcoming listing' : 'buyer need';
+  if (!confirm(`Remove this ${label} from the hotsheet?`)) return;
+  try {
+    const r = await fetch(`${PROXY}/notices/${type}/${id}`, { method: 'DELETE', headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail } });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'HTTP '+r.status); }
+    await renderAll();
+  } catch (e) {
+    alert('Failed to remove: ' + e.message);
   }
 }
 

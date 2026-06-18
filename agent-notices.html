@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Notices — Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+:root{
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --green:#1A7A4C; --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#C0392B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+.topbar{background:var(--navy);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:50px;border-bottom:2px solid var(--gold)}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-title{color:#fff;font-size:14px;font-weight:500;margin-left:14px}
+.topbar-left{display:flex;align-items:center}
+.topbar-right{font-size:12px;color:#8ab4cc}
+
+.page{max-width:680px;margin:0 auto;padding:24px 16px 60px}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:22px}
+.tab{padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab.active{color:var(--navy);border-bottom-color:var(--blue)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+.card{background:var(--surface);border-radius:10px;border:1px solid var(--border);padding:20px 22px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.ff{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.field input,.field select,.field textarea{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);background:var(--surface);outline:none;font-family:inherit}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue)}
+.field textarea{resize:vertical;min-height:72px}
+.field-note{font-size:11px;color:var(--muted);margin-top:2px}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.toggle-label{font-size:13px;font-weight:500}
+.toggle-label small{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;border-radius:10px;background:var(--border);cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--blue)}
+.toggle-track::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.toggle input:checked+.toggle-track::after{transform:translateX(16px)}
+
+.btn{padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{background:#1E5F9A}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-row{display:flex;justify-content:flex-end;margin-top:18px}
+
+.toast-area{position:fixed;top:60px;right:14px;z-index:200;display:flex;flex-direction:column;gap:6px}
+.toast{background:var(--navy);color:#fff;padding:9px 14px;border-radius:7px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);animation:tin .2s ease;max-width:280px}
+.toast.err{background:var(--red)}.toast.ok{background:var(--green)}
+@keyframes tin{from{transform:translateX(16px);opacity:0}to{transform:none;opacity:1}}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.address-note{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 13px;font-size:12px;color:#1E40AF;margin-top:8px;line-height:1.5;display:none}
+.address-note.show{display:block}
+
+#auth-gate{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center}
+#auth-gate.show{display:flex}
+.auth-box{background:#fff;border-radius:12px;padding:2.5rem 2rem;text-align:center;max-width:320px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.auth-box h3{font-size:16px;color:var(--navy);margin-bottom:8px}
+.auth-box p{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
+
+.agent-note{background:var(--gold-lt);border:1px solid var(--gold);border-radius:7px;padding:10px 13px;font-size:12px;margin-bottom:16px;display:none}
+.agent-note.show{display:block}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">ACC</span>
+    <span class="topbar-title">Market Notices</span>
+  </div>
+  <div class="topbar-right" id="user-label"></div>
+</div>
+
+<div class="toast-area" id="toasts"></div>
+
+<div id="auth-gate" class="show">
+  <div class="auth-box">
+    <h3>Sign in required</h3>
+    <p>Sign in with your Adams Cameron Google account to post a notice.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+  </div>
+</div>
+
+<div class="page" id="main" style="display:none">
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('upcoming',this)">Upcoming Listing</button>
+    <button class="tab" onclick="switchTab('buyer',this)">Buyer Need</button>
+  </div>
+
+  <!-- ── Upcoming Listing ──────────────────────────────────────────────── -->
+  <div class="tab-panel active" id="tab-upcoming">
+
+    <div class="agent-note" id="upcoming-agent-note"></div>
+
+    <div class="card">
+      <div class="card-title">Contact preference</div>
+      <div class="fg">
+        <div class="field">
+          <label>How to reach you</label>
+          <select id="ul-contact-method" onchange="updateContactPlaceholder()">
+            <option value="phone">Phone</option>
+            <option value="email">Email</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="ul-contact-label">Phone number</label>
+          <input type="text" id="ul-contact-value" placeholder="(386) 555-0100">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Property details</div>
+      <div class="fg">
+        <div class="field ff">
+          <label>Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(shown only if listing agreement is signed)</span></label>
+          <input type="text" id="ul-address" placeholder="123 Main St">
+        </div>
+        <div class="field">
+          <label>City</label>
+          <input type="text" id="ul-city" placeholder="Daytona Beach">
+        </div>
+        <div class="field">
+          <label>Price range</label>
+          <input type="text" id="ul-price-range" placeholder="$350,000 – $400,000">
+        </div>
+        <div class="field">
+          <label>Bedrooms</label>
+          <input type="number" id="ul-bedrooms" placeholder="3" min="0" step="1">
+        </div>
+        <div class="field">
+          <label>Bathrooms</label>
+          <input type="number" id="ul-bathrooms" placeholder="2" min="0" step="0.5">
+        </div>
+        <div class="field">
+          <label>Expected on market</label>
+          <input type="date" id="ul-expected-date">
+        </div>
+      </div>
+      <div class="toggle-row" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div class="toggle-label">Listing agreement signed
+          <small>Address will be shared with other agents once checked</small>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="ul-has-agreement" onchange="toggleAddressNote()">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="address-note" id="address-note">
+        Address will be visible to other agents in the hotsheet. Leave unchecked to share only city and price range until the agreement is signed.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Additional notes</div>
+      <div class="field">
+        <textarea id="ul-comments" placeholder="Pool, large lot, motivated seller — anything helpful for matching…"></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="ul-submit-btn" onclick="submitUpcoming()">Submit Upcoming Listing</button>
+    </div>
+  </div>
+
+  <!-- ── Buyer Need ────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-buyer">
+
+    <div class="agent-note" id="buyer-agent-note"></div>
+
+    <div class="card">
+      <div class="card-title">What my buyer is looking for</div>
+      <div class="fg">
+        <div class="field ff">
+          <label>Area / neighborhood</label>
+          <input type="text" id="bn-area" placeholder="Ormond Beach, NSB, Flagler County…">
+        </div>
+        <div class="field">
+          <label>Min bedrooms</label>
+          <input type="number" id="bn-min-bedrooms" placeholder="3" min="0" step="1">
+        </div>
+        <div class="field">
+          <label>Min bathrooms</label>
+          <input type="number" id="bn-min-bathrooms" placeholder="2" min="0" step="0.5">
+        </div>
+        <div class="field">
+          <label>Max price</label>
+          <input type="text" id="bn-max-price" placeholder="$450,000">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Additional notes</div>
+      <div class="field">
+        <textarea id="bn-comments" placeholder="Pool required, single story, willing to consider fixer-uppers…"></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="bn-submit-btn" onclick="submitBuyerNeed()">Submit Buyer Need</button>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
+let isStaff = false;
+let agents  = [];
+
+const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
+
+function toast(msg, type) {
+  const a = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast${type ? ' '+type : ''}`;
+  el.textContent = msg;
+  a.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+function num(id) { const v = parseFloat(document.getElementById(id)?.value); return isNaN(v) ? null : v; }
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function updateContactPlaceholder() {
+  const method = val('ul-contact-method') || document.getElementById('ul-contact-method').value;
+  document.getElementById('ul-contact-label').textContent = method === 'email' ? 'Email address' : 'Phone number';
+  document.getElementById('ul-contact-value').placeholder = method === 'email' ? 'agent@adamscameron.com' : '(386) 555-0100';
+}
+
+function toggleAddressNote() {
+  const checked = document.getElementById('ul-has-agreement').checked;
+  document.getElementById('address-note').classList.toggle('show', !checked);
+}
+
+// ── Agent picker (shown to staff, hidden for agents) ──────────────────────────
+function buildAgentPicker(containerId, selectId) {
+  const note = document.getElementById(containerId);
+  if (!isStaff || !agents.length) { note.classList.remove('show'); return; }
+  note.innerHTML = `
+    <strong>Entering on behalf of an agent</strong> — select the agent:<br style="margin-bottom:4px">
+    <select id="${selectId}" style="margin-top:7px;padding:6px 9px;border:1px solid #C9A84C;border-radius:6px;font-size:13px;width:100%;background:#fff">
+      <option value="">— Select agent —</option>
+      ${agents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)} — ${esc(a.office||'')}</option>`).join('')}
+    </select>`;
+  note.classList.add('show');
+}
+
+function getSelectedAgentId(selectId) {
+  const el = document.getElementById(selectId);
+  return el?.value ? parseInt(el.value, 10) : null;
+}
+
+// ── Submit upcoming listing ───────────────────────────────────────────────────
+async function submitUpcoming() {
+  const contactMethod = document.getElementById('ul-contact-method').value;
+  const contactValue  = val('ul-contact-value');
+  if (!contactValue) { toast('Please enter your contact info', 'err'); return; }
+
+  const agentId = getSelectedAgentId('ul-upcoming-agent-select');
+  if (isStaff && !agentId) { toast('Please select an agent', 'err'); return; }
+
+  const btn = document.getElementById('ul-submit-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Submitting…';
+
+  try {
+    const body = {
+      contact_method: contactMethod,
+      contact_value:  contactValue,
+      address:        val('ul-address') || undefined,
+      city:           val('ul-city') || undefined,
+      bedrooms:       num('ul-bedrooms'),
+      bathrooms:      num('ul-bathrooms'),
+      price_range:    val('ul-price-range') || undefined,
+      expected_date:  val('ul-expected-date') || undefined,
+      has_agreement:  document.getElementById('ul-has-agreement').checked,
+      comments:       val('ul-comments') || undefined,
+    };
+    if (agentId) body.agent_id = agentId;
+
+    const r = await fetch(`${PROXY}/notices/upcoming`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+
+    toast('Upcoming listing submitted — it will appear in the hotsheet.', 'ok');
+    // Reset form
+    ['ul-contact-value','ul-address','ul-city','ul-price-range','ul-expected-date','ul-comments'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('ul-bedrooms').value='';
+    document.getElementById('ul-bathrooms').value='';
+    document.getElementById('ul-has-agreement').checked=false;
+    document.getElementById('address-note').classList.remove('show');
+    const sel = document.getElementById('ul-upcoming-agent-select');
+    if (sel) sel.value='';
+  } catch(e) {
+    toast('Failed: '+e.message, 'err');
+  } finally {
+    btn.disabled=false; btn.textContent='Submit Upcoming Listing';
+  }
+}
+
+// ── Submit buyer need ─────────────────────────────────────────────────────────
+async function submitBuyerNeed() {
+  const agentId = getSelectedAgentId('bn-buyer-agent-select');
+  if (isStaff && !agentId) { toast('Please select an agent', 'err'); return; }
+
+  const btn = document.getElementById('bn-submit-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>Submitting…';
+
+  try {
+    const body = {
+      area:          val('bn-area') || undefined,
+      min_bedrooms:  num('bn-min-bedrooms'),
+      min_bathrooms: num('bn-min-bathrooms'),
+      max_price:     val('bn-max-price') || undefined,
+      comments:      val('bn-comments') || undefined,
+    };
+    if (agentId) body.agent_id = agentId;
+
+    const r = await fetch(`${PROXY}/notices/buyer-needs`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+
+    toast('Buyer need submitted — it will appear in the hotsheet.', 'ok');
+    ['bn-area','bn-max-price','bn-comments'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('bn-min-bedrooms').value='';
+    document.getElementById('bn-min-bathrooms').value='';
+    const sel = document.getElementById('bn-buyer-agent-select');
+    if (sel) sel.value='';
+  } catch(e) {
+    toast('Failed: '+e.message, 'err');
+  } finally {
+    btn.disabled=false; btn.textContent='Submit Buyer Need';
+  }
+}
+
+// ── Init after sign-in ────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('user-label').textContent = USER_EMAIL;
+
+  // Check if this user is staff (can enter on behalf of others)
+  try {
+    const r = await fetch(`${PROXY}/auth/is-manager`, { headers: H() });
+    isStaff = r.ok;
+  } catch(_) {}
+
+  if (isStaff) {
+    // Load agent list for staff picker
+    try {
+      const r = await fetch(`${PROXY}/daily-desk/agents`, { headers: H() });
+      if (r.ok) agents = await r.json();
+      agents.sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''));
+    } catch(_) {}
+    buildAgentPicker('upcoming-agent-note', 'ul-upcoming-agent-select');
+    buildAgentPicker('buyer-agent-note', 'bn-buyer-agent-select');
+  } else {
+    // Pre-fill contact value with agent's email
+    document.getElementById('ul-contact-method').value = 'email';
+    document.getElementById('ul-contact-value').value = USER_EMAIL;
+    updateContactPlaceholder();
+  }
+
+  document.getElementById('main').style.display = 'block';
+}
+
+// ── Google Sign-In ────────────────────────────────────────────────────────────
+function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    USER_EMAIL = payload.email || '';
+    if (USER_EMAIL) sessionStorage.setItem('ac_user_email', USER_EMAIL);
+  } catch(_) {}
+  document.getElementById('auth-gate').classList.remove('show');
+  if (USER_EMAIL) init(); else toast('Sign-in failed', 'err');
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt(n => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) {
+      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large', text:'signin_with' });
+      document.getElementById('auth-gate').classList.add('show');
+    }
+  });
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+if (USER_EMAIL) {
+  document.getElementById('auth-gate').classList.remove('show');
+  init();
+} else if (window.google?.accounts?.id) {
+  initGoogleSignIn();
+} else {
+  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+}
+</script>
+</body>
+</html>
