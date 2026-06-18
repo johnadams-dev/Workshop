@@ -840,13 +840,12 @@ tbody tr.clickable { cursor: pointer; }
               <th>Address</th>
               <th>Agent</th>
               <th>List Price</th>
-              <th>Bed/Bath</th>
               <th>Cached</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="untracked-tbody">
-            <tr><td colspan="6" class="empty">Loading…</td></tr>
+            <tr><td colspan="5" class="empty">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1190,6 +1189,26 @@ tbody tr.clickable { cursor: pointer; }
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DELTANET MATCH MODAL ═══ -->
+<div class="modal-overlay" id="matchModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Match to Existing Listing</div>
+        <div style="font-size:12px; color:var(--text-muted); font-family:var(--mono); margin-top:2px;" id="matchModalAddr">—</div>
+      </div>
+      <button class="modal-close" onclick="closeMatchModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text-muted); margin:0 0 12px;">Select the existing listing in our system that corresponds to this DeltaNet entry. Multiple DeltaNet IDs can be linked to the same listing.</p>
+      <input type="text" id="match-q" placeholder="Search by address, agent, city…" oninput="matchFilterListings()" style="width:100%; padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; margin-bottom:10px; box-sizing:border-box;">
+      <div class="fs-list" id="match-listing-list">
+        <div class="empty">Type to search listings.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2607,7 +2626,7 @@ function renderUntrackedTable(rows) {
   const banner = document.getElementById('untracked-banner');
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">No untracked DeltaNet listings found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No untracked DeltaNet listings found.</td></tr>';
     banner.style.display = 'none';
     return;
   }
@@ -2617,10 +2636,7 @@ function renderUntrackedTable(rows) {
     `${rows.length} DeltaNet listing${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? "isn't" : "aren't"} tracked yet`;
 
   tbody.innerHTML = rows.map(r => {
-    const sub = [r.city, (r.mls_ids || [])[0]].filter(Boolean).join(' &middot; ');
-    const bedBath = (r.bedrooms != null || r.bathrooms != null)
-      ? `${r.bedrooms ?? '—'} / ${r.bathrooms ?? '—'}`
-      : '—';
+    const sub = [r.city, ...(r.mls_ids || [])].filter(Boolean).join(' &middot; ');
     return `
             <tr>
               <td>
@@ -2629,9 +2645,13 @@ function renderUntrackedTable(rows) {
               </td>
               <td>${escapeHtml(r.agent_name) || '—'}</td>
               <td>${fmtMoney(r.price_asking)}</td>
-              <td>${bedBath}</td>
               <td>${fmtDate(r.cached_at)}</td>
-              <td><button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button></td>
+              <td>
+                <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                  <button class="btn btn-ghost btn-sm" onclick="openMatchModal('${escapeJs(r.delta_listing_id)}')">Match</button>
+                  <button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button>
+                </div>
+              </td>
             </tr>`;
   }).join('');
 }
@@ -2652,6 +2672,69 @@ async function startTracking(deltaListingId) {
     await renderAll();
   } catch (e) {
     alert('Failed to start tracking: ' + e.message);
+  }
+}
+
+/* ── DeltaNet manual match modal ── */
+let matchDeltaListingId = null;
+let matchListings = [];
+
+function openMatchModal(deltaListingId) {
+  matchDeltaListingId = deltaListingId;
+  const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
+  document.getElementById('matchModalAddr').textContent = row ? (row.address || deltaListingId) : deltaListingId;
+  document.getElementById('match-q').value = '';
+  document.getElementById('match-listing-list').innerHTML = '<div class="empty">Type to search listings.</div>';
+  matchListings = (STATE.listings || []).concat(STATE.contracts || []);
+  document.getElementById('matchModal').classList.add('open');
+}
+
+function closeMatchModal() {
+  document.getElementById('matchModal').classList.remove('open');
+  matchDeltaListingId = null;
+}
+
+function matchFilterListings() {
+  const q = document.getElementById('match-q').value.trim().toLowerCase();
+  if (!q) {
+    document.getElementById('match-listing-list').innerHTML = '<div class="empty">Type to search listings.</div>';
+    return;
+  }
+  const hits = matchListings.filter(t =>
+    (t.property_address || '').toLowerCase().includes(q) ||
+    (t.city || '').toLowerCase().includes(q) ||
+    (t.mls_id || '').toLowerCase().includes(q)
+  ).slice(0, 20);
+  matchRenderListings(hits);
+}
+
+function matchRenderListings(rows) {
+  const el = document.getElementById('match-listing-list');
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty">No matching listings found.</div>';
+    return;
+  }
+  el.innerHTML = rows.map(t => `
+    <div class="fs-item" onclick="confirmMatch('${escapeJs(t.id)}')">
+      <div class="fs-item-addr">${escapeHtml(t.property_address || '—')}</div>
+      <div class="fs-item-meta">${escapeHtml(t.city || '')}${t.mls_id ? ' &middot; MLS ' + escapeHtml(t.mls_id) : ''}</div>
+    </div>`).join('');
+}
+
+async function confirmMatch(transactionId) {
+  if (!matchDeltaListingId) return;
+  const t = matchListings.find(x => x.id === transactionId);
+  const label = t ? (t.property_address || transactionId) : transactionId;
+  if (!confirm(`Link DeltaNet listing to "${label}"?`)) return;
+  try {
+    await POST('/daily-desk/deltanet-matches', {
+      delta_listing_id: matchDeltaListingId,
+      transaction_id: transactionId,
+    });
+    closeMatchModal();
+    await renderAll();
+  } catch (e) {
+    alert('Failed to save match: ' + e.message);
   }
 }
 
