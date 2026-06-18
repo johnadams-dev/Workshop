@@ -2334,6 +2334,8 @@ function renderInventory(boxes) {
             ? `<button class="tbl-link" onclick='pickCiBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkin")'>Check In</button> `
             : b.status === 'available' && ['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" onclick='pickBox(${JSON.stringify(b).replace(/'/g,"&#39;")});switchPage("checkout")'>Check Out</button> `
+            : b.status === 'missing' && ['manager', 'staff'].includes(STATE.userRole)
+            ? `<button class="tbl-link" style="color:var(--green)" onclick='recoverLockbox(${JSON.stringify(b).replace(/'/g,"&#39;")})'>✓ Recover</button> `
             : ''}
           ${['manager', 'staff'].includes(STATE.userRole)
             ? `<button class="tbl-link" style="color:var(--blue);opacity:.7" title="Print QR label" onclick='printSingleLabel(${JSON.stringify(b).replace(/'/g,"&#39;")})'>🏷</button>`
@@ -2374,6 +2376,23 @@ async function editInvMlsId(b) {
     loadMlsFlags();
   } catch (e) {
     alert('Failed to update MLS ID: ' + e.message);
+  }
+}
+
+async function recoverLockbox(b) {
+  if (!confirm(`Mark lockbox #${b.serial_number} as Available?\n\nThis removes it from the missing list and returns it to active inventory.`)) return;
+  try {
+    await api(`/lockbox/${encodeURIComponent(b.serial_number)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'available', notes: 'Recovered — returned to inventory' }),
+    });
+    const box = STATE.boxes.find(x => x.serial_number === b.serial_number);
+    if (box) box.status = 'available';
+    renderInventory(STATE.boxes);
+    renderDashboard();
+    toast(`Lockbox #${b.serial_number} recovered and marked available.`);
+  } catch (e) {
+    toast('Failed to recover lockbox: ' + e.message, 'warn');
   }
 }
 
