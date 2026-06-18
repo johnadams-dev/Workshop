@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Online Presence Audit — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;color:#1a1a2e;min-height:100vh}
+
+/* ── Auth gate ── */
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1a1a2e}
+.auth-card{background:#fff;border-radius:16px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.4)}
+.auth-logo{width:60px;height:60px;background:#c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1a2e;font-size:20px;margin:0 auto 18px}
+.auth-brand{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9a84c}
+.auth-title{font-size:22px;font-weight:700;color:#1a1a2e;margin:8px 0 6px}
+.auth-sub{font-size:13px;color:#6b7280;margin-bottom:28px;line-height:1.5}
+#g-signin-btn{display:flex;justify-content:center}
+
+/* ── App ── */
+#app{display:none}
+.header{background:#1a1a2e;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.header-left{display:flex;align-items:center;gap:14px}
+.header-logo{width:34px;height:34px;background:#c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1a2e;font-size:13px;flex-shrink:0}
+.header-brand{color:#c9a84c;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.header-title{color:#fff;font-size:16px;font-weight:300}
+.header-right{display:flex;align-items:center;gap:12px}
+.header-user{font-size:12px;color:#9a9ab8}
+.header-btn{padding:5px 13px;border-radius:20px;border:1px solid #2e3a5c;background:none;color:#9a9ab8;font-size:12px;cursor:pointer;transition:all .2s}
+.header-btn:hover{border-color:#c9a84c;color:#c9a84c}
+
+.container{max-width:900px;margin:28px auto;padding:0 20px 80px}
+
+/* ── Cards ── */
+.card{background:#fff;border-radius:14px;padding:28px 30px;margin-bottom:18px;box-shadow:0 2px 14px rgba(0,0,0,.06)}
+.card-title{font-size:17px;font-weight:700;margin-bottom:4px;color:#1a1a2e}
+.card-sub{font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5}
+
+/* ── Form ── */
+.mode-tabs{display:flex;gap:0;border:1px solid #e0dcd4;border-radius:9px;overflow:hidden;margin-bottom:20px;width:fit-content}
+.mode-tab{padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:#f9f8f5;color:#6b7280;transition:all .15s}
+.mode-tab.active{background:#1a1a2e;color:#fff}
+
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.ff{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af}
+.field input,.field select{padding:9px 12px;border:1px solid #e0dcd4;border-radius:8px;font-size:13px;color:#1a1a2e;background:#fff;outline:none;font-family:inherit;transition:border-color .15s}
+.field input:focus,.field select:focus{border-color:#c9a84c}
+
+.btn-row{display:flex;justify-content:flex-end;margin-top:18px;gap:10px}
+.btn{padding:9px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;font-family:inherit;display:flex;align-items:center;gap:7px}
+.btn-primary{background:#1a1a2e;color:#fff}
+.btn-primary:hover{background:#2d3a5c}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:#fff;color:#1a1a2e;border-color:#e0dcd4}
+.btn-ghost:hover{border-color:#1a1a2e}
+.btn-gold{background:#c9a84c;color:#fff;border-color:#c9a84c}
+.btn-gold:hover{background:#b8963e}
+
+/* ── Progress ── */
+.progress-card{background:#1a1a2e;border-radius:14px;padding:32px 30px;color:#fff;text-align:center;margin-bottom:18px}
+.progress-icon{font-size:40px;margin-bottom:12px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.progress-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.progress-sub{font-size:13px;color:#9a9ab8;line-height:1.5;margin-bottom:20px}
+.progress-bar-wrap{background:#2d3a5c;border-radius:4px;height:6px;overflow:hidden;max-width:360px;margin:0 auto}
+.progress-bar{height:100%;background:#c9a84c;border-radius:4px;transition:width 1s ease}
+.progress-status{font-size:12px;color:#6b7280;margin-top:10px}
+
+/* ── Score dashboard ── */
+.score-header{display:flex;align-items:center;gap:22px;margin-bottom:22px;flex-wrap:wrap}
+.overall-ring{position:relative;flex-shrink:0}
+.overall-ring svg{transform:rotate(-90deg)}
+.ring-score{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-num{font-size:28px;font-weight:700;color:#1a1a2e;line-height:1}
+.ring-lbl{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em}
+.score-meta{flex:1}
+.score-name{font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:3px}
+.score-date{font-size:12px;color:#9ca3af}
+.score-flags{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.flag-badge{padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600}
+.flag-red{background:#fee2e2;color:#991b1b}
+.flag-none{background:#d1fae5;color:#065f46}
+
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.cat-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9f8f5;border-radius:9px}
+.cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cat-label{flex:1;font-size:12px;font-weight:600;color:#374151}
+.cat-score{font-size:15px;font-weight:700;color:#1a1a2e;margin-left:auto}
+.cat-bar-wrap{width:80px;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;flex-shrink:0}
+.cat-bar{height:100%;border-radius:3px;transition:width .8s ease}
+
+.dot-green{background:#10b981}
+.dot-yellow{background:#f59e0b}
+.dot-red{background:#ef4444}
+
+/* ── Report ── */
+.report-body{font-size:13px;line-height:1.75;color:#374151}
+.report-body h1,.report-body h2{color:#1a1a2e;font-size:16px;font-weight:700;margin:18px 0 8px}
+.report-body h3{color:#1a1a2e;font-size:14px;font-weight:700;margin:14px 0 6px}
+.report-body p{margin-bottom:10px}
+.report-body ul,.report-body ol{padding-left:20px;margin-bottom:10px}
+.report-body li{margin-bottom:4px}
+.report-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
+.report-body th{background:#f9f8f5;padding:7px 10px;text-align:left;font-weight:700;border-bottom:1px solid #e0dcd4}
+.report-body td{padding:7px 10px;border-bottom:1px solid #f0ede7}
+.report-body strong{font-weight:700;color:#1a1a2e}
+.report-body a{color:#c9a84c;text-decoration:none}
+.report-body a:hover{text-decoration:underline}
+.report-body code{background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:12px}
+
+.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:#e0dcd4}
+
+/* ── History ── */
+.history-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f0ede7;cursor:pointer;transition:background .1s}
+.history-row:last-child{border-bottom:none}
+.history-row:hover{background:#faf9f7}
+.history-date{font-size:12px;color:#6b7280;width:90px;flex-shrink:0}
+.history-score{font-size:18px;font-weight:700;color:#1a1a2e;width:44px;flex-shrink:0}
+.history-bar-wrap{flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.history-bar{height:100%;border-radius:3px;background:#c9a84c}
+.history-flags{font-size:11px;color:#ef4444;flex-shrink:0;width:60px;text-align:right}
+
+/* ── History list ── */
+.audit-list-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:9px;cursor:pointer;transition:background .1s;border:1px solid transparent}
+.audit-list-row:hover{background:#f9f8f5;border-color:#e0dcd4}
+.audit-list-name{font-weight:600;font-size:13px;flex:1}
+.audit-list-ctx{font-size:11px;color:#9ca3af}
+.audit-list-score{font-size:18px;font-weight:700;color:#1a1a2e;width:44px;text-align:right}
+.audit-list-status{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;flex-shrink:0}
+.status-complete{background:#d1fae5;color:#065f46}
+.status-running,.status-stage2,.status-pending{background:#fef3c7;color:#92400e}
+.status-failed{background:#fee2e2;color:#991b1b}
+
+/* ── Toast ── */
+.toast-area{position:fixed;top:70px;right:16px;z-index:300;display:flex;flex-direction:column;gap:7px}
+.toast{background:#1a1a2e;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:tin .2s ease;max-width:300px}
+.toast.ok{background:#065f46}.toast.err{background:#991b1b}
+@keyframes tin{from{transform:translateX(12px);opacity:0}to{transform:none;opacity:1}}
+
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.spin-dark{border-color:rgba(0,0,0,.15);border-top-color:#1a1a2e}
+
+/* responsive */
+@media(max-width:640px){.cat-grid{grid-template-columns:1fr}.fg{grid-template-columns:1fr}.fg3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo">AC</div>
+    <div class="auth-brand">Adams Cameron &amp; Co.</div>
+    <div class="auth-title">Online Presence Audit</div>
+    <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit.</div>
+    <div id="g-signin-btn"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-logo">AC</div>
+      <div>
+        <div class="header-brand">Adams Cameron &amp; Co.</div>
+        <div class="header-title">Online Presence Audit</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="header-user" id="header-user"></span>
+      <button class="header-btn" onclick="showView('list')">← All Audits</button>
+    </div>
+  </div>
+
+  <div class="toast-area" id="toasts"></div>
+
+  <!-- ── List view ── -->
+  <div id="view-list" class="container">
+    <div class="card">
+      <div class="card-title">Run a New Audit</div>
+      <div class="card-sub">Stage 1 uses Claude with web search to score the agent's presence and typically takes 60–120 seconds.</div>
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-internal" onclick="setMode('internal')">ACC Agent</button>
+        <button class="mode-tab" id="tab-external" onclick="setMode('external')">External Agent</button>
+      </div>
+
+      <!-- Internal agent -->
+      <div id="form-internal">
+        <div class="fg">
+          <div class="field ff">
+            <label>Agent</label>
+            <select id="f-agent">
+              <option value="">— Loading agents… —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- External agent -->
+      <div id="form-external" style="display:none">
+        <div class="fg fg3">
+          <div class="field ff">
+            <label>Full name (as publicly listed)</label>
+            <input type="text" id="f-ext-name" placeholder="Jane Smith">
+          </div>
+          <div class="field">
+            <label>Brokerage</label>
+            <input type="text" id="f-ext-brokerage" placeholder="Realty One Group">
+          </div>
+          <div class="field">
+            <label>City, State</label>
+            <input type="text" id="f-ext-city" placeholder="Ormond Beach, FL">
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-gold" id="run-btn" onclick="runAudit()">
+          Run Audit
+        </button>
+      </div>
+    </div>
+
+    <!-- Recent audits -->
+    <div class="card">
+      <div class="card-title">Recent Audits</div>
+      <div id="audit-list" style="margin-top:12px">
+        <div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Progress view ── -->
+  <div id="view-progress" class="container" style="display:none">
+    <div class="progress-card">
+      <div class="progress-icon" id="prog-icon">🔍</div>
+      <div class="progress-title" id="prog-title">Running Audit…</div>
+      <div class="progress-sub" id="prog-sub">Claude is searching the web and scoring the agent's online presence. This typically takes 60–120 seconds.</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar" style="width:5%"></div></div>
+      <div class="progress-status" id="prog-status">Stage 1 — Researching…</div>
+    </div>
+  </div>
+
+  <!-- ── Report view ── -->
+  <div id="view-report" class="container" style="display:none">
+
+    <!-- Score dashboard -->
+    <div class="card" id="report-dashboard">
+      <div class="score-header">
+        <div class="overall-ring">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="40" fill="none" stroke="#f0ede7" stroke-width="8"/>
+            <circle cx="48" cy="48" r="40" fill="none" stroke="#c9a84c" stroke-width="8"
+                    stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                    id="ring-arc" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-score">
+            <div class="ring-num" id="ring-num">—</div>
+            <div class="ring-lbl">/ 100</div>
+          </div>
+        </div>
+        <div class="score-meta">
+          <div class="score-name" id="report-agent-name">—</div>
+          <div class="score-date" id="report-date">—</div>
+          <div class="score-flags" id="report-flags"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;flex-shrink:0">
+          <button class="btn btn-ghost" onclick="copyReport()">Copy Report</button>
+          <button class="btn btn-gold" onclick="rerunAudit()">Re-run Audit</button>
+        </div>
+      </div>
+
+      <div class="section-label">Category Scores</div>
+      <div class="cat-grid" id="cat-grid"></div>
+    </div>
+
+    <!-- Comparison narrative -->
+    <div class="card" id="comparison-card" style="display:none">
+      <div class="card-title">Benchmark Comparison</div>
+      <div class="report-body" id="comparison-body"></div>
+    </div>
+
+    <!-- Full report -->
+    <div class="card">
+      <div class="card-title">Full Audit Report</div>
+      <div class="report-body" id="report-body"></div>
+    </div>
+
+    <!-- History (internal agents only) -->
+    <div class="card" id="history-card" style="display:none">
+      <div class="card-title">Score History</div>
+      <div id="history-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
+let currentAuditId = null;
+let pollTimer = null;
+let currentAgentId = null;
+let allAgents = [];
+
+const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const a = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast${type ? ' '+type : ''}`;
+  el.textContent = msg;
+  a.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function scoreColor(s) {
+  if (s == null) return '#d1d5db';
+  if (s >= 75) return '#10b981';
+  if (s >= 50) return '#f59e0b';
+  return '#ef4444';
+}
+
+function dotClass(s) {
+  if (s == null) return 'dot-yellow';
+  if (s >= 75) return 'dot-green';
+  if (s >= 50) return 'dot-yellow';
+  return 'dot-red';
+}
+
+// Minimal markdown-to-HTML converter
+function md2html(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/^#{3} (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^#{2} (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^#{1} (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^[*-] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>'+m+'</ul>')
+    .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/^(?!<[hul])/gm, '')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/```[\w]*\n[\s\S]*?```/g, '')  // strip code fences (the JSON block)
+    .replace(/<p><\/p>/g,'')
+    .trim();
+}
+
+// ── Views ─────────────────────────────────────────────────────────────────────
+function showView(name) {
+  ['list','progress','report'].forEach(v => {
+    document.getElementById('view-'+v).style.display = v === name ? 'block' : 'none';
+  });
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+let currentMode = 'internal';
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('tab-internal').classList.toggle('active', m === 'internal');
+  document.getElementById('tab-external').classList.toggle('active', m === 'external');
+  document.getElementById('form-internal').style.display = m === 'internal' ? 'block' : 'none';
+  document.getElementById('form-external').style.display = m === 'external' ? 'block' : 'none';
+}
+
+// ── Load agents ───────────────────────────────────────────────────────────────
+async function loadAgents() {
+  try {
+    const r = await fetch(`${PROXY}/daily-desk/agents`, { headers: H() });
+    if (!r.ok) return;
+    allAgents = await r.json();
+    allAgents.sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''));
+    const sel = document.getElementById('f-agent');
+    sel.innerHTML = '<option value="">— Select agent —</option>' +
+      allAgents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`).join('');
+  } catch(e) { console.warn('loadAgents:', e.message); }
+}
+
+// ── Load audit list ───────────────────────────────────────────────────────────
+async function loadAuditList() {
+  try {
+    const r = await fetch(`${PROXY}/api/audits`, { headers: H() });
+    if (!r.ok) return;
+    const rows = await r.json();
+    const el = document.getElementById('audit-list');
+    if (!rows.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">No audits yet — run the first one above.</div>'; return; }
+    el.innerHTML = rows.map(row => `
+      <div class="audit-list-row" onclick="loadReport(${row.id})">
+        <div>
+          <div class="audit-list-name">${esc(row.agent_name)}</div>
+          <div class="audit-list-ctx">${esc(row.context||'')} &middot; ${fmtDate(row.run_at)}</div>
+        </div>
+        <div class="audit-list-score">${row.status === 'complete' ? row.overall_score : '—'}</div>
+        <div class="audit-list-status status-${row.status}">${row.status}</div>
+      </div>`).join('');
+  } catch(e) { console.warn('loadAuditList:', e.message); }
+}
+
+// ── Run audit ─────────────────────────────────────────────────────────────────
+async function runAudit() {
+  const btn = document.getElementById('run-btn');
+  let body = {};
+
+  if (currentMode === 'internal') {
+    const agentId = document.getElementById('f-agent').value;
+    if (!agentId) { toast('Select an agent', 'err'); return; }
+    body = { agentId: parseInt(agentId) };
+    currentAgentId = parseInt(agentId);
+  } else {
+    const name = document.getElementById('f-ext-name').value.trim();
+    const city = document.getElementById('f-ext-city').value.trim();
+    if (!name || !city) { toast('Name and city are required', 'err'); return; }
+    body = {
+      externalName:     name,
+      externalBrokerage: document.getElementById('f-ext-brokerage').value.trim() || undefined,
+      externalCity:     city,
+    };
+    currentAgentId = null;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Starting…';
+
+  try {
+    const r = await fetch(`${PROXY}/api/audits/run`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+    currentAuditId = data.id;
+    showView('progress');
+    startPolling(data.id);
+  } catch(e) {
+    toast('Failed to start audit: '+e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Audit';
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+const statusMessages = {
+  pending: ['Stage 1 — Queued…', 5],
+  running: ['Stage 1 — Searching the web and scoring…', 30],
+  stage2:  ['Stage 2 — Writing comparison narrative…', 80],
+  complete:['Complete!', 100],
+  failed:  ['Failed', 0],
+};
+
+function startPolling(id) {
+  if (pollTimer) clearInterval(pollTimer);
+  let elapsed = 0;
+  pollTimer = setInterval(async () => {
+    elapsed += 4;
+    try {
+      const r = await fetch(`${PROXY}/api/audits/${id}`, { headers: H() });
+      if (!r.ok) return;
+      const data = await r.json();
+      const [msg, pct] = statusMessages[data.status] || ['Checking…', 50];
+      document.getElementById('prog-status').textContent = msg;
+      // Animate bar based on status + elapsed time
+      const basePct = pct;
+      const animated = Math.min(basePct + (elapsed / 2), basePct + 15);
+      document.getElementById('prog-bar').style.width = Math.min(animated, 95) + '%';
+
+      if (data.status === 'complete') {
+        clearInterval(pollTimer);
+        document.getElementById('prog-bar').style.width = '100%';
+        document.getElementById('prog-icon').textContent = '✅';
+        document.getElementById('prog-title').textContent = 'Audit Complete';
+        document.getElementById('prog-sub').textContent = 'Report ready.';
+        setTimeout(() => { renderReport(data); showView('report'); loadAuditList(); }, 800);
+      } else if (data.status === 'failed') {
+        clearInterval(pollTimer);
+        document.getElementById('prog-icon').textContent = '❌';
+        document.getElementById('prog-title').textContent = 'Audit Failed';
+        document.getElementById('prog-sub').textContent = data.error_message || 'An error occurred.';
+      }
+    } catch(e) { console.warn('poll:', e.message); }
+  }, 4000);
+}
+
+// ── Load report by ID ─────────────────────────────────────────────────────────
+async function loadReport(id) {
+  currentAuditId = id;
+  showView('progress');
+  document.getElementById('prog-icon').textContent = '📄';
+  document.getElementById('prog-title').textContent = 'Loading Report…';
+  document.getElementById('prog-sub').textContent = '';
+  document.getElementById('prog-bar').style.width = '60%';
+
+  try {
+    const r = await fetch(`${PROXY}/api/audits/${id}`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+
+    if (data.status !== 'complete') {
+      currentAgentId = data.agent_id || null;
+      startPolling(id);
+      document.getElementById('prog-title').textContent = 'Audit In Progress…';
+      document.getElementById('prog-sub').textContent = 'This audit is still running. The page will update automatically.';
+      return;
+    }
+
+    currentAgentId = data.agent_id || null;
+    renderReport(data);
+    showView('report');
+
+    if (currentAgentId) loadHistory(currentAgentId);
+  } catch(e) {
+    toast('Failed to load report: '+e.message, 'err');
+    showView('list');
+  }
+}
+
+// ── Render report ─────────────────────────────────────────────────────────────
+function renderReport(data) {
+  const name = data.agent_name || data.external_name || 'Unknown Agent';
+
+  // Ring
+  const score = data.overall_score || 0;
+  const circ = 251.2;
+  const offset = circ - (circ * score / 100);
+  const arc = document.getElementById('ring-arc');
+  arc.setAttribute('stroke-dashoffset', offset);
+  arc.setAttribute('stroke', scoreColor(score));
+  document.getElementById('ring-num').textContent = score;
+
+  document.getElementById('report-agent-name').textContent = name;
+  document.getElementById('report-date').textContent = 'Audited ' + fmtDate(data.run_at);
+
+  // Flags
+  const flagsEl = document.getElementById('report-flags');
+  flagsEl.innerHTML = data.red_flag_count > 0
+    ? `<span class="flag-badge flag-red">🚩 ${data.red_flag_count} red flag${data.red_flag_count !== 1 ? 's' : ''}</span>`
+    : `<span class="flag-badge flag-none">✓ No red flags</span>`;
+
+  // Category grid
+  const cats = [
+    { key:'social_media_score',       label:'Social Media' },
+    { key:'reviews_score',            label:'Reviews' },
+    { key:'platform_profiles_score',  label:'Platform Profiles' },
+    { key:'local_seo_score',          label:'Local SEO' },
+    { key:'ai_search_score',          label:'AI Search Visibility' },
+    { key:'brand_consistency_score',  label:'Brand Consistency' },
+    { key:'compliance_score',         label:'Compliance' },
+  ];
+  document.getElementById('cat-grid').innerHTML = cats.map(c => {
+    const s = data[c.key];
+    const pct = s != null ? s : 0;
+    return `<div class="cat-row">
+      <div class="cat-dot ${dotClass(s)}"></div>
+      <div class="cat-label">${c.label}</div>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${scoreColor(s)}"></div></div>
+      <div class="cat-score">${s != null ? s : '—'}</div>
+    </div>`;
+  }).join('');
+
+  // Comparison narrative
+  if (data.comparison_narrative) {
+    document.getElementById('comparison-body').innerHTML = md2html(data.comparison_narrative);
+    document.getElementById('comparison-card').style.display = 'block';
+  } else {
+    document.getElementById('comparison-card').style.display = 'none';
+  }
+
+  // Full report (strip JSON block for display)
+  const reportText = (data.raw_stage1_response || '').replace(/```json[\s\S]*?```/g, '').trim();
+  document.getElementById('report-body').innerHTML = md2html(reportText) || '<p style="color:#9ca3af">Report text not available.</p>';
+
+  // Store for re-run
+  currentAuditData = data;
+}
+
+let currentAuditData = null;
+
+async function loadHistory(agentId) {
+  try {
+    const r = await fetch(`${PROXY}/api/audits/agent/${agentId}/history`, { headers: H() });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (rows.length < 2) return;
+    const card = document.getElementById('history-card');
+    const body = document.getElementById('history-body');
+    body.innerHTML = rows.map(row => `
+      <div class="history-row" onclick="loadReport(${row.id})">
+        <div class="history-date">${fmtDate(row.run_at)}</div>
+        <div class="history-score" style="color:${scoreColor(row.overall_score)}">${row.overall_score}</div>
+        <div class="history-bar-wrap"><div class="history-bar" style="width:${row.overall_score}%;background:${scoreColor(row.overall_score)}"></div></div>
+        <div class="history-flags">${row.red_flag_count > 0 ? '🚩 ' + row.red_flag_count : ''}</div>
+      </div>`).join('');
+    card.style.display = 'block';
+  } catch(e) {}
+}
+
+function rerunAudit() {
+  if (!currentAuditData) return;
+  if (currentAuditData.agent_id) {
+    document.getElementById('f-agent').value = currentAuditData.agent_id;
+    setMode('internal');
+  } else {
+    document.getElementById('f-ext-name').value = currentAuditData.external_name || '';
+    document.getElementById('f-ext-city').value = currentAuditData.external_city || '';
+    document.getElementById('f-ext-brokerage').value = currentAuditData.external_brokerage || '';
+    setMode('external');
+  }
+  showView('list');
+}
+
+function copyReport() {
+  const text = document.getElementById('report-body').innerText;
+  navigator.clipboard.writeText(text).then(() => toast('Report copied to clipboard', 'ok'));
+}
+
+// ── Sign-in ───────────────────────────────────────────────────────────────────
+function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    USER_EMAIL = payload.email || '';
+    if (USER_EMAIL) sessionStorage.setItem('ac_user_email', USER_EMAIL);
+  } catch(_) {}
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('header-user').textContent = USER_EMAIL;
+  init();
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt(n => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) {
+      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large' });
+    }
+  });
+}
+
+async function init() {
+  showView('list');
+  await Promise.all([loadAgents(), loadAuditList()]);
+}
+
+if (USER_EMAIL) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('header-user').textContent = USER_EMAIL;
+  if (window.google?.accounts?.id) init();
+  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); init(); } }, 100); }
+} else if (window.google?.accounts?.id) {
+  initGoogleSignIn();
+} else {
+  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+}
+</script>
+</body>
+</html>
