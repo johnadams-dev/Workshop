@@ -197,12 +197,15 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
         <div class="fg fg3">
           <div class="field ff">
             <label>Agent</label>
+            <!-- Dropdown shown to managers/admins -->
             <select id="f-agent" onchange="onAgentChange()">
               <option value="">— Loading agents… —</option>
             </select>
+            <!-- Static display shown to coordinators (hidden until role loads) -->
+            <div id="f-agent-self" style="display:none;padding:8px 12px;border:1px solid #e0dcd4;border-radius:6px;font-size:13px;background:#f9f8f5;color:#1a1a2e"></div>
           </div>
           <div class="field" style="grid-column:span 2">
-            <label>Market / Focus Area <span style="font-weight:400;color:#9ca3af;font-size:11px">— edit if the agent works a different area than their office</span></label>
+            <label>Market / Focus Area <span style="font-weight:400;color:#9ca3af;font-size:11px">— edit if you work a different area than your office</span></label>
             <input type="text" id="f-focus-city" placeholder="e.g., Ormond Beach, FL or Deltona, FL">
           </div>
         </div>
@@ -318,6 +321,7 @@ let currentAuditId = null;
 let pollTimer = null;
 let currentAgentId = null;
 let allAgents = [];
+let userRole = null; // 'manager' | 'staff' | 'agent' | 'unknown'
 
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
 
@@ -760,7 +764,40 @@ function initGoogleSignIn() {
 
 async function init() {
   showView('list');
-  await Promise.all([loadAgents(), loadAuditList()]);
+  const [, , me] = await Promise.all([
+    loadAgents(),
+    loadAuditList(),
+    fetch(`${PROXY}/lockbox/me`, { headers: H() }).then(r => r.json()).catch(() => ({ role: 'unknown' })),
+  ]);
+  userRole = me.role;
+  applyRoleRestrictions();
+}
+
+function applyRoleRestrictions() {
+  if (userRole === 'manager') return; // full access — dropdown stays
+
+  // Non-manager: lock internal form to the signed-in user's own agent record
+  const myAgent = allAgents.find(a => (a.email || '').toLowerCase() === USER_EMAIL.toLowerCase());
+  const sel = document.getElementById('f-agent');
+  const selfLabel = document.getElementById('f-agent-self');
+
+  if (myAgent) {
+    sel.style.display = 'none';
+    selfLabel.style.display = '';
+    selfLabel.textContent = `${myAgent.first_name} ${myAgent.last_name}  ·  ${myAgent.office_name || ''}`;
+    sel.value = String(myAgent.id);
+    document.getElementById('f-focus-city').value = officeCityDefault(myAgent.office_name);
+
+    // Also hide the External Agent tab — coordinators audit only themselves
+    document.getElementById('tab-external').style.display = 'none';
+  } else {
+    sel.style.display = 'none';
+    selfLabel.style.display = '';
+    selfLabel.style.color = '#9ca3af';
+    selfLabel.textContent = 'No agent record linked to your account — contact your manager.';
+    document.getElementById('run-btn').disabled = true;
+    document.getElementById('tab-external').style.display = 'none';
+  }
 }
 
 if (USER_EMAIL) {
