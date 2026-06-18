@@ -2135,6 +2135,12 @@ function amChooseAction(key) {
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
           <input type="text" id="am-notes" placeholder="Optional">
         </div>
+      </div>
+      <div class="form-row" style="margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Address Correction <span style="font-weight:400;opacity:.6">(leave unchanged if no correction needed)</span></span>
+          <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address">
+        </div>
       </div>`;
   } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
     fieldsHtml = `
@@ -2312,6 +2318,8 @@ async function amSubmit() {
     const expirationDate = document.getElementById('am-expiration-date').value;
     if (expirationDate) fields.expirationDate = expirationDate;
     fields.notes = document.getElementById('am-notes').value || null;
+    const correctedAddr = document.getElementById('am-property-address').value.trim();
+    if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
   } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
     const effectiveDate = document.getElementById('am-effective-date').value;
     if (effectiveDate) fields.effectiveDate = effectiveDate;
