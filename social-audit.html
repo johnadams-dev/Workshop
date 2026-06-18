@@ -194,12 +194,16 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 
       <!-- Internal agent -->
       <div id="form-internal">
-        <div class="fg">
+        <div class="fg fg3">
           <div class="field ff">
             <label>Agent</label>
-            <select id="f-agent">
+            <select id="f-agent" onchange="onAgentChange()">
               <option value="">— Loading agents… —</option>
             </select>
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label>Market / Focus Area <span style="font-weight:400;color:#9ca3af;font-size:11px">— edit if the agent works a different area than their office</span></label>
+            <input type="text" id="f-focus-city" placeholder="e.g., Ormond Beach, FL or Deltona, FL">
           </div>
         </div>
       </div>
@@ -388,6 +392,28 @@ function setMode(m) {
 }
 
 // ── Load agents ───────────────────────────────────────────────────────────────
+const OFFICE_CITY_MAP = [
+  ['ormond beachside',  'Ormond Beach, FL'],
+  ['ormond mainland',   'Ormond Beach, FL'],
+  ['ormond',            'Ormond Beach, FL'],
+  ['port orange',       'Port Orange, FL'],
+  ['palm coast',        'Palm Coast, FL'],
+  ['west volusia',      'DeLand, FL'],
+  ['deland',            'DeLand, FL'],
+  ['new smyrna',        'New Smyrna Beach, FL'],
+  ['ponce inlet',       'Ponce Inlet, FL'],
+  ['daytona',           'Daytona Beach, FL'],
+];
+
+function officeCityDefault(officeName) {
+  if (!officeName) return '';
+  const lc = officeName.toLowerCase();
+  for (const [key, city] of OFFICE_CITY_MAP) {
+    if (lc.includes(key)) return city;
+  }
+  return officeName.replace(/\b(mainland|beachside|office|realty)\b/gi, '').trim() + ', FL';
+}
+
 async function loadAgents() {
   try {
     const r = await fetch(`${PROXY}/daily-desk/agents`, { headers: H() });
@@ -398,6 +424,13 @@ async function loadAgents() {
     sel.innerHTML = '<option value="">— Select agent —</option>' +
       allAgents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`).join('');
   } catch(e) { console.warn('loadAgents:', e.message); }
+}
+
+function onAgentChange() {
+  const agentId = document.getElementById('f-agent').value;
+  const agent = allAgents.find(a => String(a.id) === agentId);
+  const cityEl = document.getElementById('f-focus-city');
+  cityEl.value = agent ? officeCityDefault(agent.office_name) : '';
 }
 
 // ── Load audit list ───────────────────────────────────────────────────────────
@@ -427,8 +460,9 @@ async function runAudit() {
 
   if (currentMode === 'internal') {
     const agentId = document.getElementById('f-agent').value;
+    const focusCity = document.getElementById('f-focus-city').value.trim();
     if (!agentId) { toast('Select an agent', 'err'); return; }
-    body = { agentId: parseInt(agentId) };
+    body = { agentId: parseInt(agentId), focusCity: focusCity || undefined };
     currentAgentId = parseInt(agentId);
   } else {
     const name = document.getElementById('f-ext-name').value.trim();
@@ -657,6 +691,7 @@ function rerunAudit() {
   if (!currentAuditData) return;
   if (currentAuditData.agent_id) {
     document.getElementById('f-agent').value = currentAuditData.agent_id;
+    onAgentChange();
     setMode('internal');
   } else {
     document.getElementById('f-ext-name').value = currentAuditData.external_name || '';
