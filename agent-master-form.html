@@ -283,11 +283,18 @@ let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
 
 // Live Google Workspace data — loaded after sign-in via Admin SDK
 let googleSnap = {};
-async function loadGoogleUsers() {
-  try {
-    const r = await fetch(`${PROXY_URL}/google-admin/users`, { headers: H() });
-    if (r.ok) googleSnap = await r.json();
-  } catch(_) {}
+let _googleSnapPromise = null;
+function loadGoogleUsers() {
+  if (!_googleSnapPromise) {
+    _googleSnapPromise = (async () => {
+      try {
+        const r = await fetch(`${PROXY_URL}/google-admin/users`, { headers: H() });
+        if (r.ok) googleSnap = await r.json();
+        else console.warn('[google-admin] GET /users returned', r.status);
+      } catch(e) { console.warn('[google-admin] loadGoogleUsers failed:', e.message); }
+    })();
+  }
+  return _googleSnapPromise;
 }
 
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
@@ -560,8 +567,35 @@ function renderDetail(a) {
       </div>
     </div>`;
 
-  // Kick off DeltaNet reconciliation
-  if (a.dmg_id) runRecon(a.id, a.dmg_id, a);
+  // Kick off reconciliation — also handles Google-only rows for agents without a dmg_id
+  if (a.dmg_id) {
+    runRecon(a.id, a.dmg_id, a);
+  } else {
+    // No DeltaNet ID: still wait for Google data and repaint the panel
+    loadGoogleUsers().then(() => {
+      const recon = document.querySelector('.recon-body');
+      if (!recon || currentId !== a.id) return;
+      const g = googleSnap[a.email?.toLowerCase()] || {};
+      const gName   = g.first_name ? `${g.first_name} ${g.last_name}`.trim() : null;
+      const gPhone  = g.mobile || null;
+      const gActive = g.status ? (g.status === 'Active' ? 'Yes' : 'No (' + g.status + ')') : null;
+      const dbName  = `${a.first_name||''} ${a.last_name||''}`.trim();
+      const dbPhone = fmtPhone(a.cell_e164) || a.cell_raw || null;
+      recon.innerHTML = `
+        <div class="recon-row header-row">
+          <div class="recon-cell">Field</div>
+          <div class="recon-cell src-db">Database</div>
+          <div class="recon-cell">DeltaNet</div>
+          <div class="recon-cell">Google Workspace</div>
+        </div>
+        ${reconRow('Name',            dbName,                 null, gName)}
+        ${reconRow('Email',           a.email,                null, a.email, true)}
+        ${reconRow('Phone',           dbPhone,                null, gPhone, false, false, v => (v||'').replace(/\D/g,''))}
+        ${reconRow('Office',          a.office||null,         null, g.department||null)}
+        ${reconRow('Active',          a.active?'Yes':'No',    null, gActive)}
+        ${reconRow('Last Google sign-in', null,               null, g.last_sign_in||null, false, true)}`;
+    });
+  }
 }
 
 // ── Reconciliation row helper ─────────────────────────────────────────────────
@@ -600,7 +634,10 @@ async function runRecon(agentId, dmgId, agentData) {
   if (!dmgId) return;
   const statusEl = document.getElementById('recon-status');
   const extraEl  = document.getElementById(`recon-extra-${agentId}`);
-  if (statusEl) statusEl.innerHTML = '<span class="spin"></span> Checking DeltaNet…';
+  if (statusEl) statusEl.innerHTML = '<span class="spin"></span> Checking…';
+
+  // Ensure Google data is loaded before we build the reconciliation table
+  await loadGoogleUsers();
 
   try {
     const r = await fetch(`${PROXY_URL}/agent/deltanet-bio?dmg_id=${encodeURIComponent(dmgId)}`, { headers: H() });
