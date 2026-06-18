@@ -2703,7 +2703,8 @@ function matchFilterListings() {
   const hits = matchListings.filter(t =>
     (t.property_address || '').toLowerCase().includes(q) ||
     (t.city || '').toLowerCase().includes(q) ||
-    (t.mls_id || '').toLowerCase().includes(q)
+    (t.mls_id || '').toLowerCase().includes(q) ||
+    (t.agent_name || '').toLowerCase().includes(q)
   ).slice(0, 20);
   matchRenderListings(hits);
 }
@@ -2714,11 +2715,14 @@ function matchRenderListings(rows) {
     el.innerHTML = '<div class="empty">No matching listings found.</div>';
     return;
   }
-  el.innerHTML = rows.map(t => `
+  el.innerHTML = rows.map(t => {
+    const meta = [t.city, t.mls_id ? 'MLS ' + t.mls_id : null, t.agent_name].filter(Boolean).join(' &middot; ');
+    return `
     <div class="fs-item" onclick="confirmMatch('${escapeJs(t.id)}')">
       <div class="fs-item-addr">${escapeHtml(t.property_address || '—')}</div>
-      <div class="fs-item-meta">${escapeHtml(t.city || '')}${t.mls_id ? ' &middot; MLS ' + escapeHtml(t.mls_id) : ''}</div>
-    </div>`).join('');
+      <div class="fs-item-meta">${meta || '—'}</div>
+    </div>`;
+  }).join('');
 }
 
 async function confirmMatch(transactionId) {
