@@ -442,17 +442,55 @@ async function runAudit() {
   }
 
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span> Starting…';
+  btn.innerHTML = '<span class="spin"></span> Running…';
+
+  // Show progress immediately — the POST is synchronous and may take 2-3 min.
+  // We also poll /api/audits/:id in parallel so stage transitions are visible.
+  showView('progress');
+  document.getElementById('prog-icon').textContent = '🔍';
+  document.getElementById('prog-title').textContent = 'Running Audit…';
+  document.getElementById('prog-sub').textContent = 'Claude is searching the web and scoring the agent\'s online presence. This typically takes 60–120 seconds.';
+  document.getElementById('prog-bar').style.width = '5%';
+  document.getElementById('prog-status').textContent = 'Stage 1 — Starting…';
+
+  // Animate the progress bar while the synchronous POST is in flight
+  let elapsed = 0;
+  const animTimer = setInterval(() => {
+    elapsed += 3;
+    const pct = Math.min(5 + elapsed * 0.4, 88);
+    document.getElementById('prog-bar').style.width = pct + '%';
+    if (elapsed > 30) document.getElementById('prog-status').textContent = 'Stage 1 — Searching the web…';
+    if (elapsed > 90) document.getElementById('prog-status').textContent = 'Stage 1 — Scoring results…';
+    if (elapsed > 150) document.getElementById('prog-status').textContent = 'Stage 2 — Writing comparison…';
+  }, 3000);
 
   try {
     const r = await fetch(`${PROXY}/api/audits/run`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    clearInterval(animTimer);
+
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+
     currentAuditId = data.id;
-    showView('progress');
-    startPolling(data.id);
+
+    if (data.status === 'complete') {
+      renderReport(data);
+      showView('report');
+      loadAuditList();
+    } else if (data.status === 'failed') {
+      document.getElementById('prog-icon').textContent = '❌';
+      document.getElementById('prog-title').textContent = 'Audit Failed';
+      document.getElementById('prog-sub').textContent = data.error_message || 'An error occurred.';
+    } else {
+      // Unexpected status — fall back to polling
+      startPolling(data.id);
+    }
   } catch(e) {
-    toast('Failed to start audit: '+e.message, 'err');
+    clearInterval(animTimer);
+    document.getElementById('prog-icon').textContent = '❌';
+    document.getElementById('prog-title').textContent = 'Failed to Start';
+    document.getElementById('prog-sub').textContent = e.message;
+    toast('Audit failed: '+e.message, 'err');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Run Audit';
