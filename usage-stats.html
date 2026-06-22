@@ -163,17 +163,27 @@
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
-let _proxyKey = '';
-let _email    = '';
+let _proxyKey = sessionStorage.getItem('ac_proxy_key') || '';
+let _email    = sessionStorage.getItem('ac_user_email') || '';
 let _days     = 30;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
+// If we already have a session from index.html, skip Google sign-in entirely.
+if (_proxyKey && _email) {
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('data-screen').style.display = '';
+  loadStats(_days);
+} else {
+  // No session — show sign-in
+  if (window.google?.accounts?.id) { initGoogleSignIn(); }
+  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
+}
+
 async function handleCredential(cred) {
   try {
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     _email = payload.email || '';
 
-    // Get proxy key
     const initRes = await fetch(PROXY_BASE + '/config/init', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken: cred.credential }),
@@ -181,18 +191,6 @@ async function handleCredential(cred) {
     if (!initRes.ok) throw new Error('Auth failed');
     const { proxyKey } = await initRes.json();
     _proxyKey = proxyKey;
-
-    // Check manager
-    const mgr = await fetch(PROXY_BASE + '/auth/is-manager', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: cred.credential }),
-    }).then(r => r.json());
-
-    if (!mgr.isManager) {
-      document.getElementById('signin-screen').style.display = 'none';
-      document.getElementById('denied-screen').style.display = 'flex';
-      return;
-    }
 
     document.getElementById('signin-screen').style.display = 'none';
     document.getElementById('data-screen').style.display = '';
@@ -209,8 +207,6 @@ function initGoogleSignIn() {
     theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
   });
 }
-if (window.google?.accounts?.id) { initGoogleSignIn(); }
-else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
 
 // ── Period tabs ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
@@ -229,11 +225,16 @@ async function loadStats(days) {
     const r = await fetch(url, {
       headers: { 'x-proxy-key': _proxyKey, 'x-user-email': _email },
     });
+    if (r.status === 403) {
+      document.getElementById('data-screen').style.display = 'none';
+      document.getElementById('denied-screen').style.display = 'flex';
+      return;
+    }
     if (!r.ok) throw new Error((await r.json()).error || r.statusText);
     const data = await r.json();
     renderStats(data);
   } catch (e) {
-    document.getElementById('subtitle').textContent = 'Error loading data: ' + e.message;
+    document.getElementById('subtitle').textContent = 'Error: ' + e.message;
   }
 }
 
