@@ -293,7 +293,7 @@ function renderStats(data) {
   document.getElementById('user-total').textContent = data.by_user.length + ' users';
   document.getElementById('user-tbody').innerHTML = data.by_user.map(r => `
     <tr>
-      <td class="email-cell" title="${esc(r.user_email)}">${esc(shortEmail(r.user_email))}</td>
+      <td class="email-cell" title="${esc(r.agent_email)}">${esc(shortEmail(r.agent_email))}</td>
       <td class="count-cell">
         <div class="bar-wrap">
           <div class="bar" style="width:${Math.round(r.count / maxUser * 80)}px"></div>
@@ -307,8 +307,8 @@ function renderStats(data) {
   document.getElementById('feed-body').innerHTML = data.recent.map(r => `
     <div class="feed-row">
       <span><span class="tool-pill">${esc(r.tool)}</span></span>
-      <span class="email-cell" title="${esc(r.user_email || '')}">${esc(shortEmail(r.user_email))}</span>
-      <span class="time-str">${fmtTime(r.occurred_at)}</span>
+      <span class="email-cell" title="${esc(r.agent_email || '')}">${esc(shortEmail(r.agent_email))}</span>
+      <span class="time-str">${fmtTime(r.created_at)}</span>
     </div>`).join('') || '<div class="feed-row"><span colspan="3" class="muted-val">No activity yet</span></div>';
 }
 
