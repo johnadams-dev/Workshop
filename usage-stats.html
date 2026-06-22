@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tool Usage — Workshop</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c;
+      --cream: #faf8f3; --cream-dark: #f0ece0; --slate: #5a5a78;
+      --muted: #8a8aa8; --card-bg: #fff;
+      --shadow: 0 2px 20px rgba(26,26,46,.08);
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+
+    header {
+      background: var(--ink); padding: 0 2rem; display: flex;
+      align-items: center; justify-content: space-between; height: 56px;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; color: var(--gold); font-size: 1.25rem; font-weight: 600; text-decoration: none; }
+    .back-link { font-size: 0.8rem; color: rgba(255,255,255,.6); text-decoration: none; }
+    .back-link:hover { color: var(--gold); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; margin-bottom: .25rem; }
+    .subtitle { color: var(--slate); font-size: .9rem; margin-bottom: 1.75rem; }
+
+    /* period tabs */
+    .period-tabs { display: flex; gap: .5rem; margin-bottom: 2rem; }
+    .tab {
+      padding: .45rem 1.1rem; border-radius: 999px; border: 1px solid var(--cream-dark);
+      background: var(--card-bg); color: var(--slate); font-size: .85rem; cursor: pointer;
+      transition: all .15s;
+    }
+    .tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .tab:hover:not(.active) { border-color: var(--gold); color: var(--ink); }
+
+    /* cards */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+    .card-head {
+      padding: .85rem 1.25rem; border-bottom: 1px solid var(--cream-dark);
+      font-weight: 500; font-size: .95rem; display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-head .total { font-size: .78rem; color: var(--muted); font-weight: 400; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+    th { text-align: left; padding: .6rem 1.25rem; color: var(--muted); font-weight: 500; font-size: .78rem;
+         text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--cream-dark); }
+    td { padding: .6rem 1.25rem; border-bottom: 1px solid var(--cream-dark); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--cream); }
+    .count-cell { font-weight: 600; color: var(--ink); }
+    .bar-wrap { display: flex; align-items: center; gap: .6rem; }
+    .bar { height: 6px; border-radius: 3px; background: var(--gold); opacity: .7; min-width: 2px; }
+    .muted-val { color: var(--muted); font-size: .8rem; }
+    .email-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* recent feed */
+    .feed { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+    .feed-head { padding: .85rem 1.25rem; border-bottom: 1px solid var(--cream-dark); font-weight: 500; font-size: .95rem; }
+    .feed-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;
+      padding: .55rem 1.25rem; border-bottom: 1px solid var(--cream-dark);
+      font-size: .85rem; align-items: center;
+    }
+    .feed-row:last-child { border-bottom: none; }
+    .feed-row:hover { background: var(--cream); }
+    .feed-head-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;
+      padding: .55rem 1.25rem; border-bottom: 1px solid var(--cream-dark);
+      font-size: .78rem; color: var(--muted); font-weight: 500;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .tool-pill {
+      display: inline-block; padding: .15rem .6rem; border-radius: 999px;
+      background: var(--cream-dark); color: var(--ink-soft); font-size: .8rem; font-weight: 500;
+    }
+    .time-str { color: var(--muted); font-size: .8rem; }
+
+    /* auth states */
+    #signin-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: 1rem; text-align: center;
+    }
+    #signin-screen h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; }
+    #signin-screen p { color: var(--slate); font-size: .9rem; }
+    #denied-screen {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: .75rem; text-align: center;
+    }
+    #denied-screen h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: #c0392b; }
+    #denied-screen p { color: var(--slate); font-size: .9rem; }
+    #data-screen { display: none; }
+    .spinner { color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">Workshop</a>
+  <a href="./index.html" class="back-link">← Back to Tools</a>
+</header>
+
+<div class="container">
+  <div style="padding:10px 0 0;text-align:left"></div>
+
+  <div id="signin-screen">
+    <h2>Tool Usage Statistics</h2>
+    <p>Sign in with your Adams Cameron account to continue.</p>
+    <div id="g-signin-btn"></div>
+    <p class="spinner" id="signin-status">Checking your account…</p>
+  </div>
+
+  <div id="denied-screen">
+    <h2>Access Restricted</h2>
+    <p>This page is available to managers and administrators only.</p>
+  </div>
+
+  <div id="data-screen">
+    <h1>Tool Usage</h1>
+    <p class="subtitle" id="subtitle">Loading…</p>
+
+    <div class="period-tabs">
+      <button class="tab" data-days="7">Last 7 days</button>
+      <button class="tab active" data-days="30">Last 30 days</button>
+      <button class="tab" data-days="90">Last 90 days</button>
+      <button class="tab" data-days="">All time</button>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-head">By Tool <span class="total" id="tool-total"></span></div>
+        <table>
+          <thead><tr><th>Tool</th><th>Visits</th><th>Last visit</th></tr></thead>
+          <tbody id="tool-tbody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-head">By User <span class="total" id="user-total"></span></div>
+        <table>
+          <thead><tr><th>User</th><th>Visits</th><th>Last visit</th></tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="feed">
+      <div class="feed-head">Recent Activity</div>
+      <div class="feed-head-row"><span>Tool</span><span>User</span><span>When</span></div>
+      <div id="feed-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let _proxyKey = '';
+let _email    = '';
+let _days     = 30;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    _email = payload.email || '';
+
+    // Get proxy key
+    const initRes = await fetch(PROXY_BASE + '/config/init', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: cred.credential }),
+    });
+    if (!initRes.ok) throw new Error('Auth failed');
+    const { proxyKey } = await initRes.json();
+    _proxyKey = proxyKey;
+
+    // Check manager
+    const mgr = await fetch(PROXY_BASE + '/auth/is-manager', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: cred.credential }),
+    }).then(r => r.json());
+
+    if (!mgr.isManager) {
+      document.getElementById('signin-screen').style.display = 'none';
+      document.getElementById('denied-screen').style.display = 'flex';
+      return;
+    }
+
+    document.getElementById('signin-screen').style.display = 'none';
+    document.getElementById('data-screen').style.display = '';
+    loadStats(_days);
+  } catch (e) {
+    document.getElementById('signin-status').textContent = 'Sign-in error: ' + e.message;
+  }
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt();
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
+  });
+}
+if (window.google?.accounts?.id) { initGoogleSignIn(); }
+else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
+
+// ── Period tabs ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _days = btn.dataset.days ? parseInt(btn.dataset.days, 10) : '';
+    loadStats(_days);
+  });
+});
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+async function loadStats(days) {
+  const url = PROXY_BASE + '/log/stats' + (days ? `?days=${days}` : '');
+  try {
+    const r = await fetch(url, {
+      headers: { 'x-proxy-key': _proxyKey, 'x-user-email': _email },
+    });
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const data = await r.json();
+    renderStats(data);
+  } catch (e) {
+    document.getElementById('subtitle').textContent = 'Error loading data: ' + e.message;
+  }
+}
+
+function fmtDate(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 86400 * 2) return 'yesterday';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+}
+
+function fmtTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function shortEmail(e) {
+  if (!e) return '—';
+  return e.replace('@adamscameron.com', '');
+}
+
+function renderStats(data) {
+  const period = data.period.days === 'all' ? 'all time' : `last ${data.period.days} days`;
+  const total = data.by_tool.reduce((s, r) => s + r.count, 0);
+  document.getElementById('subtitle').textContent =
+    `${total.toLocaleString()} total visits — ${period}`;
+
+  // By tool
+  const maxTool = Math.max(...data.by_tool.map(r => r.count), 1);
+  document.getElementById('tool-total').textContent = data.by_tool.length + ' tools';
+  document.getElementById('tool-tbody').innerHTML = data.by_tool.map(r => `
+    <tr>
+      <td>${esc(r.tool)}</td>
+      <td class="count-cell">
+        <div class="bar-wrap">
+          <div class="bar" style="width:${Math.round(r.count / maxTool * 80)}px"></div>
+          ${r.count.toLocaleString()}
+        </div>
+      </td>
+      <td class="muted-val">${fmtDate(r.last_visit)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="muted-val" style="padding:1rem 1.25rem">No data yet</td></tr>';
+
+  // By user
+  const maxUser = Math.max(...data.by_user.map(r => r.count), 1);
+  document.getElementById('user-total').textContent = data.by_user.length + ' users';
+  document.getElementById('user-tbody').innerHTML = data.by_user.map(r => `
+    <tr>
+      <td class="email-cell" title="${esc(r.user_email)}">${esc(shortEmail(r.user_email))}</td>
+      <td class="count-cell">
+        <div class="bar-wrap">
+          <div class="bar" style="width:${Math.round(r.count / maxUser * 80)}px"></div>
+          ${r.count.toLocaleString()}
+        </div>
+      </td>
+      <td class="muted-val">${fmtDate(r.last_visit)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="muted-val" style="padding:1rem 1.25rem">No data yet</td></tr>';
+
+  // Recent feed
+  document.getElementById('feed-body').innerHTML = data.recent.map(r => `
+    <div class="feed-row">
+      <span><span class="tool-pill">${esc(r.tool)}</span></span>
+      <span class="email-cell" title="${esc(r.user_email || '')}">${esc(shortEmail(r.user_email))}</span>
+      <span class="time-str">${fmtTime(r.occurred_at)}</span>
+    </div>`).join('') || '<div class="feed-row"><span colspan="3" class="muted-val">No activity yet</span></div>';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
