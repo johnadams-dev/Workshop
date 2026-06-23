@@ -226,7 +226,7 @@ const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
-let USER_EMAIL = sessionStorage.getItem('ac_user_email') || '';
+let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
 let isStaff = false;
 let agents  = [];
 
@@ -397,7 +397,7 @@ function handleCredential(cred) {
   try {
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     USER_EMAIL = payload.email || '';
-    if (USER_EMAIL) sessionStorage.setItem('ac_user_email', USER_EMAIL);
+    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
   } catch(_) {}
   document.getElementById('auth-gate').classList.remove('show');
   if (USER_EMAIL) init(); else toast('Sign-in failed', 'err');

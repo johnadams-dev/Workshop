@@ -164,7 +164,7 @@ const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
-let _email = sessionStorage.getItem('ac_user_email') || '';
+let _email = localStorage.getItem('ac_user_email') || '';
 let _days  = 30;
 
 const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': _email });
@@ -183,7 +183,7 @@ function handleCredential(cred) {
   try {
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     _email = payload.email || '';
-    if (_email) sessionStorage.setItem('ac_user_email', _email);
+    if (_email) localStorage.setItem('ac_user_email', _email);
     document.getElementById('signin-screen').style.display = 'none';
     document.getElementById('data-screen').style.display = 'block';
     loadStats(_days);

@@ -895,14 +895,14 @@ function addPill(container, text, cls='') {
 // sign-in ourselves so the agent profile can still be auto-filled.
 function ensureUserEmail() {
   return new Promise((resolve) => {
-    const cached = sessionStorage.getItem('ac_user_email');
+    const cached = localStorage.getItem('ac_user_email');
     if (cached) return resolve(cached);
 
     const onCredential = (cred) => {
       try {
         const payload = JSON.parse(atob(cred.credential.split('.')[1]));
         const email = payload.email || '';
-        if (email) sessionStorage.setItem('ac_user_email', email);
+        if (email) localStorage.setItem('ac_user_email', email);
         resolve(email);
       } catch (_) { resolve(''); }
     };
@@ -1204,6 +1204,6 @@ function toast(msg) {
  copyLink, downloadVideo].forEach(fn => { window[fn.name] = fn; });
 
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Cameron's Stage',email:sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Cameron's Stage',email:localStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
