@@ -161,37 +161,29 @@
 
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
-let _proxyKey = sessionStorage.getItem('ac_proxy_key') || '';
-let _email    = sessionStorage.getItem('ac_user_email') || '';
-let _days     = 30;
+let _email = sessionStorage.getItem('ac_user_email') || '';
+let _days  = 30;
+
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': _email });
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-// If we already have a session from index.html, skip Google sign-in entirely.
-if (_proxyKey && _email) {
+if (_email) {
   document.getElementById('signin-screen').style.display = 'none';
   document.getElementById('data-screen').style.display = '';
   loadStats(_days);
 } else {
-  // No session — show sign-in
   if (window.google?.accounts?.id) { initGoogleSignIn(); }
   else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
 }
 
-async function handleCredential(cred) {
+function handleCredential(cred) {
   try {
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     _email = payload.email || '';
-
-    const initRes = await fetch(PROXY_BASE + '/config/init', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: cred.credential }),
-    });
-    if (!initRes.ok) throw new Error('Auth failed');
-    const { proxyKey } = await initRes.json();
-    _proxyKey = proxyKey;
-
+    if (_email) sessionStorage.setItem('ac_user_email', _email);
     document.getElementById('signin-screen').style.display = 'none';
     document.getElementById('data-screen').style.display = '';
     loadStats(_days);
@@ -222,9 +214,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 async function loadStats(days) {
   const url = PROXY_BASE + '/log/stats' + (days ? `?days=${days}` : '');
   try {
-    const r = await fetch(url, {
-      headers: { 'x-proxy-key': _proxyKey, 'x-user-email': _email },
-    });
+    const r = await fetch(url, { headers: H() });
     if (r.status === 403) {
       document.getElementById('data-screen').style.display = 'none';
       document.getElementById('denied-screen').style.display = 'flex';
