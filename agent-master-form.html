@@ -408,6 +408,7 @@ async function selectAgent(id) {
   } catch(_) {}
 
   renderDetail(a);
+  loadFloorEligibility(a.id);
 }
 
 function renderDetail(a) {
@@ -551,6 +552,23 @@ function renderDetail(a) {
           <label class="toggle"><input type="checkbox" ${a.sms_opted_in?'checked':''} onchange="chg('sms_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
         <div class="toggle-row"><div class="toggle-label">Email notifications<small>Coaching digests and system alerts</small></div>
           <label class="toggle"><input type="checkbox" ${a.email_opted_in?'checked':''} onchange="chg('email_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
+      </div>
+    </div>
+
+    <div class="card" id="floor-duty-card-${a.id}">
+      <div class="card-head">Floor Duty <span id="floor-duty-status-${a.id}" style="font-weight:400;font-size:11px;color:var(--muted)">Loading…</span></div>
+      <div class="card-body">
+        <div class="toggle-row">
+          <div class="toggle-label">Floor duty eligible<small>Agent can be assigned to floor duty shifts</small></div>
+          <label class="toggle"><input type="checkbox" id="flr-eligible-${a.id}" onchange="saveFloorEligibility(${a.id})"><span class="toggle-track"></span></label>
+        </div>
+        <div id="flr-since-row-${a.id}" style="display:none;margin-top:8px">
+          <div class="field" style="max-width:200px">
+            <label class="field-lbl">Eligible since</label>
+            <input type="date" id="flr-since-${a.id}" class="field-input" onchange="saveFloorEligibility(${a.id})">
+          </div>
+        </div>
+        <div id="flr-msg-${a.id}" style="font-size:12px;margin-top:6px"></div>
       </div>
     </div>
 
@@ -915,6 +933,62 @@ if (USER_EMAIL) {
   initGoogleSignIn();
 } else {
   const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+}
+
+// ── Floor Duty eligibility ───────────────────────────────────────────────────
+async function loadFloorEligibility(agentId) {
+  const statusEl = document.getElementById(`floor-duty-status-${agentId}`);
+  const togEl    = document.getElementById(`flr-eligible-${agentId}`);
+  const sinceRow = document.getElementById(`flr-since-row-${agentId}`);
+  const sinceEl  = document.getElementById(`flr-since-${agentId}`);
+  if (!statusEl || !togEl) return;
+
+  try {
+    const data = await fetch(`${PROXY_URL}/api/floor/eligibility/agent/${agentId}`, { headers: H() });
+    if (!data.ok) { statusEl.textContent = ''; return; }
+    const e = await data.json();
+    togEl.checked = !!e.is_eligible;
+    if (e.eligible_since) sinceEl.value = e.eligible_since.slice(0, 10);
+    sinceRow.style.display = e.is_eligible ? 'block' : 'none';
+    statusEl.textContent = e.is_eligible ? '✓ Eligible' : '';
+    statusEl.style.color = e.is_eligible ? 'var(--green)' : 'var(--muted)';
+  } catch(_) {
+    statusEl.textContent = '';
+  }
+}
+
+async function saveFloorEligibility(agentId) {
+  const togEl   = document.getElementById(`flr-eligible-${agentId}`);
+  const sinceEl = document.getElementById(`flr-since-${agentId}`);
+  const sinceRow = document.getElementById(`flr-since-row-${agentId}`);
+  const msgEl   = document.getElementById(`flr-msg-${agentId}`);
+  const statusEl = document.getElementById(`floor-duty-status-${agentId}`);
+  if (!togEl) return;
+
+  const eligible = togEl.checked;
+  const today    = new Date().toISOString().slice(0, 10);
+  sinceRow.style.display = eligible ? 'block' : 'none';
+  if (eligible && !sinceEl.value) sinceEl.value = today;
+
+  msgEl.textContent = 'Saving…';
+  msgEl.style.color = 'var(--muted)';
+  try {
+    await fetch(`${PROXY_URL}/api/floor/eligibility/agent/${agentId}`, {
+      method: 'PUT', headers: H(),
+      body: JSON.stringify({
+        is_eligible:    eligible,
+        eligible_since: eligible ? (sinceEl.value || today) : null
+      })
+    });
+    msgEl.textContent = 'Saved';
+    msgEl.style.color = 'var(--green)';
+    statusEl.textContent = eligible ? '✓ Eligible' : '';
+    statusEl.style.color = eligible ? 'var(--green)' : 'var(--muted)';
+    setTimeout(() => { msgEl.textContent = ''; }, 2000);
+  } catch(e) {
+    msgEl.textContent = 'Error: ' + e.message;
+    msgEl.style.color = 'var(--red)';
+  }
 }
 </script>
 </body>

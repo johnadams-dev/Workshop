@@ -280,6 +280,51 @@
     .placeholder-page h3 { font-size: 16px; font-weight: 600; color: var(--muted); }
     .placeholder-page p { font-size: 13px; color: var(--muted); max-width: 320px; }
 
+    /* ── Eligibility table ──────────────────────────────────────────────────── */
+    .elig-table {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    .elig-row {
+      display: grid; grid-template-columns: 1fr 140px 120px;
+      align-items: center; padding: 10px 16px;
+      border-bottom: 1px solid var(--border); gap: 12px;
+    }
+    .elig-row:last-child { border-bottom: none; }
+    .elig-row:hover { background: var(--bg); }
+    .elig-row.header {
+      background: var(--bg); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+      padding: 8px 16px;
+    }
+    .elig-name { font-weight: 500; font-size: 13px; }
+    .elig-email { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .elig-since input[type="date"] {
+      padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px;
+      font-size: 12px; color: var(--text); background: var(--surface);
+      outline: none; width: 130px;
+    }
+    .elig-since input[type="date"]:focus { border-color: var(--navy); }
+    .elig-since .since-placeholder { font-size: 12px; color: var(--muted); }
+
+    /* Toggle switch */
+    .sw { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .sw input { opacity: 0; width: 0; height: 0; }
+    .sw-track {
+      position: absolute; inset: 0; border-radius: 10px;
+      background: var(--border); cursor: pointer; transition: background .2s;
+    }
+    .sw-track::before {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      left: 3px; top: 3px; border-radius: 50%; background: #fff;
+      transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .sw input:checked + .sw-track { background: var(--green); }
+    .sw input:checked + .sw-track::before { transform: translateX(16px); }
+    .elig-toggle-cell { display: flex; align-items: center; gap: 8px; }
+    .elig-status-text { font-size: 12px; color: var(--muted); }
+    .elig-status-text.on { color: var(--green); font-weight: 600; }
+
     /* ── Spinner ─────────────────────────────────────────────────────────────── */
     .spin {
       display: inline-block; width: 14px; height: 14px;
@@ -370,13 +415,21 @@
     </button>
   </div>
 
-  <!-- ── Agent Eligibility tab (placeholder) ──────────────────────────────── -->
+  <!-- ── Agent Eligibility tab ────────────────────────────────────────────── -->
   <div class="page" id="page-eligibility">
-    <div class="placeholder-page">
-      <div class="ph-icon">👥</div>
-      <h3>Agent Eligibility</h3>
-      <p>Toggle floor duty eligibility for agents at the selected office. Coming in a future step.</p>
+    <div class="page-header">
+      <h1>Agent Eligibility</h1>
+      <p id="eligibility-subtitle">Set which agents are eligible for floor duty at the selected office.</p>
     </div>
+
+    <div class="filter-row">
+      <button class="day-btn active" data-filter="all" id="ef-all">All</button>
+      <button class="day-btn" data-filter="eligible" id="ef-eligible">Eligible</button>
+      <button class="day-btn" data-filter="pending" id="ef-pending">Not yet set</button>
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)" id="eligibility-count"></span>
+    </div>
+
+    <div id="eligibility-list"></div>
   </div>
 
   <!-- ── Feedback tab (placeholder) ──────────────────────────────────────── -->
@@ -408,6 +461,8 @@ let _access = null;  // floorAccess object from /api/floor/my-access
 let _offices = [];
 let _shifts  = [];
 let _showInactive = false;
+let _eligibility = [];
+let _eligFilter  = 'all';
 
 const H = () => ({
   'Content-Type': 'application/json',
@@ -520,9 +575,13 @@ function onOfficeChange() {
   const officeId = document.getElementById('office-select').value;
   if (!officeId) return;
   const office = _offices.find(o => String(o.id) === officeId);
+  const name = office ? office.name : 'this office';
   document.getElementById('shifts-subtitle').textContent =
-    `Configure the shifts agents can be assigned to at ${office ? office.name : 'this office'}.`;
+    `Configure the shifts agents can be assigned to at ${name}.`;
+  document.getElementById('eligibility-subtitle').textContent =
+    `Set which agents are eligible for floor duty at ${name}.`;
   loadShifts(officeId);
+  loadEligibility(officeId);
 }
 
 // ── Show inactive toggle ────────────────────────────────────────────────────
@@ -814,6 +873,135 @@ document.getElementById('add-shift-btn').addEventListener('click', () => {
 
   setTimeout(() => div.querySelector('#new-name')?.focus(), 50);
 });
+
+// ── Eligibility ─────────────────────────────────────────────────────────────
+document.querySelectorAll('[data-filter]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _eligFilter = btn.dataset.filter;
+    document.querySelectorAll('[data-filter]').forEach(b =>
+      b.classList.toggle('active', b.dataset.filter === _eligFilter)
+    );
+    renderEligibility();
+  });
+});
+
+async function loadEligibility(officeId) {
+  const list = document.getElementById('eligibility-list');
+  list.innerHTML = '<div class="loading-row"><span class="spin"></span> Loading agents…</div>';
+  try {
+    _eligibility = await api('GET', '/api/floor/eligibility/office/' + officeId);
+    renderEligibility();
+  } catch(e) {
+    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderEligibility() {
+  const list = document.getElementById('eligibility-list');
+  const canEdit = _access.can_set_eligibility;
+
+  let visible = _eligibility;
+  if (_eligFilter === 'eligible') visible = _eligibility.filter(a => a.is_eligible);
+  if (_eligFilter === 'pending')  visible = _eligibility.filter(a => !a.is_eligible);
+
+  document.getElementById('eligibility-count').textContent =
+    `${visible.length} of ${_eligibility.length} agent${_eligibility.length !== 1 ? 's' : ''}`;
+
+  if (!visible.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><p>No agents match this filter.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="elig-table">
+      <div class="elig-row header">
+        <span>Agent</span>
+        <span>Floor Eligible</span>
+        <span>Eligible Since</span>
+      </div>
+      ${visible.map(a => eligRowHtml(a, canEdit)).join('')}
+    </div>`;
+
+  list.querySelectorAll('.elig-toggle').forEach(tog => {
+    tog.addEventListener('change', () => onEligToggle(tog));
+  });
+  list.querySelectorAll('.elig-since-input').forEach(inp => {
+    inp.addEventListener('change', () => onEligSinceChange(inp));
+  });
+}
+
+function eligRowHtml(a, canEdit) {
+  const sincePart = a.is_eligible
+    ? `<div class="elig-since">
+        <input type="date" class="elig-since-input" data-agent="${a.id}"
+          value="${a.eligible_since ? a.eligible_since.slice(0,10) : ''}"
+          ${canEdit ? '' : 'disabled'}
+          title="Eligible since">
+       </div>`
+    : `<div class="elig-since"><span class="since-placeholder">—</span></div>`;
+
+  return `
+    <div class="elig-row" id="elig-row-${a.id}">
+      <div>
+        <div class="elig-name">${esc(a.first_name)} ${esc(a.last_name)}</div>
+        <div class="elig-email">${esc(a.email)}</div>
+      </div>
+      <div class="elig-toggle-cell">
+        <label class="sw">
+          <input type="checkbox" class="elig-toggle" data-agent="${a.id}"
+            ${a.is_eligible ? 'checked' : ''} ${canEdit ? '' : 'disabled'}>
+          <span class="sw-track"></span>
+        </label>
+        <span class="elig-status-text${a.is_eligible ? ' on' : ''}">
+          ${a.is_eligible ? 'Eligible' : 'Not set'}
+        </span>
+      </div>
+      ${sincePart}
+    </div>`;
+}
+
+async function onEligToggle(tog) {
+  const agentId  = parseInt(tog.dataset.agent, 10);
+  const eligible = tog.checked;
+  const row      = document.getElementById('elig-row-' + agentId);
+  const today    = new Date().toISOString().slice(0, 10);
+
+  // Optimistically update local state
+  const a = _eligibility.find(x => x.id === agentId);
+  if (a) {
+    a.is_eligible = eligible;
+    if (eligible && !a.eligible_since) a.eligible_since = today;
+  }
+
+  try {
+    const updated = await api('PUT', '/api/floor/eligibility/agent/' + agentId, {
+      is_eligible:    eligible,
+      eligible_since: eligible ? (a?.eligible_since || today) : null
+    });
+    if (a) { a.is_eligible = updated.is_eligible; a.eligible_since = updated.eligible_since; }
+    renderEligibility();
+  } catch(e) {
+    // Revert on error
+    if (a) a.is_eligible = !eligible;
+    tog.checked = !eligible;
+    alert('Error: ' + e.message);
+  }
+}
+
+async function onEligSinceChange(inp) {
+  const agentId = parseInt(inp.dataset.agent, 10);
+  const date    = inp.value || null;
+  const a       = _eligibility.find(x => x.id === agentId);
+  if (a) a.eligible_since = date;
+  try {
+    await api('PUT', '/api/floor/eligibility/agent/' + agentId, {
+      is_eligible:    true,
+      eligible_since: date
+    });
+  } catch(e) {
+    alert('Error saving date: ' + e.message);
+  }
+}
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 function esc(s) {
