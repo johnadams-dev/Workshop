@@ -280,6 +280,53 @@
     .placeholder-page h3 { font-size: 16px; font-weight: 600; color: var(--muted); }
     .placeholder-page p { font-size: 13px; color: var(--muted); max-width: 320px; }
 
+    /* ── Schedule / period management ──────────────────────────────────────── */
+    .month-nav {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+    }
+    .month-nav-btn {
+      width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--navy); font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all .15s;
+    }
+    .month-nav-btn:hover { border-color: var(--navy); background: var(--bg); }
+    .month-label { font-size: 18px; font-weight: 700; color: var(--navy); min-width: 160px; text-align: center; }
+
+    .period-status-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+    .period-status-head { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .period-status-head h3 { font-size: 14px; font-weight: 700; color: var(--navy); }
+    .period-status-body { padding: 16px; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; padding: 3px 10px;
+      border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .status-badge.pending   { background: #f3f4f6; color: #6b7280; }
+    .status-badge.open      { background: #dcfce7; color: #15803d; }
+    .status-badge.closed    { background: #fef9c3; color: #854d0e; }
+    .status-badge.draft     { background: #dbeafe; color: #1d4ed8; }
+    .status-badge.published { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+
+    .period-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+    .period-meta-item { font-size: 12px; }
+    .period-meta-item .pmeta-label { color: var(--muted); text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: .05em; margin-bottom: 2px; }
+    .period-meta-item .pmeta-val   { color: var(--text); font-weight: 500; }
+
+    .stat-row-sm { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .stat-sm {
+      flex: 1; min-width: 80px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; text-align: center;
+    }
+    .stat-sm-val { font-size: 20px; font-weight: 700; color: var(--navy); }
+    .stat-sm-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 2px; }
+
+    .period-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .period-no-period { padding: 32px 16px; text-align: center; }
+    .period-no-period p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+    .create-period-form { padding: 16px; border-top: 1px solid var(--border); display: none; }
+    .create-period-form.open { display: block; }
+
     /* ── Eligibility table ──────────────────────────────────────────────────── */
     .elig-table {
       background: var(--surface); border: 1px solid var(--border);
@@ -385,12 +432,21 @@
     <button class="nav-tab" data-tab="publish">🚀 Publish</button>
   </nav>
 
-  <!-- ── Schedule tab (placeholder) ──────────────────────────────────────── -->
+  <!-- ── Schedule tab ─────────────────────────────────────────────────────── -->
   <div class="page" id="page-schedule">
-    <div class="placeholder-page">
-      <div class="ph-icon">📅</div>
-      <h3>Schedule</h3>
-      <p>The scheduling calendar will appear here once shift configuration is complete.</p>
+    <div class="page-header">
+      <h1>Schedule</h1>
+      <p id="schedule-subtitle">Manage the availability window and scheduling period for the selected office.</p>
+    </div>
+
+    <div class="month-nav">
+      <button class="month-nav-btn" id="month-prev">&#8249;</button>
+      <div class="month-label" id="month-label">—</div>
+      <button class="month-nav-btn" id="month-next">&#8250;</button>
+    </div>
+
+    <div id="period-area">
+      <div class="loading-row"><span class="spin"></span> Loading…</div>
     </div>
   </div>
 
@@ -463,6 +519,12 @@ let _shifts  = [];
 let _showInactive = false;
 let _eligibility = [];
 let _eligFilter  = 'all';
+
+// Schedule / period state
+let _schedYear  = 0;
+let _schedMonth = 0;  // 1-based
+let _periods    = [];
+let _eligCount  = 0;
 
 const H = () => ({
   'Content-Type': 'application/json',
@@ -559,6 +621,8 @@ document.querySelectorAll('.nav-tab').forEach(btn => {
 function switchTab(tab) {
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  // Re-render period area when switching to Schedule (month nav may have changed)
+  if (tab === 'schedule' && _periods.length !== undefined) renderPeriodArea();
 }
 
 // ── Office selector ─────────────────────────────────────────────────────────
@@ -580,8 +644,12 @@ function onOfficeChange() {
     `Configure the shifts agents can be assigned to at ${name}.`;
   document.getElementById('eligibility-subtitle').textContent =
     `Set which agents are eligible for floor duty at ${name}.`;
+  document.getElementById('schedule-subtitle').textContent =
+    `Manage the availability window and scheduling period for ${name}.`;
   loadShifts(officeId);
   loadEligibility(officeId);
+  initScheduleMonth();
+  loadPeriods(officeId);
 }
 
 // ── Show inactive toggle ────────────────────────────────────────────────────
@@ -873,6 +941,278 @@ document.getElementById('add-shift-btn').addEventListener('click', () => {
 
   setTimeout(() => div.querySelector('#new-name')?.focus(), 50);
 });
+
+// ── Schedule / Period management ────────────────────────────────────────────
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+
+function initScheduleMonth() {
+  // Default to next month (managers open the schedule ~20th of prior month)
+  const now = new Date();
+  _schedMonth = now.getMonth() + 2; // next month, 1-based
+  _schedYear  = now.getFullYear();
+  if (_schedMonth > 12) { _schedMonth = 1; _schedYear++; }
+  updateMonthLabel();
+}
+
+function updateMonthLabel() {
+  document.getElementById('month-label').textContent =
+    `${MONTH_NAMES[_schedMonth - 1]} ${_schedYear}`;
+}
+
+document.getElementById('month-prev').addEventListener('click', () => {
+  _schedMonth--;
+  if (_schedMonth < 1) { _schedMonth = 12; _schedYear--; }
+  updateMonthLabel();
+  renderPeriodArea();
+});
+
+document.getElementById('month-next').addEventListener('click', () => {
+  _schedMonth++;
+  if (_schedMonth > 12) { _schedMonth = 1; _schedYear++; }
+  updateMonthLabel();
+  renderPeriodArea();
+});
+
+async function loadPeriods(officeId) {
+  document.getElementById('period-area').innerHTML =
+    '<div class="loading-row"><span class="spin"></span> Loading…</div>';
+  try {
+    const data = await api('GET', '/api/floor/periods/' + officeId);
+    _periods   = data.periods;
+    _eligCount = data.eligible_count;
+    renderPeriodArea();
+  } catch(e) {
+    document.getElementById('period-area').innerHTML =
+      `<div class="loading-row" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function currentPeriod() {
+  return _periods.find(p => p.period_year === _schedYear && p.period_month === _schedMonth) || null;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtDateInput(iso) {
+  if (!iso) return '';
+  return new Date(iso).toISOString().slice(0, 16); // datetime-local format
+}
+
+function renderPeriodArea() {
+  const area   = document.getElementById('period-area');
+  const period = currentPeriod();
+  const canEdit = _access.can_configure_shifts;
+  const monthName = `${MONTH_NAMES[_schedMonth - 1]} ${_schedYear}`;
+
+  if (!period) {
+    area.innerHTML = `
+      <div class="period-status-card">
+        <div class="period-status-head">
+          <h3>${monthName}</h3>
+          <span class="status-badge pending">No Period</span>
+        </div>
+        <div class="period-no-period">
+          <p>No scheduling period has been created for ${monthName}.</p>
+          ${canEdit ? `<button class="btn-primary" id="btn-create-period">Open Scheduling for ${monthName}</button>` : ''}
+        </div>
+        ${canEdit ? `
+        <div class="create-period-form" id="create-period-form">
+          <div class="form-row">
+            <div class="form-field" style="flex:1">
+              <label>Availability Window Opens</label>
+              <input type="datetime-local" id="cp-opens" value="${defaultOpens()}">
+            </div>
+            <div class="form-field" style="flex:1">
+              <label>Availability Window Closes</label>
+              <input type="datetime-local" id="cp-closes" value="${defaultCloses()}">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="btn-create-confirm">Create Period</button>
+            <button class="btn-secondary" id="btn-create-cancel">Cancel</button>
+            <span class="inline-msg" id="cp-msg"></span>
+          </div>
+        </div>` : ''}
+      </div>`;
+
+    document.getElementById('btn-create-period')?.addEventListener('click', () => {
+      document.getElementById('create-period-form').classList.add('open');
+      document.getElementById('btn-create-period').style.display = 'none';
+    });
+    document.getElementById('btn-create-cancel')?.addEventListener('click', () => {
+      document.getElementById('create-period-form').classList.remove('open');
+      document.getElementById('btn-create-period').style.display = '';
+    });
+    document.getElementById('btn-create-confirm')?.addEventListener('click', createPeriod);
+    return;
+  }
+
+  const statusActions = buildStatusActions(period, canEdit);
+
+  area.innerHTML = `
+    <div class="period-status-card">
+      <div class="period-status-head">
+        <h3>${monthName}</h3>
+        <span class="status-badge ${period.status}">${capitalize(period.status)}</span>
+      </div>
+      <div class="period-status-body">
+        <div class="period-meta">
+          <div class="period-meta-item">
+            <div class="pmeta-label">Window Opens</div>
+            <div class="pmeta-val">${fmtDate(period.opens_at)}</div>
+          </div>
+          <div class="period-meta-item">
+            <div class="pmeta-label">Window Closes</div>
+            <div class="pmeta-val">${fmtDate(period.closes_at)}</div>
+          </div>
+          <div class="period-meta-item">
+            <div class="pmeta-label">Eligible Agents</div>
+            <div class="pmeta-val">${_eligCount}</div>
+          </div>
+          <div class="period-meta-item">
+            <div class="pmeta-label">Defaults Submitted</div>
+            <div class="pmeta-val">${period.defaults_submitted ?? '—'}</div>
+          </div>
+          ${period.published_at ? `
+          <div class="period-meta-item">
+            <div class="pmeta-label">Published</div>
+            <div class="pmeta-val">${fmtDate(period.published_at)}${period.published_by_name ? ' by ' + esc(period.published_by_name) : ''}</div>
+          </div>` : ''}
+        </div>
+        ${statusActions}
+      </div>
+    </div>
+
+    ${canEdit && period.status !== 'published' ? `
+    <div class="card">
+      <div class="card-head"><span class="card-head-label">Edit Window Dates</span></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-field" style="flex:1">
+            <label>Opens</label>
+            <input type="datetime-local" id="ep-opens" value="${fmtDateInput(period.opens_at)}">
+          </div>
+          <div class="form-field" style="flex:1">
+            <label>Closes</label>
+            <input type="datetime-local" id="ep-closes" value="${fmtDateInput(period.closes_at)}">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" id="btn-save-dates">Save Dates</button>
+          <span class="inline-msg" id="ep-msg"></span>
+        </div>
+      </div>
+    </div>` : ''}`;
+
+  // Bind status action buttons
+  document.getElementById('btn-open-period')?.addEventListener('click',   () => advancePeriod(period.id, 'open'));
+  document.getElementById('btn-close-period')?.addEventListener('click',  () => advancePeriod(period.id, 'closed'));
+  document.getElementById('btn-draft-period')?.addEventListener('click',  () => advancePeriod(period.id, 'draft'));
+
+  document.getElementById('btn-save-dates')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-dates');
+    const msg = document.getElementById('ep-msg');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
+    try {
+      await api('PUT', '/api/floor/periods/' + period.id, {
+        opens_at:  document.getElementById('ep-opens').value,
+        closes_at: document.getElementById('ep-closes').value
+      });
+      const officeId = document.getElementById('office-select').value;
+      await loadPeriods(officeId);
+    } catch(e) {
+      msg.className = 'inline-msg err'; msg.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Save Dates';
+    }
+  });
+}
+
+function buildStatusActions(period, canEdit) {
+  if (!canEdit) return '';
+  const { status, id } = period;
+  if (status === 'pending') return `
+    <div class="period-actions">
+      <button class="btn-primary" id="btn-open-period">Open Availability Window</button>
+      <span style="font-size:12px;color:var(--muted)">Agents will be able to submit their availability once the window is open.</span>
+    </div>`;
+  if (status === 'open') return `
+    <div class="period-actions">
+      <button class="btn-secondary" id="btn-close-period">Close Availability Window</button>
+      <span style="font-size:12px;color:var(--muted)">Closing the window prevents new submissions and prepares the period for scheduling.</span>
+    </div>`;
+  if (status === 'closed') return `
+    <div class="period-actions">
+      <button class="btn-primary" id="btn-draft-period">Mark Ready for Scheduling</button>
+      <span style="font-size:12px;color:var(--muted)">Moves the period to Draft so the scheduling algorithm can be run.</span>
+    </div>`;
+  if (status === 'draft') return `
+    <div class="period-actions">
+      <span style="font-size:12px;color:var(--muted)">Review assignments below, then use the Publish tab when ready.</span>
+    </div>`;
+  if (status === 'published') return `
+    <div class="period-actions">
+      <span style="font-size:12px;color:var(--green);font-weight:600">✓ Published — agents have been notified.</span>
+    </div>`;
+  return '';
+}
+
+async function createPeriod() {
+  const btn = document.getElementById('btn-create-confirm');
+  const msg = document.getElementById('cp-msg');
+  msg.className = 'inline-msg'; msg.textContent = '';
+  const opens  = document.getElementById('cp-opens').value;
+  const closes = document.getElementById('cp-closes').value;
+  if (!opens || !closes) { msg.className = 'inline-msg err'; msg.textContent = 'Both dates are required.'; return; }
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Creating…';
+  try {
+    const officeId = document.getElementById('office-select').value;
+    await api('POST', '/api/floor/periods/' + officeId, {
+      period_year:  _schedYear,
+      period_month: _schedMonth,
+      opens_at:     opens,
+      closes_at:    closes
+    });
+    await loadPeriods(officeId);
+  } catch(e) {
+    msg.className = 'inline-msg err'; msg.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Create Period';
+  }
+}
+
+async function advancePeriod(periodId, newStatus) {
+  const labels = { open: 'Opening…', closed: 'Closing…', draft: 'Updating…' };
+  const btn = document.getElementById(
+    newStatus === 'open' ? 'btn-open-period' :
+    newStatus === 'closed' ? 'btn-close-period' : 'btn-draft-period'
+  );
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spin"></span> ${labels[newStatus] || 'Updating…'}`; }
+  try {
+    const officeId = document.getElementById('office-select').value;
+    await api('PUT', '/api/floor/periods/' + periodId, { status: newStatus });
+    await loadPeriods(officeId);
+  } catch(e) {
+    alert('Error: ' + e.message);
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+function defaultOpens() {
+  return new Date().toISOString().slice(0, 16);
+}
+
+function defaultCloses() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 16);
+}
+
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 
 // ── Eligibility ─────────────────────────────────────────────────────────────
 document.querySelectorAll('[data-filter]').forEach(btn => {
