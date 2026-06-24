@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Floor Duty — Adams Cameron</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #1a3c6b;
+      --navy-dark: #142e53;
+      --blue: #2E75B6;
+      --gold: #C9A84C;
+      --surface: #ffffff;
+      --bg: #f4f6f9;
+      --border: #DDE1E9;
+      --text: #1A1D23;
+      --muted: #6B7280;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────────────────────── */
+    .topbar {
+      background: var(--navy);
+      padding: 0 20px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 2px solid var(--gold);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 10px; }
+    .topbar-icon {
+      width: 30px; height: 30px; background: var(--gold); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; font-size: 15px;
+    }
+    .topbar-title { color: #fff; font-weight: 600; font-size: 15px; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .topbar-brand { color: rgba(255,255,255,.55); font-size: 12px; }
+    .topbar-back { color: rgba(255,255,255,.55); font-size: 12px; text-decoration: none; }
+    .topbar-back:hover { color: var(--gold); }
+    .topbar-user {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 11px; font-weight: 700; cursor: default;
+    }
+
+    /* ── Auth gate ──────────────────────────────────────────────────────────── */
+    #auth-gate {
+      position: fixed; inset: 0; background: rgba(20,46,83,.92);
+      display: flex; align-items: center; justify-content: center; z-index: 200;
+    }
+    .auth-card {
+      background: var(--surface); border-radius: 12px; padding: 40px 36px;
+      text-align: center; width: 340px; box-shadow: 0 8px 48px rgba(0,0,0,.3);
+    }
+    .auth-icon {
+      width: 52px; height: 52px; background: var(--navy); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin: 0 auto 20px;
+    }
+    .auth-card h2 { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+    .auth-card p { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    #g-signin-btn { display: flex; justify-content: center; }
+    .auth-status { color: var(--muted); font-size: 12px; margin-top: 14px; }
+
+    /* ── No-access screen ───────────────────────────────────────────────────── */
+    #no-access {
+      display: none; min-height: 60vh; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; text-align: center; padding: 40px;
+    }
+    #no-access h2 { font-size: 18px; font-weight: 700; color: var(--red); }
+    #no-access p { color: var(--muted); font-size: 13px; }
+
+    /* ── Office bar ─────────────────────────────────────────────────────────── */
+    .office-bar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+    }
+    .office-bar label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted); }
+    .office-bar select {
+      padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; color: var(--text); background: var(--surface);
+      outline: none; min-width: 200px;
+    }
+    .office-bar select:focus { border-color: var(--navy); }
+
+    /* ── Nav tabs ───────────────────────────────────────────────────────────── */
+    .nav-tabs {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 20px; display: flex; gap: 0;
+    }
+    .nav-tab {
+      padding: 12px 18px; font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      white-space: nowrap; transition: color .15s;
+    }
+    .nav-tab:hover { color: var(--navy); }
+    .nav-tab.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 600; }
+    .nav-tab[hidden] { display: none; }
+
+    /* ── Page content ───────────────────────────────────────────────────────── */
+    .page { display: none; padding: 24px 20px; max-width: 960px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* ── Cards ──────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 16px; overflow: hidden;
+    }
+    .card-head {
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-head-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--muted);
+    }
+    .card-body { padding: 16px; }
+
+    /* ── Page header ────────────────────────────────────────────────────────── */
+    .page-header { margin-bottom: 20px; }
+    .page-header h1 { font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+    .page-header p { color: var(--muted); font-size: 13px; }
+
+    /* ── Shift cards ────────────────────────────────────────────────────────── */
+    .shift-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 12px; overflow: visible;
+    }
+    .shift-card.inactive { opacity: .6; }
+    .shift-card-header {
+      padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .shift-card-header.collapsed { border-bottom: none; }
+    .shift-drag-handle { color: var(--muted); cursor: grab; font-size: 14px; flex-shrink: 0; }
+    .shift-name-display {
+      font-weight: 600; font-size: 14px; color: var(--navy); flex: 1;
+    }
+    .shift-time-display { font-size: 12px; color: var(--muted); }
+    .shift-days-display { display: flex; gap: 3px; }
+    .day-pip {
+      width: 20px; height: 20px; border-radius: 4px; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .day-pip.on { background: var(--navy); color: #fff; }
+    .day-pip.off { background: var(--border); color: var(--muted); }
+    .badge-inactive {
+      display: inline-flex; align-items: center; padding: 2px 8px;
+      border-radius: 999px; font-size: 11px; font-weight: 600;
+      background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+    }
+    .shift-card-actions { display: flex; gap: 6px; align-items: center; }
+    .btn-icon {
+      width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 13px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .btn-icon:hover { border-color: var(--navy); color: var(--navy); background: var(--bg); }
+    .btn-icon.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+    /* ── Shift edit form ────────────────────────────────────────────────────── */
+    .shift-edit-form { padding: 16px; }
+    .form-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); }
+    .form-field input[type="text"],
+    .form-field input[type="time"],
+    .form-field input[type="number"] {
+      padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; color: var(--text); background: var(--surface);
+      outline: none; font-family: inherit;
+    }
+    .form-field input:focus { border-color: var(--navy); }
+    .form-field.name-field { flex: 1; min-width: 140px; }
+    .form-field.time-field { width: 110px; }
+    .form-field.order-field { width: 80px; }
+
+    .days-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .days-row label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); }
+    .days-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+    .day-btn {
+      padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all .15s; user-select: none;
+      min-width: 38px; text-align: center;
+    }
+    .day-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+    .form-actions { display: flex; align-items: center; gap: 8px; }
+    .btn-primary {
+      padding: 7px 16px; background: var(--navy); color: #fff; border: none;
+      border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background .15s; display: flex; align-items: center; gap: 6px;
+    }
+    .btn-primary:hover { background: var(--navy-dark); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 7px 14px; background: var(--surface); color: var(--navy);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
+      font-weight: 500; cursor: pointer; transition: all .15s;
+    }
+    .btn-secondary:hover { border-color: var(--navy); background: var(--bg); }
+    .btn-danger {
+      padding: 7px 14px; background: var(--surface); color: var(--red);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 13px;
+      font-weight: 500; cursor: pointer; transition: all .15s;
+    }
+    .btn-danger:hover { border-color: var(--red); background: var(--red-bg); }
+    .btn-link {
+      background: none; border: none; color: var(--navy); font-size: 13px;
+      font-weight: 500; cursor: pointer; padding: 4px 2px;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    .btn-link:hover { color: var(--navy-dark); }
+
+    .inline-msg {
+      font-size: 12px; padding: 0 4px;
+    }
+    .inline-msg.ok { color: var(--green); }
+    .inline-msg.err { color: var(--red); }
+
+    /* ── Add shift button ───────────────────────────────────────────────────── */
+    .add-shift-btn {
+      width: 100%; padding: 12px; border: 2px dashed var(--border);
+      border-radius: 10px; background: none; color: var(--muted);
+      font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .add-shift-btn:hover { border-color: var(--navy); color: var(--navy); background: var(--bg); }
+
+    /* ── Inactive toggle ────────────────────────────────────────────────────── */
+    .filter-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .toggle-label {
+      display: flex; align-items: center; gap: 7px; cursor: pointer;
+      font-size: 13px; color: var(--muted); user-select: none;
+    }
+    .toggle-label input[type="checkbox"] { accent-color: var(--navy); width: 14px; height: 14px; }
+
+    /* ── Empty state ────────────────────────────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 48px 20px; color: var(--muted);
+    }
+    .empty-state .empty-icon { font-size: 32px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Placeholder tab ────────────────────────────────────────────────────── */
+    .placeholder-page {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 300px; gap: 10px; text-align: center;
+    }
+    .placeholder-page .ph-icon { font-size: 36px; opacity: .3; }
+    .placeholder-page h3 { font-size: 16px; font-weight: 600; color: var(--muted); }
+    .placeholder-page p { font-size: 13px; color: var(--muted); max-width: 320px; }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────────── */
+    .spin {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--navy);
+      border-radius: 50%; animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-row { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Auth gate ──────────────────────────────────────────────────────────── -->
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-icon">📅</div>
+    <h2>Floor Duty</h2>
+    <p>Sign in with your Adams Cameron account to continue.</p>
+    <div id="g-signin-btn"></div>
+    <p class="auth-status" id="auth-status">Checking sign-in status…</p>
+  </div>
+</div>
+
+<!-- ── No-access screen ───────────────────────────────────────────────────── -->
+<div id="no-access" style="display:none">
+  <h2>Access Restricted</h2>
+  <p>You don't have floor duty access. Contact your manager if you think this is a mistake.</p>
+  <a href="./index.html" class="btn-link" style="margin-top:8px">← Back to Tools</a>
+</div>
+
+<!-- ── App shell ──────────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-icon">📅</div>
+      <span class="topbar-title">Floor Duty</span>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-brand">Adams Cameron &amp; Co.</span>
+      <a href="./index.html" class="topbar-back">← Back to Tools</a>
+      <div class="topbar-user" id="user-avatar" title="">?</div>
+    </div>
+  </header>
+
+  <div class="office-bar">
+    <label for="office-select">Office</label>
+    <select id="office-select">
+      <option value="">Loading offices…</option>
+    </select>
+  </div>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab" data-tab="schedule">📅 Schedule</button>
+    <button class="nav-tab active" data-tab="shifts" id="tab-shifts">⚙️ Shift Setup</button>
+    <button class="nav-tab" data-tab="eligibility" id="tab-eligibility">👥 Agent Eligibility</button>
+    <button class="nav-tab" data-tab="feedback">💬 Feedback</button>
+    <button class="nav-tab" data-tab="publish">🚀 Publish</button>
+  </nav>
+
+  <!-- ── Schedule tab (placeholder) ──────────────────────────────────────── -->
+  <div class="page" id="page-schedule">
+    <div class="placeholder-page">
+      <div class="ph-icon">📅</div>
+      <h3>Schedule</h3>
+      <p>The scheduling calendar will appear here once shift configuration is complete.</p>
+    </div>
+  </div>
+
+  <!-- ── Shift Setup tab ──────────────────────────────────────────────────── -->
+  <div class="page active" id="page-shifts">
+    <div class="page-header">
+      <h1>Shift Setup</h1>
+      <p id="shifts-subtitle">Configure the shifts agents can be assigned to for the selected office.</p>
+    </div>
+
+    <div class="filter-row">
+      <label class="toggle-label">
+        <input type="checkbox" id="show-inactive">
+        Show inactive shifts
+      </label>
+    </div>
+
+    <div id="shifts-list"></div>
+
+    <button class="add-shift-btn" id="add-shift-btn" style="display:none">
+      <span>＋</span> Add Shift
+    </button>
+  </div>
+
+  <!-- ── Agent Eligibility tab (placeholder) ──────────────────────────────── -->
+  <div class="page" id="page-eligibility">
+    <div class="placeholder-page">
+      <div class="ph-icon">👥</div>
+      <h3>Agent Eligibility</h3>
+      <p>Toggle floor duty eligibility for agents at the selected office. Coming in a future step.</p>
+    </div>
+  </div>
+
+  <!-- ── Feedback tab (placeholder) ──────────────────────────────────────── -->
+  <div class="page" id="page-feedback">
+    <div class="placeholder-page">
+      <div class="ph-icon">💬</div>
+      <h3>Feedback</h3>
+      <p>Post-shift ratings and manager notes. Coming in a future step.</p>
+    </div>
+  </div>
+
+  <!-- ── Publish tab (placeholder) ────────────────────────────────────────── -->
+  <div class="page" id="page-publish">
+    <div class="placeholder-page">
+      <div class="ph-icon">🚀</div>
+      <h3>Publish</h3>
+      <p>Pre-flight checklist and one-click publish to Google Calendar. Coming in a future step.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const KEY     = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const GCLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let _email = localStorage.getItem('ac_user_email') || '';
+let _access = null;  // floorAccess object from /api/floor/my-access
+let _offices = [];
+let _shifts  = [];
+let _showInactive = false;
+
+const H = () => ({
+  'Content-Type': 'application/json',
+  'x-proxy-key': KEY,
+  'x-user-email': _email
+});
+
+async function api(method, path, body) {
+  const r = await fetch(PROXY + path, {
+    method,
+    headers: H(),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+// ── Auth ────────────────────────────────────────────────────────────────────
+if (_email) {
+  initApp();
+} else {
+  waitForGoogle();
+}
+
+function waitForGoogle() {
+  if (window.google?.accounts?.id) {
+    initGoogleSignIn();
+  } else {
+    const t = setInterval(() => {
+      if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); }
+    }, 100);
+  }
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: GCLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt();
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular'
+  });
+  document.getElementById('auth-status').textContent = 'Sign in with your @adamscameron.com account.';
+}
+
+function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    _email = payload.email || '';
+    if (_email) localStorage.setItem('ac_user_email', _email);
+    initApp();
+  } catch(e) {
+    document.getElementById('auth-status').textContent = 'Sign-in error: ' + e.message;
+  }
+}
+
+async function initApp() {
+  try {
+    _access = await api('GET', '/api/floor/my-access');
+  } catch(e) {
+    if (e.message.includes('No floor duty access') || e.message.includes('Staff access required')) {
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('no-access').style.display = 'flex';
+      return;
+    }
+    document.getElementById('auth-status').textContent = 'Error: ' + e.message;
+    return;
+  }
+
+  // Set up user avatar
+  const initials = _email.split('@')[0].slice(0, 2).toUpperCase();
+  const avatar = document.getElementById('user-avatar');
+  avatar.textContent = initials;
+  avatar.title = _email;
+
+  // Hide config-only tabs for coordinators
+  if (!_access.can_configure_shifts) {
+    document.getElementById('tab-shifts').hidden = true;
+    document.getElementById('tab-eligibility').hidden = true;
+    // Default to schedule tab
+    switchTab('schedule');
+  }
+
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  await loadOffices();
+}
+
+// ── Tab navigation ──────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+}
+
+// ── Office selector ─────────────────────────────────────────────────────────
+async function loadOffices() {
+  _offices = await api('GET', '/api/floor/offices');
+  const sel = document.getElementById('office-select');
+  sel.innerHTML = _offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+  if (_offices.length) onOfficeChange();
+}
+
+document.getElementById('office-select').addEventListener('change', onOfficeChange);
+
+function onOfficeChange() {
+  const officeId = document.getElementById('office-select').value;
+  if (!officeId) return;
+  const office = _offices.find(o => String(o.id) === officeId);
+  document.getElementById('shifts-subtitle').textContent =
+    `Configure the shifts agents can be assigned to at ${office ? office.name : 'this office'}.`;
+  loadShifts(officeId);
+}
+
+// ── Show inactive toggle ────────────────────────────────────────────────────
+document.getElementById('show-inactive').addEventListener('change', e => {
+  _showInactive = e.target.checked;
+  renderShifts();
+});
+
+// ── Shifts ──────────────────────────────────────────────────────────────────
+async function loadShifts(officeId) {
+  const list = document.getElementById('shifts-list');
+  list.innerHTML = '<div class="loading-row"><span class="spin"></span> Loading shifts…</div>';
+  document.getElementById('add-shift-btn').style.display = 'none';
+
+  try {
+    _shifts = await api('GET', '/api/floor/shifts/' + officeId);
+    renderShifts();
+    if (_access.can_configure_shifts) {
+      document.getElementById('add-shift-btn').style.display = 'flex';
+    }
+  } catch(e) {
+    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderShifts() {
+  const list = document.getElementById('shifts-list');
+  const visible = _showInactive ? _shifts : _shifts.filter(s => s.is_active);
+  if (!visible.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚙️</div>
+        <p>${_shifts.length ? 'No active shifts. Enable "Show inactive shifts" to see deactivated shifts.' : 'No shifts configured yet. Add your first shift below.'}</p>
+      </div>`;
+    return;
+  }
+  list.innerHTML = visible.map(s => shiftCardHtml(s)).join('');
+  list.querySelectorAll('.shift-card').forEach(card => bindShiftCard(card));
+}
+
+const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const DAY_LABELS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+function fmt12(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function shiftCardHtml(s) {
+  const daysDisplay = DAYS.map((d, i) =>
+    `<span class="day-pip ${s[d] ? 'on' : 'off'}">${DAY_LABELS[i]}</span>`
+  ).join('');
+
+  const canEdit = _access.can_configure_shifts;
+
+  return `
+    <div class="shift-card${s.is_active ? '' : ' inactive'}" data-id="${s.id}">
+      <div class="shift-card-header collapsed">
+        <span class="shift-drag-handle" style="${canEdit ? '' : 'display:none'}">⠿</span>
+        <div>
+          <div class="shift-name-display">${esc(s.name)}</div>
+          <div class="shift-time-display">${fmt12(s.start_time)} – ${fmt12(s.end_time)}</div>
+        </div>
+        <div class="shift-days-display">${daysDisplay}</div>
+        ${!s.is_active ? '<span class="badge-inactive">Inactive</span>' : ''}
+        <div class="shift-card-actions" style="${canEdit ? '' : 'display:none'}">
+          <button class="btn-icon edit-btn" title="Edit shift">✏️</button>
+          ${s.is_active
+            ? `<button class="btn-icon danger deactivate-btn" title="Deactivate shift">🗑️</button>`
+            : `<button class="btn-icon restore-btn" title="Reactivate shift">↩️</button>`}
+        </div>
+      </div>
+      <div class="shift-edit-form" style="display:none">
+        <div class="form-row">
+          <div class="form-field name-field">
+            <label>Shift Name</label>
+            <input type="text" class="f-name" value="${esc(s.name)}" placeholder="e.g. Morning">
+          </div>
+          <div class="form-field time-field">
+            <label>Start Time</label>
+            <input type="time" class="f-start" value="${s.start_time}">
+          </div>
+          <div class="form-field time-field">
+            <label>End Time</label>
+            <input type="time" class="f-end" value="${s.end_time}">
+          </div>
+          <div class="form-field order-field">
+            <label>Order</label>
+            <input type="number" class="f-order" value="${s.display_order}" min="0" max="99">
+          </div>
+        </div>
+        <div class="days-row">
+          <label>Active Days</label>
+          <div class="days-toggles">
+            ${DAYS.map((d, i) =>
+              `<button type="button" class="day-btn${s[d] ? ' active' : ''}" data-day="${d}">${DAY_LABELS[i]}</button>`
+            ).join('')}
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary save-btn">Save Changes</button>
+          <button class="btn-secondary cancel-btn">Cancel</button>
+          <span class="inline-msg"></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function bindShiftCard(card) {
+  const shiftId = parseInt(card.dataset.id, 10);
+  const header = card.querySelector('.shift-card-header');
+  const form   = card.querySelector('.shift-edit-form');
+
+  // Edit toggle
+  const editBtn = card.querySelector('.edit-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      const open = form.style.display !== 'none';
+      form.style.display = open ? 'none' : 'block';
+      header.classList.toggle('collapsed', open);
+    });
+  }
+
+  // Day toggles
+  card.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+
+  // Cancel
+  card.querySelector('.cancel-btn')?.addEventListener('click', () => {
+    form.style.display = 'none';
+    header.classList.add('collapsed');
+    // Reset to original values
+    const s = _shifts.find(s => s.id === shiftId);
+    if (s) {
+      card.querySelector('.f-name').value = s.name;
+      card.querySelector('.f-start').value = s.start_time;
+      card.querySelector('.f-end').value = s.end_time;
+      card.querySelector('.f-order').value = s.display_order;
+      card.querySelectorAll('.day-btn').forEach(btn =>
+        btn.classList.toggle('active', !!s[btn.dataset.day])
+      );
+    }
+    card.querySelector('.inline-msg').textContent = '';
+  });
+
+  // Save
+  card.querySelector('.save-btn')?.addEventListener('click', async () => {
+    const btn = card.querySelector('.save-btn');
+    const msg = card.querySelector('.inline-msg');
+    msg.className = 'inline-msg';
+    msg.textContent = '';
+    const body = {
+      name:          card.querySelector('.f-name').value.trim(),
+      start_time:    card.querySelector('.f-start').value,
+      end_time:      card.querySelector('.f-end').value,
+      display_order: parseInt(card.querySelector('.f-order').value, 10) || 0
+    };
+    DAYS.forEach(d => { body[d] = !!card.querySelector(`.day-btn[data-day="${d}"]`)?.classList.contains('active'); });
+    if (!body.name || !body.start_time || !body.end_time) {
+      msg.className = 'inline-msg err'; msg.textContent = 'Name and times are required.'; return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Saving…';
+    try {
+      const updated = await api('PUT', '/api/floor/shifts/' + shiftId, body);
+      const idx = _shifts.findIndex(s => s.id === shiftId);
+      if (idx >= 0) _shifts[idx] = updated;
+      renderShifts();
+    } catch(e) {
+      msg.className = 'inline-msg err'; msg.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Save Changes';
+    }
+  });
+
+  // Deactivate
+  card.querySelector('.deactivate-btn')?.addEventListener('click', async () => {
+    if (!confirm('Deactivate this shift? It will no longer appear in scheduling but can be reactivated.')) return;
+    try {
+      await api('DELETE', '/api/floor/shifts/' + shiftId);
+      const idx = _shifts.findIndex(s => s.id === shiftId);
+      if (idx >= 0) _shifts[idx].is_active = false;
+      renderShifts();
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  });
+
+  // Restore
+  card.querySelector('.restore-btn')?.addEventListener('click', async () => {
+    try {
+      const updated = await api('PUT', '/api/floor/shifts/' + shiftId, { is_active: true });
+      const idx = _shifts.findIndex(s => s.id === shiftId);
+      if (idx >= 0) _shifts[idx] = updated;
+      renderShifts();
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  });
+}
+
+// ── Add shift ───────────────────────────────────────────────────────────────
+document.getElementById('add-shift-btn').addEventListener('click', () => {
+  const btn = document.getElementById('add-shift-btn');
+  btn.style.display = 'none';
+  const officeId = document.getElementById('office-select').value;
+
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.innerHTML = `
+    <div class="card-head">
+      <span class="card-head-label">New Shift</span>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-field name-field">
+          <label>Shift Name</label>
+          <input type="text" id="new-name" placeholder="e.g. Morning" autofocus>
+        </div>
+        <div class="form-field time-field">
+          <label>Start Time</label>
+          <input type="time" id="new-start" value="09:00">
+        </div>
+        <div class="form-field time-field">
+          <label>End Time</label>
+          <input type="time" id="new-end" value="13:00">
+        </div>
+        <div class="form-field order-field">
+          <label>Order</label>
+          <input type="number" id="new-order" value="${_shifts.length}" min="0" max="99">
+        </div>
+      </div>
+      <div class="days-row">
+        <label>Active Days</label>
+        <div class="days-toggles">
+          ${DAYS.map((d, i) => `<button type="button" class="day-btn active" data-day="${d}">${DAY_LABELS[i]}</button>`).join('')}
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" id="new-save-btn">Add Shift</button>
+        <button class="btn-secondary" id="new-cancel-btn">Cancel</button>
+        <span class="inline-msg" id="new-msg"></span>
+      </div>
+    </div>`;
+
+  div.querySelectorAll('.day-btn').forEach(b =>
+    b.addEventListener('click', () => b.classList.toggle('active'))
+  );
+
+  document.getElementById('shifts-list').appendChild(div);
+
+  div.querySelector('#new-cancel-btn').addEventListener('click', () => {
+    div.remove();
+    btn.style.display = 'flex';
+  });
+
+  div.querySelector('#new-save-btn').addEventListener('click', async () => {
+    const saveBtn = div.querySelector('#new-save-btn');
+    const msg = div.querySelector('#new-msg');
+    msg.className = 'inline-msg'; msg.textContent = '';
+    const body = {
+      name:          div.querySelector('#new-name').value.trim(),
+      start_time:    div.querySelector('#new-start').value,
+      end_time:      div.querySelector('#new-end').value,
+      display_order: parseInt(div.querySelector('#new-order').value, 10) || 0
+    };
+    DAYS.forEach(d => { body[d] = !!div.querySelector(`.day-btn[data-day="${d}"]`)?.classList.contains('active'); });
+    if (!body.name || !body.start_time || !body.end_time) {
+      msg.className = 'inline-msg err'; msg.textContent = 'Name and times are required.'; return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spin"></span> Adding…';
+    try {
+      const created = await api('POST', '/api/floor/shifts/' + officeId, body);
+      _shifts.push(created);
+      div.remove();
+      btn.style.display = 'flex';
+      renderShifts();
+    } catch(e) {
+      msg.className = 'inline-msg err'; msg.textContent = e.message;
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Add Shift';
+    }
+  });
+
+  setTimeout(() => div.querySelector('#new-name')?.focus(), 50);
+});
+
+// ── Utility ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
