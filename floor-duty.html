@@ -381,6 +381,43 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .loading-row { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    /* ── Availability tab ───────────────────────────────────────────────────── */
+    .avail-offices-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+    .avail-office-check {
+      display: flex; align-items: center; gap: 7px; cursor: pointer;
+      font-size: 13px; padding: 6px 12px; border: 1px solid var(--border);
+      border-radius: 6px; user-select: none; transition: all .15s;
+    }
+    .avail-office-check.checked { border-color: var(--navy); background: var(--navy); color: #fff; }
+    .avail-office-check input { display: none; }
+
+    /* Calendar */
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+      margin-bottom: 4px;
+    }
+    .cal-hdr {
+      text-align: center; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em;
+      color: var(--muted); padding: 4px 0;
+    }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500; transition: opacity .12s;
+      user-select: none; position: relative;
+    }
+    .cal-day:hover:not(.empty) { opacity: .78; }
+    .cal-day.empty { cursor: default; visibility: hidden; }
+    .cal-day.default-off { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+    .cal-day.default-on  { background: var(--navy); color: #fff; }
+    .cal-day.override-on { background: var(--green); color: #fff; }
+    .cal-day.override-off { background: var(--red); color: #fff; }
+
+    .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+    .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .cal-legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -428,6 +465,7 @@
     <button class="nav-tab" data-tab="schedule">📅 Schedule</button>
     <button class="nav-tab active" data-tab="shifts" id="tab-shifts">⚙️ Shift Setup</button>
     <button class="nav-tab" data-tab="eligibility" id="tab-eligibility">👥 Agent Eligibility</button>
+    <button class="nav-tab" data-tab="availability" id="tab-availability">📋 Availability</button>
     <button class="nav-tab" data-tab="feedback">💬 Feedback</button>
     <button class="nav-tab" data-tab="publish">🚀 Publish</button>
   </nav>
@@ -486,6 +524,115 @@
     </div>
 
     <div id="eligibility-list"></div>
+  </div>
+
+  <!-- ── Availability tab ─────────────────────────────────────────────────── -->
+  <div class="page" id="page-availability">
+    <div class="page-header">
+      <h1>Agent Availability</h1>
+      <p id="availability-subtitle">Enter or update availability preferences on behalf of an agent.</p>
+    </div>
+
+    <!-- Agent selector -->
+    <div class="card">
+      <div class="card-head"><span class="card-head-label">Agent</span></div>
+      <div class="card-body">
+        <div class="form-field" style="max-width:340px">
+          <label>Select Agent</label>
+          <select id="avail-agent-select" style="width:100%">
+            <option value="">— select an office first —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="avail-content" style="display:none">
+
+      <!-- Standing Preferences -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-head-label">Standing Preferences</span>
+          <span style="font-size:11px;color:var(--muted)" id="avail-defaults-updated"></span>
+        </div>
+        <div class="card-body">
+
+          <div style="margin-bottom:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px">
+              Willing to Work At
+            </div>
+            <div class="avail-offices-grid" id="avail-offices-grid"></div>
+          </div>
+
+          <div class="days-row" style="margin-bottom:18px">
+            <label>Available Days</label>
+            <div class="days-toggles" id="avail-days-toggles"></div>
+          </div>
+
+          <div id="avail-shifts-section" style="margin-bottom:18px;display:none">
+            <div class="days-row">
+              <label>Shift Preferences
+                <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(empty = any shift)</span>
+              </label>
+              <div class="days-toggles" id="avail-shifts-toggles"></div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-primary" id="avail-save-defaults">Save Preferences</button>
+            <span class="inline-msg" id="avail-defaults-msg"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Overrides -->
+      <div class="card">
+        <div class="card-head"><span class="card-head-label">Monthly Overrides</span></div>
+        <div class="card-body">
+          <div class="form-row" style="margin-bottom:16px;align-items:flex-end">
+            <div class="form-field">
+              <label>Scheduling Period</label>
+              <select id="avail-period-select" style="min-width:220px">
+                <option value="">— no periods —</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="avail-cal-wrap" style="display:none">
+            <div class="cal-grid">
+              <div class="cal-hdr">Mo</div><div class="cal-hdr">Tu</div>
+              <div class="cal-hdr">We</div><div class="cal-hdr">Th</div>
+              <div class="cal-hdr">Fr</div><div class="cal-hdr">Sa</div>
+              <div class="cal-hdr">Su</div>
+            </div>
+            <div class="cal-grid" id="avail-cal-grid"></div>
+            <div class="cal-legend">
+              <div class="cal-legend-item">
+                <div class="cal-legend-swatch" style="background:var(--navy)"></div> Available by default
+              </div>
+              <div class="cal-legend-item">
+                <div class="cal-legend-swatch" style="background:var(--bg);border:1px solid var(--border)"></div> Off by default
+              </div>
+              <div class="cal-legend-item">
+                <div class="cal-legend-swatch" style="background:var(--green)"></div> Override: added
+              </div>
+              <div class="cal-legend-item">
+                <div class="cal-legend-swatch" style="background:var(--red)"></div> Override: blocked
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top:16px">
+              <button class="btn-primary" id="avail-save-overrides">Save Overrides</button>
+              <button class="btn-secondary" id="avail-reset-overrides">Reset</button>
+              <span class="inline-msg" id="avail-overrides-msg"></span>
+            </div>
+          </div>
+
+          <div id="avail-cal-no-period">
+            <p style="color:var(--muted);font-size:13px">No scheduling periods found for this office. Create one in the Schedule tab first.</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /avail-content -->
   </div>
 
   <!-- ── Feedback tab (placeholder) ──────────────────────────────────────── -->
@@ -646,8 +793,11 @@ function onOfficeChange() {
     `Set which agents are eligible for floor duty at ${name}.`;
   document.getElementById('schedule-subtitle').textContent =
     `Manage the availability window and scheduling period for ${name}.`;
+  document.getElementById('availability-subtitle').textContent =
+    `Enter or update availability preferences for agents at ${name}.`;
   loadShifts(officeId);
   loadEligibility(officeId);
+  loadAvailAgents(officeId);
   initScheduleMonth();
   loadPeriods(officeId);
 }
@@ -1342,6 +1492,284 @@ async function onEligSinceChange(inp) {
     alert('Error saving date: ' + e.message);
   }
 }
+
+// ── Availability tab ────────────────────────────────────────────────────────
+let _availAgents    = [];
+let _availAgentId   = null;
+let _availDefaults  = null;
+let _availPeriodId  = null;
+let _savedOverrides = [];
+let _pendingOvr     = {};  // dateStr -> { is_available: bool }
+
+async function loadAvailAgents(officeId) {
+  const sel = document.getElementById('avail-agent-select');
+  sel.innerHTML = '<option value="">— loading… —</option>';
+  _availAgents = [];
+  _availAgentId = null;
+  document.getElementById('avail-content').style.display = 'none';
+  try {
+    _availAgents = await api('GET', '/api/floor/availability/agents/' + officeId);
+    sel.innerHTML = '<option value="">— select an agent —</option>' +
+      _availAgents.map(a =>
+        `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}${a.is_eligible ? '' : ' ◦'}</option>`
+      ).join('');
+  } catch(e) {
+    sel.innerHTML = `<option value="">Error: ${esc(e.message)}</option>`;
+  }
+}
+
+document.getElementById('avail-agent-select').addEventListener('change', async e => {
+  const id = parseInt(e.target.value, 10);
+  if (!id) {
+    _availAgentId = null;
+    document.getElementById('avail-content').style.display = 'none';
+    return;
+  }
+  _availAgentId = id;
+  document.getElementById('avail-content').style.display = 'none';
+  await loadAvailDefaults(id);
+  renderAvailDefaults();
+  populateAvailPeriods();
+  document.getElementById('avail-content').style.display = 'block';
+});
+
+async function loadAvailDefaults(agentId) {
+  try {
+    _availDefaults = await api('GET', '/api/floor/availability/defaults/' + agentId);
+  } catch(e) {
+    _availDefaults = {
+      mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false,
+      willing_office_ids: [], preferred_shift_ids: [], updated_at: null
+    };
+  }
+}
+
+function renderAvailDefaults() {
+  if (!_availDefaults) return;
+
+  // Office checkboxes
+  const grid = document.getElementById('avail-offices-grid');
+  grid.innerHTML = _offices.map(o => {
+    const checked = _availDefaults.willing_office_ids.includes(o.id);
+    return `<label class="avail-office-check${checked ? ' checked' : ''}">
+      <input type="checkbox" value="${o.id}"${checked ? ' checked' : ''}>
+      ${esc(o.name)}
+    </label>`;
+  }).join('');
+  grid.querySelectorAll('.avail-office-check').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const cb = lbl.querySelector('input');
+      cb.checked = !cb.checked;
+      lbl.classList.toggle('checked', cb.checked);
+    });
+  });
+
+  // Day toggles
+  const daysDiv = document.getElementById('avail-days-toggles');
+  daysDiv.innerHTML = DAYS.map((d, i) =>
+    `<button type="button" class="day-btn${_availDefaults[d] ? ' active' : ''}" data-day="${d}">${DAY_LABELS[i]}</button>`
+  ).join('');
+  daysDiv.querySelectorAll('.day-btn').forEach(btn =>
+    btn.addEventListener('click', () => btn.classList.toggle('active'))
+  );
+
+  // Shift toggles
+  const activeShifts = _shifts.filter(s => s.is_active);
+  const shiftsSection = document.getElementById('avail-shifts-section');
+  if (activeShifts.length) {
+    shiftsSection.style.display = 'block';
+    const shiftsDiv = document.getElementById('avail-shifts-toggles');
+    shiftsDiv.innerHTML = activeShifts.map(s =>
+      `<button type="button" class="day-btn${_availDefaults.preferred_shift_ids.includes(s.id) ? ' active' : ''}"
+        data-shift="${s.id}">${esc(s.name)}</button>`
+    ).join('');
+    shiftsDiv.querySelectorAll('[data-shift]').forEach(btn =>
+      btn.addEventListener('click', () => btn.classList.toggle('active'))
+    );
+  } else {
+    shiftsSection.style.display = 'none';
+  }
+
+  // Updated-at label
+  const updEl = document.getElementById('avail-defaults-updated');
+  updEl.textContent = _availDefaults.updated_at
+    ? 'Last updated ' + new Date(_availDefaults.updated_at).toLocaleDateString()
+    : 'No preferences saved yet';
+}
+
+function populateAvailPeriods() {
+  const sel     = document.getElementById('avail-period-select');
+  const calWrap = document.getElementById('avail-cal-wrap');
+  const noEl    = document.getElementById('avail-cal-no-period');
+
+  _availPeriodId = null;
+  _pendingOvr    = {};
+  _savedOverrides = [];
+  calWrap.style.display = 'none';
+
+  if (!_periods || !_periods.length) {
+    sel.innerHTML = '<option value="">— no periods —</option>';
+    noEl.style.display = 'block';
+    return;
+  }
+
+  noEl.style.display = 'none';
+  sel.innerHTML = _periods.map(p =>
+    `<option value="${p.id}">${MONTH_NAMES[p.period_month - 1]} ${p.period_year} — ${capitalize(p.status)}</option>`
+  ).join('');
+
+  // Default to first open period, otherwise first in list
+  const open = _periods.find(p => p.status === 'open') || _periods[0];
+  sel.value = String(open.id);
+  onAvailPeriodChange();
+}
+
+document.getElementById('avail-period-select').addEventListener('change', onAvailPeriodChange);
+
+async function onAvailPeriodChange() {
+  const periodId = parseInt(document.getElementById('avail-period-select').value, 10);
+  const calWrap  = document.getElementById('avail-cal-wrap');
+  const msg      = document.getElementById('avail-overrides-msg');
+  if (!periodId || !_availAgentId) { calWrap.style.display = 'none'; return; }
+  _availPeriodId  = periodId;
+  _pendingOvr     = {};
+  _savedOverrides = [];
+  calWrap.style.display = 'none';
+  msg.className = 'inline-msg'; msg.textContent = '';
+  try {
+    _savedOverrides = await api('GET', `/api/floor/availability/overrides/${_availAgentId}/${periodId}`);
+    for (const o of _savedOverrides) {
+      _pendingOvr[o.override_date] = { is_available: o.is_available };
+    }
+    calWrap.style.display = 'block';
+    renderAvailCalendar();
+  } catch(e) {
+    msg.className = 'inline-msg err'; msg.textContent = e.message;
+  }
+}
+
+function renderAvailCalendar() {
+  if (!_availDefaults || !_availPeriodId) return;
+  const period = _periods.find(p => p.id === _availPeriodId);
+  if (!period) return;
+
+  const year = period.period_year;
+  const month = period.period_month;  // 1-based
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const jsFirstDay  = new Date(year, month - 1, 1).getDay();  // 0=Sun
+  const startOffset = jsFirstDay === 0 ? 6 : jsFirstDay - 1;  // Mon-first
+
+  const dayFields = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  let cells = '';
+
+  for (let i = 0; i < startOffset; i++) cells += '<div class="cal-day empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const jsDay  = new Date(year, month - 1, d).getDay();
+    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const field  = dayFields[dayIdx];
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const defaultOn = !!_availDefaults[field];
+    const override  = _pendingOvr[dateStr];
+
+    let cls;
+    if (override !== undefined) {
+      cls = override.is_available ? 'override-on' : 'override-off';
+    } else {
+      cls = defaultOn ? 'default-on' : 'default-off';
+    }
+    cells += `<div class="cal-day ${cls}" data-date="${dateStr}" data-default="${defaultOn ? '1' : '0'}">${d}</div>`;
+  }
+
+  const grid = document.getElementById('avail-cal-grid');
+  grid.innerHTML = cells;
+  grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell =>
+    cell.addEventListener('click', () => toggleCalDay(cell))
+  );
+}
+
+function toggleCalDay(cell) {
+  const date      = cell.dataset.date;
+  const defaultOn = cell.dataset.default === '1';
+  const override  = _pendingOvr[date];
+
+  if (override !== undefined) {
+    delete _pendingOvr[date];           // remove override → revert to standing default
+  } else if (defaultOn) {
+    _pendingOvr[date] = { is_available: false };  // block a normally-available day
+  } else {
+    _pendingOvr[date] = { is_available: true };   // add an off-by-default day
+  }
+  renderAvailCalendar();
+}
+
+document.getElementById('avail-save-defaults').addEventListener('click', async () => {
+  if (!_availAgentId) return;
+  const btn = document.getElementById('avail-save-defaults');
+  const msg = document.getElementById('avail-defaults-msg');
+  msg.className = 'inline-msg'; msg.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
+
+  const willing = Array.from(document.querySelectorAll('#avail-offices-grid input:checked'))
+    .map(cb => parseInt(cb.value, 10));
+  const days = {};
+  DAYS.forEach(d => {
+    days[d] = !!document.querySelector(`#avail-days-toggles .day-btn[data-day="${d}"]`)?.classList.contains('active');
+  });
+  const shifts = Array.from(document.querySelectorAll('#avail-shifts-toggles .day-btn.active'))
+    .map(b => parseInt(b.dataset.shift, 10));
+
+  try {
+    _availDefaults = await api('PUT', '/api/floor/availability/defaults/' + _availAgentId, {
+      ...days, willing_office_ids: willing, preferred_shift_ids: shifts
+    });
+    renderAvailCalendar();  // refresh calendar — default-on days may have changed
+    const updEl = document.getElementById('avail-defaults-updated');
+    updEl.textContent = 'Last updated ' + new Date(_availDefaults.updated_at).toLocaleDateString();
+    msg.className = 'inline-msg ok'; msg.textContent = 'Saved.';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch(e) {
+    msg.className = 'inline-msg err'; msg.textContent = e.message;
+  }
+  btn.disabled = false; btn.textContent = 'Save Preferences';
+});
+
+document.getElementById('avail-save-overrides').addEventListener('click', async () => {
+  if (!_availAgentId || !_availPeriodId) return;
+  const btn = document.getElementById('avail-save-overrides');
+  const msg = document.getElementById('avail-overrides-msg');
+  msg.className = 'inline-msg'; msg.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
+
+  const overrides = Object.entries(_pendingOvr).map(([date, val]) => ({
+    override_date: date, shift_id: null, is_available: val.is_available, note: null
+  }));
+
+  try {
+    _savedOverrides = await api('PUT',
+      `/api/floor/availability/overrides/${_availAgentId}/${_availPeriodId}`,
+      { overrides }
+    );
+    _pendingOvr = {};
+    for (const o of _savedOverrides) {
+      _pendingOvr[o.override_date] = { is_available: o.is_available };
+    }
+    renderAvailCalendar();
+    msg.className = 'inline-msg ok'; msg.textContent = 'Saved.';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  } catch(e) {
+    msg.className = 'inline-msg err'; msg.textContent = e.message;
+  }
+  btn.disabled = false; btn.textContent = 'Save Overrides';
+});
+
+document.getElementById('avail-reset-overrides').addEventListener('click', () => {
+  _pendingOvr = {};
+  for (const o of _savedOverrides) {
+    _pendingOvr[o.override_date] = { is_available: o.is_available };
+  }
+  renderAvailCalendar();
+});
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 function esc(s) {
