@@ -1262,6 +1262,7 @@ function renderPeriodArea() {
   document.getElementById('btn-open-period')?.addEventListener('click',   () => advancePeriod(period.id, 'open'));
   document.getElementById('btn-close-period')?.addEventListener('click',  () => advancePeriod(period.id, 'closed'));
   document.getElementById('btn-draft-period')?.addEventListener('click',  () => advancePeriod(period.id, 'draft'));
+  document.getElementById('btn-run-algorithm')?.addEventListener('click', () => runAlgorithm(period.id));
 
   document.getElementById('btn-save-dates')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-save-dates');
@@ -1296,8 +1297,9 @@ function buildStatusActions(period, canEdit) {
     </div>`;
   if (status === 'closed') return `
     <div class="period-actions">
-      <button class="btn-primary" id="btn-draft-period">Mark Ready for Scheduling</button>
-      <span style="font-size:12px;color:var(--muted)">Moves the period to Draft so the scheduling algorithm can be run.</span>
+      <button class="btn-primary" id="btn-run-algorithm">Run Scheduling Algorithm</button>
+      <button class="btn-secondary" id="btn-draft-period" style="margin-left:4px">Skip to Draft</button>
+      <span style="font-size:12px;color:var(--muted)">Fills assignments from agent availability, then moves to Draft for review. Skip if you want to assign manually.</span>
     </div>`;
   if (status === 'draft') return `
     <div class="period-actions">
@@ -1330,6 +1332,26 @@ async function createPeriod() {
   } catch(e) {
     msg.className = 'inline-msg err'; msg.textContent = e.message;
     btn.disabled = false; btn.textContent = 'Create Period';
+  }
+}
+
+async function runAlgorithm(periodId) {
+  const btn = document.getElementById('btn-run-algorithm');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Running…'; }
+  try {
+    const result = await api('POST', '/api/floor/schedule/' + periodId + '/run');
+    const officeId = document.getElementById('office-select').value;
+    await loadPeriods(officeId);
+    // renderPeriodArea is called by loadPeriods → show a brief summary overlay
+    const area = document.getElementById('period-area');
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:var(--green-bg);border:1px solid var(--green);border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--green)';
+    banner.innerHTML = `<strong>Algorithm complete</strong> — ${result.filled} slot${result.filled !== 1 ? 's' : ''} filled, ${result.unfilled} unfilled${result.skipped ? ', ' + result.skipped + ' manual assignment' + (result.skipped !== 1 ? 's' : '') + ' preserved' : ''}. Review below, then publish when ready.`;
+    area.prepend(banner);
+    setTimeout(() => banner.remove(), 8000);
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Scheduling Algorithm'; }
+    alert('Algorithm error: ' + e.message);
   }
 }
 
