@@ -457,6 +457,17 @@
     .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
     .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
     .cal-legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Publish / preflight ────────────────────────────────────────────────── */
+    .pf-list { display: flex; flex-direction: column; }
+    .pf-item { display: flex; align-items: flex-start; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+    .pf-item:last-child { border-bottom: none; }
+    .pf-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+    .pf-icon.ok   { background: var(--green-bg); color: var(--green); }
+    .pf-icon.warn { background: var(--amber-bg); color: var(--amber); }
+    .pf-icon.fail { background: var(--red-bg);   color: var(--red); }
+    .pf-label  { font-size: 13px; font-weight: 600; color: var(--text); }
+    .pf-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -685,10 +696,12 @@
 
   <!-- ── Publish tab (placeholder) ────────────────────────────────────────── -->
   <div class="page" id="page-publish">
-    <div class="placeholder-page">
-      <div class="ph-icon">🚀</div>
-      <h3>Publish</h3>
-      <p>Pre-flight checklist and one-click publish to Google Calendar. Coming in a future step.</p>
+    <div class="page-header">
+      <h1>Publish Schedule</h1>
+      <p id="publish-subtitle">Select an office to begin.</p>
+    </div>
+    <div id="publish-area">
+      <div class="loading-row"><span class="spin"></span> Loading…</div>
     </div>
   </div>
 </div>
@@ -809,6 +822,7 @@ function switchTab(tab) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
   // Re-render period area when switching to Schedule (month nav may have changed)
   if (tab === 'schedule' && _periods.length !== undefined) renderPeriodArea();
+  if (tab === 'publish') renderPublishArea();
 }
 
 // ── Office selector ─────────────────────────────────────────────────────────
@@ -1172,6 +1186,7 @@ async function loadPeriods(officeId) {
     _periods   = data.periods;
     _eligCount = data.eligible_count;
     renderPeriodArea();
+    renderPublishArea();
   } catch(e) {
     document.getElementById('period-area').innerHTML =
       `<div class="loading-row" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
@@ -2011,6 +2026,213 @@ document.getElementById('avail-reset-overrides').addEventListener('click', () =>
   }
   renderAvailCalendar();
 });
+
+// ── Publish tab ─────────────────────────────────────────────────────────────
+
+async function renderPublishArea() {
+  const area = document.getElementById('publish-area');
+  if (!area) return;
+
+  const officeId = document.getElementById('office-select').value;
+  if (!officeId) {
+    area.innerHTML = '<div class="loading-row">Select an office above to view publish options.</div>';
+    return;
+  }
+
+  const draftPeriod = _periods.find(p => p.status === 'draft');
+  if (!draftPeriod) {
+    const pub = _periods.find(p => p.status === 'published');
+    area.innerHTML = pub
+      ? `<div class="period-status-card"><div class="period-status-head"><h3>${esc(MONTH_NAMES[pub.period_month - 1])} ${pub.period_year}</h3><span class="status-badge published">Published</span></div><div class="period-status-body"><p style="color:var(--muted);font-size:13px">This schedule has already been published. Individual assignments can still be edited from the Schedule tab.</p></div></div>`
+      : '<div class="loading-row" style="color:var(--muted)">No draft schedule found. Run the scheduling algorithm from the Schedule tab first.</div>';
+    return;
+  }
+
+  area.innerHTML = '<div class="loading-row"><span class="spin"></span> Running pre-flight check…</div>';
+  try {
+    const pf = await api('GET', `/api/floor/preflight/${draftPeriod.id}`);
+    renderPreflightUI(area, pf);
+  } catch (e) {
+    area.innerHTML = `<div class="loading-row" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderPreflightUI(area, pf) {
+  const { period, assignments, calendar_ready, gcal_calendar_id, email_ready } = pf;
+  const monthName  = `${MONTH_NAMES[period.period_month - 1]} ${period.period_year}`;
+  const canPublish = period.status === 'draft' && assignments.filled > 0;
+
+  const checks = [
+    {
+      ok:   period.status === 'draft',
+      warn: false,
+      label: 'Schedule status',
+      detail: period.status === 'draft' ? 'Draft — ready to publish' : `Status is "${period.status}" (must be draft)`,
+    },
+    {
+      ok:   assignments.filled > 0,
+      warn: assignments.filled > 0 && assignments.unfilled > 0,
+      label: 'Assignments',
+      detail: assignments.total === 0
+        ? 'No assignments found — run the algorithm first'
+        : `${assignments.filled} filled · ${assignments.unfilled} open · ${assignments.total} total`,
+    },
+    {
+      ok:   calendar_ready,
+      warn: !calendar_ready,
+      label: 'Google Calendar',
+      detail: calendar_ready
+        ? 'Service account and calendar ID configured'
+        : 'Not fully configured — calendar events will be skipped',
+    },
+    {
+      ok:   email_ready,
+      warn: !email_ready,
+      label: 'Confirmation emails',
+      detail: email_ready
+        ? 'Gmail configured — confirmation emails will be sent'
+        : 'Gmail not configured — email notifications will be skipped',
+    },
+  ];
+
+  const checkHtml = checks.map(c => {
+    const cls  = c.ok ? 'ok' : (c.warn ? 'warn' : 'fail');
+    const icon = c.ok ? '✓' : (c.warn ? '!' : '✗');
+    return `<div class="pf-item">
+      <div class="pf-icon ${cls}">${icon}</div>
+      <div><div class="pf-label">${esc(c.label)}</div><div class="pf-detail">${esc(c.detail)}</div></div>
+    </div>`;
+  }).join('');
+
+  const calInputHtml = _access.can_configure_shifts && !calendar_ready ? `
+    <div class="card">
+      <div class="card-head"><span class="card-head-label">Google Calendar ID</span></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+          Enter the calendar ID for the ${esc(period.office_name)} office calendar.
+          Find it in Google Calendar → gear icon → Settings for the calendar → Calendar ID.
+        </p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="cal-id-input"
+            placeholder="office@group.calendar.google.com"
+            value="${esc(gcal_calendar_id || '')}"
+            style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          <button class="btn-secondary" id="btn-save-cal-id">Save</button>
+          <span class="inline-msg" id="cal-id-msg"></span>
+        </div>
+      </div>
+    </div>` : '';
+
+  const openNote = assignments.unfilled > 0
+    ? ` <strong style="color:var(--amber)">${assignments.unfilled} slot${assignments.unfilled !== 1 ? 's' : ''} will remain unassigned.</strong>`
+    : '';
+
+  area.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-head-label">Pre-Flight Check — ${esc(monthName)}</span>
+        <span class="status-badge ${period.status}">${capitalize(period.status)}</span>
+      </div>
+      <div class="card-body">
+        <div class="pf-list">${checkHtml}</div>
+      </div>
+    </div>
+    ${calInputHtml}
+    <div class="card">
+      <div class="card-head"><span class="card-head-label">Publish Summary</span></div>
+      <div class="card-body">
+        <div class="stat-row-sm">
+          <div class="stat-sm">
+            <div class="stat-sm-val">${assignments.filled}</div>
+            <div class="stat-sm-lbl">Agents confirmed</div>
+          </div>
+          <div class="stat-sm">
+            <div class="stat-sm-val">${assignments.unfilled}</div>
+            <div class="stat-sm-lbl">Open slots</div>
+          </div>
+          <div class="stat-sm">
+            <div class="stat-sm-val">${calendar_ready ? assignments.filled : 0}</div>
+            <div class="stat-sm-lbl">Calendar events</div>
+          </div>
+          <div class="stat-sm">
+            <div class="stat-sm-val">${email_ready ? assignments.filled : 0}</div>
+            <div class="stat-sm-lbl">Emails to send</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
+          Publishing is permanent. Individual assignments can still be edited afterward.${openNote}
+        </p>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn-primary" id="btn-publish" ${canPublish ? '' : 'disabled'}>
+            Publish ${esc(monthName)}
+          </button>
+          <span class="inline-msg" id="publish-msg"></span>
+        </div>
+        ${!canPublish && assignments.filled === 0 ? '<p style="font-size:12px;color:var(--red);margin-top:8px">No filled assignments to publish.</p>' : ''}
+      </div>
+    </div>`;
+
+  document.getElementById('btn-save-cal-id')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-save-cal-id');
+    const msg = document.getElementById('cal-id-msg');
+    const val = document.getElementById('cal-id-input').value.trim();
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await api('PUT', `/api/floor/offices/${period.office_id}/settings`, { gcal_calendar_id: val });
+      msg.className = 'inline-msg ok'; msg.textContent = 'Saved — refreshing…';
+      setTimeout(() => renderPublishArea(), 800);
+    } catch (e) {
+      msg.className = 'inline-msg err'; msg.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  });
+
+  document.getElementById('btn-publish')?.addEventListener('click',
+    () => publishSchedule(period.id, monthName));
+}
+
+async function publishSchedule(periodId, monthName) {
+  if (!confirm(`Publish the ${monthName} schedule? Google Calendar events and confirmation emails will be sent to all assigned agents.`)) return;
+  const btn = document.getElementById('btn-publish');
+  const msg = document.getElementById('publish-msg');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Publishing…';
+  msg.textContent = '';
+  try {
+    const result = await api('POST', `/api/floor/periods/${periodId}/publish`);
+    const officeId = document.getElementById('office-select').value;
+    await loadPeriods(officeId);
+    const area = document.getElementById('publish-area');
+    if (area) {
+      area.innerHTML = `
+        <div class="period-status-card">
+          <div class="period-status-head">
+            <h3>${esc(monthName)} — Published</h3>
+            <span class="status-badge published">Published</span>
+          </div>
+          <div class="period-status-body">
+            <div class="stat-row-sm">
+              <div class="stat-sm">
+                <div class="stat-sm-val">${result.assignments_confirmed}</div>
+                <div class="stat-sm-lbl">Assignments confirmed</div>
+              </div>
+              <div class="stat-sm">
+                <div class="stat-sm-val">${result.cal_events_created}</div>
+                <div class="stat-sm-lbl">Calendar events</div>
+              </div>
+              <div class="stat-sm">
+                <div class="stat-sm-val">${result.emails_sent}</div>
+                <div class="stat-sm-lbl">Emails sent</div>
+              </div>
+            </div>
+            ${result.errors.length ? `<p style="color:var(--amber);font-size:13px;margin-top:12px">⚠ ${result.errors.length} non-critical error(s) — calendar or email deliveries that failed individually: ${result.errors.map(esc).join('; ')}</p>` : '<p style="color:var(--green);font-size:13px;margin-top:12px">✓ All done. Agents have been notified.</p>'}
+          </div>
+        </div>`;
+    }
+  } catch (e) {
+    msg.className = 'inline-msg err'; msg.textContent = e.message;
+    btn.disabled = false; btn.textContent = `Publish ${monthName}`;
+  }
+}
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 function esc(s) {
