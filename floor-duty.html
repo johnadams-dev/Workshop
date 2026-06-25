@@ -382,6 +382,45 @@
 
     .loading-row { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
 
+    /* ── Schedule detail (draft/published view) ────────────────────────────── */
+    .sched-cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+    }
+    .sched-cal-hdr {
+      text-align: center; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 4px 0;
+    }
+    .sched-cal-day {
+      border: 1px solid var(--border); border-radius: 6px; padding: 5px 4px; min-height: 50px;
+    }
+    .sched-cal-day.empty { border-color: transparent; }
+    .sched-cal-date { font-size: 11px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+    .sched-cal-dots { display: flex; gap: 3px; flex-wrap: wrap; }
+    .sched-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .sched-dot.filled { background: var(--green); }
+    .sched-dot.open   { background: var(--red); }
+
+    .open-slots-table { border-top: 1px solid var(--border); }
+    .open-slot-row {
+      display: grid; grid-template-columns: 100px 1fr 185px 72px;
+      align-items: center; padding: 9px 16px; gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .open-slot-row:last-child { border-bottom: none; }
+    .open-slot-row.hdr {
+      background: var(--bg); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 7px 16px;
+    }
+    .slot-date  { font-size: 13px; font-weight: 500; }
+    .slot-shift { font-size: 13px; }
+    .slot-time  { font-size: 11px; color: var(--muted); }
+    .slot-sel   {
+      padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px; color: var(--text); background: var(--surface);
+      outline: none; width: 100%;
+    }
+    .slot-sel:focus { border-color: var(--navy); }
+
     /* ── Availability tab ───────────────────────────────────────────────────── */
     .avail-offices-grid { display: flex; gap: 8px; flex-wrap: wrap; }
     .avail-office-check {
@@ -795,6 +834,7 @@ function onOfficeChange() {
     `Manage the availability window and scheduling period for ${name}.`;
   document.getElementById('availability-subtitle').textContent =
     `Enter or update availability preferences for agents at ${name}.`;
+  _schedEligAgents = [];
   loadShifts(officeId);
   loadEligibility(officeId);
   loadAvailAgents(officeId);
@@ -1280,6 +1320,15 @@ function renderPeriodArea() {
       btn.disabled = false; btn.textContent = 'Save Dates';
     }
   });
+
+  // Append schedule detail below the period card for draft and published periods
+  if (['draft', 'published'].includes(period.status)) {
+    const detailDiv = document.createElement('div');
+    detailDiv.id = 'sched-detail';
+    detailDiv.innerHTML = '<div class="loading-row"><span class="spin"></span> Loading schedule…</div>';
+    document.getElementById('period-area').appendChild(detailDiv);
+    loadAndRenderSchedule(period);
+  }
 }
 
 function buildStatusActions(period, canEdit) {
@@ -1513,6 +1562,176 @@ async function onEligSinceChange(inp) {
   } catch(e) {
     alert('Error saving date: ' + e.message);
   }
+}
+
+// ── Schedule detail (draft / published view) ─────────────────────────────────
+let _scheduleData    = null;
+let _schedEligAgents = [];   // cached per office, cleared on office change
+
+async function loadAndRenderSchedule(period) {
+  const detail = document.getElementById('sched-detail');
+  if (!detail) return;
+  try {
+    _scheduleData = await api('GET', '/api/floor/schedule/' + period.id);
+
+    if (!_schedEligAgents.length) {
+      const all = await api('GET', '/api/floor/eligibility/office/' + period.office_id);
+      _schedEligAgents = all.filter(a => a.is_eligible);
+    }
+
+    detail.innerHTML = '';
+    detail.appendChild(buildSchedStats());
+    detail.appendChild(buildSchedCalendar(period));
+
+    const canEdit = period.status === 'draft' && _access.can_configure_shifts;
+    if (canEdit) detail.appendChild(buildOpenSlots(period));
+  } catch(e) {
+    detail.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading schedule: ${esc(e.message)}</div>`;
+  }
+}
+
+function buildSchedStats() {
+  const { total, filled, unfilled } = _scheduleData.stats;
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div class="stat-row-sm" style="margin-bottom:16px">
+      <div class="stat-sm">
+        <div class="stat-sm-val">${total}</div>
+        <div class="stat-sm-lbl">Total Slots</div>
+      </div>
+      <div class="stat-sm">
+        <div class="stat-sm-val" style="color:var(--green)">${filled}</div>
+        <div class="stat-sm-lbl">Filled</div>
+      </div>
+      <div class="stat-sm">
+        <div class="stat-sm-val" style="color:${unfilled > 0 ? 'var(--red)' : 'var(--green)'}">${unfilled}</div>
+        <div class="stat-sm-lbl">Open</div>
+      </div>
+    </div>`;
+  return div;
+}
+
+function buildSchedCalendar(period) {
+  const year  = period.period_year;
+  const month = period.period_month;
+  const daysInMonth  = new Date(year, month, 0).getDate();
+  const jsFirstDay   = new Date(year, month - 1, 1).getDay();
+  const startOffset  = jsFirstDay === 0 ? 6 : jsFirstDay - 1;
+
+  // Index assignments by date
+  const byDate = {};
+  for (const a of _scheduleData.assignments) {
+    if (!byDate[a.assignment_date]) byDate[a.assignment_date] = [];
+    byDate[a.assignment_date].push(a);
+  }
+
+  let cells = '';
+  for (let i = 0; i < startOffset; i++) cells += '<div class="sched-cal-day empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayAs   = byDate[dateStr] || [];
+    const dots    = dayAs.map(a => {
+      const cls   = a.agent_id ? 'filled' : 'open';
+      const label = a.agent_id ? `${a.shift_name}: ${a.agent_name}` : `${a.shift_name}: Open`;
+      return `<div class="sched-dot ${cls}" title="${esc(label)}"></div>`;
+    }).join('');
+
+    cells += `<div class="sched-cal-day">
+      <div class="sched-cal-date">${d}</div>
+      <div class="sched-cal-dots">${dots}</div>
+    </div>`;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginBottom = '16px';
+  card.innerHTML = `
+    <div class="card-head"><span class="card-head-label">Month Overview</span>
+      <span style="font-size:11px;color:var(--muted)">
+        <span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px">
+          <span class="sched-dot filled" style="display:inline-block"></span> Filled
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:4px">
+          <span class="sched-dot open" style="display:inline-block"></span> Open
+        </span>
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="sched-cal-grid">
+        <div class="sched-cal-hdr">Mo</div><div class="sched-cal-hdr">Tu</div>
+        <div class="sched-cal-hdr">We</div><div class="sched-cal-hdr">Th</div>
+        <div class="sched-cal-hdr">Fr</div><div class="sched-cal-hdr">Sa</div>
+        <div class="sched-cal-hdr">Su</div>
+        ${cells}
+      </div>
+    </div>`;
+  return card;
+}
+
+function buildOpenSlots(period) {
+  const open = _scheduleData.assignments.filter(a => !a.agent_id);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginBottom = '16px';
+
+  if (!open.length) {
+    card.innerHTML = `
+      <div class="card-head"><span class="card-head-label">Open Slots</span></div>
+      <div class="card-body" style="text-align:center;color:var(--green);font-weight:600;padding:20px">
+        ✓ All ${_scheduleData.stats.total} slots are filled
+      </div>`;
+    return card;
+  }
+
+  const agentOpts = _schedEligAgents.map(a =>
+    `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`
+  ).join('');
+
+  const rows = open.map(a => {
+    const dt    = new Date(a.assignment_date + 'T00:00:00');
+    const label = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    return `
+      <div class="open-slot-row" data-id="${a.id}">
+        <div class="slot-date">${esc(label)}</div>
+        <div class="slot-shift">${esc(a.shift_name)}<span class="slot-time"> · ${esc(a.shift_start)}–${esc(a.shift_end)}</span></div>
+        <select class="slot-sel">
+          <option value="">— select agent —</option>
+          ${agentOpts}
+        </select>
+        <button class="btn-primary slot-assign-btn">Assign</button>
+      </div>`;
+  }).join('');
+
+  card.innerHTML = `
+    <div class="card-head"><span class="card-head-label">Open Slots (${open.length})</span></div>
+    <div class="open-slots-table">
+      <div class="open-slot-row hdr">
+        <span>Date</span><span>Shift</span><span>Agent</span><span></span>
+      </div>
+      ${rows}
+    </div>`;
+
+  card.querySelectorAll('.open-slot-row[data-id]').forEach(row => {
+    const id  = parseInt(row.dataset.id, 10);
+    const sel = row.querySelector('.slot-sel');
+    const btn = row.querySelector('.slot-assign-btn');
+    btn.addEventListener('click', async () => {
+      const agentId = parseInt(sel.value, 10) || null;
+      if (!agentId) { sel.focus(); return; }
+      btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+      try {
+        await api('PUT', '/api/floor/assignments/' + id, { agent_id: agentId });
+        await loadAndRenderSchedule(period);
+      } catch(e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false; btn.textContent = 'Assign';
+      }
+    });
+  });
+
+  return card;
 }
 
 // ── Availability tab ────────────────────────────────────────────────────────
