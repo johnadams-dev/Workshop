@@ -2225,12 +2225,16 @@ async function nlSaveListing() {
 // Action definitions per status/kind. Each action has a label, icon, description,
 // optional form fields (rendered in the confirm step), and checklist items added on confirm.
 const LISTING_ACTIONS = {
+  coming_soon: [
+    { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
+  ],
   active: [
-    { key: 'change',         icon: '✎', title: 'Change',         desc: 'Price change, extension, or other update.' },
-    { key: 'under_contract', icon: '🤝', title: 'Under Contract', desc: 'A buyer has been found for this listing.' },
-    { key: 'closing',        icon: '🔑', title: 'Closing',        desc: 'The contract closed (recorded directly from Active).' },
-    { key: 'expired',        icon: '⏳', title: 'Expired',        desc: "Listing's term ended without a sale." },
-    { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',      desc: 'Seller is pulling the listing early.' },
+    { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
+    { key: 'change',         icon: '✎', title: 'Change',          desc: 'Price change, extension, or other update.' },
+    { key: 'under_contract', icon: '🤝', title: 'Under Contract',  desc: 'A buyer has been found for this listing.' },
+    { key: 'closing',        icon: '🔑', title: 'Closing',         desc: 'The contract closed (recorded directly from Active).' },
+    { key: 'expired',        icon: '⏳', title: 'Expired',         desc: "Listing's term ended without a sale." },
+    { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',       desc: 'Seller is pulling the listing early.' },
   ],
   under_contract: [
     { key: 'closing',      icon: '🔑', title: 'Closing',      desc: 'The contract closed.' },
@@ -2291,6 +2295,7 @@ const ACTION_TITLES = {
   fall_through:   'Fall Through',
   closing:        'Closing',
   under_contract: 'Under Contract',
+  caravan:        'Add to Caravan',
 };
 
 let amState = { id: null, addr: null, kind: null, status: null, actionKey: null };
@@ -2330,7 +2335,43 @@ function amShowChoose() {
 function amBackToChoose() {
   amShowChoose();
 }
-function amChooseAction(key) {
+async function amChooseAction(key) {
+  if (key === 'caravan') {
+    closeActionModal();
+    const txn   = STATE.listings.find(t => String(t.id) === String(amState.id));
+    const mlsId = txn?.mls_id;
+    if (cvQueue.some(i => i.mlsId === mlsId || (i.addr || i.fullAddr) === amState.addr)) {
+      cvToast('⚠', 'Already in caravan queue.');
+      return;
+    }
+    if (mlsId) {
+      cvToast('⏳', 'Looking up listing…');
+      try {
+        const listing = await cvFetchListing(mlsId);
+        cvQueue.push({ ...listing, entryInstructions: '', agentComments: '' });
+        cvRenderQueue();
+        cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
+      } catch (e) {
+        cvToast('⚠', 'Could not fetch listing: ' + e.message);
+      }
+    } else {
+      // No MLS ID — add with address and price from transaction record
+      cvQueue.push({
+        mlsId: '', addr: amState.addr || '', city: txn?.city || '',
+        state: 'FL', zip: '', fullAddr: amState.addr || '',
+        propType: 'Residential', beds: '', baths: '', sqft: '',
+        price: txn?.current_price || '', agent: txn?.agent_name || '',
+        agentPhone: '', remarks: '', photoUrl: '',
+        yearBuilt: '', garageAttached: '', garageSize: '', pool: '',
+        lotDisplay: '', listDate: '', subdivision: '', cooling: '', heating: '',
+        entryInstructions: '', agentComments: '', _raw: {},
+      });
+      cvRenderQueue();
+      cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
+    }
+    return;
+  }
+
   amState.actionKey = key;
   document.getElementById('actionModalTitle').textContent = ACTION_TITLES[key] || 'Confirm';
   document.getElementById('am-step-choose').style.display = 'none';
