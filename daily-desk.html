@@ -636,6 +636,103 @@ tbody tr.clickable { cursor: pointer; }
   margin: 18px 0 12px;
 }
 .divider::before, .divider::after { content: ''; flex: 1; border-top: 1px solid var(--ink-border); }
+
+/* ═══ CARAVAN TAB ═══ */
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+.btn-danger:hover { background: rgba(248,81,73,.2); }
+.cv-layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+.panel { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r); overflow: hidden; }
+.panel-head { padding: 12px 16px; border-bottom: 1px solid var(--ink-border); display: flex; align-items: center; justify-content: space-between; }
+.panel-title { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .1em; }
+.panel-body { padding: 16px; }
+.cv-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.cv-field:last-child { margin-bottom: 0; }
+.cv-field-label { font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+.cv-field input, .cv-field textarea { font-family: var(--sans); font-size: 13px; color: var(--text); background: var(--ink); border: 1px solid var(--ink-border); border-radius: var(--r); padding: 8px 11px; outline: none; transition: border-color .15s; width: 100%; }
+.cv-field input:focus, .cv-field textarea:focus { border-color: var(--amber); }
+.cv-field input::placeholder, .cv-field textarea::placeholder { color: var(--text-dim); }
+.cv-field textarea { resize: vertical; min-height: 64px; }
+.mls-row { display: flex; gap: 8px; }
+.mls-row input { flex: 1; font-family: var(--sans); font-size: 13px; color: var(--text); background: var(--ink); border: 1px solid var(--ink-border); border-radius: var(--r); padding: 8px 11px; outline: none; transition: border-color .15s; }
+.mls-row input:focus { border-color: var(--amber); }
+.mls-row input::placeholder { color: var(--text-dim); }
+.mls-status-msg { margin-top: 10px; font-size: 12px; color: var(--text-muted); display: none; align-items: center; gap: 6px; }
+.mls-err-msg { margin-top: 10px; font-size: 12px; color: var(--red); display: none; }
+.queue-empty { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.queue-item { display: flex; align-items: flex-start; gap: 12px; border-bottom: 1px solid var(--ink-border); padding: 12px 16px; cursor: grab; transition: background .12s; }
+.queue-item:last-child { border-bottom: none; }
+.queue-item:hover { background: rgba(255,255,255,.02); }
+.queue-item.dragging { opacity: .4; cursor: grabbing; }
+.queue-item.drag-over { background: var(--amber-bg); border-color: var(--amber); }
+.queue-num { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--amber); width: 22px; flex-shrink: 0; padding-top: 1px; }
+.queue-drag { color: var(--text-dim); font-size: 14px; cursor: grab; flex-shrink: 0; padding-top: 1px; user-select: none; }
+.queue-info { flex: 1; min-width: 0; }
+.queue-addr { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
+.queue-note { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-remove { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 15px; padding: 0 2px; flex-shrink: 0; transition: color .15s; }
+.queue-remove:hover { color: var(--red); }
+.print-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--ink-light); border: 1px solid var(--ink-border); border-radius: var(--r); }
+.print-item-addr { font-size: 12px; font-weight: 500; }
+.print-item-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.cv-spinner { width: 14px; height: 14px; border: 2px solid var(--ink-border); border-top-color: var(--amber); border-radius: 50%; animation: cvspin .7s linear infinite; flex-shrink: 0; }
+@keyframes cvspin { to { transform: rotate(360deg); } }
+.cv-toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r); padding: 10px 16px; font-size: 13px; display: none; align-items: center; gap: 8px; z-index: 999; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.cv-toast.on { display: flex; animation: cvfadein .2s ease; }
+@keyframes cvfadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Caravan print styles ── */
+@media print {
+  body > .shell { display: none !important; }
+  .cv-toast { display: none !important; }
+  .cv-print-page { display: block !important; page-break-after: always; break-after: page; width: 100%; min-height: 100vh; padding: 0.6in 0.65in; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 10.5pt; color: #000; background: #fff; box-sizing: border-box; position: relative; }
+  .cv-print-page:last-child { page-break-after: avoid; break-after: avoid; }
+  @page { size: letter portrait; margin: 0; }
+}
+.cv-print-page { display: none; }
+.pp-header { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 8pt; border-bottom: 2pt solid #d29922; margin-bottom: 10pt; gap: 12pt; }
+.pp-logo-area { display: flex; flex-direction: column; }
+.pp-brokerage { font-family: 'IBM Plex Mono', monospace; font-size: 8pt; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #d29922; margin-bottom: 2pt; }
+.pp-caravan-label { font-family: 'IBM Plex Mono', monospace; font-size: 18pt; font-weight: 600; color: #0d1117; line-height: 1; }
+.pp-date-label { font-family: 'IBM Plex Mono', monospace; font-size: 8pt; color: #555; margin-top: 3pt; }
+.pp-mls-chip { font-family: 'IBM Plex Mono', monospace; font-size: 9pt; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; padding: 4pt 10pt; color: #333; white-space: nowrap; align-self: flex-start; }
+.pp-body { display: grid; grid-template-columns: 200pt 1fr; gap: 14pt; margin-bottom: 10pt; }
+.pp-photo-cell { display: flex; flex-direction: column; gap: 8pt; }
+.pp-photo { width: 200pt; height: 150pt; background: #f4f4f4; border: 1px solid #ddd; border-radius: 3pt; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.pp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-photo-placeholder { font-size: 8pt; color: #999; text-align: center; padding: 12pt; }
+.pp-entry { background: #fffbf0; border: 1pt solid #d29922; border-radius: 3pt; padding: 7pt 9pt; font-size: 8.5pt; color: #333; line-height: 1.5; }
+.pp-entry-label { font-family: 'IBM Plex Mono', monospace; font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #d29922; margin-bottom: 3pt; }
+.pp-info-cell { display: flex; flex-direction: column; gap: 6pt; }
+.pp-address { font-size: 15pt; font-weight: 600; color: #0d1117; line-height: 1.2; margin-bottom: 2pt; }
+.pp-city { font-size: 10pt; color: #555; margin-bottom: 6pt; }
+.pp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt; margin-bottom: 6pt; }
+.pp-stat { background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 3pt; padding: 6pt 8pt; }
+.pp-stat-val { font-family: 'IBM Plex Mono', monospace; font-size: 13pt; font-weight: 600; color: #0d1117; line-height: 1; }
+.pp-stat-key { font-family: 'IBM Plex Mono', monospace; font-size: 7pt; color: #888; text-transform: uppercase; letter-spacing: .06em; margin-top: 2pt; }
+.pp-price-row { display: flex; align-items: baseline; gap: 8pt; margin-bottom: 6pt; }
+.pp-price { font-size: 20pt; font-weight: 600; color: #d29922; line-height: 1; }
+.pp-price-label { font-family: 'IBM Plex Mono', monospace; font-size: 7.5pt; color: #888; text-transform: uppercase; letter-spacing: .08em; }
+.pp-details { display: grid; grid-template-columns: 1fr 1fr; gap: 3pt 14pt; font-size: 8.5pt; color: #333; }
+.pp-detail-row { display: flex; gap: 5pt; }
+.pp-detail-key { font-family: 'IBM Plex Mono', monospace; font-size: 7.5pt; color: #888; text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0; min-width: 60pt; padding-top: 1pt; }
+.pp-detail-val { color: #111; font-weight: 500; }
+.pp-remarks { border: 1px solid #e0e0e0; border-radius: 3pt; padding: 7pt 9pt; font-size: 8.5pt; color: #333; line-height: 1.6; margin-bottom: 10pt; max-height: 52pt; overflow: hidden; }
+.pp-remarks-label { font-family: 'IBM Plex Mono', monospace; font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #888; margin-bottom: 3pt; }
+.pp-rating-section { border-top: 1pt solid #e0e0e0; padding-top: 8pt; }
+.pp-rating-title { font-family: 'IBM Plex Mono', monospace; font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: #555; margin-bottom: 8pt; }
+.pp-rating-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6pt; margin-bottom: 8pt; }
+.pp-rating-col { display: flex; flex-direction: column; align-items: center; gap: 4pt; }
+.pp-rating-label { font-family: 'IBM Plex Mono', monospace; font-size: 6.5pt; text-transform: uppercase; letter-spacing: .05em; color: #555; text-align: center; line-height: 1.3; }
+.pp-rating-boxes { display: flex; flex-direction: column; gap: 3pt; width: 100%; }
+.pp-rating-box { border: 1pt solid #bbb; border-radius: 2pt; height: 16pt; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 7pt; color: #aaa; background: #fafafa; }
+.pp-rating-box.label { background: #f0f0f0; border-color: #ccc; color: #555; font-weight: 600; }
+.pp-comments-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+.pp-comment-block { display: flex; flex-direction: column; gap: 4pt; }
+.pp-comment-label { font-family: 'IBM Plex Mono', monospace; font-size: 7.5pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #888; }
+.pp-comment-lines { display: flex; flex-direction: column; gap: 4pt; }
+.pp-comment-line { border-bottom: 1pt solid #ccc; height: 14pt; }
+.pp-footer { position: absolute; bottom: 0.4in; left: 0.65in; right: 0.65in; display: flex; justify-content: space-between; align-items: center; border-top: 0.5pt solid #e0e0e0; padding-top: 5pt; font-family: 'IBM Plex Mono', monospace; font-size: 7pt; color: #aaa; }
 </style>
 </head>
 <body>
@@ -693,6 +790,9 @@ tbody tr.clickable { cursor: pointer; }
     </div>
     <div class="nav-tab" data-page="notices" onclick="showPage('notices',this)">
       <span class="tab-icon">📢</span> Notices <span class="tab-count" id="notices-count">—</span>
+    </div>
+    <div class="nav-tab" data-page="caravan" id="caravan-nav-tab" onclick="showPage('caravan',this)" style="display:none">
+      <span class="tab-icon">🚗</span> Caravan
     </div>
     <div class="nav-tab" data-page="admin" id="admin-nav-tab" onclick="showPage('admin',this)" style="display:none">
       <span class="tab-icon">⚙</span> Admin
@@ -948,7 +1048,138 @@ tbody tr.clickable { cursor: pointer; }
 
     </div>
 
+    <!-- ═══ CARAVAN PAGE ═══ -->
+    <div class="page" id="page-caravan">
+
+      <div class="section-head" style="margin-bottom:20px;">
+        <div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:3px;">Caravan Builder</div>
+          <div style="font-size:12px; color:var(--text-muted);">Build a caravan session, add listings, then print one sheet per property.</div>
+        </div>
+      </div>
+
+      <div class="cv-layout">
+
+        <!-- LEFT: Session + Property Search -->
+        <div>
+
+          <div class="panel" style="margin-bottom:16px;">
+            <div class="panel-head"><div class="panel-title">Session</div></div>
+            <div class="panel-body">
+              <div class="cv-field">
+                <div class="cv-field-label">Caravan Date</div>
+                <input type="date" id="cv-date">
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-bottom:16px;">
+            <div class="panel-head"><div class="panel-title">Add Property</div></div>
+            <div class="panel-body">
+              <div class="cv-field">
+                <div class="cv-field-label">MLS Number</div>
+                <div class="mls-row">
+                  <input type="text" id="cv-mls-input" placeholder="e.g. 1234567"
+                    onkeydown="if(event.key==='Enter')cvSearch()">
+                  <button class="btn btn-ghost btn-sm" onclick="cvSearch()" id="cv-search-btn">Search</button>
+                </div>
+                <div class="mls-status-msg" id="cv-status">
+                  <span class="cv-spinner"></span>&nbsp;Searching DeltaNet…
+                </div>
+                <div class="mls-err-msg" id="cv-err"></div>
+              </div>
+
+              <div id="cv-result" style="display:none;">
+                <div style="background:var(--ink-light); border:1px solid var(--ink-border); border-radius:var(--r); padding:10px 12px; margin-bottom:14px;">
+                  <div id="cv-res-addr" style="font-size:13px; font-weight:600;"></div>
+                  <div id="cv-res-meta" style="font-size:11px; color:var(--text-muted); font-family:var(--mono); margin-top:3px;"></div>
+                  <div id="cv-res-price" style="font-size:14px; font-weight:600; color:var(--amber); margin-top:4px;"></div>
+                </div>
+                <div style="font-family:var(--mono); font-size:10px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:.1em; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--ink-border);">
+                  Caravan-Specific Information
+                </div>
+                <div class="cv-field">
+                  <div class="cv-field-label">Entry Information</div>
+                  <textarea id="cv-res-entry" rows="3"
+                    placeholder="e.g. Agent will be present&#10;Vacant — combo lockbox on front door: 4821&#10;Gate code #1234. Food provided!"></textarea>
+                  <div style="font-size:11px; color:var(--text-dim); margin-top:4px;">How agents get in. Not on DeltaNet — enter it here.</div>
+                </div>
+                <div class="cv-field">
+                  <div class="cv-field-label">Listing Agent Comments <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-dim);">(optional)</span></div>
+                  <textarea id="cv-res-agent-comments" rows="2"
+                    placeholder="e.g. New roof 2023. Motivated seller. Please remove shoes."></textarea>
+                </div>
+                <div class="btn-row" style="margin-top:12px;">
+                  <button class="btn btn-primary btn-sm" onclick="cvAddToQueue()">Add to Caravan</button>
+                  <button class="btn btn-ghost btn-sm" onclick="cvClear()">Clear</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">Log Session</div></div>
+            <div class="panel-body">
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px; line-height:1.6;">
+                Records that this caravan was scheduled. No feedback is collected — agents leave the printed sheets at the property.
+              </p>
+              <button class="btn btn-ghost" style="width:100%;" onclick="cvSaveSession()" id="cv-save-btn">
+                💾 Log This Caravan
+              </button>
+              <div id="cv-save-status" style="font-size:12px; color:var(--text-muted); margin-top:8px; display:none;"></div>
+            </div>
+          </div>
+
+        </div><!-- /left -->
+
+        <!-- RIGHT: Queue + Print -->
+        <div>
+
+          <div class="panel" style="margin-bottom:16px;">
+            <div class="panel-head">
+              <div class="panel-title">
+                Caravan Queue — <span id="cv-count">0</span> propert<span id="cv-count-s">ies</span>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-ghost btn-sm" onclick="cvClearQueue()" id="cv-clear-all" style="display:none;">Clear All</button>
+              </div>
+            </div>
+            <div id="cv-queue-empty" class="queue-empty">No properties yet. Search an MLS # on the left to get started.</div>
+            <div id="cv-queue-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div class="panel-title">Print</div></div>
+            <div class="panel-body">
+              <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.6;">
+                Each property prints as one full sheet. Agents complete the feedback grid and leave it with the listing agent at the property.
+              </p>
+              <div id="cv-print-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+                <div style="font-size:12px; color:var(--text-dim);">Add listings to see print options.</div>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary" onclick="cvPrintAll()" id="cv-print-all-btn" disabled>
+                  🖨 Print All Sheets
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /right -->
+
+      </div><!-- /cv-layout -->
+    </div><!-- /page-caravan -->
+
   </div>
+</div>
+
+<!-- Print pages: populated by JS when printing -->
+<div id="cv-print-pages"></div>
+
+<!-- Caravan toast -->
+<div class="cv-toast" id="cvToastEl">
+  <span id="cvToastIco"></span>
+  <span id="cvToastTxt"></span>
 </div>
 
 <!-- ═══ ADD NEW MODAL ═══ -->
@@ -1546,6 +1777,11 @@ async function init() {
   if (STATE.userRole === 'manager') {
     document.getElementById('admin-nav-tab').style.display = 'flex';
     adminLoadTemplates();
+  }
+
+  if (['manager', 'agent'].includes(STATE.userRole)) {
+    document.getElementById('caravan-nav-tab').style.display = 'flex';
+    cvInitDate();
   }
 
   await renderAll();
@@ -3163,6 +3399,436 @@ async function adminSaveTemplate(templateId, btn) {
     alert('Failed to save template: ' + e.message);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CARAVAN TAB
+═══════════════════════════════════════════════════════════════════ */
+
+function cvHeaders() {
+  return {
+    'Accept':       'application/json',
+    'x-proxy-key':  proxyKey,
+    'x-user-email': userEmail,
+  };
+}
+
+// Queue state — each item: { mlsId, addr, city, beds, baths, sqft, price, agent, agentPhone,
+//   propType, listDate, remarks, entryInstructions, agentComments, photoUrl, _raw }
+const cvQueue = [];
+let cvPendingListing = null;
+
+// ── DeltaNet normalize (same logic as camerons-lens.html) ──
+function cvNormalizeListing(l) {
+  const truthy = v => v === true || v === 'true' || v === 1 || v === '1';
+  const propType =
+    truthy(l.property_type_condo)          ? 'Condo / Townhouse' :
+    truthy(l.property_type_townhouse)      ? 'Condo / Townhouse' :
+    truthy(l.property_category_multi)      ? 'Multi-Family'      :
+    truthy(l.property_category_land)       ? 'Land'              :
+    truthy(l.property_category_commercial) ? 'Commercial'        : 'Residential';
+  const street   = [l.address, l.address2, l.unit_number ? '#' + l.unit_number : null].filter(Boolean).join(' ');
+  const city     = l.city || '';
+  const state    = l.state || 'FL';
+  const zip      = l.zip_code || '';
+  const fullAddr = l.unparsed_address || [street, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+  const photos   = l.photo_data || [];
+  const photoUrl = l.primary_photo_url || (photos[0] && (photos[0].url || photos[0].large_url)) || '';
+  const beds     = l.bedrooms || '';
+  const baths    = l.bathrooms_full || l.bathrooms || '';
+  const sqft     = l.home_size || l.square_feet || '';
+  const price    = l.price_asking || l.list_price || '';
+  const mlsId    = l.mls_id || l.custom_listing_id || l.delta_listing_id || '';
+  const remarks  = l.comments || l.feature_comments || l.additional_comments || '';
+  const agent    = l.listing_agent || '';
+  const agentPhone = l.listing_agent_phone || '';
+  const yearBuilt  = l.year_built  || '';
+  const garageSize = l.garage_size || '';
+  const garageAttached = truthy(l.garage_attached) ? 'Attached' : (garageSize ? 'Yes' : '');
+  const pool       = truthy(l.swimming_pool) ? 'Yes' : '';
+  const lotAcres   = l.lot_size_acres || '';
+  const lotSqft    = l.lot_size_feet  || '';
+  const lotDisplay = lotAcres ? lotAcres + ' ac' : (lotSqft ? Number(lotSqft).toLocaleString() + ' sqft' : '');
+  const listDate   = l.date_listed || '';
+  const subdivision = l.subdivision || l.neighborhood || '';
+  const cooling    = l.cooling_type || '';
+  const heating    = l.heating_type || '';
+  return { mlsId, addr: street, city, state, zip, fullAddr, propType, beds, baths, sqft, price,
+    agent, agentPhone, remarks, photoUrl, yearBuilt, garageAttached, garageSize, pool, lotDisplay,
+    listDate, subdivision, cooling, heating, _raw: l };
+}
+
+async function cvFetchListing(mlsId) {
+  const params = new URLSearchParams({ mls_id: mlsId, status: '0,1,2,3,4', limit: '5' });
+  const res = await fetch(`${PROXY}/deltanet/listings?${params}`, { headers: cvHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error('DeltaNet ' + res.status + ': ' + (err.error || res.statusText));
+  }
+  const body = await res.json();
+  const hits = body?.listings || body?.data || body?.results || [];
+  if (!hits.length) throw new Error('MLS# ' + mlsId + ' not found. Check the number and try again.');
+  return cvNormalizeListing(hits[0]);
+}
+
+async function cvFetchPhotoAsDataUrl(photoUrl) {
+  if (!photoUrl) return null;
+  try {
+    const res = await fetch(`${PROXY}/photo-proxy?url=${encodeURIComponent(photoUrl)}`, {
+      headers: { 'x-proxy-key': proxyKey }
+    });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.warn('[cv photo-proxy] failed:', e.message);
+    return null;
+  }
+}
+
+// ── Search ──
+async function cvSearch() {
+  const q = document.getElementById('cv-mls-input').value.trim();
+  if (!q) { cvToast('⚠', 'Enter an MLS number first.'); return; }
+  cvSetStatus('loading');
+  cvPendingListing = null;
+  document.getElementById('cv-result').style.display = 'none';
+  try {
+    const listing = await cvFetchListing(q);
+    cvPendingListing = listing;
+    cvSetStatus('');
+    document.getElementById('cv-res-addr').textContent  = listing.addr || listing.fullAddr;
+    document.getElementById('cv-res-meta').textContent  =
+      [listing.city + ', ' + listing.state + ' ' + listing.zip,
+       listing.beds  && listing.beds  + ' bd',
+       listing.baths && listing.baths + ' ba',
+       listing.sqft  && Number(listing.sqft).toLocaleString() + ' sqft',
+       'MLS# ' + listing.mlsId].filter(Boolean).join(' · ');
+    document.getElementById('cv-res-price').textContent =
+      listing.price ? '$' + Number(listing.price).toLocaleString() : '';
+    document.getElementById('cv-result').style.display = 'block';
+  } catch (e) {
+    cvSetStatus('error', e.message);
+  }
+}
+
+function cvSetStatus(state, msg) {
+  const statusEl = document.getElementById('cv-status');
+  const errEl    = document.getElementById('cv-err');
+  statusEl.style.display = state === 'loading' ? 'flex' : 'none';
+  errEl.style.display    = state === 'error'   ? 'block' : 'none';
+  if (state === 'error') errEl.textContent = '⚠ ' + msg;
+}
+
+// ── Queue management ──
+function cvAddToQueue() {
+  if (!cvPendingListing) return;
+  if (cvQueue.some(i => i.mlsId === cvPendingListing.mlsId)) {
+    cvToast('⚠', 'MLS# ' + cvPendingListing.mlsId + ' is already in the queue.');
+    return;
+  }
+  const entry         = document.getElementById('cv-res-entry').value.trim();
+  const agentComments = document.getElementById('cv-res-agent-comments').value.trim();
+  cvQueue.push({ ...cvPendingListing, entryInstructions: entry, agentComments });
+  cvRenderQueue();
+  cvClear();
+  cvToast('✓', 'Added ' + (cvPendingListing.addr || 'listing') + ' to caravan.');
+  cvPendingListing = null;
+}
+
+function cvRemove(idx) {
+  cvQueue.splice(idx, 1);
+  cvRenderQueue();
+}
+
+function cvClear() {
+  document.getElementById('cv-result').style.display = 'none';
+  document.getElementById('cv-mls-input').value = '';
+  document.getElementById('cv-res-entry').value = '';
+  document.getElementById('cv-res-agent-comments').value = '';
+  document.getElementById('cv-err').style.display = 'none';
+  cvPendingListing = null;
+}
+
+function cvClearQueue() {
+  if (!cvQueue.length) return;
+  if (!confirm('Remove all ' + cvQueue.length + ' listings from the caravan?')) return;
+  cvQueue.length = 0;
+  cvRenderQueue();
+  document.getElementById('cv-print-pages').innerHTML = '';
+}
+
+function cvRenderQueue() {
+  const list       = document.getElementById('cv-queue-list');
+  const empty      = document.getElementById('cv-queue-empty');
+  const count      = document.getElementById('cv-count');
+  const countS     = document.getElementById('cv-count-s');
+  const clearAllBtn = document.getElementById('cv-clear-all');
+  const printAllBtn = document.getElementById('cv-print-all-btn');
+  count.textContent  = cvQueue.length;
+  countS.textContent = cvQueue.length === 1 ? 'y' : 'ies';
+  clearAllBtn.style.display = cvQueue.length ? '' : 'none';
+  printAllBtn.disabled      = cvQueue.length === 0;
+  if (!cvQueue.length) {
+    empty.style.display = 'block';
+    list.innerHTML = '';
+    cvRenderPrintList();
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = cvQueue.map((item, i) => `
+    <div class="queue-item" draggable="true"
+         ondragstart="cvDragStart(event,${i})"
+         ondragover="cvDragOver(event,${i})"
+         ondrop="cvDrop(event,${i})"
+         ondragleave="cvDragLeave(event)">
+      <span class="queue-drag" title="Drag to reorder">⠿</span>
+      <span class="queue-num">${i + 1}</span>
+      <div class="queue-info">
+        <div class="queue-addr">${escapeHtml(item.addr || item.fullAddr)}</div>
+        <div class="queue-meta">${[item.city, item.mlsId && 'MLS# ' + item.mlsId, item.price && '$' + Number(item.price).toLocaleString()].filter(Boolean).join(' · ')}</div>
+        ${item.entryInstructions ? `<div class="queue-note">${escapeHtml(item.entryInstructions)}</div>` : ''}
+      </div>
+      <button class="queue-remove" onclick="cvRemove(${i})" title="Remove">×</button>
+    </div>
+  `).join('');
+  cvRenderPrintList();
+}
+
+// ── Drag-to-reorder ──
+let _cvDragIdx = null;
+function cvDragStart(e, idx) { _cvDragIdx = idx; e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function cvDragOver(e, idx) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over')); e.currentTarget.classList.add('drag-over'); }
+function cvDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function cvDrop(e, toIdx) {
+  e.preventDefault();
+  document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over', 'dragging'));
+  if (_cvDragIdx === null || _cvDragIdx === toIdx) { _cvDragIdx = null; return; }
+  const [moved] = cvQueue.splice(_cvDragIdx, 1);
+  cvQueue.splice(toIdx, 0, moved);
+  _cvDragIdx = null;
+  cvRenderQueue();
+}
+
+// ── Print list ──
+function cvRenderPrintList() {
+  const container = document.getElementById('cv-print-list');
+  if (!cvQueue.length) {
+    container.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Add listings to see print options.</div>';
+    return;
+  }
+  container.innerHTML = cvQueue.map((item, i) => `
+    <div class="print-item-row">
+      <div>
+        <div class="print-item-addr">${escapeHtml(item.addr || item.fullAddr)}</div>
+        <div class="print-item-meta">MLS# ${escapeHtml(item.mlsId)} · ${item.price ? '$' + Number(item.price).toLocaleString() : '—'}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="cvPrintOne(${i})">🖨 Print</button>
+    </div>
+  `).join('');
+}
+
+// ── Print ──
+function cvCaravanDate() {
+  const v = document.getElementById('cv-date').value;
+  if (!v) return '';
+  const [y, m, d] = v.split('-');
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+async function cvPrintOne(idx) {
+  cvToast('⏳', 'Loading photo…');
+  await cvBuildPrintPages([idx]);
+  cvToast('✓', 'Opening print dialog…');
+  window.print();
+}
+
+async function cvPrintAll() {
+  if (!cvQueue.length) return;
+  cvToast('⏳', 'Loading photos, please wait…');
+  await cvBuildPrintPages(cvQueue.map((_, i) => i));
+  cvToast('✓', 'Opening print dialog…');
+  window.print();
+}
+
+async function cvBuildPrintPages(indices) {
+  const container = document.getElementById('cv-print-pages');
+  container.innerHTML = '';
+  const date  = cvCaravanDate();
+  const total = indices.length;
+  for (const idx of indices) {
+    const item    = cvQueue[idx];
+    const order   = idx + 1;
+    const dataUrl = await cvFetchPhotoAsDataUrl(item.photoUrl);
+    const photoHtml = dataUrl
+      ? `<img src="${dataUrl}" alt="Property photo">`
+      : `<div class="pp-photo-placeholder">📷 Photo not available</div>`;
+    const details = [
+      item.yearBuilt     && ['Year Built',  item.yearBuilt],
+      item.garageAttached && ['Garage',     item.garageAttached + (item.garageSize ? ' — ' + item.garageSize + ' car' : '')],
+      item.pool          && ['Pool',        'Yes'],
+      item.lotDisplay    && ['Lot',         item.lotDisplay],
+      item.subdivision   && ['Subdivision', item.subdivision],
+      item.cooling       && ['Cooling',     item.cooling],
+      item.heating       && ['Heating',     item.heating],
+      item.listDate      && ['Listed',      fmtDate(item.listDate)],
+    ].filter(Boolean);
+    const detailHtml = details.map(([k, v]) =>
+      `<div class="pp-detail-row"><div class="pp-detail-key">${k}</div><div class="pp-detail-val">${escapeHtml(v)}</div></div>`
+    ).join('');
+    const remarksHtml = item.remarks
+      ? `<div class="pp-remarks"><div class="pp-remarks-label">Remarks</div>${escapeHtml(item.remarks.substring(0, 380))}${item.remarks.length > 380 ? '…' : ''}</div>`
+      : '';
+    const ratingCats   = ['Curb Appeal', 'Exterior', 'Interior', 'Kitchen', 'Baths', 'Neatness', 'Price'];
+    const ratingLabels = ['1 Poor', '2', '3 Fair', '4', '5 Good'];
+    const ratingGridHtml = ratingCats.map(cat => `
+      <div class="pp-rating-col">
+        <div class="pp-rating-label">${cat}</div>
+        <div class="pp-rating-boxes">
+          ${ratingLabels.map((l, li) =>
+            `<div class="pp-rating-box ${li === 0 || li === 4 ? 'label' : ''}">${li === 0 ? '1' : li === 4 ? '5' : ''}</div>`
+          ).join('')}
+        </div>
+      </div>`).join('');
+    const mlsChip = item.mlsId ? `<div class="pp-mls-chip">MLS# ${escapeHtml(item.mlsId)}</div>` : '';
+    const page = document.createElement('div');
+    page.className = 'cv-print-page';
+    page.innerHTML = `
+      <div class="pp-header">
+        <div class="pp-logo-area">
+          <div class="pp-brokerage">Adams, Cameron &amp; Co. Realtors</div>
+          <div class="pp-caravan-label">Caravan</div>
+          ${date ? `<div class="pp-date-label">${escapeHtml(date)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10pt;">
+          ${mlsChip}
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9pt;color:#888;">${order} of ${total}</div>
+        </div>
+      </div>
+      <div class="pp-body">
+        <div class="pp-photo-cell">
+          <div class="pp-photo">${photoHtml}</div>
+          ${item.entryInstructions ? `<div class="pp-entry"><div class="pp-entry-label">Entry / Showing Instructions</div>${escapeHtml(item.entryInstructions)}</div>` : ''}
+          ${item.agentComments ? `<div class="pp-entry" style="border-color:#aaa;background:#f9f9f9;"><div class="pp-entry-label" style="color:#666;">Listing Agent Comments</div>${escapeHtml(item.agentComments)}</div>` : ''}
+        </div>
+        <div class="pp-info-cell">
+          <div>
+            <div class="pp-address">${escapeHtml(item.addr || item.fullAddr)}</div>
+            <div class="pp-city">${escapeHtml([item.city, item.state, item.zip].filter(Boolean).join(', '))}</div>
+          </div>
+          <div class="pp-price-row">
+            <div class="pp-price">${item.price ? '$' + Number(item.price).toLocaleString() : '—'}</div>
+            <div class="pp-price-label">Asking Price</div>
+          </div>
+          <div class="pp-stats">
+            <div class="pp-stat"><div class="pp-stat-val">${escapeHtml(item.beds || '—')}</div><div class="pp-stat-key">Beds</div></div>
+            <div class="pp-stat"><div class="pp-stat-val">${escapeHtml(item.baths || '—')}</div><div class="pp-stat-key">Baths</div></div>
+            <div class="pp-stat"><div class="pp-stat-val">${item.sqft ? Number(item.sqft).toLocaleString() : '—'}</div><div class="pp-stat-key">Sqft</div></div>
+            <div class="pp-stat"><div class="pp-stat-val">${escapeHtml(item.propType || '—')}</div><div class="pp-stat-key">Type</div></div>
+          </div>
+          ${detailHtml ? `<div class="pp-details">${detailHtml}</div>` : ''}
+        </div>
+      </div>
+      ${remarksHtml}
+      ${item.agent ? `<div style="font-size:8pt;color:#555;margin-bottom:8pt;padding:4pt 8pt;background:#f7f7f7;border-radius:3pt;border:1px solid #e0e0e0;display:inline-block;"><strong>Listing Agent:</strong> ${escapeHtml(item.agent)}${item.agentPhone ? '&nbsp;&nbsp;📞 ' + escapeHtml(item.agentPhone) : ''}</div>` : ''}
+      <div class="pp-rating-section">
+        <div class="pp-rating-title">Agent Feedback — Rate 1 (Poor) to 5 (Good)</div>
+        <div class="pp-rating-grid">${ratingGridHtml}</div>
+        <div class="pp-comments-row">
+          <div class="pp-comment-block">
+            <div class="pp-comment-label">Comments</div>
+            <div class="pp-comment-lines">
+              <div class="pp-comment-line"></div>
+              <div class="pp-comment-line"></div>
+              <div class="pp-comment-line"></div>
+            </div>
+          </div>
+          <div class="pp-comment-block">
+            <div class="pp-comment-label">Reviewed By</div>
+            <div class="pp-comment-lines">
+              <div class="pp-comment-line"></div>
+              <div class="pp-comment-line" style="margin-top:8pt;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pp-footer">
+        <span>Adams, Cameron &amp; Co. Realtors · adamscameron.com</span>
+        <span>Printed ${new Date().toLocaleDateString('en-US')}</span>
+      </div>`;
+    container.appendChild(page);
+  }
+}
+
+// ── Log session ──
+async function cvSaveSession() {
+  if (!cvQueue.length) { cvToast('⚠', 'Add at least one property first.'); return; }
+  const date = document.getElementById('cv-date').value;
+  if (!date) { cvToast('⚠', 'Set a caravan date first.'); return; }
+  const btn    = document.getElementById('cv-save-btn');
+  const status = document.getElementById('cv-save-status');
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.textContent   = 'Logging…';
+  const body = {
+    caravan_date: date,
+    listings: cvQueue.map((item, i) => ({
+      sort_order:         i + 1,
+      mls_id:             item.mlsId,
+      address:            item.addr || item.fullAddr,
+      price:              item.price,
+      entry_instructions: item.entryInstructions || null,
+    })),
+  };
+  try {
+    const res = await fetch(`${PROXY}/daily-desk/caravan-sessions`, {
+      method:  'POST',
+      headers: { ...cvHeaders(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    });
+    if (res.ok) {
+      status.style.color = 'var(--green)';
+      status.textContent = '✓ Caravan logged for ' + (cvCaravanDate() || date) + ' (' + cvQueue.length + ' properties).';
+      cvToast('✓', 'Caravan session logged.');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      status.style.color = 'var(--text-muted)';
+      status.textContent = '⚠ Could not log (server: ' + (err.error || res.status) + '). You can still print.';
+    }
+  } catch (e) {
+    status.style.color = 'var(--text-muted)';
+    status.textContent = '⚠ Network error — session not logged. You can still print.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Init: default caravan date to next Tuesday ──
+function cvInitDate() {
+  const el = document.getElementById('cv-date');
+  if (!el || el.value) return;
+  const today  = new Date();
+  const daysUntilTuesday = (2 - today.getDay() + 7) % 7 || 7;
+  const tuesday = new Date(today);
+  tuesday.setDate(today.getDate() + daysUntilTuesday);
+  el.valueAsDate = tuesday;
+}
+
+// ── Toast ──
+function cvToast(ico, msg) {
+  document.getElementById('cvToastIco').textContent = ico;
+  document.getElementById('cvToastTxt').textContent = msg;
+  const t = document.getElementById('cvToastEl');
+  t.classList.add('on');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('on'), 3200);
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
 
 function adminShowNewTemplateForm() {
   document.getElementById('admin-new-template').style.display = 'block';
