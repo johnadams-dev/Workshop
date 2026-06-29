@@ -2614,13 +2614,16 @@ async function amSubmit() {
         cvQueue.push({ ...listing, entryInstructions, agentComments, caravanDate });
         cvRenderQueue();
         cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
+        cvSendNotify(listing.addr || listing.fullAddr, listing.city, caravanDate);
       } catch (e) {
         cvToast('⚠', 'Could not fetch listing: ' + e.message);
       }
     } else {
+      const addr = amState.addr || '';
+      const city = txn?.city || '';
       cvQueue.push({
-        mlsId: '', addr: amState.addr || '', city: txn?.city || '',
-        state: 'FL', zip: '', fullAddr: amState.addr || '',
+        mlsId: '', addr, city,
+        state: 'FL', zip: '', fullAddr: addr,
         propType: 'Residential', beds: '', baths: '', sqft: '',
         price: txn?.current_price || '', agent: txn?.agent_name || '',
         agentPhone: '', remarks: '', photoUrl: '',
@@ -2630,6 +2633,7 @@ async function amSubmit() {
       });
       cvRenderQueue();
       cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
+      cvSendNotify(addr, city, caravanDate);
     }
     return;
   }
@@ -3653,6 +3657,15 @@ function cvSetStatus(state, msg) {
   if (state === 'error') errEl.textContent = '⚠ ' + msg;
 }
 
+// ── Caravan notification ──
+function cvSendNotify(address, city, caravanDate) {
+  fetch(`${PROXY}/daily-desk/caravan-notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    body: JSON.stringify({ userName: userDisplay || userEmail, address, city: city || '', caravanDate: caravanDate || '' }),
+  }).catch(e => console.warn('[caravan-notify]', e.message));
+}
+
 // ── Queue management ──
 function cvAddToQueue() {
   if (!cvPendingListing) return;
@@ -3667,6 +3680,7 @@ function cvAddToQueue() {
   cvRenderQueue();
   cvClear();
   cvToast('✓', 'Added ' + (cvPendingListing.addr || 'listing') + ' to caravan.');
+  cvSendNotify(cvPendingListing.addr || cvPendingListing.fullAddr, cvPendingListing.city, caravanDate);
   cvPendingListing = null;
 }
 
