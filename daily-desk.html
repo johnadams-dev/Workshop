@@ -672,6 +672,7 @@ tbody tr.clickable { cursor: pointer; }
 .queue-note { font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .queue-remove { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 15px; padding: 0 2px; flex-shrink: 0; transition: color .15s; }
 .queue-remove:hover { color: var(--red); }
+.queue-item-dim { opacity: .4; }
 .print-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--ink-light); border: 1px solid var(--ink-border); border-radius: var(--r); }
 .print-item-addr { font-size: 12px; font-weight: 500; }
 .print-item-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
@@ -2312,6 +2313,8 @@ function closeActionModal() {
 function amShowChoose() {
   document.getElementById('am-step-choose').style.display = 'flex';
   document.getElementById('am-step-confirm').style.display = 'none';
+  document.querySelector('#am-step-confirm .divider').style.display = '';
+  document.getElementById('amChecklistPreview').style.display = '';
 
   const actions = (amState.kind === 'contract' ? CONTRACT_ACTIONS : LISTING_ACTIONS)[amState.status] || [];
   const listEl = document.getElementById('am-step-choose');
@@ -2336,38 +2339,39 @@ function amBackToChoose() {
 }
 async function amChooseAction(key) {
   if (key === 'caravan') {
-    closeActionModal();
     const txn   = STATE.listings.find(t => String(t.id) === String(amState.id));
     const mlsId = txn?.mls_id;
     if (cvQueue.some(i => i.mlsId === mlsId || (i.addr || i.fullAddr) === amState.addr)) {
       cvToast('⚠', 'Already in caravan queue.');
+      closeActionModal();
       return;
     }
-    if (mlsId) {
-      cvToast('⏳', 'Looking up listing…');
-      try {
-        const listing = await cvFetchListing(mlsId);
-        cvQueue.push({ ...listing, entryInstructions: '', agentComments: '' });
-        cvRenderQueue();
-        cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
-      } catch (e) {
-        cvToast('⚠', 'Could not fetch listing: ' + e.message);
-      }
-    } else {
-      // No MLS ID — add with address and price from transaction record
-      cvQueue.push({
-        mlsId: '', addr: amState.addr || '', city: txn?.city || '',
-        state: 'FL', zip: '', fullAddr: amState.addr || '',
-        propType: 'Residential', beds: '', baths: '', sqft: '',
-        price: txn?.current_price || '', agent: txn?.agent_name || '',
-        agentPhone: '', remarks: '', photoUrl: '',
-        yearBuilt: '', garageAttached: '', garageSize: '', pool: '',
-        lotDisplay: '', listDate: '', subdivision: '', cooling: '', heating: '',
-        entryInstructions: '', agentComments: '', _raw: {},
-      });
-      cvRenderQueue();
-      cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
-    }
+    amState.actionKey = key;
+    amState._caravanMlsId = mlsId;
+    amState._caravanTxn   = txn;
+    document.getElementById('actionModalTitle').textContent = 'Add to Caravan';
+    document.getElementById('am-step-choose').style.display = 'none';
+    document.getElementById('am-step-confirm').style.display = 'block';
+    document.querySelector('#am-step-confirm .divider').style.display = 'none';
+    document.getElementById('amChecklistPreview').style.display = 'none';
+    const currentDate = document.getElementById('cv-date')?.value || '';
+    const fs = 'display:flex;flex-direction:column;gap:5px;margin-bottom:14px;';
+    const ls = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
+    const is = 'padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;';
+    document.getElementById('amConfirmFields').innerHTML = `
+      <div style="${fs}">
+        <span style="${ls}">Caravan Date</span>
+        <input type="date" id="am-caravan-date" style="${is}" value="${currentDate}">
+      </div>
+      <div style="${fs}">
+        <span style="${ls}">Entry / Showing Instructions</span>
+        <textarea id="am-caravan-entry" rows="3" style="${is}resize:vertical;" placeholder="e.g. Vacant — combo lockbox on front door: 4821"></textarea>
+        <span style="font-size:11px;color:var(--text-dim);">How agents get in. Not on DeltaNet — enter it here.</span>
+      </div>
+      <div style="${fs}">
+        <span style="${ls}">Listing Agent Comments <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(optional)</span></span>
+        <textarea id="am-caravan-comments" rows="2" style="${is}resize:vertical;" placeholder="e.g. New roof 2023. Motivated seller."></textarea>
+      </div>`;
     return;
   }
 
@@ -2585,6 +2589,44 @@ async function amLoadBuyerAgents() {
 async function amSubmit() {
   const key = amState.actionKey;
   const fields = {};
+
+  if (key === 'caravan') {
+    const caravanDate       = document.getElementById('am-caravan-date').value;
+    const entryInstructions = document.getElementById('am-caravan-entry').value.trim();
+    const agentComments     = document.getElementById('am-caravan-comments').value.trim();
+    if (caravanDate) {
+      const dateEl = document.getElementById('cv-date');
+      if (dateEl && !dateEl.value) dateEl.value = caravanDate;
+    }
+    const mlsId = amState._caravanMlsId;
+    const txn   = amState._caravanTxn;
+    closeActionModal();
+    if (mlsId) {
+      cvToast('⏳', 'Looking up listing…');
+      try {
+        const listing = await cvFetchListing(mlsId);
+        cvQueue.push({ ...listing, entryInstructions, agentComments, caravanDate });
+        cvRenderQueue();
+        cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
+      } catch (e) {
+        cvToast('⚠', 'Could not fetch listing: ' + e.message);
+      }
+    } else {
+      cvQueue.push({
+        mlsId: '', addr: amState.addr || '', city: txn?.city || '',
+        state: 'FL', zip: '', fullAddr: amState.addr || '',
+        propType: 'Residential', beds: '', baths: '', sqft: '',
+        price: txn?.current_price || '', agent: txn?.agent_name || '',
+        agentPhone: '', remarks: '', photoUrl: '',
+        yearBuilt: '', garageAttached: '', garageSize: '', pool: '',
+        lotDisplay: '', listDate: '', subdivision: '', cooling: '', heating: '',
+        entryInstructions, agentComments, caravanDate, _raw: {},
+      });
+      cvRenderQueue();
+      cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
+    }
+    return;
+  }
 
   if (key === 'change' && amState.status === 'closed') {
     fields.notes = document.getElementById('am-notes').value || null;
@@ -3573,7 +3615,8 @@ function cvAddToQueue() {
   }
   const entry         = document.getElementById('cv-res-entry').value.trim();
   const agentComments = document.getElementById('cv-res-agent-comments').value.trim();
-  cvQueue.push({ ...cvPendingListing, entryInstructions: entry, agentComments });
+  const caravanDate   = document.getElementById('cv-date').value;
+  cvQueue.push({ ...cvPendingListing, entryInstructions: entry, agentComments, caravanDate });
   cvRenderQueue();
   cvClear();
   cvToast('✓', 'Added ' + (cvPendingListing.addr || 'listing') + ' to caravan.');
@@ -3603,16 +3646,21 @@ function cvClearQueue() {
 }
 
 function cvRenderQueue() {
-  const list       = document.getElementById('cv-queue-list');
-  const empty      = document.getElementById('cv-queue-empty');
-  const count      = document.getElementById('cv-count');
-  const countS     = document.getElementById('cv-count-s');
+  const list        = document.getElementById('cv-queue-list');
+  const empty       = document.getElementById('cv-queue-empty');
+  const count       = document.getElementById('cv-count');
+  const countS      = document.getElementById('cv-count-s');
   const clearAllBtn = document.getElementById('cv-clear-all');
   const printAllBtn = document.getElementById('cv-print-all-btn');
+  const filterDate  = document.getElementById('cv-date').value;
+  const filtered    = filterDate ? cvQueue.filter(i => i.caravanDate === filterDate) : cvQueue;
   count.textContent  = cvQueue.length;
   countS.textContent = cvQueue.length === 1 ? 'y' : 'ies';
   clearAllBtn.style.display = cvQueue.length ? '' : 'none';
-  printAllBtn.disabled      = cvQueue.length === 0;
+  printAllBtn.disabled = filtered.length === 0;
+  printAllBtn.textContent = filtered.length
+    ? `🖨 Print ${filtered.length === cvQueue.length ? 'All' : filtered.length + ' of ' + cvQueue.length} Sheet${filtered.length === 1 ? '' : 's'}`
+    : '🖨 Print All Sheets';
   if (!cvQueue.length) {
     empty.style.display = 'block';
     list.innerHTML = '';
@@ -3620,8 +3668,13 @@ function cvRenderQueue() {
     return;
   }
   empty.style.display = 'none';
-  list.innerHTML = cvQueue.map((item, i) => `
-    <div class="queue-item" draggable="true"
+  list.innerHTML = cvQueue.map((item, i) => {
+    const isForDate = !filterDate || item.caravanDate === filterDate;
+    const dateBadge = item.caravanDate
+      ? `<span style="font-size:10px;font-family:var(--mono);color:var(--text-dim);margin-left:4px;">${fmtDate(item.caravanDate)}</span>`
+      : '';
+    return `
+    <div class="queue-item${isForDate ? '' : ' queue-item-dim'}" draggable="true"
          ondragstart="cvDragStart(event,${i})"
          ondragover="cvDragOver(event,${i})"
          ondrop="cvDrop(event,${i})"
@@ -3629,13 +3682,13 @@ function cvRenderQueue() {
       <span class="queue-drag" title="Drag to reorder">⠿</span>
       <span class="queue-num">${i + 1}</span>
       <div class="queue-info">
-        <div class="queue-addr">${escapeHtml(item.addr || item.fullAddr)}</div>
+        <div class="queue-addr">${escapeHtml(item.addr || item.fullAddr)}${dateBadge}</div>
         <div class="queue-meta">${[item.city, item.mlsId && 'MLS# ' + item.mlsId, item.price && '$' + Number(item.price).toLocaleString()].filter(Boolean).join(' · ')}</div>
         ${item.entryInstructions ? `<div class="queue-note">${escapeHtml(item.entryInstructions)}</div>` : ''}
       </div>
       <button class="queue-remove" onclick="cvRemove(${i})" title="Remove">×</button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   cvRenderPrintList();
 }
 
@@ -3656,16 +3709,22 @@ function cvDrop(e, toIdx) {
 
 // ── Print list ──
 function cvRenderPrintList() {
-  const container = document.getElementById('cv-print-list');
+  const container  = document.getElementById('cv-print-list');
+  const filterDate = document.getElementById('cv-date').value;
   if (!cvQueue.length) {
     container.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Add listings to see print options.</div>';
     return;
   }
-  container.innerHTML = cvQueue.map((item, i) => `
+  const visible = filterDate ? cvQueue.map((item, i) => ({ item, i })).filter(({ item }) => item.caravanDate === filterDate) : cvQueue.map((item, i) => ({ item, i }));
+  if (!visible.length) {
+    container.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">No listings match the selected caravan date.</div>';
+    return;
+  }
+  container.innerHTML = visible.map(({ item, i }) => `
     <div class="print-item-row">
       <div>
         <div class="print-item-addr">${escapeHtml(item.addr || item.fullAddr)}</div>
-        <div class="print-item-meta">MLS# ${escapeHtml(item.mlsId)} · ${item.price ? '$' + Number(item.price).toLocaleString() : '—'}</div>
+        <div class="print-item-meta">${[item.mlsId && 'MLS# ' + escapeHtml(item.mlsId), item.price ? '$' + Number(item.price).toLocaleString() : '—'].filter(Boolean).join(' · ')}</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="cvPrintOne(${i})">🖨 Print</button>
     </div>
@@ -3688,9 +3747,11 @@ async function cvPrintOne(idx) {
 }
 
 async function cvPrintAll() {
-  if (!cvQueue.length) return;
+  const filterDate = document.getElementById('cv-date').value;
+  const indices = cvQueue.map((item, i) => i).filter(i => !filterDate || cvQueue[i].caravanDate === filterDate);
+  if (!indices.length) { cvToast('⚠', filterDate ? 'No listings for the selected date.' : 'Add at least one property first.'); return; }
   cvToast('⏳', 'Loading photos, please wait…');
-  await cvBuildPrintPages(cvQueue.map((_, i) => i));
+  await cvBuildPrintPages(indices);
   cvToast('✓', 'Opening print dialog…');
   window.print();
 }
@@ -3843,6 +3904,7 @@ function cvInitDate() {
   const tuesday = new Date(today);
   tuesday.setDate(today.getDate() + daysUntilTuesday);
   el.valueAsDate = tuesday;
+  el.addEventListener('change', cvRenderQueue);
 }
 
 // ── Toast ──
