@@ -314,6 +314,11 @@ thead th {
   border-bottom: 1px solid var(--ink-border);
   white-space: nowrap;
 }
+thead th[data-sort] { cursor: pointer; user-select: none; }
+thead th[data-sort]:hover { color: var(--amber); }
+thead th[data-sort]::after { content: ' ↕'; opacity: .3; font-style: normal; }
+thead th.sort-asc::after  { content: ' ↑'; opacity: 1; color: var(--amber); }
+thead th.sort-desc::after { content: ' ↓'; opacity: 1; color: var(--amber); }
 tbody td {
   padding: 9px 14px;
   border-bottom: 1px solid rgba(48,54,61,.5);
@@ -872,10 +877,10 @@ tbody tr.clickable { cursor: pointer; }
         <table>
           <thead>
             <tr>
-              <th>Address</th>
-              <th>Agent</th>
-              <th>Price</th>
-              <th>Date</th>
+              <th data-sort="property_address" onclick="sortListingsBy('property_address')">Address</th>
+              <th data-sort="agent_name" onclick="sortListingsBy('agent_name')">Agent</th>
+              <th data-sort="current_price" onclick="sortListingsBy('current_price')">Price</th>
+              <th data-sort="list_date" onclick="sortListingsBy('list_date')">Date</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -906,11 +911,11 @@ tbody tr.clickable { cursor: pointer; }
         <table>
           <thead>
             <tr>
-              <th>Address</th>
-              <th>Buyer's Agent</th>
+              <th data-sort="property_address" onclick="sortContractsBy('property_address')">Address</th>
+              <th data-sort="agent_name" onclick="sortContractsBy('agent_name')">Buyer's Agent</th>
               <th>Listing Brokerage</th>
-              <th>Price</th>
-              <th>Contract Date</th>
+              <th data-sort="current_price" onclick="sortContractsBy('current_price')">Price</th>
+              <th data-sort="list_date" onclick="sortContractsBy('list_date')">Contract Date</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -1852,8 +1857,9 @@ async function renderAll() {
   document.getElementById('notices-count').textContent   = noticesTotal || '—';
 
   renderTodayTable(getSortedToday());
-  renderListingsTable(STATE.listings);
-  renderContractsTable(STATE.contracts);
+  renderListingsTable(tableSort(STATE.listings, lstSort.col, lstSort.dir));
+  renderContractsTable(tableSort(STATE.contracts, ctrSort.col, ctrSort.dir));
+  updateSortHeaders();
   renderUntrackedTable(STATE.untracked);
   renderNoticesUpcoming(STATE.noticesUpcoming);
   renderNoticesBuyer(STATE.noticesBuyer);
@@ -2996,6 +3002,47 @@ async function ncSelectFsTransaction(index) {
 }
 
 /* ═══ Listings / Contracts filtering ═══ */
+const lstSort = { col: 'list_date', dir: 'desc' };
+const ctrSort = { col: 'list_date', dir: 'desc' };
+
+function tableSort(arr, col, dir) {
+  return [...arr].sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (col === 'current_price') { va = Number(va) || 0; vb = Number(vb) || 0; }
+    else if (col === 'list_date') { va = va ? new Date(va).getTime() : 0; vb = vb ? new Date(vb).getTime() : 0; }
+    else { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase(); }
+    const c = va < vb ? -1 : va > vb ? 1 : 0;
+    return dir === 'asc' ? c : -c;
+  });
+}
+
+function sortListingsBy(col) {
+  lstSort.dir = lstSort.col === col ? (lstSort.dir === 'asc' ? 'desc' : 'asc') : (col === 'current_price' || col === 'list_date' ? 'desc' : 'asc');
+  lstSort.col = col;
+  renderListingsTable(tableSort(STATE.listings, lstSort.col, lstSort.dir));
+  filterListings();
+  updateSortHeaders();
+}
+
+function sortContractsBy(col) {
+  ctrSort.dir = ctrSort.col === col ? (ctrSort.dir === 'asc' ? 'desc' : 'asc') : (col === 'current_price' || col === 'list_date' ? 'desc' : 'asc');
+  ctrSort.col = col;
+  renderContractsTable(tableSort(STATE.contracts, ctrSort.col, ctrSort.dir));
+  filterContracts();
+  updateSortHeaders();
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('#page-listings thead th[data-sort]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === lstSort.col && lstSort.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === lstSort.col && lstSort.dir === 'desc');
+  });
+  document.querySelectorAll('#page-contracts thead th[data-sort]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === ctrSort.col && ctrSort.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === ctrSort.col && ctrSort.dir === 'desc');
+  });
+}
+
 function filterListings() {
   const q = document.getElementById('lst-q').value.toLowerCase();
   const status = document.getElementById('lst-status').value;
