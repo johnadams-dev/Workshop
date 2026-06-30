@@ -122,6 +122,23 @@
     .nav-tab.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 600; }
     .nav-tab[hidden] { display: none; }
 
+    .nav-admin-wrap { position: relative; margin-left: auto; }
+    .nav-admin-btn { color: var(--muted); }
+    .nav-admin-wrap.open .nav-admin-btn { color: var(--navy); }
+    .nav-admin-menu {
+      display: none; position: absolute; right: 0; top: 100%;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 220px; padding: 6px; z-index: 50;
+    }
+    .nav-admin-wrap.open .nav-admin-menu { display: block; }
+    .nav-admin-item {
+      display: block; width: 100%; text-align: left; padding: 9px 12px;
+      font-size: 13px; font-weight: 500; color: var(--text); background: none;
+      border: none; border-radius: 6px; cursor: pointer; transition: background .12s;
+    }
+    .nav-admin-item:hover { background: var(--bg); }
+    .nav-admin-item.active { color: var(--navy); font-weight: 600; }
+
     /* ── Page content ───────────────────────────────────────────────────────── */
     .page { display: none; padding: 24px 20px; max-width: 960px; margin: 0 auto; }
     .page.active { display: block; }
@@ -213,6 +230,29 @@
       min-width: 38px; text-align: center;
     }
     .day-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+    /* ── Availability matrix (days × shifts) ───────────────────────────────── */
+    .avail-matrix-wrap { overflow-x: auto; }
+    .avail-matrix { border-collapse: collapse; width: 100%; min-width: 480px; }
+    .avail-matrix th, .avail-matrix td { padding: 4px; text-align: center; }
+    .avail-matrix .am-shift-label {
+      text-align: left; font-size: 12px; color: var(--text); white-space: nowrap;
+      padding-right: 10px; font-weight: 500;
+    }
+    .avail-matrix .am-shift-time { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+    .am-day-btn {
+      width: 100%; padding: 6px 0; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 12px;
+      font-weight: 700; cursor: pointer; transition: all .15s; user-select: none;
+    }
+    .am-day-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .am-cell-btn {
+      width: 26px; height: 26px; border-radius: 5px; border: 1px solid var(--border);
+      background: var(--surface); color: transparent; cursor: pointer; transition: all .15s;
+      font-size: 13px; line-height: 1;
+    }
+    .am-cell-btn.on { background: var(--green); color: #fff; border-color: var(--green); }
+    .am-cell-btn:disabled { background: var(--bg); cursor: not-allowed; opacity: .5; }
 
     .form-actions { display: flex; align-items: center; gap: 8px; }
     .btn-primary {
@@ -512,18 +552,24 @@
   </div>
 
   <nav class="nav-tabs">
-    <button class="nav-tab" data-tab="schedule">📅 Schedule</button>
-    <button class="nav-tab active" data-tab="shifts" id="tab-shifts">⚙️ Shift Setup</button>
-    <button class="nav-tab" data-tab="eligibility" id="tab-eligibility">👥 Agent Eligibility</button>
+    <button class="nav-tab active" data-tab="schedule">📅 Calendar</button>
     <button class="nav-tab" data-tab="availability" id="tab-availability">📋 Availability</button>
     <button class="nav-tab" data-tab="feedback">💬 Feedback</button>
-    <button class="nav-tab" data-tab="publish">🚀 Publish</button>
+    <div class="nav-admin-wrap" id="nav-admin-wrap" style="display:none">
+      <button class="nav-tab nav-admin-btn" id="nav-admin-btn">⚙️ Admin ▾</button>
+      <div class="nav-admin-menu" id="nav-admin-menu">
+        <button class="nav-admin-item" id="admin-item-shifts" data-tab="shifts">⚙️ Shift Setup</button>
+        <button class="nav-admin-item" id="admin-item-eligibility" data-tab="eligibility">👥 Agent Eligibility</button>
+        <button class="nav-admin-item" id="admin-item-run-algorithm">🧮 Run Scheduling Algorithm</button>
+        <button class="nav-admin-item" id="admin-item-publish" data-tab="publish">🚀 Publish</button>
+      </div>
+    </div>
   </nav>
 
-  <!-- ── Schedule tab ─────────────────────────────────────────────────────── -->
-  <div class="page" id="page-schedule">
+  <!-- ── Schedule / Calendar tab ───────────────────────────────────────────── -->
+  <div class="page active" id="page-schedule">
     <div class="page-header">
-      <h1>Schedule</h1>
+      <h1>Calendar</h1>
       <p id="schedule-subtitle">Manage the availability window and scheduling period for the selected office.</p>
     </div>
 
@@ -538,8 +584,8 @@
     </div>
   </div>
 
-  <!-- ── Shift Setup tab ──────────────────────────────────────────────────── -->
-  <div class="page active" id="page-shifts">
+  <!-- ── Shift Setup tab (admin) ──────────────────────────────────────────── -->
+  <div class="page" id="page-shifts">
     <div class="page-header">
       <h1>Shift Setup</h1>
       <p id="shifts-subtitle">Configure the shifts agents can be assigned to for the selected office.</p>
@@ -613,17 +659,13 @@
             <div class="avail-offices-grid" id="avail-offices-grid"></div>
           </div>
 
-          <div class="days-row" style="margin-bottom:18px">
-            <label>Available Days</label>
-            <div class="days-toggles" id="avail-days-toggles"></div>
-          </div>
-
-          <div id="avail-shifts-section" style="margin-bottom:18px;display:none">
-            <div class="days-row">
-              <label>Shift Preferences
-                <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px">(empty = any shift)</span>
-              </label>
-              <div class="days-toggles" id="avail-shifts-toggles"></div>
+          <div style="margin-bottom:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px">
+              Days &amp; Shifts
+              <span style="font-weight:400;text-transform:none;font-size:11px;margin-left:4px;letter-spacing:0">— click a day to toggle availability, then uncheck specific shifts on that day if needed</span>
+            </div>
+            <div class="avail-matrix-wrap">
+              <table class="avail-matrix" id="avail-matrix"></table>
             </div>
           </div>
 
@@ -677,7 +719,7 @@
           </div>
 
           <div id="avail-cal-no-period">
-            <p style="color:var(--muted);font-size:13px">No scheduling periods found for this office. Create one in the Schedule tab first.</p>
+            <p style="color:var(--muted);font-size:13px">No scheduling periods found for this office. Create one in the Calendar tab first.</p>
           </div>
         </div>
       </div>
@@ -798,13 +840,14 @@ async function initApp() {
   avatar.textContent = initials;
   avatar.title = _email;
 
-  // Hide config-only tabs for coordinators
-  if (!_access.can_configure_shifts) {
-    document.getElementById('tab-shifts').hidden = true;
-    document.getElementById('tab-eligibility').hidden = true;
-    // Default to schedule tab
-    switchTab('schedule');
-  }
+  // Admin menu: show only items the user has rights for; hide the whole
+  // menu if they have none of the three admin capabilities.
+  document.getElementById('admin-item-shifts').hidden      = !_access.can_configure_shifts;
+  document.getElementById('admin-item-eligibility').hidden = !_access.can_set_eligibility;
+  document.getElementById('admin-item-run-algorithm').hidden = !_access.can_configure_shifts;
+  document.getElementById('admin-item-publish').hidden     = !_access.can_publish;
+  const hasAdminAccess = _access.can_configure_shifts || _access.can_set_eligibility || _access.can_publish;
+  document.getElementById('nav-admin-wrap').style.display = hasAdminAccess ? '' : 'none';
 
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -813,16 +856,49 @@ async function initApp() {
 }
 
 // ── Tab navigation ──────────────────────────────────────────────────────────
-document.querySelectorAll('.nav-tab').forEach(btn => {
+document.querySelectorAll('.nav-tabs > .nav-tab').forEach(btn => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+document.querySelectorAll('.nav-admin-item[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => { switchTab(btn.dataset.tab); closeAdminMenu(); });
+});
+
+document.getElementById('admin-item-run-algorithm').addEventListener('click', () => {
+  closeAdminMenu();
+  triggerRunAlgorithmFromMenu();
+});
+
+document.getElementById('nav-admin-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('nav-admin-wrap').classList.toggle('open');
+});
+document.addEventListener('click', closeAdminMenu);
+
+function closeAdminMenu() {
+  document.getElementById('nav-admin-wrap').classList.remove('open');
+}
+
 function switchTab(tab) {
-  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.nav-tabs > .nav-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.nav-admin-item[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
-  // Re-render period area when switching to Schedule (month nav may have changed)
+  // Re-render period area when switching to Calendar (month nav may have changed)
   if (tab === 'schedule' && _periods.length !== undefined) renderPeriodArea();
   if (tab === 'publish') renderPublishArea();
+}
+
+// Jump to the Calendar tab and run the algorithm against the period shown
+// there, if it's in a runnable state; otherwise explain what's blocking it.
+function triggerRunAlgorithmFromMenu() {
+  switchTab('schedule');
+  const period = currentPeriod();
+  if (!period) { alert('No scheduling period found for this month. Create one on the Calendar tab first.'); return; }
+  if (!['closed', 'draft'].includes(period.status)) {
+    alert(`This period is currently "${capitalize(period.status)}". Close the availability window first, then run the algorithm.`);
+    return;
+  }
+  runAlgorithm(period.id);
 }
 
 // ── Office selector ─────────────────────────────────────────────────────────
@@ -1795,7 +1871,7 @@ async function loadAvailDefaults(agentId) {
   } catch(e) {
     _availDefaults = {
       mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false,
-      willing_office_ids: [], preferred_shift_ids: [], updated_at: null
+      willing_office_ids: [], preferred_shift_ids: [], day_shift_ids: {}, updated_at: null
     };
   }
 }
@@ -1820,37 +1896,68 @@ function renderAvailDefaults() {
     });
   });
 
-  // Day toggles
-  const daysDiv = document.getElementById('avail-days-toggles');
-  daysDiv.innerHTML = DAYS.map((d, i) =>
-    `<button type="button" class="day-btn${_availDefaults[d] ? ' active' : ''}" data-day="${d}">${DAY_LABELS[i]}</button>`
-  ).join('');
-  daysDiv.querySelectorAll('.day-btn').forEach(btn =>
-    btn.addEventListener('click', () => btn.classList.toggle('active'))
-  );
-
-  // Shift toggles
-  const activeShifts = _shifts.filter(s => s.is_active);
-  const shiftsSection = document.getElementById('avail-shifts-section');
-  if (activeShifts.length) {
-    shiftsSection.style.display = 'block';
-    const shiftsDiv = document.getElementById('avail-shifts-toggles');
-    shiftsDiv.innerHTML = activeShifts.map(s =>
-      `<button type="button" class="day-btn${_availDefaults.preferred_shift_ids.includes(s.id) ? ' active' : ''}"
-        data-shift="${s.id}">${esc(s.name)}</button>`
-    ).join('');
-    shiftsDiv.querySelectorAll('[data-shift]').forEach(btn =>
-      btn.addEventListener('click', () => btn.classList.toggle('active'))
-    );
-  } else {
-    shiftsSection.style.display = 'none';
-  }
+  renderAvailMatrix();
 
   // Updated-at label
   const updEl = document.getElementById('avail-defaults-updated');
   updEl.textContent = _availDefaults.updated_at
     ? 'Last updated ' + new Date(_availDefaults.updated_at).toLocaleDateString()
     : 'No preferences saved yet';
+}
+
+// A shift counts as "on" for a given day if: a day-specific restriction lists it,
+// or (no day-specific restriction) the global preference list lists it,
+// or (no restriction at any level) — defaults to available.
+function isShiftOnForDay(shiftId, day) {
+  const daySpecific = (_availDefaults.day_shift_ids && _availDefaults.day_shift_ids[day]) || [];
+  if (daySpecific.length) return daySpecific.includes(shiftId);
+  const pref = _availDefaults.preferred_shift_ids || [];
+  if (pref.length) return pref.includes(shiftId);
+  return true;
+}
+
+function renderAvailMatrix() {
+  const activeShifts = _shifts.filter(s => s.is_active);
+  const table = document.getElementById('avail-matrix');
+
+  let html = '<thead><tr><th></th>' +
+    DAYS.map((d, i) =>
+      `<th><button type="button" class="am-day-btn${_availDefaults[d] ? ' active' : ''}" data-day="${d}">${DAY_LABELS[i]}</button></th>`
+    ).join('') + '</tr></thead><tbody>';
+
+  if (activeShifts.length) {
+    html += activeShifts.map(s => `
+      <tr>
+        <td class="am-shift-label">${esc(s.name)}<span class="am-shift-time">${fmt12(s.start_time)}–${fmt12(s.end_time)}</span></td>
+        ${DAYS.map(d => {
+          const dayOn = !!_availDefaults[d];
+          const on    = isShiftOnForDay(s.id, d);
+          return `<td><button type="button" class="am-cell-btn${on ? ' on' : ''}" data-day="${d}" data-shift="${s.id}"${dayOn ? '' : ' disabled'}>${on ? '✓' : ''}</button></td>`;
+        }).join('')}
+      </tr>`).join('');
+  } else {
+    html += `<tr><td class="am-shift-label" style="color:var(--muted)">No shifts configured</td>${DAYS.map(() => '<td></td>').join('')}</tr>`;
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  table.querySelectorAll('.am-day-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const isOn = btn.classList.contains('active');
+      table.querySelectorAll(`.am-cell-btn[data-day="${btn.dataset.day}"]`).forEach(cell => {
+        cell.disabled = !isOn;
+      });
+    });
+  });
+
+  table.querySelectorAll('.am-cell-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const on = btn.classList.toggle('on');
+      btn.textContent = on ? '✓' : '';
+    });
+  });
 }
 
 function populateAvailPeriods() {
@@ -1970,14 +2077,17 @@ document.getElementById('avail-save-defaults').addEventListener('click', async (
     .map(cb => parseInt(cb.value, 10));
   const days = {};
   DAYS.forEach(d => {
-    days[d] = !!document.querySelector(`#avail-days-toggles .day-btn[data-day="${d}"]`)?.classList.contains('active');
+    days[d] = !!document.querySelector(`#avail-matrix .am-day-btn[data-day="${d}"]`)?.classList.contains('active');
   });
-  const shifts = Array.from(document.querySelectorAll('#avail-shifts-toggles .day-btn.active'))
-    .map(b => parseInt(b.dataset.shift, 10));
+  const dayShiftIds = {};
+  DAYS.forEach(d => {
+    dayShiftIds[d] = Array.from(document.querySelectorAll(`#avail-matrix .am-cell-btn[data-day="${d}"].on`))
+      .map(b => parseInt(b.dataset.shift, 10));
+  });
 
   try {
     _availDefaults = await api('PUT', '/api/floor/availability/defaults/' + _availAgentId, {
-      ...days, willing_office_ids: willing, preferred_shift_ids: shifts
+      ...days, willing_office_ids: willing, preferred_shift_ids: [], day_shift_ids: dayShiftIds
     });
     renderAvailCalendar();  // refresh calendar — default-on days may have changed
     const updEl = document.getElementById('avail-defaults-updated');
@@ -2043,8 +2153,8 @@ async function renderPublishArea() {
   if (!draftPeriod) {
     const pub = _periods.find(p => p.status === 'published');
     area.innerHTML = pub
-      ? `<div class="period-status-card"><div class="period-status-head"><h3>${esc(MONTH_NAMES[pub.period_month - 1])} ${pub.period_year}</h3><span class="status-badge published">Published</span></div><div class="period-status-body"><p style="color:var(--muted);font-size:13px">This schedule has already been published. Individual assignments can still be edited from the Schedule tab.</p></div></div>`
-      : '<div class="loading-row" style="color:var(--muted)">No draft schedule found. Run the scheduling algorithm from the Schedule tab first.</div>';
+      ? `<div class="period-status-card"><div class="period-status-head"><h3>${esc(MONTH_NAMES[pub.period_month - 1])} ${pub.period_year}</h3><span class="status-badge published">Published</span></div><div class="period-status-body"><p style="color:var(--muted);font-size:13px">This schedule has already been published. Individual assignments can still be edited from the Calendar tab.</p></div></div>`
+      : '<div class="loading-row" style="color:var(--muted)">No draft schedule found. Run the scheduling algorithm from the Admin menu or the Calendar tab first.</div>';
     return;
   }
 
