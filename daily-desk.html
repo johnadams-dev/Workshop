@@ -356,6 +356,14 @@ tbody tr.clickable { cursor: pointer; }
   vertical-align: middle;
 }
 .addr-cell { font-weight: 500; }
+.link-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; font-family: var(--mono);
+  border-radius: 4px; padding: 1px 5px; margin-left: 5px;
+  letter-spacing: .02em; vertical-align: middle;
+}
+.link-tag-dn { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue); }
+.link-tag-fs { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
 .addr-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); margin-top: 1px; }
 
 /* ═══ BUTTONS ═══ */
@@ -2069,6 +2077,13 @@ function renderTodayTable(rows) {
   tbody.innerHTML = html;
 }
 
+function linkTags(t) {
+  let html = '';
+  if (t.mls_id)    html += `<span class="link-tag link-tag-dn" title="Linked to DeltaNet/MLS — ${escapeHtml(t.mls_id)}">DN</span>`;
+  if (t.fs_linked) html += `<span class="link-tag link-tag-fs" title="Linked to Form Simplicity">FS</span>`;
+  return html;
+}
+
 function renderListingsTable(rows) {
   const tbody = document.getElementById('listings-tbody');
   if (!rows.length) {
@@ -2083,7 +2098,7 @@ function renderListingsTable(rows) {
     return `
             <tr class="lst-row" data-status="${dStatus}" data-attn="${t.needs_attention ? '1' : '0'}">
               <td>
-                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span></div>
+                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span>${linkTags(t)}</div>
                 <div class="addr-sub">${sub}</div>
               </td>
               <td>${escapeHtml(t.agent_name) || '—'}</td>
@@ -2108,7 +2123,7 @@ function renderContractsTable(rows) {
     return `
             <tr class="ctr-row" data-status="${dStatus}">
               <td>
-                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span></div>
+                <div class="addr-cell">${attnDot}<span class="tbl-link" onclick="openDrawer('${t.id}')">${escapeHtml(t.property_address)}</span>${linkTags(t)}</div>
                 <div class="addr-sub">${escapeHtml(t.city) || '—'}</div>
               </td>
               <td>${escapeHtml(t.agent_name) || '—'}</td>
