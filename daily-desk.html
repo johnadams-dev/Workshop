@@ -690,6 +690,16 @@ tbody tr.clickable { cursor: pointer; }
 .print-item-addr { font-size: 12px; font-weight: 500; }
 .print-item-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
 .cv-spinner { width: 14px; height: 14px; border: 2px solid var(--ink-border); border-top-color: var(--amber); border-radius: 50%; animation: cvspin .7s linear infinite; flex-shrink: 0; }
+.co-agent-link { background:none; border:none; color:var(--text-muted); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.06em; cursor:pointer; padding:0; }
+.co-agent-link:hover { color:var(--amber); }
+.co-agent-area { margin-top:6px; padding:8px 10px; background:var(--ink-mid); border:1px solid var(--ink-border); border-radius:var(--r); display:flex; flex-direction:column; gap:7px; }
+.co-agent-row { display:flex; align-items:center; gap:8px; }
+.co-split-label { font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; width:52px; flex-shrink:0; }
+.co-split-input { width:44px; padding:5px 8px; text-align:center; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; }
+.co-split-pct { font-family:var(--mono); font-size:12px; color:var(--text-muted); flex-shrink:0; }
+.co-agent-sel { flex:1; padding:7px 10px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px; }
+.co-agent-remove { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:14px; padding:2px 4px; line-height:1; flex-shrink:0; }
+.co-agent-remove:hover { color:#e55; }
 @keyframes cvspin { to { transform: rotate(360deg); } }
 .cv-toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r); padding: 10px 16px; font-size: 13px; display: none; align-items: center; gap: 8px; z-index: 999; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
 .cv-toast.on { display: flex; animation: cvfadein .2s ease; }
@@ -1398,10 +1408,28 @@ tbody tr.clickable { cursor: pointer; }
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
+                <button type="button" id="nl-coagent-btn" class="co-agent-link" onclick="nlToggleCoAgent()">+ co&#8209;agent</button>
+              </div>
               <select id="nl-agent" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
                 <option value="">Select agent…</option>
               </select>
+              <div id="nl-coagent-area" class="co-agent-area" style="display:none;">
+                <div class="co-agent-row">
+                  <span class="co-split-label">Primary</span>
+                  <div style="flex:1;"></div>
+                  <input type="number" id="nl-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <span class="co-split-pct">%</span>
+                </div>
+                <div class="co-agent-row">
+                  <span class="co-split-label">Co&#8209;Agent</span>
+                  <select id="nl-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
+                  <input type="number" id="nl-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <span class="co-split-pct">%</span>
+                  <button type="button" class="co-agent-remove" onclick="nlToggleCoAgent()" title="Remove co-agent">✕</button>
+                </div>
+              </div>
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">List Price</span>
@@ -1601,10 +1629,28 @@ tbody tr.clickable { cursor: pointer; }
               </select>
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer's Agent</span>
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer's Agent</span>
+                <button type="button" id="nc-ext-coagent-btn" class="co-agent-link" onclick="ncExtToggleCoAgent()">+ co&#8209;agent</button>
+              </div>
               <select id="nc-ext-agent" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
                 <option value="">Select office first…</option>
               </select>
+              <div id="nc-ext-coagent-area" class="co-agent-area" style="display:none;">
+                <div class="co-agent-row">
+                  <span class="co-split-label">Primary</span>
+                  <div style="flex:1;"></div>
+                  <input type="number" id="nc-ext-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <span class="co-split-pct">%</span>
+                </div>
+                <div class="co-agent-row">
+                  <span class="co-split-label">Co&#8209;Agent</span>
+                  <select id="nc-ext-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
+                  <input type="number" id="nc-ext-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <span class="co-split-pct">%</span>
+                  <button type="button" class="co-agent-remove" onclick="ncExtToggleCoAgent()" title="Remove co-agent">✕</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2179,6 +2225,61 @@ async function setItemState(btn, state) {
   }
 }
 
+/* ── Co-agent utilities ── */
+let _allAgents = null;
+
+async function loadAllAgents() {
+  if (_allAgents) return _allAgents;
+  _allAgents = await GET('/daily-desk/agents?all=true');
+  return _allAgents;
+}
+
+function buildAgentOptions(agents) {
+  return '<option value="">Select agent…</option>'
+    + agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}${a.office_name ? ' — ' + escapeHtml(a.office_name) : ''}</option>`).join('');
+}
+
+async function toggleCoAgent(btnId, areaId, selId, splitPrimaryId, splitCoId) {
+  const area = document.getElementById(areaId);
+  const btn  = document.getElementById(btnId);
+  if (!area || !btn) return;
+  const show = area.style.display === 'none';
+  area.style.display = show ? '' : 'none';
+  btn.textContent = show ? '✕ remove' : '+ co‑agent';
+  if (show) {
+    const sel = document.getElementById(selId);
+    if (sel && sel.options.length <= 1) {
+      sel.innerHTML = '<option value="">Loading…</option>';
+      try {
+        const agents = await loadAllAgents();
+        sel.innerHTML = buildAgentOptions(agents);
+      } catch (e) {
+        sel.innerHTML = '<option value="">Failed to load</option>';
+      }
+    }
+    const sp = document.getElementById(splitPrimaryId);
+    const sc = document.getElementById(splitCoId);
+    if (sp) sp.value = 50;
+    if (sc) sc.value = 50;
+  }
+}
+
+function collectCoAgent(areaId, selId, splitPrimaryId, splitCoId) {
+  const area = document.getElementById(areaId);
+  if (!area || area.style.display === 'none') return { split_pct: null, co_agents: [] };
+  const coId = document.getElementById(selId)?.value || '';
+  const primarySplit = parseFloat(document.getElementById(splitPrimaryId)?.value) || null;
+  const coSplit      = parseFloat(document.getElementById(splitCoId)?.value) || null;
+  return {
+    split_pct: primarySplit,
+    co_agents: coId ? [{ agent_id: coId, split_pct: coSplit }] : [],
+  };
+}
+
+function nlToggleCoAgent()    { toggleCoAgent('nl-coagent-btn',     'nl-coagent-area',     'nl-coagent-sel',     'nl-split-primary',     'nl-split-co'); }
+function ncAccToggleCoAgent() { toggleCoAgent('nc-acc-coagent-btn', 'nc-acc-coagent-area', 'nc-acc-coagent-sel', 'nc-acc-split-primary', 'nc-acc-split-co'); }
+function ncExtToggleCoAgent() { toggleCoAgent('nc-ext-coagent-btn', 'nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co'); }
+
 /* ── Add modal flow ── */
 /* ═══ NEW LISTING MODAL ═══ */
 let nlAgents = [];
@@ -2357,6 +2458,7 @@ async function nlSaveListing() {
   const mls_ids = [...document.querySelectorAll('#nl-mls-wrap .nl-mls-id')]
     .map(el => el.value.trim()).filter(Boolean);
 
+  const coData = collectCoAgent('nl-coagent-area', 'nl-coagent-sel', 'nl-split-primary', 'nl-split-co');
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -2371,6 +2473,7 @@ async function nlSaveListing() {
     commission_rate: parseFloat(document.getElementById('nl-commission').value.replace(/[^0-9.]/g, '')) || null,
     cooperating_commission: parseFloat(document.getElementById('nl-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
+    ...coData,
   };
 
   try {
@@ -2937,8 +3040,26 @@ function ncUpdateAccRepFields() {
           <select id="nc-acc-office" onchange="ncLoadAccBuyerAgents()" style="${selStyle}">${opts}</select>
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="${lblStyle}">Buyer's Agent</span>
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span class="field-label" style="${lblStyle}">Buyer's Agent</span>
+            <button type="button" id="nc-acc-coagent-btn" class="co-agent-link" onclick="ncAccToggleCoAgent()">+ co&#8209;agent</button>
+          </div>
           <select id="nc-acc-agent" style="${selStyle}"><option value="">Loading…</option></select>
+          <div id="nc-acc-coagent-area" class="co-agent-area" style="display:none;">
+            <div class="co-agent-row">
+              <span class="co-split-label">Primary</span>
+              <div style="flex:1;"></div>
+              <input type="number" id="nc-acc-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+              <span class="co-split-pct">%</span>
+            </div>
+            <div class="co-agent-row">
+              <span class="co-split-label">Co&#8209;Agent</span>
+              <select id="nc-acc-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
+              <input type="number" id="nc-acc-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+              <span class="co-split-pct">%</span>
+              <button type="button" class="co-agent-remove" onclick="ncAccToggleCoAgent()" title="Remove co-agent">&#x2715;</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
@@ -2995,6 +3116,9 @@ async function ncSaveAccContract() {
     fields.agentId       = document.getElementById('nc-acc-agent').value || null;
     fields.sourceOfBuyer = document.getElementById('nc-acc-source').value || null;
     if (!fields.agentId) { alert("Please select the buyer's agent."); return; }
+    const coData = collectCoAgent('nc-acc-coagent-area', 'nc-acc-coagent-sel', 'nc-acc-split-primary', 'nc-acc-split-co');
+    fields.splitPct  = coData.split_pct;
+    fields.coAgents  = coData.co_agents;
   } else {
     fields.cooperatingBrokerage = document.getElementById('nc-acc-coop-brokerage').value || null;
     fields.cooperatingAgentName = document.getElementById('nc-acc-coop-agent').value || null;
@@ -3049,6 +3173,7 @@ async function ncSaveExternalContract() {
   if (!addr)    { alert('Property address is required.'); return; }
   if (!agentId) { alert("Please select the buyer's agent."); return; }
 
+  const extCoData = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
   try {
     await POST('/daily-desk/contracts', {
       property_address:    addr,
@@ -3065,6 +3190,7 @@ async function ncSaveExternalContract() {
       cooperating_commission:  parseFloat(document.getElementById('nc-ext-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
       office_id:               document.getElementById('nc-ext-office').value || null,
       agent_id:                agentId,
+      ...extCoData,
     });
     closeNewContractModal();
     await renderAll();
@@ -3457,10 +3583,15 @@ function renderDrawer(t) {
   const isContractView = !t.represents_seller && t.represents_buyer;
 
   const primaryRole = isContractView ? 'buyers_agent' : 'listing_agent';
-  const agent = (t.participants || []).find(p => p.role === primaryRole) || (t.participants || [])[0];
+  const coRole      = isContractView ? 'co_buyers_agent' : 'co_listing_agent';
+  const allAgentParticipants = (t.participants || []).filter(p => p.role === primaryRole || p.role === coRole);
   document.getElementById('drawer-agent-label').textContent = isContractView ? "Buyer's Agent" : 'Agent';
-  document.getElementById('drawer-agent').textContent = agent
-    ? (agent.first_name ? `${agent.first_name} ${agent.last_name}` : (agent.external_name || '—'))
+  document.getElementById('drawer-agent').innerHTML = allAgentParticipants.length
+    ? allAgentParticipants.map(p => {
+        const name = p.first_name ? `${p.first_name} ${p.last_name}` : (p.external_name || '—');
+        const split = p.split_pct != null ? ` <span style="font-size:11px;color:var(--text-muted);">(${p.split_pct}%)</span>` : '';
+        return escapeHtml(name) + split;
+      }).join('<br>')
     : '—';
 
   document.getElementById('drawer-office').textContent = t.office_name || '—';
