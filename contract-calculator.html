@@ -87,7 +87,7 @@
             border: 2px solid #e9ecef;
         }
         .mode-selector h2 { font-size: 20px; margin-bottom: 20px; color: #2c3e50; text-align: center; }
-        .mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .mode-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
         .mode-option {
             background: white;
             border: 3px solid #dee2e6;
@@ -245,7 +245,54 @@
                     <div class="mode-title">Manual Entry</div>
                     <div class="mode-description">Enter dates yourself</div>
                 </label>
+                <label class="mode-option" id="fsModeOption">
+                    <input type="radio" name="inputMode" value="fs" id="fsModeRadio">
+                    <div class="mode-icon">📂</div>
+                    <div class="mode-title">Form Simplicity</div>
+                    <div class="mode-description">Pick a file from your transactions</div>
+                </label>
             </div>
+        </div>
+
+        <!-- Form Simplicity Section -->
+        <div class="upload-section" id="fsSection">
+            <div class="form-group">
+                <label style="font-weight:600;color:#2c3e50;font-size:15px;">Your Email Address</label>
+                <div style="display:flex;gap:10px;margin-top:8px;">
+                    <input type="email" id="fsEmail" placeholder="agent@adamscameron.com"
+                           style="flex:1;padding:12px 15px;border:2px solid #dee2e6;border-radius:8px;font-size:15px;">
+                    <button class="upload-button" onclick="fsLoadTransactions()" id="fsLoadBtn"
+                            style="white-space:nowrap;padding:12px 20px;border-radius:8px;font-size:14px;">
+                        Find Transactions
+                    </button>
+                </div>
+            </div>
+
+            <div id="fsTransactionWrap" style="display:none;margin-top:4px;">
+                <div class="form-group">
+                    <label style="font-weight:600;color:#2c3e50;font-size:15px;">Transaction</label>
+                    <select id="fsTransactionSel" onchange="fsTransactionSelected()"
+                            style="width:100%;padding:12px 15px;border:2px solid #dee2e6;border-radius:8px;font-size:14px;margin-top:8px;background:white;">
+                        <option value="">— Select a transaction —</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="fsFileWrap" style="display:none;margin-top:4px;">
+                <div class="form-group">
+                    <label style="font-weight:600;color:#2c3e50;font-size:15px;">Contract File</label>
+                    <select id="fsFileSel"
+                            style="width:100%;padding:12px 15px;border:2px solid #dee2e6;border-radius:8px;font-size:14px;margin-top:8px;background:white;">
+                        <option value="">— Select a file —</option>
+                    </select>
+                </div>
+                <button class="upload-button" onclick="fsProcessFile()" id="fsProcessBtn"
+                        style="width:100%;padding:13px;border-radius:8px;font-size:15px;margin-top:4px;">
+                    📄 Process Contract with AI
+                </button>
+            </div>
+
+            <div class="extraction-status" id="fsStatus" style="margin-top:16px;"></div>
         </div>
 
         <!-- Upload Section -->
@@ -390,13 +437,171 @@
     // ── MODE SWITCHING ──────────────────────────────────────────────
     document.querySelectorAll('input[name="inputMode"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const isUpload = this.value === 'upload';
-            document.getElementById('uploadSection').classList.toggle('active', isUpload);
-            document.getElementById('contractForm').classList.toggle('active', !isUpload);
-            document.getElementById('uploadModeOption').classList.toggle('active', isUpload);
-            document.getElementById('manualModeOption').classList.toggle('active', !isUpload);
+            const mode = this.value;
+            document.getElementById('uploadSection').classList.toggle('active', mode === 'upload');
+            document.getElementById('fsSection').classList.toggle('active',     mode === 'fs');
+            document.getElementById('contractForm').classList.toggle('active',  mode === 'manual');
+            document.getElementById('uploadModeOption').classList.toggle('active', mode === 'upload');
+            document.getElementById('manualModeOption').classList.toggle('active', mode === 'manual');
+            document.getElementById('fsModeOption').classList.toggle('active',     mode === 'fs');
         });
     });
+
+    // ── FORM SIMPLICITY ─────────────────────────────────────────────
+    const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+    const PH = { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_CONFIG.proxyKey };
+
+    // Pre-fill email from any prior sign-in stored in localStorage
+    (function() {
+        const saved = localStorage.getItem('ac_user_email') || '';
+        if (saved) document.getElementById('fsEmail').value = saved;
+    })();
+
+    let _fsTrans = [];  // normalized transaction list
+    let _fsTransId = null;
+
+    function fsSetStatus(msg, type) {
+        const el = document.getElementById('fsStatus');
+        const bg = type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#e7f3ff';
+        const border = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#0066cc';
+        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '<div class="loading-spinner"></div>';
+        el.className = 'extraction-status active';
+        el.style.cssText = `background:${bg};border:2px solid ${border};border-radius:12px;padding:15px;display:block;`;
+        el.innerHTML = `<div class="status-content">${typeof icon === 'string' && icon.startsWith('<') ? icon : '<div class="status-icon">'+icon+'</div>'}<div class="status-text"><p style="margin:0;font-size:14px;">${msg}</p></div></div>`;
+    }
+    function fsClearStatus() {
+        const el = document.getElementById('fsStatus');
+        el.className = 'extraction-status';
+        el.style.display = 'none';
+        el.innerHTML = '';
+    }
+
+    function normalizeFsFiles(data) {
+        const raw = data?.files || data?.data || data?.result || (Array.isArray(data) ? data : []);
+        return (Array.isArray(raw) ? raw : []).map(f => ({
+            id:   f.fileID   || f.fileId   || f.id   || '',
+            name: f.fileName || f.filename || f.name || 'Unnamed file',
+        })).filter(f => f.id);
+    }
+
+    async function fsLoadTransactions() {
+        const email = document.getElementById('fsEmail').value.trim();
+        if (!email) { showNotification('Please enter your email address.', 'error'); return; }
+
+        const btn = document.getElementById('fsLoadBtn');
+        btn.disabled = true; btn.textContent = '⏳ Loading…';
+        fsClearStatus();
+        document.getElementById('fsTransactionWrap').style.display = 'none';
+        document.getElementById('fsFileWrap').style.display = 'none';
+        fsSetStatus('Looking up your Form Simplicity account…', 'loading');
+
+        try {
+            // Step 1: resolve NRDS ID from email
+            const acct = await fetch(`${PROXY_BASE}/fs/get-account`, {
+                method: 'POST', headers: PH, body: JSON.stringify({ email }),
+            }).then(r => r.json());
+            if (acct.error) throw new Error(acct.error);
+            const nrdsId = acct.agentNRDSID || acct.nrdsId || acct.NrdsId;
+            if (!nrdsId) throw new Error('No NRDS ID found for this email in Form Simplicity');
+
+            fsSetStatus('Loading transactions…', 'loading');
+
+            // Step 2: list transactions
+            const txData = await fetch(`${PROXY_BASE}/fs/list-transactions`, {
+                method: 'POST', headers: PH, body: JSON.stringify({ agentNRDSID: nrdsId }),
+            }).then(r => r.json());
+            if (txData.error) throw new Error(txData.error);
+
+            const raw = txData?.data || txData?.transactions || txData?.result || (Array.isArray(txData) ? txData : []);
+            const parseDate = s => { if (!s) return 0; const [m,d,y] = s.split('/'); return new Date(+y,+m-1,+d).getTime(); };
+            _fsTrans = (Array.isArray(raw) ? raw : [])
+                .sort((a, b) => parseDate(b.lastUpdateDate) - parseDate(a.lastUpdateDate))
+                .map((tx, i) => ({
+                    id:      tx.transId || String(i),
+                    address: tx.transName || tx.address || tx.streetAddress || 'Unknown address',
+                    status:  tx.propertyStatus || '',
+                    updated: tx.lastUpdateDate || '',
+                }));
+
+            if (!_fsTrans.length) throw new Error('No transactions found in the last 45 days');
+
+            const sel = document.getElementById('fsTransactionSel');
+            sel.innerHTML = '<option value="">— Select a transaction —</option>' +
+                _fsTrans.map(tx => `<option value="${tx.id}">${tx.address}${tx.updated ? '  ·  ' + tx.updated : ''}</option>`).join('');
+            document.getElementById('fsTransactionWrap').style.display = 'block';
+            fsClearStatus();
+
+        } catch (e) {
+            fsSetStatus(e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Find Transactions';
+        }
+    }
+
+    async function fsTransactionSelected() {
+        const transId = document.getElementById('fsTransactionSel').value;
+        document.getElementById('fsFileWrap').style.display = 'none';
+        fsClearStatus();
+        if (!transId) return;
+
+        _fsTransId = transId;
+        fsSetStatus('Loading files…', 'loading');
+
+        try {
+            const data = await fetch(`${PROXY_BASE}/fs/list-files`, {
+                method: 'POST', headers: PH, body: JSON.stringify({ transId }),
+            }).then(r => r.json());
+            if (data.error) throw new Error(data.error);
+
+            const files = normalizeFsFiles(data);
+            if (!files.length) throw new Error('No files found in this transaction');
+
+            const sel = document.getElementById('fsFileSel');
+            sel.innerHTML = '<option value="">— Select a file —</option>' +
+                files.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+            document.getElementById('fsFileWrap').style.display = 'block';
+            fsClearStatus();
+        } catch (e) {
+            fsSetStatus(e.message, 'error');
+        }
+    }
+
+    async function fsProcessFile() {
+        const fileId  = document.getElementById('fsFileSel').value;
+        const transId = _fsTransId;
+        if (!fileId)  { showNotification('Please select a file.', 'error'); return; }
+        if (!transId) { showNotification('Please select a transaction first.', 'error'); return; }
+
+        const btn = document.getElementById('fsProcessBtn');
+        btn.disabled = true; btn.textContent = '⏳ Downloading…';
+        fsSetStatus('Downloading file from Form Simplicity…', 'loading');
+
+        try {
+            const dl = await fetch(`${PROXY_BASE}/fs/download-file`, {
+                method: 'POST', headers: PH, body: JSON.stringify({ transId, fileId }),
+            }).then(r => r.json());
+            if (dl.error) throw new Error(dl.error);
+            if (!dl.base64) throw new Error('No file data returned');
+
+            fsSetStatus('AI is reading the contract and extracting dates…', 'loading');
+            const extracted = await extractWithGeminiProxy(dl.base64);
+
+            fsSetStatus('Extraction complete — review the values below.', 'success');
+            fillFormWithExtractedData(extracted);
+
+            // Switch to manual mode for review
+            document.getElementById('manualModeRadio').checked = true;
+            document.getElementById('fsSection').classList.remove('active');
+            document.getElementById('contractForm').classList.add('active');
+            document.getElementById('fsModeOption').classList.remove('active');
+            document.getElementById('manualModeOption').classList.add('active');
+
+        } catch (e) {
+            fsSetStatus('Failed: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '📄 Process Contract with AI';
+        }
+    }
 
     // ── FILE UPLOAD ─────────────────────────────────────────────────
     const uploadArea = document.getElementById('uploadArea');
