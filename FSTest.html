@@ -4,100 +4,240 @@
   <meta charset="UTF-8">
   <title>FS API Test Tool</title>
   <style>
-    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 24px; }
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 24px; max-width: 900px; }
     h2 { color: #c9a84c; }
-    input, textarea { background: #2d2d2d; border: 1px solid #555; color: #d4d4d4; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
+    h3 { color: #c9a84c; margin-top: 0; }
+    input, select { background: #2d2d2d; border: 1px solid #555; color: #d4d4d4; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
     button { background: #c9a84c; color: #1e1e1e; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 8px; margin-bottom: 8px; }
     button:hover { background: #e0b85c; }
     pre { background: #2d2d2d; border: 1px solid #555; padding: 16px; border-radius: 4px; overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: 400px; margin-top: 12px; }
     label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
-    .section { margin-bottom: 24px; border: 1px solid #444; padding: 16px; border-radius: 8px; }
+    .section { margin-bottom: 16px; border: 1px solid #444; padding: 16px; border-radius: 8px; transition: opacity 0.2s; }
+    .section.dim { opacity: 0.35; pointer-events: none; }
     .ok { color: #4ec9b0; }
     .err { color: #f48771; }
+    .step-num { display: inline-block; background: #c9a84c; color: #1e1e1e; width: 22px; height: 22px; border-radius: 50%; text-align: center; line-height: 22px; font-weight: bold; font-size: 12px; margin-right: 8px; flex-shrink: 0; }
+    .step-title { display: flex; align-items: center; margin-bottom: 12px; }
+    .txn-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin-top: 12px; }
+    .txn-item { background: #2d2d2d; border: 1px solid #555; border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+    .txn-item:hover { border-color: #c9a84c; }
+    .txn-item.selected { border-color: #c9a84c; background: #3a3000; }
+    .txn-addr { font-weight: bold; font-size: 13px; }
+    .txn-meta { font-size: 11px; color: #888; margin-top: 3px; }
+    .confirm-box { background: #0d3a1a; border: 1px solid #4ec9b0; border-radius: 6px; padding: 8px 14px; font-size: 13px; color: #4ec9b0; margin-top: 8px; }
+    .selected-id { background: #3a3000; border: 1px solid #c9a84c; border-radius: 6px; padding: 8px 14px; font-size: 13px; color: #c9a84c; margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; align-items: flex-start; }
+    .row input { margin-bottom: 0; }
+    .row button { white-space: nowrap; flex-shrink: 0; margin-bottom: 0; }
   </style>
 </head>
 <body>
   <h2>🔧 Form Simplicity API Test Tool</h2>
-  <p style="color:#888; margin-bottom:24px;">Runs against the MLS Proxy (server.js) on Cloud Run.</p>
 
   <div class="section">
-    <h3 style="color:#c9a84c; margin-top:0">Config</h3>
+    <div class="step-title"><h3 style="margin:0">Config</h3></div>
     <label>Proxy Base URL</label>
     <input id="base" value="https://mls-proxy-975684028597.us-east1.run.app" />
     <label>Proxy Key</label>
     <input id="proxyKey" value="530354c4e71b7319e7177b20c28de391d83f15b9638fdd37" />
-    <label>Transaction ID (from your FS account)</label>
-    <input id="transId" value="3mz07jr1P8" />
   </div>
 
-  <div class="section">
-    <h3 style="color:#c9a84c; margin-top:0">0. Get Transaction by ID</h3>
-    <p style="color:#888; font-size:13px">Fetch the complete transaction record — shows all party, property, and brokerage fields available for this transaction.</p>
-    <button onclick="getTransById()">Get Transaction Details</button>
-    <pre id="transResult">— enter a Transaction ID above, then click —</pre>
+  <!-- Step 1: Select Agent -->
+  <div class="section" id="step1">
+    <div class="step-title">
+      <span class="step-num">1</span>
+      <h3 style="margin:0">Select Agent</h3>
+    </div>
+    <button onclick="loadUsers()">Load Active Users</button>
+    <div id="userWrap" style="display:none; margin-top:4px;">
+      <label>Select Agent</label>
+      <select id="userSelect" onchange="userSelected()">
+        <option value="">— select agent —</option>
+      </select>
+    </div>
+    <div style="margin-top:10px; color:#666; font-size:12px; margin-bottom:6px;">— or enter email directly —</div>
+    <div class="row">
+      <input id="emailInput" placeholder="agent@example.com" />
+      <button onclick="lookupByEmail()">Look Up</button>
+    </div>
+    <pre id="agentResult" style="display:none"></pre>
+    <div id="agentConfirm" style="display:none"></div>
   </div>
 
-  <div class="section">
-    <h3 style="color:#c9a84c; margin-top:0">1. List Files in Transaction</h3>
-    <p style="color:#888; font-size:13px">Lists all files already in this transaction — gives us fileID values for the download test.</p>
-    <button onclick="listFiles()">List Files</button>
-    <pre id="listResult">— click to run —</pre>
+  <!-- Step 2: Select Transaction -->
+  <div class="section dim" id="step2">
+    <div class="step-title">
+      <span class="step-num">2</span>
+      <h3 style="margin:0">Select Transaction</h3>
+    </div>
+    <p style="color:#888; font-size:13px; margin-top:0">Shows transactions updated in the last 45 days.</p>
+    <button onclick="loadTransactions()">Load Transactions</button>
+    <div class="txn-list" id="txnList" style="display:none"></div>
+    <pre id="txnRaw" style="display:none"></pre>
   </div>
 
-  <div class="section">
-    <h3 style="color:#c9a84c; margin-top:0">2. Download File</h3>
-    <p style="color:#888; font-size:13px">Returns base64-encoded file content via the MLS proxy.</p>
-    <label>File ID</label>
-    <input id="fileId" placeholder="e.g. 12345" />
-    <button onclick="downloadFile()">Download File</button>
-    <pre id="downloadResult">— click to run —</pre>
+  <!-- Step 3: Transaction Details -->
+  <div class="section dim" id="step3">
+    <div class="step-title">
+      <span class="step-num">3</span>
+      <h3 style="margin:0">Transaction Details</h3>
+    </div>
+    <div class="selected-id" id="selectedTxnId">No transaction selected</div>
+    <button onclick="getTransById()">Get Full Transaction Record</button>
+    <pre id="transResult">— select a transaction in step 2 —</pre>
+  </div>
+
+  <!-- Step 4: List Files -->
+  <div class="section dim" id="step4">
+    <div class="step-title">
+      <span class="step-num">4</span>
+      <h3 style="margin:0">List Files</h3>
+    </div>
+    <button onclick="listFiles()">List Files in Transaction</button>
+    <pre id="listResult">— select a transaction in step 2 —</pre>
+  </div>
+
+  <!-- Step 5: Download File -->
+  <div class="section dim" id="step5">
+    <div class="step-title">
+      <span class="step-num">5</span>
+      <h3 style="margin:0">Download File</h3>
+    </div>
+    <label>File ID (from step 4)</label>
+    <div class="row">
+      <input id="fileId" placeholder="e.g. 12345" />
+      <button onclick="downloadFile()">Download</button>
+    </div>
+    <pre id="downloadResult">— enter a file ID from step 4 —</pre>
   </div>
 
   <script>
     const base     = () => document.getElementById("base").value.replace(/\/$/, "");
     const proxyKey = () => document.getElementById("proxyKey").value.trim();
-    const transId  = () => document.getElementById("transId").value.trim();
 
-    async function call(endpoint, body, resultId) {
-      const el = document.getElementById(resultId);
-      el.textContent = "Loading...";
-      el.className = "";
-      try {
-        const resp = await fetch(`${base()}${endpoint}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-proxy-key": proxyKey() },
-          body: JSON.stringify(body),
-        });
-        const text = await resp.text();
-        let display;
-        try {
-          display = JSON.stringify(JSON.parse(text), null, 2);
-        } catch {
-          display = text;
-        }
-        el.textContent = `HTTP ${resp.status}\n\n${display}`;
-        el.className = resp.ok ? "ok" : "err";
-      } catch (err) {
-        el.textContent = "Error: " + err.message;
-        el.className = "err";
+    let currentNrdsId  = null;
+    let currentTransId = null;
+
+    function authHeaders() {
+      return { "Content-Type": "application/json", "x-proxy-key": proxyKey() };
+    }
+
+    function setStep(n) {
+      for (let i = 1; i <= 5; i++) {
+        document.getElementById(`step${i}`).classList.toggle("dim", i > n);
       }
     }
 
+    async function apiPost(endpoint, body, resultId) {
+      const el = resultId ? document.getElementById(resultId) : null;
+      if (el) { el.textContent = "Loading…"; el.className = ""; el.style.display = ""; }
+      const resp = await fetch(`${base()}${endpoint}`, {
+        method: "POST", headers: authHeaders(), body: JSON.stringify(body),
+      });
+      const text = await resp.text();
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { parsed = text; }
+      if (el) {
+        el.textContent = `HTTP ${resp.status}\n\n${typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2)}`;
+        el.className = resp.ok ? "ok" : "err";
+      }
+      return { ok: resp.ok, data: parsed };
+    }
+
+    async function apiGet(endpoint, resultId) {
+      const el = resultId ? document.getElementById(resultId) : null;
+      if (el) { el.textContent = "Loading…"; el.className = ""; el.style.display = ""; }
+      const resp = await fetch(`${base()}${endpoint}`, {
+        method: "GET", headers: authHeaders(),
+      });
+      const text = await resp.text();
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { parsed = text; }
+      if (el) {
+        el.textContent = `HTTP ${resp.status}\n\n${typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2)}`;
+        el.className = resp.ok ? "ok" : "err";
+      }
+      return { ok: resp.ok, data: parsed };
+    }
+
+    function confirmAgent(email, nrdsId, name) {
+      currentNrdsId = nrdsId;
+      const box = document.getElementById("agentConfirm");
+      box.style.display = "";
+      box.innerHTML = `<div class="confirm-box">✓ ${name || email} &nbsp;·&nbsp; NRDS: ${nrdsId || "unknown"}</div>`;
+      setStep(2);
+    }
+
+    async function loadUsers() {
+      const { ok, data } = await apiGet("/fs/active-users");
+      if (!ok || !Array.isArray(data)) return;
+      const sel = document.getElementById("userSelect");
+      sel.innerHTML = '<option value="">— select agent —</option>' +
+        data.map(u => `<option value="${u.email}" data-nrds="${u.nrdsId || ""}" data-name="${u.name || ""}">${u.name} (${u.email})</option>`).join("");
+      document.getElementById("userWrap").style.display = "";
+    }
+
+    function userSelected() {
+      const opt = document.getElementById("userSelect").selectedOptions[0];
+      if (!opt || !opt.value) return;
+      document.getElementById("emailInput").value = opt.value;
+      confirmAgent(opt.value, opt.dataset.nrds, opt.dataset.name);
+    }
+
+    async function lookupByEmail() {
+      const email = document.getElementById("emailInput").value.trim();
+      if (!email) return;
+      const { ok, data } = await apiPost("/fs/get-account", { email }, "agentResult");
+      if (ok && data) {
+        const nrdsId = data.agentNRDSID || data.nrdsId || data.NRDSID || "";
+        const name   = `${data.firstName || ""} ${data.lastName || ""}`.trim();
+        confirmAgent(email, nrdsId, name);
+      }
+    }
+
+    async function loadTransactions() {
+      if (!currentNrdsId) return;
+      const { ok, data } = await apiPost("/fs/list-transactions", { agentNRDSID: currentNrdsId }, "txnRaw");
+      if (!ok) return;
+      const raw  = Array.isArray(data) ? (data[0]?.data ?? data) : (data?.data ?? []);
+      const txns = Array.isArray(raw) ? raw : [];
+      const list = document.getElementById("txnList");
+      list.style.display = "";
+      if (!txns.length) {
+        list.innerHTML = '<div style="color:#888; font-size:13px; padding:8px">No transactions found.</div>';
+        return;
+      }
+      list.innerHTML = txns.map(t => {
+        const addr = [t.streetAddress, t.City, t.State, t.Zip].filter(Boolean).join(", ") || t.transName || t.transId;
+        const meta = [t.sellerParty1Name || t.sellerLandlordName, t.transactionType, t.lastUpdateDate ? `Updated: ${t.lastUpdateDate}` : ""]
+          .filter(Boolean).join(" · ");
+        return `<div class="txn-item" data-id="${t.transId}" onclick="selectTransaction(this)">
+          <div class="txn-addr">${addr}</div>
+          <div class="txn-meta">${meta || "ID: " + t.transId}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function selectTransaction(el) {
+      currentTransId = el.dataset.id;
+      document.querySelectorAll(".txn-item").forEach(e => e.classList.remove("selected"));
+      el.classList.add("selected");
+      document.getElementById("selectedTxnId").textContent = `Transaction ID: ${currentTransId}`;
+      setStep(5);
+    }
+
     function getTransById() {
-      call("/fs/get-trans-by-id", { transId: transId() }, "transResult");
+      if (currentTransId) apiPost("/fs/get-trans-by-id", { transId: currentTransId }, "transResult");
     }
 
     function listFiles() {
-      call("/fs/list-files", { transId: transId() }, "listResult");
+      if (currentTransId) apiPost("/fs/list-files", { transId: currentTransId }, "listResult");
     }
 
     function downloadFile() {
       const fileId = document.getElementById("fileId").value.trim();
-      call("/fs/download-file", { transId: transId(), fileId }, "downloadResult");
+      if (currentTransId && fileId) apiPost("/fs/download-file", { transId: currentTransId, fileId }, "downloadResult");
     }
-
-    // Auto-fetch transaction details when transId changes
-    document.getElementById("transId").addEventListener("change", getTransById);
   </script>
 </body>
 </html>
