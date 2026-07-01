@@ -532,10 +532,14 @@
 
     function normalizeFsFiles(data) {
         const raw = data?.files || data?.data || data?.result || (Array.isArray(data) ? data : []);
-        return (Array.isArray(raw) ? raw : []).map(f => ({
-            id:   f.fileID   || f.fileId   || f.id   || '',
-            name: f.fileDescription || f.description || f.fileName || f.filename || f.name || 'Unnamed file',
-        })).filter(f => f.id);
+        return (Array.isArray(raw) ? raw : []).map(f => {
+            const fileName    = f.fileName    || f.filename    || f.name        || '';
+            const description = f.fileDescription || f.description              || '';
+            const date        = f.lastUpdateDate  || f.insertDate || f.uploadDate || '';
+            const parts = [fileName, description !== fileName ? description : ''].filter(Boolean);
+            const label = (parts.join('  —  ') || 'Unnamed file') + (date ? '  ·  ' + date : '');
+            return { id: f.fileID || f.fileId || f.id || '', fileName, description, date, label };
+        }).filter(f => f.id);
     }
 
     async function fsLoadTransactions() {
@@ -612,7 +616,7 @@
 
             const sel = document.getElementById('fsFileSel');
             sel.innerHTML = '<option value="">— Select a file —</option>' +
-                files.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+                files.map(f => `<option value="${f.id}">${f.label}</option>`).join('');
             document.getElementById('fsFileWrap').style.display = 'block';
             fsClearStatus();
         } catch (e) {
