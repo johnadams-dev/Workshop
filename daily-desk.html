@@ -2713,35 +2713,44 @@ async function amChooseAction(key) {
         <textarea id="am-notes" rows="3" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px; resize:vertical;" placeholder="Describe the correction or update"></textarea>
       </div>`;
   } else if (key === 'change') {
+    const labelStyle = 'font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
+    const selStyle   = 'padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; width:100%;';
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Change Type</span>
-          <select id="am-change-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+          <span class="field-label" style="${labelStyle}">Change Type</span>
+          <select id="am-change-type" onchange="amToggleChangeType()" style="${selStyle}">
             <option value="price">Price Change</option>
             <option value="back_on_market">Back on Market</option>
             <option value="extension">Extension</option>
+            <option value="agent">Agent Change</option>
             <option value="other">Other</option>
           </select>
         </div>
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">New Price (if applicable)</span>
+        <div class="field" id="am-price-wrap" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${labelStyle}">New Price (if applicable)</span>
           <input type="text" id="am-new-price" placeholder="$0">
         </div>
       </div>
-      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+      <div class="form-row" id="am-dates-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">New Expiration Date (if extension)</span>
+          <span class="field-label" style="${labelStyle}">New Expiration Date (if extension)</span>
           <input type="date" id="am-expiration-date">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
+          <span class="field-label" style="${labelStyle}">Note</span>
           <input type="text" id="am-notes" placeholder="Optional">
         </div>
       </div>
+      <!-- Agent change section — shown only when Change Type = Agent Change -->
+      <div id="am-agent-change" style="display:none; margin-bottom:14px;">
+        <span class="field-label" style="${labelStyle}">Listing Agents</span>
+        <div id="am-agent-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+        <button onclick="amAddAgentRow()" style="margin-top:8px; padding:6px 14px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); font-size:12px; cursor:pointer;">+ Add Agent</button>
+      </div>
       <div class="form-row" style="margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Address Correction <span style="font-weight:400;opacity:.6">(leave unchanged if no correction needed)</span></span>
+          <span class="field-label" style="${labelStyle}">Address Correction <span style="font-weight:400;opacity:.6">(leave unchanged if no correction needed)</span></span>
           <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address">
         </div>
       </div>`;
@@ -2909,6 +2918,87 @@ async function amLoadBuyerAgents() {
   }
 }
 
+function amToggleChangeType() {
+  const type = document.getElementById('am-change-type').value;
+  const isAgent = type === 'agent';
+  document.getElementById('am-price-wrap').style.display  = isAgent ? 'none' : '';
+  document.getElementById('am-dates-wrap').style.display  = isAgent ? 'none' : '';
+  document.getElementById('am-agent-change').style.display = isAgent ? '' : 'none';
+  if (isAgent && document.getElementById('am-agent-list').children.length === 0) {
+    amLoadCurrentListingAgents();
+  }
+}
+
+async function amLoadCurrentListingAgents() {
+  const list = document.getElementById('am-agent-list');
+  list.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">Loading current agents…</div>';
+  try {
+    const txn = await GET(`/daily-desk/transactions/${amState.id}`);
+    const listing = (txn.participants || [])
+      .filter(p => p.role === 'listing_agent' || p.role === 'co_listing_agent')
+      .sort((a, b) => (a.role === 'listing_agent' ? -1 : 1));
+    list.innerHTML = '';
+    if (listing.length) {
+      for (const p of listing) await amAddAgentRow(p.agent_id, p.office_id, p.commission_split);
+    } else {
+      await amAddAgentRow();
+    }
+  } catch (e) {
+    list.innerHTML = '';
+    await amAddAgentRow();
+  }
+}
+
+async function amAddAgentRow(preAgentId = null, preOfficeId = null, preSplit = null) {
+  const list = document.getElementById('am-agent-list');
+  const selStyle = 'padding:7px 10px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; flex:1; min-width:0;';
+  const officeOpts = (STATE.offices || []).map(o =>
+    `<option value="${o.id}" ${String(o.id) === String(preOfficeId) ? 'selected' : ''}>${escapeHtml(o.name)}</option>`
+  ).join('');
+
+  const row = document.createElement('div');
+  row.className = 'am-agent-row';
+  row.style.cssText = 'display:flex; gap:8px; align-items:center;';
+  row.innerHTML = `
+    <select class="am-agent-office" onchange="amRefreshAgentOpts(this)" style="${selStyle}">
+      <option value="">— Office —</option>${officeOpts}
+    </select>
+    <select class="am-agent-select" style="${selStyle}"><option value="">Loading…</option></select>
+    <input class="am-agent-split" type="number" min="0" max="100" placeholder="Split %" style="width:80px; padding:7px 10px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;" value="${preSplit ?? ''}">
+    <button onclick="amRemoveAgentRow(this)" style="flex-shrink:0; background:transparent; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; padding:4px 6px;">✕</button>`;
+  list.appendChild(row);
+
+  // Load agents for the pre-selected office, then set the pre-selected agent
+  const officeSel = row.querySelector('.am-agent-office');
+  const agentSel  = row.querySelector('.am-agent-select');
+  const officeId  = preOfficeId || (officeSel.value || '');
+  try {
+    const agents = await GET(`/daily-desk/agents${officeId ? `?office_id=${officeId}` : ''}`);
+    agentSel.innerHTML = '<option value="">Select agent…</option>' +
+      agents.map(a => `<option value="${a.id}" ${String(a.id) === String(preAgentId) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+  } catch (_) {
+    agentSel.innerHTML = '<option value="">Failed to load</option>';
+  }
+}
+
+async function amRefreshAgentOpts(officeSelect) {
+  const agentSel = officeSelect.closest('.am-agent-row').querySelector('.am-agent-select');
+  agentSel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const agents = await GET(`/daily-desk/agents${officeSelect.value ? `?office_id=${officeSelect.value}` : ''}`);
+    agentSel.innerHTML = '<option value="">Select agent…</option>' +
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+  } catch (_) {
+    agentSel.innerHTML = '<option value="">Failed to load</option>';
+  }
+}
+
+function amRemoveAgentRow(btn) {
+  const list = document.getElementById('am-agent-list');
+  if (list.children.length <= 1) return; // must keep at least one
+  btn.closest('.am-agent-row').remove();
+}
+
 async function amSubmit() {
   const key = amState.actionKey;
   const fields = {};
@@ -2958,10 +3048,26 @@ async function amSubmit() {
   if (key === 'change' && amState.status === 'closed') {
     fields.notes = document.getElementById('am-notes').value || null;
   } else if (key === 'change') {
-    const newPrice = amParseMoney(document.getElementById('am-new-price').value);
-    if (newPrice != null) fields.newPrice = newPrice;
-    const expirationDate = document.getElementById('am-expiration-date').value;
-    if (expirationDate) fields.expirationDate = expirationDate;
+    const changeType = document.getElementById('am-change-type').value;
+    fields.changeType = changeType;
+    if (changeType === 'agent') {
+      const rows = document.querySelectorAll('.am-agent-row');
+      const agents = [];
+      for (const row of rows) {
+        const agentId = row.querySelector('.am-agent-select').value;
+        const officeId = row.querySelector('.am-agent-office').value;
+        const split = row.querySelector('.am-agent-split').value;
+        if (!agentId) { alert('Please select an agent for each row, or remove empty rows.'); return; }
+        agents.push({ agentId: Number(agentId), officeId: officeId ? Number(officeId) : null, split: split ? Number(split) : null });
+      }
+      if (!agents.length) { alert('Please add at least one listing agent.'); return; }
+      fields.listingAgents = agents;
+    } else {
+      const newPrice = amParseMoney(document.getElementById('am-new-price').value);
+      if (newPrice != null) fields.newPrice = newPrice;
+      const expirationDate = document.getElementById('am-expiration-date').value;
+      if (expirationDate) fields.expirationDate = expirationDate;
+    }
     fields.notes = document.getElementById('am-notes').value || null;
     const correctedAddr = document.getElementById('am-property-address').value.trim();
     if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
