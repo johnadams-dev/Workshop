@@ -256,7 +256,17 @@
 
         <!-- Form Simplicity Section -->
         <div class="upload-section" id="fsSection">
-            <div class="form-group">
+            <!-- Staff/manager: agent picker (shown after role check) -->
+            <div class="form-group" id="fsAgentPickerWrap" style="display:none">
+                <label style="font-weight:600;color:#2c3e50;font-size:15px;">Select Agent</label>
+                <select id="fsAgentSel" onchange="fsAgentSelected()"
+                        style="width:100%;padding:12px 15px;border:2px solid #dee2e6;border-radius:8px;font-size:14px;margin-top:8px;background:white;">
+                    <option value="">— Loading agents… —</option>
+                </select>
+            </div>
+
+            <!-- Email input: shown for unknown users, hidden when role is known -->
+            <div class="form-group" id="fsEmailWrap">
                 <label style="font-weight:600;color:#2c3e50;font-size:15px;">Your Email Address</label>
                 <div style="display:flex;gap:10px;margin-top:8px;">
                     <input type="email" id="fsEmail" placeholder="agent@adamscameron.com"
@@ -444,6 +454,7 @@
             document.getElementById('uploadModeOption').classList.toggle('active', mode === 'upload');
             document.getElementById('manualModeOption').classList.toggle('active', mode === 'manual');
             document.getElementById('fsModeOption').classList.toggle('active',     mode === 'fs');
+            if (mode === 'fs') fsInitSection();
         });
     });
 
@@ -451,14 +462,57 @@
     const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
     const PH = { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_CONFIG.proxyKey };
 
-    // Pre-fill email from any prior sign-in stored in localStorage
-    (function() {
-        const saved = localStorage.getItem('ac_user_email') || '';
-        if (saved) document.getElementById('fsEmail').value = saved;
-    })();
+    let _fsTrans    = [];
+    let _fsTransId  = null;
+    let _fsInitDone = false;
 
-    let _fsTrans = [];  // normalized transaction list
-    let _fsTransId = null;
+    async function fsInitSection() {
+        if (_fsInitDone) return;
+        _fsInitDone = true;
+
+        const userEmail = localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || '';
+
+        try {
+            const r = await fetch(`${PROXY_BASE}/lockbox/me`, {
+                headers: { 'x-user-email': userEmail, 'x-proxy-key': PROXY_CONFIG.proxyKey },
+            });
+            const me = r.ok ? await r.json() : {};
+            const role = me.role || 'unknown';
+
+            if (role === 'manager' || role === 'staff') {
+                // Show agent picker, hide email input
+                document.getElementById('fsEmailWrap').style.display = 'none';
+                document.getElementById('fsAgentPickerWrap').style.display = 'block';
+                const usersResp = await fetch(`${PROXY_BASE}/fs/active-users`, { headers: PH });
+                const users = usersResp.ok ? await usersResp.json() : [];
+                const sel = document.getElementById('fsAgentSel');
+                sel.innerHTML = '<option value="">— Select agent —</option>' +
+                    users.map(u => `<option value="${u.email}">${u.name} (${u.email})</option>`).join('');
+            } else if (role === 'agent' && userEmail) {
+                // Auto-fill and auto-load — no input needed
+                document.getElementById('fsEmailWrap').style.display = 'none';
+                document.getElementById('fsEmail').value = userEmail;
+                fsLoadTransactions();
+            } else {
+                // Unknown role or no email — show the email input (default state)
+                if (userEmail) document.getElementById('fsEmail').value = userEmail;
+            }
+        } catch (e) {
+            // On any error fall back to showing the email input
+            if (userEmail) document.getElementById('fsEmail').value = userEmail;
+        }
+    }
+
+    function fsAgentSelected() {
+        const sel = document.getElementById('fsAgentSel');
+        const opt = sel.selectedOptions[0];
+        if (!opt || !opt.value) return;
+        document.getElementById('fsEmail').value = opt.value;
+        document.getElementById('fsTransactionWrap').style.display = 'none';
+        document.getElementById('fsFileWrap').style.display = 'none';
+        fsClearStatus();
+        fsLoadTransactions();
+    }
 
     function fsSetStatus(msg, type) {
         const el = document.getElementById('fsStatus');
