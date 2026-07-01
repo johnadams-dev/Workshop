@@ -3061,6 +3061,22 @@ async function amSubmit() {
         agents.push({ agentId: Number(agentId), officeId: officeId ? Number(officeId) : null, split: split ? Number(split) : null });
       }
       if (!agents.length) { alert('Please add at least one listing agent.'); return; }
+
+      // Validate splits when more than one agent, or when any split is entered
+      const withSplit    = agents.filter(a => a.split != null);
+      const withoutSplit = agents.filter(a => a.split == null);
+      if (withSplit.length > 0 && withoutSplit.length > 0) {
+        alert('Please enter a commission split % for every agent, or leave all blank.');
+        return;
+      }
+      if (withSplit.length > 0) {
+        const total = withSplit.reduce((s, a) => s + a.split, 0);
+        if (Math.abs(total - 100) > 0.01) {
+          alert(`Commission splits must add up to 100%. Currently: ${total}%.\nIf there is a referral fee, record the agents' splits after the referral is taken off the top — the referral will be tracked separately.`);
+          return;
+        }
+      }
+
       fields.listingAgents = agents;
     } else {
       const newPrice = amParseMoney(document.getElementById('am-new-price').value);
