@@ -29,6 +29,13 @@
   </div>
 
   <div class="section">
+    <h3 style="color:#c9a84c; margin-top:0">0. Get Transaction by ID</h3>
+    <p style="color:#888; font-size:13px">Fetch the complete transaction record — shows all party, property, and brokerage fields available for this transaction.</p>
+    <button onclick="getTransById()">Get Transaction Details</button>
+    <pre id="transResult">— enter a Transaction ID above, then click —</pre>
+  </div>
+
+  <div class="section">
     <h3 style="color:#c9a84c; margin-top:0">1. List Files in Transaction</h3>
     <p style="color:#888; font-size:13px">Lists all files already in this transaction — gives us fileID values for the download test.</p>
     <button onclick="listFiles()">List Files</button>
@@ -94,6 +101,13 @@
         el.className = "err";
       }
     }
+
+    function getTransById() {
+      call("/getTransById", { transId: transId() }, "transResult");
+    }
+
+    // Auto-fetch transaction details when transId changes
+    document.getElementById("transId").addEventListener("change", getTransById);
 
     function listFiles() {
       call("/listFiles", { transId: transId() }, "listResult");
