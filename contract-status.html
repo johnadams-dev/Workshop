@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contract Status — Adams, Cameron &amp; Co.</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f6fa;
+      color: #2c3e50;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    .header {
+      background: #1e3a5f;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .header-logo img {
+      height: 40px;
+      width: auto;
+    }
+    .header-logo-text {
+      color: #c9a84c;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .header-label {
+      color: #94a3b8;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────────── */
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 16px 60px;
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    /* ── Property card ───────────────────────────────────────────────── */
+    .property-photo {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
+    }
+    .property-body {
+      padding: 20px 24px;
+    }
+    .property-address {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+    .property-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #c9a84c;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .property-link:hover { text-decoration: underline; }
+
+    /* ── Agent card ──────────────────────────────────────────────────── */
+    .agent-card {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .agent-photo {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #c9a84c;
+      flex-shrink: 0;
+    }
+    .agent-photo-placeholder {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #e8edf5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      flex-shrink: 0;
+    }
+    .agent-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: 4px;
+    }
+    .agent-title {
+      font-size: 12px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+    .agent-contact {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .agent-contact a {
+      font-size: 13px;
+      color: #2c3e50;
+      text-decoration: none;
+    }
+    .agent-contact a:hover { color: #c9a84c; }
+
+    /* ── Timeline ────────────────────────────────────────────────────── */
+    .timeline-header {
+      padding: 20px 24px 12px;
+      border-bottom: 1px solid #f0f2f8;
+    }
+    .timeline-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e3a5f;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid #f5f6fa;
+      transition: background 0.1s;
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-item.past { opacity: 0.55; }
+    .timeline-item.today { background: #fffbeb; }
+
+    .tl-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .tl-icon.past    { background: #f0f2f8; color: #94a3b8; }
+    .tl-icon.today   { background: #c9a84c; color: #fff; }
+    .tl-icon.upcoming{ background: #e8edf5; color: #1e3a5f; }
+
+    .tl-body { flex: 1; min-width: 0; }
+    .tl-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 2px;
+    }
+    .tl-label.past    { color: #94a3b8; }
+    .tl-label.today   { color: #92400e; }
+    .tl-date {
+      font-size: 13px;
+      color: #6b7280;
+    }
+    .tl-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tl-badge.past     { background: #f0f2f8; color: #94a3b8; }
+    .tl-badge.today    { background: #c9a84c; color: #fff; }
+    .tl-badge.upcoming { background: #e8edf5; color: #1e3a5f; }
+    .tl-badge.closing  { background: #1e3a5f; color: #fff; }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding: 32px 16px;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+    .footer strong { color: #c9a84c; }
+
+    /* ── Error / loading ─────────────────────────────────────────────── */
+    .state-box {
+      text-align: center;
+      padding: 60px 24px;
+      color: #94a3b8;
+    }
+    .state-box .icon { font-size: 48px; margin-bottom: 16px; }
+    .state-box p { font-size: 15px; }
+
+    @media (max-width: 480px) {
+      .agent-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .property-address { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <a href="https://www.johnadams.org" class="header-logo" target="_blank" rel="noopener">
+    <img src="https://www.johnadams.org/images/logo-white.png"
+         onerror="this.style.display='none'"
+         alt="Adams, Cameron &amp; Co.">
+    <span class="header-logo-text">Adams, Cameron &amp; Co.</span>
+  </a>
+  <span class="header-label">Contract Status</span>
+</div>
+
+<div class="container" id="app">
+  <div class="state-box">
+    <div class="icon">⏳</div>
+    <p>Loading contract details…</p>
+  </div>
+</div>
+
+<div class="footer" id="footer" style="display:none">
+  Prepared by <strong>Adams, Cameron &amp; Co., Realtors®</strong> &nbsp;·&nbsp;
+  <a href="https://www.johnadams.org" style="color:#c9a84c;text-decoration:none;">johnadams.org</a>
+</div>
+
+<script>
+  const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+
+  const MILESTONES = [
+    { field: 'effective_date',           label: 'Effective Date',                    icon: '📝' },
+    { field: 'initial_deposit_due',      label: 'Initial Deposit Due',               icon: '💰' },
+    { field: 'additional_deposit_due',   label: 'Additional Deposit Due',            icon: '💰' },
+    { field: 'inspection_period_end',    label: 'Inspection Period Ends',            icon: '🔍' },
+    { field: 'loan_approval_deadline',   label: 'Loan Approval Deadline',            icon: '🏦' },
+    { field: 'seller_cancellation_deadline', label: 'Seller Cancellation Deadline',  icon: '⚠️' },
+    { field: 'title_commitment_due',     label: 'Title Commitment Due',              icon: '📋' },
+    { field: 'flood_determination_due',  label: 'Flood Zone Determination Due',      icon: '🌊' },
+    { field: 'insurance_evidence_due',   label: 'Insurance Evidence Due',            icon: '🛡️' },
+    { field: 'closing_disclosure_due',   label: 'Closing Disclosure (CD) Due',       icon: '📄' },
+    { field: 'final_walkthrough',        label: 'Final Walk-Through',                icon: '🚶' },
+    { field: 'closing_date',             label: 'Closing Date',                      icon: '🔑' },
+  ];
+
+  function parseDate(str) {
+    if (!str) return null;
+    // DB returns ISO date strings like "2026-06-15" or "2026-06-15T00:00:00.000Z"
+    const s = str.slice(0, 10);
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function formatDate(date) {
+    return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function daysFrom(date, today) {
+    return Math.round((date - today) / 86400000);
+  }
+
+  function formatPhone(e164) {
+    if (!e164) return null;
+    const d = e164.replace(/\D/g, '');
+    if (d.length === 11 && d[0] === '1') {
+      return `(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+    }
+    return e164;
+  }
+
+  async function load() {
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) { showError('No contract ID provided.'); return; }
+
+    try {
+      const resp = await fetch(`${PROXY}/contract-dates/${id}`);
+      if (resp.status === 404) { showError('This contract link is not found or is no longer active.'); return; }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      render(data);
+    } catch (e) {
+      showError('Could not load contract details. Please try again later.');
+      console.error(e);
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('app').innerHTML = `
+      <div class="state-box">
+        <div class="icon">⚠️</div>
+        <p>${msg}</p>
+      </div>`;
+  }
+
+  function render(data) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const app = document.getElementById('app');
+    const sections = [];
+
+    // ── Property card ──────────────────────────────────────────────
+    const addr = data.property_address || 'Property Address Not Set';
+    let photoHtml = '';
+    if (data.primary_photo_url) {
+      photoHtml = `<img class="property-photo" src="${esc(data.primary_photo_url)}" alt="Property photo">`;
+    }
+    let listingLinkHtml = '';
+    if (data.listing_url) {
+      listingLinkHtml = `<a class="property-link" href="${esc(data.listing_url)}" target="_blank" rel="noopener">
+        View Listing on johnadams.org ↗
+      </a>`;
+    }
+    sections.push(`
+      <div class="card">
+        ${photoHtml}
+        <div class="property-body">
+          <div class="property-address">${esc(addr)}</div>
+          ${listingLinkHtml}
+        </div>
+      </div>`);
+
+    // ── Agent card ─────────────────────────────────────────────────
+    if (data.first_name || data.last_name || data.agent_photo_url) {
+      const name  = [data.first_name, data.last_name].filter(Boolean).join(' ');
+      const phone = formatPhone(data.cell_e164);
+      const photoEl = data.agent_photo_url
+        ? `<img class="agent-photo" src="${esc(data.agent_photo_url)}" alt="${esc(name)}">`
+        : `<div class="agent-photo-placeholder">👤</div>`;
+      sections.push(`
+        <div class="card">
+          <div class="agent-card">
+            ${photoEl}
+            <div>
+              <div class="agent-title">Your Agent</div>
+              <div class="agent-name">${esc(name)}</div>
+              <div class="agent-contact">
+                ${data.agent_email ? `<a href="mailto:${esc(data.agent_email)}">${esc(data.agent_email)}</a>` : ''}
+                ${phone ? `<a href="tel:${esc(data.cell_e164)}">${esc(phone)}</a>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`);
+    }
+
+    // ── Timeline ───────────────────────────────────────────────────
+    let timelineRows = '';
+    for (const m of MILESTONES) {
+      const date = parseDate(data[m.field]);
+      if (!date) continue;
+
+      const diff     = daysFrom(date, today);
+      const isToday  = diff === 0;
+      const isPast   = diff < 0;
+      const isClosing = m.field === 'closing_date';
+      const state    = isToday ? 'today' : isPast ? 'past' : 'upcoming';
+
+      let badge;
+      if (isToday)        badge = `<span class="tl-badge today">Today</span>`;
+      else if (isPast)    badge = `<span class="tl-badge past">✓ Done</span>`;
+      else if (isClosing) badge = `<span class="tl-badge closing">in ${diff} day${diff !== 1 ? 's' : ''}</span>`;
+      else                badge = `<span class="tl-badge upcoming">in ${diff} day${diff !== 1 ? 's' : ''}</span>`;
+
+      timelineRows += `
+        <div class="timeline-item ${state}">
+          <div class="tl-icon ${state}">${isPast ? '✓' : m.icon}</div>
+          <div class="tl-body">
+            <div class="tl-label ${state}">${esc(m.label)}</div>
+            <div class="tl-date">${formatDate(date)}</div>
+          </div>
+          ${badge}
+        </div>`;
+    }
+
+    sections.push(`
+      <div class="card">
+        <div class="timeline-header"><h2>Contract Timeline</h2></div>
+        ${timelineRows}
+      </div>`);
+
+    app.innerHTML = sections.join('');
+    document.getElementById('footer').style.display = '';
+    document.title = `Contract Status — ${data.property_address || 'Adams, Cameron & Co.'}`;
+  }
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  load();
+</script>
+</body>
+</html>

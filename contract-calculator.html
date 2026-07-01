@@ -429,6 +429,16 @@
                 <button class="action-btn btn-print"    onclick="printReport()">🖨️ Print Report</button>
                 <button class="action-btn btn-copy"     onclick="copyToClipboard()">📋 Copy Dates</button>
                 <button class="action-btn btn-calendar" onclick="addToGoogleCalendar()">📅 Add to Calendar</button>
+                <button class="action-btn" id="shareBtn"
+                        style="background:#1e3a5f;color:#fff;border:none;"
+                        onclick="saveAndShare()">🔗 Save &amp; Share</button>
+            </div>
+            <div id="shareBox" style="display:none;margin-top:16px;padding:16px;background:#f0f4ff;border:2px solid #1e3a5f;border-radius:12px;">
+                <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1e3a5f;">Shareable link — send this to your client, cooperating agent, or buyer:</p>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input id="shareUrl" readonly style="flex:1;padding:10px 12px;border:1px solid #c0c9e0;border-radius:8px;font-size:13px;background:#fff;color:#2c3e50;">
+                    <button onclick="copyShareUrl()" style="padding:10px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">Copy Link</button>
+                </div>
             </div>
         </div>
 
@@ -917,6 +927,8 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         const financingDays   = isCash ? 0 : parseInt(document.getElementById('financingDays').value);
 
         calculatedDates = [];
+        document.getElementById('shareBox').style.display = 'none';
+        document.getElementById('shareBtn').textContent = '🔗 Save & Share';
 
         const push = (label, date, description, warning = null) => calculatedDates.push({ label, date, description, warning });
 
@@ -1215,6 +1227,89 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         const propId = document.getElementById('resultPropertyId').textContent;
         if (!confirm(`Add ${calculatedDates.length} events to Google Calendar for:\n\n${propId}\n\nClick OK to authorize with Google.`)) return;
         accessToken ? createCalendarEvents() : tokenClient.requestAccessToken();
+    }
+
+    // ── Save & Share ─────────────────────────────────────────────────────────
+    const LABEL_TO_FIELD = {
+        'Effective Date':                   'effective_date',
+        'Initial Deposit Due':              'initial_deposit_due',
+        'Additional Deposit Due':           'additional_deposit_due',
+        'Inspection Period Ends':           'inspection_period_end',
+        'Loan Approval Deadline':           'loan_approval_deadline',
+        'Seller Cancellation Deadline':     'seller_cancellation_deadline',
+        'Title Insurance / Commitment Due': 'title_commitment_due',
+        'Flood Zone Determination Due':     'flood_determination_due',
+        'Insurance Evidence Due':           'insurance_evidence_due',
+        'Closing Disclosure (CD) Due':      'closing_disclosure_due',
+        'Final Walk-Through':               'final_walkthrough',
+        'Closing Date':                     'closing_date',
+    };
+
+    function isoLocal(date) {
+        if (!date) return null;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    async function saveAndShare() {
+        if (!calculatedDates.length) { showNotification('Calculate dates first.', 'error'); return; }
+        const btn = document.getElementById('shareBtn');
+        btn.textContent = '⏳ Saving…';
+        btn.disabled = true;
+
+        const dates = {};
+        calculatedDates.forEach(item => {
+            const field = LABEL_TO_FIELD[item.label];
+            if (field) dates[field] = isoLocal(item.date);
+        });
+
+        const isCash = document.getElementById('cashRadio').checked;
+        const body = {
+            property_address:        document.getElementById('propertyId').value.trim() || null,
+            transaction_type:        isCash ? 'cash' : 'financed',
+            effective_date:          dates.effective_date,
+            closing_date:            dates.closing_date,
+            initial_deposit_days:    parseInt(document.getElementById('initialDeposit').value) || null,
+            additional_deposit_days: parseInt(document.getElementById('additionalDeposit').value) || null,
+            financing_days:          isCash ? null : (parseInt(document.getElementById('financingDays').value) || null),
+            title_days:              parseInt(document.getElementById('titleDays').value) || null,
+            flood_days:              parseInt(document.getElementById('floodDays').value) || null,
+            inspection_days:         parseInt(document.getElementById('inspectionDays').value) || null,
+            initial_deposit_due:          dates.initial_deposit_due          || null,
+            additional_deposit_due:       dates.additional_deposit_due       || null,
+            inspection_period_end:        dates.inspection_period_end        || null,
+            loan_approval_deadline:       dates.loan_approval_deadline       || null,
+            seller_cancellation_deadline: dates.seller_cancellation_deadline || null,
+            title_commitment_due:         dates.title_commitment_due         || null,
+            flood_determination_due:      dates.flood_determination_due      || null,
+            insurance_evidence_due:       dates.insurance_evidence_due       || null,
+            closing_disclosure_due:       dates.closing_disclosure_due       || null,
+            final_walkthrough:            dates.final_walkthrough            || null,
+            created_by_email: localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || null,
+        };
+
+        try {
+            const resp = await fetch(`${PROXY_BASE}/contract-dates`, {
+                method: 'POST', headers: PH, body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+            document.getElementById('shareUrl').value = data.url;
+            document.getElementById('shareBox').style.display = 'block';
+            btn.textContent = '✅ Saved';
+        } catch (e) {
+            showNotification('Could not save: ' + e.message, 'error');
+            btn.textContent = '🔗 Save & Share';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function copyShareUrl() {
+        const url = document.getElementById('shareUrl').value;
+        navigator.clipboard.writeText(url).then(() => showNotification('Link copied!', 'success'));
     }
 
     async function createCalendarEvents() {
