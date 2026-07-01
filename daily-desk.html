@@ -1421,13 +1421,13 @@ tbody tr.clickable { cursor: pointer; }
                 <div class="co-agent-row">
                   <span class="co-split-label">Primary</span>
                   <div style="flex:1;"></div>
-                  <input type="number" id="nl-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <input type="number" id="nl-split-primary" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nl-split-primary','nl-split-co')">
                   <span class="co-split-pct">%</span>
                 </div>
                 <div class="co-agent-row">
                   <span class="co-split-label">Co&#8209;Agent</span>
                   <select id="nl-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
-                  <input type="number" id="nl-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <input type="number" id="nl-split-co" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nl-split-co','nl-split-primary')">
                   <span class="co-split-pct">%</span>
                   <button type="button" class="co-agent-remove" onclick="nlToggleCoAgent()" title="Remove co-agent">✕</button>
                 </div>
@@ -1642,13 +1642,13 @@ tbody tr.clickable { cursor: pointer; }
                 <div class="co-agent-row">
                   <span class="co-split-label">Primary</span>
                   <div style="flex:1;"></div>
-                  <input type="number" id="nc-ext-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <input type="number" id="nc-ext-split-primary" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nc-ext-split-primary','nc-ext-split-co')">
                   <span class="co-split-pct">%</span>
                 </div>
                 <div class="co-agent-row">
                   <span class="co-split-label">Co&#8209;Agent</span>
                   <select id="nc-ext-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
-                  <input type="number" id="nc-ext-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+                  <input type="number" id="nc-ext-split-co" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nc-ext-split-co','nc-ext-split-primary')">
                   <span class="co-split-pct">%</span>
                   <button type="button" class="co-agent-remove" onclick="ncExtToggleCoAgent()" title="Remove co-agent">✕</button>
                 </div>
@@ -1709,13 +1709,13 @@ tbody tr.clickable { cursor: pointer; }
           <div class="co-agent-row">
             <span class="co-split-label">Primary</span>
             <div style="flex:1;"></div>
-            <input type="number" id="st-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+            <input type="number" id="st-split-primary" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('st-split-primary','st-split-co')">
             <span class="co-split-pct">%</span>
           </div>
           <div class="co-agent-row">
             <span class="co-split-label">Co&#8209;Agent</span>
             <select id="st-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
-            <input type="number" id="st-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+            <input type="number" id="st-split-co" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('st-split-co','st-split-primary')">
             <span class="co-split-pct">%</span>
             <button type="button" class="co-agent-remove" onclick="stToggleCoAgent()" title="Remove co-agent">✕</button>
           </div>
@@ -2307,15 +2307,28 @@ async function toggleCoAgent(btnId, areaId, selId, splitPrimaryId, splitCoId) {
   }
 }
 
+function syncCoSplit(changedId, otherId) {
+  const val = parseFloat(document.getElementById(changedId)?.value);
+  const other = document.getElementById(otherId);
+  if (other && !isNaN(val)) other.value = Math.max(0, 100 - val);
+}
+
 function collectCoAgent(areaId, selId, splitPrimaryId, splitCoId) {
   const area = document.getElementById(areaId);
-  if (!area || area.style.display === 'none') return { split_pct: null, co_agents: [] };
-  const coId = document.getElementById(selId)?.value || '';
+  if (!area || area.style.display === 'none') return { split_pct: null, co_agents: [], splitError: null };
+  const coId         = document.getElementById(selId)?.value || '';
   const primarySplit = parseFloat(document.getElementById(splitPrimaryId)?.value) || null;
   const coSplit      = parseFloat(document.getElementById(splitCoId)?.value) || null;
+  if (coId) {
+    const total = (primarySplit || 0) + (coSplit || 0);
+    if (Math.abs(total - 100) > 0.01) {
+      return { split_pct: primarySplit, co_agents: [{ agent_id: coId, split_pct: coSplit }], splitError: `Commission splits total ${total}% — must equal 100%.` };
+    }
+  }
   return {
     split_pct: primarySplit,
     co_agents: coId ? [{ agent_id: coId, split_pct: coSplit }] : [],
+    splitError: null,
   };
 }
 
@@ -2501,7 +2514,8 @@ async function nlSaveListing() {
   const mls_ids = [...document.querySelectorAll('#nl-mls-wrap .nl-mls-id')]
     .map(el => el.value.trim()).filter(Boolean);
 
-  const coData = collectCoAgent('nl-coagent-area', 'nl-coagent-sel', 'nl-split-primary', 'nl-split-co');
+  const { split_pct: nlSplitPct, co_agents: nlCoAgents, splitError: nlSplitErr } = collectCoAgent('nl-coagent-area', 'nl-coagent-sel', 'nl-split-primary', 'nl-split-co');
+  if (nlSplitErr) { alert(nlSplitErr); return; }
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -2516,7 +2530,8 @@ async function nlSaveListing() {
     commission_rate: parseFloat(document.getElementById('nl-commission').value.replace(/[^0-9.]/g, '')) || null,
     cooperating_commission: parseFloat(document.getElementById('nl-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
-    ...coData,
+    split_pct: nlSplitPct,
+    co_agents: nlCoAgents,
   };
 
   try {
@@ -3092,13 +3107,13 @@ function ncUpdateAccRepFields() {
             <div class="co-agent-row">
               <span class="co-split-label">Primary</span>
               <div style="flex:1;"></div>
-              <input type="number" id="nc-acc-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+              <input type="number" id="nc-acc-split-primary" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nc-acc-split-primary','nc-acc-split-co')">
               <span class="co-split-pct">%</span>
             </div>
             <div class="co-agent-row">
               <span class="co-split-label">Co&#8209;Agent</span>
               <select id="nc-acc-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
-              <input type="number" id="nc-acc-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+              <input type="number" id="nc-acc-split-co" class="co-split-input" value="50" min="0" max="100" step="1" oninput="syncCoSplit('nc-acc-split-co','nc-acc-split-primary')">
               <span class="co-split-pct">%</span>
               <button type="button" class="co-agent-remove" onclick="ncAccToggleCoAgent()" title="Remove co-agent">&#x2715;</button>
             </div>
@@ -3159,9 +3174,10 @@ async function ncSaveAccContract() {
     fields.agentId       = document.getElementById('nc-acc-agent').value || null;
     fields.sourceOfBuyer = document.getElementById('nc-acc-source').value || null;
     if (!fields.agentId) { alert("Please select the buyer's agent."); return; }
-    const coData = collectCoAgent('nc-acc-coagent-area', 'nc-acc-coagent-sel', 'nc-acc-split-primary', 'nc-acc-split-co');
-    fields.splitPct  = coData.split_pct;
-    fields.coAgents  = coData.co_agents;
+    const { split_pct: accSplitPct, co_agents: accCoAgents, splitError: accSplitErr } = collectCoAgent('nc-acc-coagent-area', 'nc-acc-coagent-sel', 'nc-acc-split-primary', 'nc-acc-split-co');
+    if (accSplitErr) { alert(accSplitErr); return; }
+    fields.splitPct  = accSplitPct;
+    fields.coAgents  = accCoAgents;
   } else {
     fields.cooperatingBrokerage = document.getElementById('nc-acc-coop-brokerage').value || null;
     fields.cooperatingAgentName = document.getElementById('nc-acc-coop-agent').value || null;
@@ -3216,7 +3232,8 @@ async function ncSaveExternalContract() {
   if (!addr)    { alert('Property address is required.'); return; }
   if (!agentId) { alert("Please select the buyer's agent."); return; }
 
-  const extCoData = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
+  const { split_pct: extSplitPct, co_agents: extCoAgents, splitError: extSplitErr } = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
+  if (extSplitErr) { alert(extSplitErr); return; }
   try {
     await POST('/daily-desk/contracts', {
       property_address:    addr,
@@ -3233,7 +3250,8 @@ async function ncSaveExternalContract() {
       cooperating_commission:  parseFloat(document.getElementById('nc-ext-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
       office_id:               document.getElementById('nc-ext-office').value || null,
       agent_id:                agentId,
-      ...extCoData,
+      split_pct:               extSplitPct,
+      co_agents:               extCoAgents,
     });
     closeNewContractModal();
     await renderAll();
@@ -3476,14 +3494,16 @@ function stToggleCoAgent() {
 async function confirmStartTracking() {
   const agentId  = document.getElementById('st-agent').value;
   const officeId = document.getElementById('officeSelect').value;
-  const coData   = collectCoAgent('st-coagent-area', 'st-coagent-sel', 'st-split-primary', 'st-split-co');
+  const { split_pct: stSplitPct, co_agents: stCoAgents, splitError: stSplitErr } = collectCoAgent('st-coagent-area', 'st-coagent-sel', 'st-split-primary', 'st-split-co');
+  if (stSplitErr) { alert(stSplitErr); return; }
   const row      = STATE.untracked.find(r => r.delta_listing_id === _stDeltaListingId);
   try {
     await POST('/daily-desk/start-tracking', {
       delta_listing_id: _stDeltaListingId,
       agent_id:  agentId || null,
       office_id: (row?.office_id) || (officeId !== 'all' ? officeId : null),
-      ...coData,
+      split_pct: stSplitPct,
+      co_agents: stCoAgents,
     });
     closeStartTrackingModal();
     await renderAll();
