@@ -533,12 +533,15 @@
     function normalizeFsFiles(data) {
         const raw = data?.files || data?.data || data?.result || (Array.isArray(data) ? data : []);
         return (Array.isArray(raw) ? raw : []).map(f => {
+            const id          = f.fileID || f.fileId || f.id || '';
             const fileName    = f.fileName    || f.filename    || f.name        || '';
             const description = f.fileDescription || f.description              || '';
-            const date        = f.lastUpdateDate  || f.insertDate || f.uploadDate || '';
-            const parts = [fileName, description !== fileName ? description : ''].filter(Boolean);
-            const label = (parts.join('  —  ') || 'Unnamed file') + (date ? '  ·  ' + date : '');
-            return { id: f.fileID || f.fileId || f.id || '', fileName, description, date, label };
+            const date        = f.fileLastUpdateDate || f.fileInsertDate
+                             || f.lastUpdateDate     || f.insertDate            || '';
+            const text = [fileName, description !== fileName ? description : ''].filter(Boolean).join('  —  ')
+                      || (id ? `File ${id}` : 'Unnamed file');
+            const label = text + (date ? '  ·  ' + date : '');
+            return { id, fileName, description, date, label };
         }).filter(f => f.id);
     }
 
