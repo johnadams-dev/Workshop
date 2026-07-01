@@ -1686,6 +1686,47 @@ tbody tr.clickable { cursor: pointer; }
 </div>
 
 <!-- ═══ DELTANET MATCH MODAL ═══ -->
+<!-- Start Tracking modal -->
+<div class="modal-overlay" id="startTrackingModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head">
+      <div class="modal-title">Start Tracking</div>
+      <button class="modal-close" onclick="closeStartTrackingModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">Creating a listing for <strong id="st-address"></strong>.</div>
+      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
+          <button type="button" id="st-coagent-btn" class="co-agent-link" onclick="stToggleCoAgent()">+ co&#8209;agent</button>
+        </div>
+        <select id="st-agent" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+          <option value="">Select agent…</option>
+        </select>
+        <div id="st-coagent-area" class="co-agent-area" style="display:none;">
+          <div class="co-agent-row">
+            <span class="co-split-label">Primary</span>
+            <div style="flex:1;"></div>
+            <input type="number" id="st-split-primary" class="co-split-input" value="50" min="0" max="100" step="1">
+            <span class="co-split-pct">%</span>
+          </div>
+          <div class="co-agent-row">
+            <span class="co-split-label">Co&#8209;Agent</span>
+            <select id="st-coagent-sel" class="co-agent-sel"><option value="">Select agent…</option></select>
+            <input type="number" id="st-split-co" class="co-split-input" value="50" min="0" max="100" step="1">
+            <span class="co-split-pct">%</span>
+            <button type="button" class="co-agent-remove" onclick="stToggleCoAgent()" title="Remove co-agent">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" onclick="closeStartTrackingModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="confirmStartTracking()">Start Tracking</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="matchModal">
   <div class="modal">
     <div class="modal-head">
@@ -3390,19 +3431,59 @@ function renderUntrackedTable(rows) {
   }).join('');
 }
 
+let _stDeltaListingId = null;
+
 async function startTracking(deltaListingId) {
   const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
   if (!row) return;
+  _stDeltaListingId = deltaListingId;
 
-  if (!confirm(`Start tracking "${row.address}"? This creates a new listing transaction.`)) return;
+  document.getElementById('st-address').textContent = row.address || deltaListingId;
 
+  // Populate agent select with all agents, pre-select matched agent
+  const stSel = document.getElementById('st-agent');
+  const agents = await loadAllAgents();
+  stSel.innerHTML = buildAgentOptions(agents);
+  if (row.agent_id) stSel.value = String(row.agent_id);
+
+  // Reset co-agent area
+  const stArea = document.getElementById('st-coagent-area');
+  stArea.style.display = 'none';
+  document.getElementById('st-coagent-btn').textContent = '+ co‑agent';
+
+  // Pre-populate co-agent if DeltaNet supplied one
+  if (row.co_agent_id || row.co_agent_name) {
+    await stToggleCoAgent();
+    if (row.co_agent_id) {
+      document.getElementById('st-coagent-sel').value = String(row.co_agent_id);
+    }
+  }
+
+  document.getElementById('startTrackingModal').classList.add('open');
+}
+
+function closeStartTrackingModal() {
+  document.getElementById('startTrackingModal').classList.remove('open');
+  _stDeltaListingId = null;
+}
+
+function stToggleCoAgent() {
+  return toggleCoAgent('st-coagent-btn', 'st-coagent-area', 'st-coagent-sel', 'st-split-primary', 'st-split-co');
+}
+
+async function confirmStartTracking() {
+  const agentId  = document.getElementById('st-agent').value;
   const officeId = document.getElementById('officeSelect').value;
+  const coData   = collectCoAgent('st-coagent-area', 'st-coagent-sel', 'st-split-primary', 'st-split-co');
+  const row      = STATE.untracked.find(r => r.delta_listing_id === _stDeltaListingId);
   try {
     await POST('/daily-desk/start-tracking', {
-      delta_listing_id: row.delta_listing_id,
-      agent_id: row.agent_id || null,
-      office_id: row.office_id || (officeId !== 'all' ? officeId : null),
+      delta_listing_id: _stDeltaListingId,
+      agent_id:  agentId || null,
+      office_id: (row?.office_id) || (officeId !== 'all' ? officeId : null),
+      ...coData,
     });
+    closeStartTrackingModal();
     await renderAll();
   } catch (e) {
     alert('Failed to start tracking: ' + e.message);
