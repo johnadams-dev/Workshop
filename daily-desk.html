@@ -969,7 +969,7 @@ tbody tr.clickable { cursor: pointer; }
     <!-- ═══ CONTRACTS PAGE ═══ -->
     <div class="page" id="page-contracts">
       <div class="form-desc" style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
-        Contracts where we represent the buyer on a co-broke listing — the listing itself lives with another brokerage.
+        Contracts where we represent the buyer — either co-broke (external listing) or dual representation on an Adams Cameron listing.
       </div>
 
       <div class="inv-bar">
@@ -3324,32 +3324,37 @@ function ncBackToSource() {
   document.getElementById('ncTitle').textContent = 'New Contract';
 }
 
-function ncShowAccForm() {
+async function ncShowAccForm() {
   document.getElementById('nc-step-source').style.display = 'none';
   document.getElementById('nc-step-acc').style.display    = 'block';
   document.getElementById('ncTitle').textContent = 'New Contract — Adams Cameron Listing';
 
-  // Populate listing select from already-loaded STATE.listings (active / coming soon only)
-  ncAllListings = (STATE.listings || []).filter(t =>
-    ['active_listing', 'coming_soon'].includes(t.status)
-  );
-  ncRenderListingSelect(ncAllListings);
-
   document.getElementById('nc-acc-filter').value = '';
+  document.getElementById('nc-acc-listing').innerHTML = '<option value="">— loading —</option>';
   ncUpdateAccRepFields();
+
+  // Fetch all active listings across all offices, not just the currently-selected office
+  try {
+    const all = await GET('/daily-desk/listings');
+    ncAllListings = (all || []).filter(t => ['active_listing', 'coming_soon'].includes(t.status));
+    ncRenderListingSelect(ncAllListings);
+  } catch (e) {
+    ncAllListings = [];
+    ncRenderListingSelect([]);
+  }
 }
 
 function ncRenderListingSelect(rows) {
   const sel = document.getElementById('nc-acc-listing');
   if (!rows.length) {
-    const officeId = document.getElementById('officeSelect').value;
-    sel.innerHTML = `<option value="">— No active listings${officeId !== 'all' ? ' for this office' : ''} —</option>`;
+    sel.innerHTML = '<option value="">— No active listings —</option>';
     return;
   }
   sel.innerHTML = '<option value="">— select —</option>' +
     rows.map(t => {
-      const label = [t.property_address, t.city].filter(Boolean).join(' — ');
-      return `<option value="${t.id}">${escapeHtml(label)}</option>`;
+      const addr  = [t.property_address, t.city].filter(Boolean).join(', ');
+      const agent = t.agent_name ? ` (${t.agent_name})` : '';
+      return `<option value="${t.id}">${escapeHtml(addr + agent)}</option>`;
     }).join('');
 }
 
