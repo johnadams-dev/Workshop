@@ -2578,6 +2578,7 @@ const CONTRACT_ACTIONS = {
   under_contract: [
     { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed.' },
     { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Contract fell through.' },
+    { key: 'change',    icon: '✎',  title: 'Change',    desc: 'Extend closing date or update buyer\'s agent.' },
   ],
   closed: [
     { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
@@ -2588,6 +2589,13 @@ const CONTRACT_ACTIONS = {
 const ACTION_CHECKLIST = {
   change: [
     'Confirm change reflected in Form Simplicity',
+  ],
+  contract_change_date: [
+    'Notify cooperating agent of new closing date',
+    'Confirm date extension addendum uploaded to Form Simplicity',
+  ],
+  contract_change_agent: [
+    'Confirm updated agent reflected in Form Simplicity',
   ],
   expired: [
     'Recover lockbox',
@@ -2717,6 +2725,42 @@ async function amChooseAction(key) {
         <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Note</span>
         <textarea id="am-notes" rows="3" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px; resize:vertical;" placeholder="Describe the correction or update"></textarea>
       </div>`;
+  } else if (key === 'change' && amState.kind === 'contract') {
+    const lS = 'font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
+    const sS = 'padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; width:100%;';
+    fieldsHtml = `
+      <div class="form-row" style="margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${lS}">Change Type</span>
+          <select id="am-contract-change-type" onchange="amToggleContractChangeType()" style="${sS}">
+            <option value="date_extension">Date Extension</option>
+            <option value="agent">Agent Change</option>
+          </select>
+        </div>
+      </div>
+      <div id="am-contract-date-wrap" style="margin-bottom:14px;">
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${lS}">New Close Date</span>
+            <input type="date" id="am-new-close-date" style="${sS}">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${lS}">Note</span>
+            <input type="text" id="am-notes" placeholder="Optional" style="${sS}">
+          </div>
+        </div>
+      </div>
+      <div id="am-contract-agent-wrap" style="display:none; margin-bottom:14px;">
+        <span class="field-label" style="${lS}">Buyer's Agents</span>
+        <div id="am-agent-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+        <button onclick="amAddAgentRow()" style="margin-top:8px; padding:6px 14px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); font-size:12px; cursor:pointer;">+ Add Agent</button>
+      </div>
+      <div class="form-row" style="margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="${lS}">Address Correction <span style="font-weight:400;opacity:.6">(leave unchanged if no correction needed)</span></span>
+          <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address" style="${sS}">
+        </div>
+      </div>`;
   } else if (key === 'change') {
     const labelStyle = 'font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
     const selStyle   = 'padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; width:100%;';
@@ -2834,7 +2878,11 @@ async function amChooseAction(key) {
   }
 
   const clEl = document.getElementById('amChecklistPreview');
-  const items = ACTION_CHECKLIST[key] || [];
+  let checklistKey = key;
+  if (key === 'change' && amState.kind === 'contract' && amState.status !== 'closed') {
+    checklistKey = 'contract_change_date'; // matches default "Date Extension" selection
+  }
+  const items = ACTION_CHECKLIST[checklistKey] || [];
   clEl.innerHTML = items.length
     ? items.map(label => `
         <div class="cl-item">
@@ -2931,6 +2979,49 @@ function amToggleChangeType() {
   document.getElementById('am-agent-change').style.display = isAgent ? '' : 'none';
   if (isAgent && document.getElementById('am-agent-list').children.length === 0) {
     amLoadCurrentListingAgents();
+  }
+}
+
+function amToggleContractChangeType() {
+  const type = document.getElementById('am-contract-change-type').value;
+  const isAgent = type === 'agent';
+  document.getElementById('am-contract-date-wrap').style.display  = isAgent ? 'none' : '';
+  document.getElementById('am-contract-agent-wrap').style.display = isAgent ? '' : 'none';
+  if (isAgent && document.getElementById('am-agent-list').children.length === 0) {
+    amLoadCurrentBuyerAgents();
+  }
+  // Update checklist preview
+  const clEl = document.getElementById('amChecklistPreview');
+  const checklistKey = isAgent ? 'contract_change_agent' : 'contract_change_date';
+  const items = ACTION_CHECKLIST[checklistKey] || [];
+  clEl.innerHTML = items.length
+    ? items.map(label => `
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-label">${label}</div>
+          <span class="chip chip-neutral" style="font-size:9px;">will be added</span>
+        </div>
+      `).join('')
+    : `<div style="font-size:12px; color:var(--text-dim);">No checklist items will be added.</div>`;
+}
+
+async function amLoadCurrentBuyerAgents() {
+  const list = document.getElementById('am-agent-list');
+  list.innerHTML = '<div style="color:var(--text-muted); font-size:12px;">Loading current agents…</div>';
+  try {
+    const txn = await GET(`/daily-desk/transactions/${amState.id}`);
+    const buyers = (txn.participants || [])
+      .filter(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent')
+      .sort((a, b) => (a.role === 'buyers_agent' ? -1 : 1));
+    list.innerHTML = '';
+    if (buyers.length) {
+      for (const p of buyers) await amAddAgentRow(p.agent_id, p.office_id, p.commission_split);
+    } else {
+      await amAddAgentRow();
+    }
+  } catch (e) {
+    list.innerHTML = '';
+    await amAddAgentRow();
   }
 }
 
@@ -3052,6 +3143,41 @@ async function amSubmit() {
 
   if (key === 'change' && amState.status === 'closed') {
     fields.notes = document.getElementById('am-notes').value || null;
+  } else if (key === 'change' && amState.kind === 'contract') {
+    const changeType = document.getElementById('am-contract-change-type').value;
+    if (changeType === 'date_extension') {
+      const newCloseDate = document.getElementById('am-new-close-date').value;
+      if (!newCloseDate) { alert('Please enter a new close date.'); return; }
+      fields.newCloseDate = newCloseDate;
+    } else if (changeType === 'agent') {
+      const rows = document.querySelectorAll('.am-agent-row');
+      const agents = [];
+      for (const row of rows) {
+        const agentId = row.querySelector('.am-agent-select').value;
+        const officeId = row.querySelector('.am-agent-office').value;
+        const split = row.querySelector('.am-agent-split').value;
+        if (!agentId) { alert('Please select an agent for each row, or remove empty rows.'); return; }
+        agents.push({ agentId: Number(agentId), officeId: officeId ? Number(officeId) : null, split: split ? Number(split) : null });
+      }
+      if (!agents.length) { alert("Please add at least one buyer's agent."); return; }
+      const withSplit    = agents.filter(a => a.split != null);
+      const withoutSplit = agents.filter(a => a.split == null);
+      if (withSplit.length > 0 && withoutSplit.length > 0) {
+        alert('Please enter a commission split % for every agent, or leave all blank.');
+        return;
+      }
+      if (withSplit.length > 0) {
+        const total = withSplit.reduce((s, a) => s + a.split, 0);
+        if (Math.abs(total - 100) > 0.01) {
+          alert(`Commission splits must add up to 100%. Currently: ${total}%.`);
+          return;
+        }
+      }
+      fields.buyerAgents = agents;
+    }
+    fields.notes = document.getElementById('am-notes')?.value || null;
+    const correctedAddr = document.getElementById('am-property-address').value.trim();
+    if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
   } else if (key === 'change') {
     const changeType = document.getElementById('am-change-type').value;
     fields.changeType = changeType;
