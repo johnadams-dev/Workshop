@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contract Status — Adams, Cameron &amp; Co.</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -333,9 +334,14 @@
       photoHtml = `<img class="property-photo" src="${esc(data.primary_photo_url)}" alt="Property photo">`;
     }
     let listingLinkHtml = '';
-    if (data.listing_url) {
+    if (data.mls_id) {
+      const url = `https://www.adamscameron.com/${esc(data.mls_id)}`;
+      listingLinkHtml = `<a class="property-link" href="${url}" target="_blank" rel="noopener">
+        Visit the property page — view details and create virtual renovations from the listing photos ↗
+      </a>`;
+    } else if (data.listing_url) {
       listingLinkHtml = `<a class="property-link" href="${esc(data.listing_url)}" target="_blank" rel="noopener">
-        View Listing on johnadams.org ↗
+        View Listing ↗
       </a>`;
     }
     sections.push(`
