@@ -669,6 +669,18 @@
             </div>
           </div>
 
+          <div style="margin-bottom:18px">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px">
+              Maximum Hours Per Month
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="number" id="avail-max-hours" min="1" max="999" step="1"
+                     placeholder="Unlimited"
+                     style="width:120px;padding:6px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-size:13px">
+              <span style="font-size:12px;color:var(--muted)">hours / month (leave blank for no limit)</span>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button class="btn-primary" id="avail-save-defaults">Save Preferences</button>
             <span class="inline-msg" id="avail-defaults-msg"></span>
@@ -1903,6 +1915,10 @@ function renderAvailDefaults() {
   updEl.textContent = _availDefaults.updated_at
     ? 'Last updated ' + new Date(_availDefaults.updated_at).toLocaleDateString()
     : 'No preferences saved yet';
+
+  // Max hours
+  const maxHoursEl = document.getElementById('avail-max-hours');
+  if (maxHoursEl) maxHoursEl.value = _availDefaults.max_hours_per_month ?? '';
 }
 
 // A shift counts as "on" for a given day if: a day-specific restriction lists it,
@@ -2086,8 +2102,11 @@ document.getElementById('avail-save-defaults').addEventListener('click', async (
   });
 
   try {
+    const maxHoursVal = document.getElementById('avail-max-hours').value.trim();
+    const max_hours_per_month = maxHoursVal ? parseInt(maxHoursVal, 10) : null;
     _availDefaults = await api('PUT', '/api/floor/availability/defaults/' + _availAgentId, {
-      ...days, willing_office_ids: willing, preferred_shift_ids: [], day_shift_ids: dayShiftIds
+      ...days, willing_office_ids: willing, preferred_shift_ids: [], day_shift_ids: dayShiftIds,
+      max_hours_per_month
     });
     renderAvailCalendar();  // refresh calendar — default-on days may have changed
     const updEl = document.getElementById('avail-defaults-updated');
