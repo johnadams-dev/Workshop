@@ -2409,6 +2409,11 @@ async function nlReset() {
   document.getElementById('nl-mls-wrap').innerHTML =
     '<input type="text" class="nl-mls-id" placeholder="MLS # (optional)">';
   document.getElementById('nl-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
+  // Reset co-agent area
+  document.getElementById('nl-coagent-area').style.display = 'none';
+  document.getElementById('nl-split-primary').value = '50';
+  document.getElementById('nl-split-co').value = '50';
+  document.getElementById('nl-coagent-sel').value = '';
   nlFsTransactions = [];
   await nlLoadAgents();
 }
@@ -3146,9 +3151,40 @@ function openNewContractModal() {
   document.getElementById('nc-step-acc').style.display      = 'none';
   document.getElementById('nc-step-external').style.display = 'none';
   document.getElementById('nc-step-fs').style.display       = 'none';
+  document.getElementById('ncTitle').textContent = 'New Contract';
+
+  // Reset ACC step
+  document.getElementById('nc-acc-filter').value = '';
+  document.getElementById('nc-acc-listing').selectedIndex = 0;
+  document.getElementById('nc-acc-price').value = '';
+  document.getElementById('nc-acc-date').value = '';
+  document.getElementById('nc-acc-rep-type').value = 'in_house';
+  document.getElementById('nc-acc-rep-fields').innerHTML = '';
+
+  // Reset External step
+  document.getElementById('nc-ext-addr').value = '';
+  document.getElementById('nc-ext-city').value = '';
+  document.getElementById('nc-ext-list-brokerage').value = '';
+  document.getElementById('nc-ext-list-agent').value = '';
+  document.getElementById('nc-ext-list-agent-email').value = '';
+  document.getElementById('nc-ext-mlsid').value = '';
+  document.getElementById('nc-ext-source').value = '';
+  document.getElementById('nc-ext-list-price').value = '';
+  document.getElementById('nc-ext-contract-price').value = '';
+  document.getElementById('nc-ext-contract-date').value = '';
+  document.getElementById('nc-ext-close-date').value = '';
+  document.getElementById('nc-ext-coop-commission').value = '';
+  document.getElementById('nc-ext-office').selectedIndex = 0;
+  document.getElementById('nc-ext-agent').innerHTML = '<option value="">Select office first…</option>';
+  document.getElementById('nc-ext-coagent-area').style.display = 'none';
+  document.getElementById('nc-ext-split-primary').value = '50';
+  document.getElementById('nc-ext-split-co').value = '50';
+  document.getElementById('nc-ext-coagent-sel').value = '';
+
+  // Reset FS step
   document.getElementById('nc-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
   document.getElementById('nc-fs-agent').value = '';
-  document.getElementById('ncTitle').textContent = 'New Contract';
+
   document.getElementById('newContractModal').classList.add('open');
 }
 function closeNewContractModal() {
