@@ -415,10 +415,13 @@
     }
 
     // ── Timeline ───────────────────────────────────────────────────
+    const milestoneItems = MILESTONES
+      .map(m => ({ m, date: parseDate(data[m.field]) }))
+      .filter(item => item.date)
+      .sort((a, b) => a.date - b.date);
+
     let timelineRows = '';
-    for (const m of MILESTONES) {
-      const date = parseDate(data[m.field]);
-      if (!date) continue;
+    for (const { m, date } of milestoneItems) {
 
       const diff     = daysFrom(date, today);
       const isToday  = diff === 0;
