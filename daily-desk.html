@@ -1410,6 +1410,13 @@ tbody tr.clickable { cursor: pointer; }
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller's Name</span>
+              <input type="text" id="nl-seller-name" placeholder="Full name">
+            </div>
+            <div></div>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent</span>
                 <button type="button" id="nl-coagent-btn" class="co-agent-link" onclick="nlToggleCoAgent()">+ co&#8209;agent</button>
@@ -1541,6 +1548,13 @@ tbody tr.clickable { cursor: pointer; }
               <input type="date" id="nc-acc-date">
             </div>
           </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer's Name</span>
+              <input type="text" id="nc-acc-buyer-name" placeholder="Full name">
+            </div>
+            <div></div>
+          </div>
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Representation</span>
             <select id="nc-acc-rep-type" onchange="ncUpdateAccRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
@@ -1584,7 +1598,10 @@ tbody tr.clickable { cursor: pointer; }
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent Email</span>
               <input type="email" id="nc-ext-list-agent-email" placeholder="agent@brokerage.com">
             </div>
-            <div></div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer's Name</span>
+              <input type="text" id="nc-ext-buyer-name" placeholder="Full name">
+            </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -1821,6 +1838,10 @@ tbody tr.clickable { cursor: pointer; }
       <div>
         <div class="dfield-key">Form Simplicity</div>
         <div class="dfield-val" id="drawer-fs">—</div>
+      </div>
+      <div id="drawer-party-row">
+        <div class="dfield-key" id="drawer-party-label">Seller</div>
+        <div class="dfield-val" id="drawer-party">—</div>
       </div>
       <div>
         <div class="dfield-key" id="drawer-buyer-agent-label">Buyer's Agent</div>
@@ -2399,6 +2420,7 @@ async function nlReset() {
   document.getElementById('newListingTitle').textContent = 'New Listing';
   document.getElementById('nl-addr').value = '';
   document.getElementById('nl-city').value = '';
+  document.getElementById('nl-seller-name').value = '';
   document.getElementById('nl-price').value = '';
   document.getElementById('nl-list-date').value = '';
   document.getElementById('nl-exp-date').value = '';
@@ -2537,6 +2559,7 @@ async function nlSaveListing() {
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
+    seller_name: document.getElementById('nl-seller-name').value.trim() || null,
   };
 
   try {
@@ -2858,6 +2881,13 @@ async function amChooseAction(key) {
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Contract Price</span>
           <input type="text" id="am-contract-price" placeholder="$0">
         </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer's Name</span>
+          <input type="text" id="am-buyer-name" placeholder="Full name">
+        </div>
+        <div></div>
       </div>
       <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
         <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Representation</span>
@@ -3236,6 +3266,7 @@ async function amSubmit() {
     if (contractDate) fields.contractDate = contractDate;
     const contractPrice = amParseMoney(document.getElementById('am-contract-price').value);
     if (contractPrice != null) fields.contractPrice = contractPrice;
+    fields.buyerName = document.getElementById('am-buyer-name').value.trim() || null;
 
     const repType = document.getElementById('am-rep-type').value;
     fields.representationType = repType;
@@ -3284,6 +3315,7 @@ function openNewContractModal() {
   document.getElementById('nc-acc-listing').selectedIndex = 0;
   document.getElementById('nc-acc-price').value = '';
   document.getElementById('nc-acc-date').value = '';
+  document.getElementById('nc-acc-buyer-name').value = '';
   document.getElementById('nc-acc-rep-type').value = 'in_house';
   document.getElementById('nc-acc-rep-fields').innerHTML = '';
 
@@ -3293,6 +3325,7 @@ function openNewContractModal() {
   document.getElementById('nc-ext-list-brokerage').value = '';
   document.getElementById('nc-ext-list-agent').value = '';
   document.getElementById('nc-ext-list-agent-email').value = '';
+  document.getElementById('nc-ext-buyer-name').value = '';
   document.getElementById('nc-ext-mlsid').value = '';
   document.getElementById('nc-ext-source').value = '';
   document.getElementById('nc-ext-list-price').value = '';
@@ -3457,6 +3490,7 @@ async function ncSaveAccContract() {
   const fields = { representationType: repType };
   if (contractPrice != null) fields.contractPrice = contractPrice;
   if (contractDate)          fields.contractDate  = contractDate;
+  fields.buyerName = document.getElementById('nc-acc-buyer-name').value.trim() || null;
 
   if (repType === 'in_house') {
     fields.officeId      = document.getElementById('nc-acc-office').value || null;
@@ -3530,6 +3564,7 @@ async function ncSaveExternalContract() {
       listing_brokerage:   document.getElementById('nc-ext-list-brokerage').value.trim() || null,
       listing_agent_name:  document.getElementById('nc-ext-list-agent').value.trim() || null,
       listing_agent_email: document.getElementById('nc-ext-list-agent-email').value.trim() || null,
+      buyer_name:          document.getElementById('nc-ext-buyer-name').value.trim() || null,
       mls_id:              document.getElementById('nc-ext-mlsid').value.trim() || null,
       source_of_buyer:     document.getElementById('nc-ext-source').value.trim() || null,
       list_price:          amParseMoney(document.getElementById('nc-ext-list-price').value),
@@ -4004,18 +4039,23 @@ function renderDrawer(t) {
 
   document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
 
+  const agentDisplayName = p => p.first_name ? `${p.first_name} ${p.last_name}` : (p.external_name || '—');
   if (isContractView) {
     const listingAgent = (t.participants || []).find(p => p.role === 'listing_agent' || p.role === 'co_listing_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = 'Listing Agent';
-    document.getElementById('drawer-buyer-agent').textContent = listingAgent ? (listingAgent.external_name || '—') : '—';
+    document.getElementById('drawer-buyer-agent').textContent = listingAgent ? agentDisplayName(listingAgent) : '—';
     document.getElementById('drawer-buyer-brokerage-label').textContent = 'Listing Brokerage';
     document.getElementById('drawer-buyer-brokerage').textContent = listingAgent ? (listingAgent.external_brokerage || '—') : '—';
+    document.getElementById('drawer-party-label').textContent = 'Buyer';
+    document.getElementById('drawer-party').textContent = t.buyer_name || '—';
   } else {
     const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = "Buyer's Agent";
-    document.getElementById('drawer-buyer-agent').textContent = buyerAgent ? (buyerAgent.external_name || '—') : '—';
+    document.getElementById('drawer-buyer-agent').textContent = buyerAgent ? agentDisplayName(buyerAgent) : '—';
     document.getElementById('drawer-buyer-brokerage-label').textContent = "Buyer's Brokerage";
     document.getElementById('drawer-buyer-brokerage').textContent = buyerAgent ? (buyerAgent.external_brokerage || '—') : '—';
+    document.getElementById('drawer-party-label').textContent = 'Seller';
+    document.getElementById('drawer-party').textContent = t.seller_name || '—';
   }
 
   const clEl = document.getElementById('drawer-checklist');
