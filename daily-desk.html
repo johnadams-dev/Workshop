@@ -5095,14 +5095,16 @@ async function foundationInit() {
 }
 
 async function foundationLoadTemplate() {
+  const meta = document.getElementById('fl-template-meta');
   try {
     const data = await GET('/daily-desk/foundation/template');
     document.getElementById('fl-template-body').value = data.body_html || '';
-    const meta = document.getElementById('fl-template-meta');
     meta.textContent = data.updated_at
       ? 'Saved ' + fmtDate(data.updated_at) + (data.updated_by_name ? ' · ' + data.updated_by_name : '')
       : '';
   } catch (e) {
+    meta.textContent = 'Failed to load template: ' + e.message;
+    meta.style.color = 'var(--red)';
     console.error('Foundation template load error:', e);
   }
 }
