@@ -876,6 +876,9 @@ tbody tr.clickable { cursor: pointer; }
     <div class="nav-tab" data-page="admin" id="admin-nav-tab" onclick="showPage('admin',this)" style="display:none">
       <span class="tab-icon">⚙</span> Admin
     </div>
+    <div class="nav-tab" data-page="foundation" id="foundation-nav-tab" onclick="showPage('foundation',this)" style="display:none">
+      <span class="tab-icon">🏛</span> Foundation
+    </div>
     <div class="nav-spacer"></div>
     <div class="nav-add">
       <button class="btn btn-primary btn-sm" id="newBtn" onclick="openNewModal()">+ New Listing</button>
@@ -1330,6 +1333,62 @@ tbody tr.clickable { cursor: pointer; }
       </div>
 
     </div><!-- /page-reports -->
+
+    <!-- ═══ FOUNDATION PAGE ═══ -->
+    <div class="page" id="page-foundation">
+
+      <div class="section-head" style="margin-bottom:20px;">
+        <div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:3px;">Foundation Letters</div>
+          <div style="font-size:12px; color:var(--text-muted);">Generate thank-you letters for Foundation donor closings.</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 360px; gap:20px; align-items:start;">
+
+        <div>
+          <!-- Pending Letters -->
+          <div class="panel" style="margin-bottom:16px;">
+            <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="panel-title">Pending Letters</div>
+              <button class="btn btn-primary btn-sm" id="fl-generate-btn" onclick="foundationGeneratePDFs()">Generate PDFs</button>
+            </div>
+            <div class="panel-body" style="padding:0;">
+              <div id="fl-pending"><div class="empty" style="padding:20px;">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Recently Sent -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Recently Sent</div>
+            </div>
+            <div class="panel-body" style="padding:0;">
+              <div id="fl-sent"><div class="empty" style="padding:20px;">Loading…</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Template Editor -->
+        <div class="panel" style="position:sticky; top:20px;">
+          <div class="panel-head">
+            <div class="panel-title">Letter Template</div>
+          </div>
+          <div class="panel-body">
+            <div style="margin-bottom:12px;">
+              <div style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin-bottom:8px;">Merge Tags</div>
+              <code style="display:block; font-size:11px; color:var(--text); line-height:2;">{{customer_name}}<br>{{customer_address}}<br>{{donor_names}}<br>{{closing_date}}</code>
+            </div>
+            <textarea id="fl-template-body" rows="18" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:12px; resize:vertical; box-sizing:border-box; line-height:1.5;"></textarea>
+            <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+              <div id="fl-template-meta" style="font-size:11px; color:var(--text-muted);"></div>
+              <button class="btn btn-primary btn-sm" onclick="foundationSaveTemplate()">Save</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /page-foundation -->
 
   </div>
 </div>
@@ -2028,6 +2087,7 @@ async function init() {
 
   if (['manager', 'staff'].includes(STATE.userRole)) {
     document.getElementById('reports-nav-tab').style.display = 'flex';
+    document.getElementById('foundation-nav-tab').style.display = 'flex';
     rptInit();
   }
 
@@ -2052,12 +2112,18 @@ function showPage(name, el) {
   document.getElementById('page-' + name).classList.add('active');
   el.classList.add('active');
   const btn = document.getElementById('newBtn');
-  if (name === 'contracts') {
-    btn.textContent = '+ New Contract';
-    btn.onclick = openNewContractModal;
+  if (name === 'foundation') {
+    btn.style.display = 'none';
+    foundationInit();
   } else {
-    btn.textContent = '+ New Listing';
-    btn.onclick = openNewModal;
+    btn.style.display = '';
+    if (name === 'contracts') {
+      btn.textContent = '+ New Contract';
+      btn.onclick = openNewContractModal;
+    } else {
+      btn.textContent = '+ New Listing';
+      btn.onclick = openNewModal;
+    }
   }
 }
 
@@ -4968,6 +5034,195 @@ function rptRenderExpiring(rows, days) {
     </div>`;
   });
   return `<div class="report-output">${html}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FOUNDATION LETTERS
+═══════════════════════════════════════════════════════════════════ */
+let foundationPending = [];
+
+async function foundationInit() {
+  await Promise.all([foundationLoadTemplate(), foundationLoadPending(), foundationLoadSent()]);
+}
+
+async function foundationLoadTemplate() {
+  try {
+    const data = await GET('/daily-desk/foundation/template');
+    document.getElementById('fl-template-body').value = data.body_html || '';
+    const meta = document.getElementById('fl-template-meta');
+    meta.textContent = data.updated_at
+      ? 'Saved ' + fmtDate(data.updated_at) + (data.updated_by_name ? ' · ' + data.updated_by_name : '')
+      : '';
+  } catch (e) {
+    console.error('Foundation template load error:', e);
+  }
+}
+
+async function foundationSaveTemplate() {
+  const body = document.getElementById('fl-template-body').value;
+  try {
+    await PUT('/daily-desk/foundation/template', { body_html: body });
+    await foundationLoadTemplate();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  }
+}
+
+async function foundationLoadPending() {
+  const el = document.getElementById('fl-pending');
+  el.innerHTML = '<div class="empty" style="padding:20px;">Loading…</div>';
+  try {
+    foundationPending = await GET('/daily-desk/foundation/pending-letters');
+  } catch (e) {
+    el.innerHTML = '<div class="empty" style="padding:20px;">Failed to load.</div>';
+    return;
+  }
+  const btn = document.getElementById('fl-generate-btn');
+  if (!foundationPending.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px;">No pending letters.</div>';
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+  el.innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>Property</th><th>Side</th><th>Customer</th><th>Donor(s)</th><th>Close Date</th>
+    </tr></thead>
+    <tbody>${foundationPending.map(r => `<tr>
+      <td style="font-size:12px;">${escapeHtml(r.property_address || '—')}</td>
+      <td><span class="chip ${r.side === 'seller' ? 'chip-amber' : 'chip-blue'}">${r.side}</span></td>
+      <td>${escapeHtml(r.customer_name)}${r.customer_address ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${escapeHtml(r.customer_address)}</div>` : ''}</td>
+      <td style="font-size:12px;">${escapeHtml(r.donor_names)}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${fmtDate(r.closing_date)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function foundationLoadSent() {
+  const el = document.getElementById('fl-sent');
+  el.innerHTML = '<div class="empty" style="padding:20px;">Loading…</div>';
+  let rows;
+  try {
+    rows = await GET('/daily-desk/foundation/sent-letters');
+  } catch (e) {
+    el.innerHTML = '<div class="empty" style="padding:20px;">Failed to load.</div>';
+    return;
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px;">No letters sent yet.</div>';
+    return;
+  }
+  el.innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>Customer</th><th>Side</th><th>Donor(s)</th><th>Closed</th><th>Sent</th><th>By</th><th></th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${escapeHtml(r.customer_name)}</td>
+      <td><span class="chip ${r.side === 'seller' ? 'chip-amber' : 'chip-blue'}">${r.side}</span></td>
+      <td style="font-size:12px;">${escapeHtml(r.donor_names)}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${fmtDate(r.closing_date)}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text-muted);">${fmtDate(r.letter_sent_at)}</td>
+      <td style="font-size:12px;">${escapeHtml(r.letter_sent_by_name || '—')}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="foundationMarkUnsent(${JSON.stringify(r.gift_ids)})">Undo</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function foundationMarkUnsent(giftIds) {
+  try {
+    await POST('/daily-desk/foundation/mark-unsent', { giftIds });
+    await Promise.all([foundationLoadPending(), foundationLoadSent()]);
+  } catch (e) {
+    alert('Failed to undo: ' + e.message);
+  }
+}
+
+function foundationEnsureLibs() {
+  const loadScript = src => new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
+  const tasks = [];
+  if (!window.html2canvas) tasks.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'));
+  if (!window.jspdf)       tasks.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+  return Promise.all(tasks);
+}
+
+async function foundationGeneratePDFs() {
+  if (!foundationPending.length) return;
+  const template = document.getElementById('fl-template-body').value;
+  if (!template.trim()) { alert('Please save a letter template first.'); return; }
+  const btn = document.getElementById('fl-generate-btn');
+  const origText = btn.textContent;
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+  try {
+    await foundationEnsureLibs();
+    const { jsPDF } = window.jspdf;
+    const pdf   = new jsPDF('p', 'mm', 'a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const allGiftIds = [];
+
+    for (let i = 0; i < foundationPending.length; i++) {
+      const row = foundationPending[i];
+      allGiftIds.push(...row.gift_ids);
+
+      const closingDateStr = row.closing_date
+        ? new Date(row.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
+        : '';
+      const letterHtml = template
+        .replace(/\{\{customer_name\}\}/g,    escapeHtml(row.customer_name))
+        .replace(/\{\{customer_address\}\}/g, (row.customer_address || '').replace(/\n/g, '<br>'))
+        .replace(/\{\{donor_names\}\}/g,      escapeHtml(row.donor_names))
+        .replace(/\{\{closing_date\}\}/g,     closingDateStr);
+
+      const snapshot = document.createElement('div');
+      snapshot.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;padding:72px;box-sizing:border-box;';
+      snapshot.innerHTML = letterHtml;
+      document.body.appendChild(snapshot);
+
+      const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false });
+      document.body.removeChild(snapshot);
+
+      if (i > 0) pdf.addPage();
+
+      const imgH    = (canvas.height * pageW) / canvas.width;
+      let remaining = imgH;
+      let srcY      = 0;
+      let firstSlice = true;
+
+      while (remaining > 0) {
+        if (!firstSlice) pdf.addPage();
+        firstSlice = false;
+        const sliceH  = Math.min(remaining, pageH);
+        const slicePx = Math.round((sliceH / imgH) * canvas.height);
+        const slice   = document.createElement('canvas');
+        slice.width   = canvas.width;
+        slice.height  = slicePx;
+        slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceH);
+        remaining -= pageH;
+        srcY      += slicePx;
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    pdf.save(`Foundation_Letters_${today}.pdf`);
+
+    await POST('/daily-desk/foundation/mark-sent', { giftIds: allGiftIds });
+    await Promise.all([foundationLoadPending(), foundationLoadSent()]);
+
+  } catch (err) {
+    console.error('Foundation PDF error:', err);
+    alert('PDF generation failed. Check the console for details.');
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = foundationPending.length === 0;
+  }
 }
 </script>
 
