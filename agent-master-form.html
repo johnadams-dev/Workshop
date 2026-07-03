@@ -58,7 +58,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .dot{width:7px;height:7px;border-radius:50%}
 
 /* detail panel */
-.detail-panel{flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg)}
+.detail-panel{flex:1;overflow-y:auto;padding:20px 24px;background:var(--bg);scroll-behavior:smooth}
 .detail-empty{height:100%;display:flex;align-items:center;justify-content:center;color:var(--muted);flex-direction:column;gap:6px}
 .detail-empty-icon{font-size:40px;opacity:.2}
 
@@ -76,6 +76,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-inactive{background:#F3F4F6;color:var(--muted)}
 .badge-office{background:var(--info);color:var(--info-b)}
 .badge-sms{background:#F0FDF4;color:var(--green);border-color:#86EFAC}
+.badge-donor{background:#ECFDF5;color:#065F46;border-color:#6EE7B7}
+.jump-nav{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 4px;font-size:11px;margin-bottom:4px}
+.jump-nav a{color:var(--blue);text-decoration:none}.jump-nav a:hover{text-decoration:underline}
+.jump-nav span{color:var(--border)}
 .badge-issue{background:var(--warn);color:var(--warn-t);border-color:#FCD34D}
 .badge-missing{background:var(--miss);color:var(--miss-t);border-color:#FECACA}
 .header-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
@@ -186,7 +190,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
   <div class="topbar-right">
     <span id="issue-summary" style="font-size:11px;color:#8ab4cc"></span>
-    <button class="btn btn-secondary btn-sm" onclick="openNewAgent()">+ Add Agent</button>
+    <button class="btn btn-secondary btn-sm" id="add-agent-btn" onclick="openNewAgent()" style="display:none">+ Add Agent</button>
     <button class="btn btn-secondary btn-sm" onclick="exportCsv()">Export</button>
   </div>
 </div>
@@ -280,6 +284,7 @@ const PROXY_URL    = 'https://mls-proxy-975684028597.us-east1.run.app';
 const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+let USER_ROLE  = null; // 'admin' | 'manager' | 'coordinator' | null — loaded after sign-in
 
 // Live Google Workspace data — loaded after sign-in via Admin SDK
 let googleSnap = {};
@@ -319,14 +324,19 @@ function issues(a) {
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
   try {
-    const [agentsRes, officesRes] = await Promise.all([
+    const [agentsRes, officesRes, roleRes] = await Promise.all([
       fetch(`${PROXY_URL}/admin/agents`, { headers: H() }),
       fetch(`${PROXY_URL}/offices`,      { headers: H() }),
+      fetch(`${PROXY_URL}/staff/me`,     { headers: H() }),
     ]);
     if (!agentsRes.ok)  throw new Error('Agents HTTP ' + agentsRes.status);
     if (!officesRes.ok) throw new Error('Offices HTTP ' + officesRes.status);
     allAgents = await agentsRes.json();
-    offices   = await officesRes.json();  // [{ id, name, deltanet_office_id }]
+    offices   = await officesRes.json();
+    if (roleRes.ok) { const rd = await roleRes.json(); USER_ROLE = rd.role || null; }
+
+    // Show "+ Add Agent" only to admins
+    document.getElementById('add-agent-btn').style.display = USER_ROLE === 'admin' ? '' : 'none';
 
     const sel = document.getElementById('na-office');
     sel.innerHTML = '<option value="">— Select —</option>' +
@@ -409,6 +419,7 @@ async function selectAgent(id) {
 
   renderDetail(a);
   loadFloorEligibility(a.id);
+  loadFoundationDonation(a.id);
 }
 
 function renderDetail(a) {
@@ -440,10 +451,27 @@ function renderDetail(a) {
         </div>
       </div>
       <div class="header-actions">
-        ${a.active
-          ?`<button class="btn btn-danger btn-sm" onclick="deactivate(${a.id})">Deactivate</button>`
-          :`<button class="btn btn-secondary btn-sm" onclick="reactivate(${a.id})">Reactivate</button>`}
+        ${USER_ROLE === 'admin'
+          ? (a.active
+              ? `<button class="btn btn-danger btn-sm" onclick="deactivate(${a.id})">Deactivate</button>`
+              : `<button class="btn btn-secondary btn-sm" onclick="reactivate(${a.id})">Reactivate</button>`)
+          : ''}
       </div>
+    </div>
+
+    <!-- Jump-to nav -->
+    <div class="jump-nav">
+      <a href="#card-contact-${a.id}">Contact &amp; Identity</a>
+      <span>·</span>
+      <a href="#card-ext-ids-${a.id}">External IDs</a>
+      <span>·</span>
+      <a href="#card-notif-${a.id}">Notifications &amp; Status</a>
+      <span>·</span>
+      <a href="#floor-duty-card-${a.id}">Floor Duty</a>
+      <span>·</span>
+      <a href="#card-foundation-${a.id}">Foundation</a>
+      <span>·</span>
+      <a href="#card-activity-${a.id}">Activity Snapshot</a>
     </div>
 
     <!-- Reconciliation panel -->
@@ -480,7 +508,7 @@ function renderDetail(a) {
     </div>
 
     <!-- Edit form -->
-    <div class="card">
+    <div class="card" id="card-contact-${a.id}">
       <div class="card-head">Contact &amp; identity</div>
       <div class="card-body">
         <div class="fg">
@@ -510,7 +538,7 @@ function renderDetail(a) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-ext-ids-${a.id}">
       <div class="card-head">External system IDs</div>
       <div class="card-body">
         <div class="fg fg3">
@@ -543,7 +571,7 @@ function renderDetail(a) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-notif-${a.id}">
       <div class="card-head">Notifications &amp; status</div>
       <div class="card-body">
         <div class="toggle-row"><div class="toggle-label">Active agent<small>Inactive agents cannot log in</small></div>
@@ -572,7 +600,41 @@ function renderDetail(a) {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="card-foundation-${a.id}">
+      <div class="card-head">Foundation
+        <span id="foundation-status-${a.id}" style="font-weight:400;font-size:11px;color:var(--muted)">Loading…</span>
+      </div>
+      <div class="card-body">
+        <div class="toggle-row">
+          <div class="toggle-label">Foundation donor
+            <small>Pledge to the Adams, Cameron Foundation</small>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="foundation-toggle-${a.id}" onchange="onFoundationToggle(${a.id})">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div id="foundation-details-${a.id}" style="display:none;margin-top:12px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div class="field" style="min-width:180px">
+              <label>Donation type</label>
+              <select id="foundation-type-${a.id}" onchange="onFoundationTypeChange(${a.id})">
+                <option value="fixed_amount">Fixed amount ($)</option>
+                <option value="percentage">Percentage of commission (%)</option>
+              </select>
+            </div>
+            <div class="field" style="min-width:120px">
+              <label id="foundation-amount-lbl-${a.id}">Amount ($)</label>
+              <input type="number" id="foundation-amount-${a.id}" min="0" step="0.01" placeholder="e.g. 50">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveFoundationDonation(${a.id}, false)">Save donation settings</button>
+          </div>
+          <div id="foundation-msg-${a.id}" style="font-size:12px;margin-top:6px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-activity-${a.id}">
       <div class="card-head">Activity snapshot</div>
       <div class="card-body">
         <div class="stat-row">
@@ -933,6 +995,133 @@ if (USER_EMAIL) {
   initGoogleSignIn();
 } else {
   const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+}
+
+// ── Foundation donation ───────────────────────────────────────────────────────
+async function loadFoundationDonation(agentId) {
+  const statusEl  = document.getElementById(`foundation-status-${agentId}`);
+  const toggleEl  = document.getElementById(`foundation-toggle-${agentId}`);
+  const detailsEl = document.getElementById(`foundation-details-${agentId}`);
+  if (!statusEl || !toggleEl) return;
+
+  try {
+    const r = await fetch(`${PROXY_URL}/api/foundation/donation/agent/${agentId}`, { headers: H() });
+    if (!r.ok) { statusEl.textContent = ''; return; }
+    const { active, history_count } = await r.json();
+
+    const isDonor = !!active;
+    toggleEl.checked = isDonor;
+    detailsEl.style.display = isDonor ? 'block' : 'none';
+
+    if (isDonor) {
+      const typeEl   = document.getElementById(`foundation-type-${agentId}`);
+      const amountEl = document.getElementById(`foundation-amount-${agentId}`);
+      if (typeEl)   typeEl.value = active.donation_type || 'fixed_amount';
+      if (amountEl) amountEl.value = active.donation_type === 'percentage'
+        ? (active.percentage_rate ?? '')
+        : (active.fixed_amount ?? '');
+      onFoundationTypeChange(agentId);
+      statusEl.textContent = '✓ Donor';
+      statusEl.style.color = 'var(--green)';
+    } else {
+      statusEl.textContent = history_count > 0 ? `${history_count} prior enrollment${history_count > 1 ? 's' : ''}` : '';
+      statusEl.style.color = 'var(--muted)';
+    }
+
+    // Inject or remove header badge
+    const badgesEl = document.querySelector('.header-badges');
+    const existing = badgesEl?.querySelector('.badge-donor');
+    if (isDonor && !existing && badgesEl) {
+      const badge = document.createElement('span');
+      badge.className = 'badge badge-donor';
+      badge.textContent = 'Foundation donor';
+      badgesEl.appendChild(badge);
+    } else if (!isDonor && existing) {
+      existing.remove();
+    }
+  } catch(_) {
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
+function onFoundationToggle(agentId) {
+  const toggleEl  = document.getElementById(`foundation-toggle-${agentId}`);
+  const detailsEl = document.getElementById(`foundation-details-${agentId}`);
+  if (!toggleEl) return;
+  if (!toggleEl.checked) {
+    saveFoundationDonation(agentId, true);
+  } else {
+    detailsEl.style.display = 'block';
+  }
+}
+
+function onFoundationTypeChange(agentId) {
+  const typeEl   = document.getElementById(`foundation-type-${agentId}`);
+  const lblEl    = document.getElementById(`foundation-amount-lbl-${agentId}`);
+  const amountEl = document.getElementById(`foundation-amount-${agentId}`);
+  if (!typeEl || !lblEl || !amountEl) return;
+  const isPct = typeEl.value === 'percentage';
+  lblEl.textContent      = isPct ? 'Rate (%)' : 'Amount ($)';
+  amountEl.placeholder   = isPct ? 'e.g. 0.5' : 'e.g. 50';
+  amountEl.step          = isPct ? '0.01' : '1';
+}
+
+async function saveFoundationDonation(agentId, turningOff) {
+  const msgEl    = document.getElementById(`foundation-msg-${agentId}`);
+  const statusEl = document.getElementById(`foundation-status-${agentId}`);
+  const toggleEl = document.getElementById(`foundation-toggle-${agentId}`);
+
+  let body;
+  if (turningOff) {
+    body = { is_active: false, end_reason: 'opted_out' };
+  } else {
+    const typeEl   = document.getElementById(`foundation-type-${agentId}`);
+    const amountEl = document.getElementById(`foundation-amount-${agentId}`);
+    const type     = typeEl?.value || 'fixed_amount';
+    const val      = parseFloat(amountEl?.value);
+    if (!val || val <= 0) {
+      if (msgEl) { msgEl.textContent = 'Enter an amount greater than zero.'; msgEl.style.color = 'var(--red)'; }
+      return;
+    }
+    body = {
+      is_active:       true,
+      donation_type:   type,
+      fixed_amount:    type === 'fixed_amount'  ? val : null,
+      percentage_rate: type === 'percentage'    ? val : null,
+    };
+  }
+
+  if (msgEl) { msgEl.textContent = 'Saving…'; msgEl.style.color = 'var(--muted)'; }
+  try {
+    const r = await fetch(`${PROXY_URL}/api/foundation/donation/agent/${agentId}`, {
+      method: 'PUT', headers: H(), body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || 'HTTP '+r.status); }
+
+    if (msgEl) { msgEl.textContent = 'Saved'; msgEl.style.color = 'var(--green)'; setTimeout(() => { msgEl.textContent = ''; }, 2000); }
+
+    const badgesEl = document.querySelector('.header-badges');
+    const existing = badgesEl?.querySelector('.badge-donor');
+    if (turningOff) {
+      if (toggleEl) toggleEl.checked = false;
+      const detailsEl = document.getElementById(`foundation-details-${agentId}`);
+      if (detailsEl) detailsEl.style.display = 'none';
+      if (statusEl) { statusEl.textContent = ''; statusEl.style.color = 'var(--muted)'; }
+      if (existing) existing.remove();
+    } else {
+      if (statusEl) { statusEl.textContent = '✓ Donor'; statusEl.style.color = 'var(--green)'; }
+      if (!existing && badgesEl) {
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-donor';
+        badge.textContent = 'Foundation donor';
+        badgesEl.appendChild(badge);
+      }
+    }
+  } catch(e) {
+    if (msgEl) { msgEl.textContent = 'Error: ' + e.message; msgEl.style.color = 'var(--red)'; }
+    if (turningOff && toggleEl) toggleEl.checked = true;
+    toast('Foundation save failed: ' + e.message, 'err');
+  }
 }
 
 // ── Floor Duty eligibility ───────────────────────────────────────────────────
