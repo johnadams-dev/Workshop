@@ -2345,6 +2345,7 @@ function ncExtToggleCoAgent() { toggleCoAgent('nc-ext-coagent-btn', 'nc-ext-coag
 let nlAgents = [];
 let nlFsTransactions = [];
 let nlFsAgents = [];
+let nlFsDetail = null;
 
 async function nlLoadAgents() {
   const officeId = document.getElementById('officeSelect').value;
@@ -2401,6 +2402,7 @@ async function nlReset() {
   document.getElementById('nl-step-fs-picker').style.display = 'none';
   document.getElementById('nl-step-manual').style.display = 'none';
   document.getElementById('newListingTitle').textContent = 'New Listing';
+  nlFsDetail = null;
   document.getElementById('nl-addr').value = '';
   document.getElementById('nl-city').value = '';
   document.getElementById('nl-price').value = '';
@@ -2495,7 +2497,7 @@ async function nlLoadFsTransactions() {
   `).join('');
 }
 
-function selectFsTransaction(index) {
+async function selectFsTransaction(index) {
   const tx = nlFsTransactions[index];
   if (!tx) return;
   const agentEmail = document.getElementById('nl-fs-agent').value;
@@ -2507,6 +2509,10 @@ function selectFsTransaction(index) {
   // Match FS agent to internal agent by email to pre-select the listing agent dropdown
   const internal = nlAgents.find(a => a.email?.toLowerCase() === agentEmail?.toLowerCase());
   if (internal) document.getElementById('nl-agent').value = String(internal.id);
+
+  // Fetch full FS transaction detail to capture party names silently
+  nlFsDetail = null;
+  try { nlFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id }); } catch (_) {}
 }
 
 async function nlSaveListing() {
@@ -2541,6 +2547,8 @@ async function nlSaveListing() {
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
+    seller_name:  nlFsDetail?.sellerLandlordName  || null,
+    seller_email: nlFsDetail?.sellerParty1Email   || null,
   };
 
   try {
@@ -3285,6 +3293,7 @@ let ncAllListings = [];
 
 function openNewContractModal() {
   ncAllListings = [];
+  ncFsDetail = null;
   document.getElementById('nc-step-source').style.display   = 'block';
   document.getElementById('nc-step-acc').style.display      = 'none';
   document.getElementById('nc-step-external').style.display = 'none';
@@ -3552,6 +3561,8 @@ async function ncSaveExternalContract() {
       agent_id:                agentId,
       split_pct:               extSplitPct,
       co_agents:               extCoAgents,
+      buyer_name:              ncFsDetail?.buyerLandlordName  || null,
+      buyer_email:             ncFsDetail?.buyerParty1Email   || null,
     });
     closeNewContractModal();
     await renderAll();
@@ -3564,6 +3575,7 @@ async function ncSaveExternalContract() {
 let ncFsTransactions = [];
 let ncFsAgents = [];
 let ncDbAgents = [];
+let ncFsDetail = null;
 
 async function ncShowFsPicker() {
   document.getElementById('nc-step-source').style.display = 'none';
@@ -3646,6 +3658,10 @@ async function ncSelectFsTransaction(index) {
     await ncLoadExtAgents();
     document.getElementById('nc-ext-agent').value = String(internal.id);
   }
+
+  // Fetch full FS transaction detail to capture party names silently
+  ncFsDetail = null;
+  try { ncFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id }); } catch (_) {}
 }
 
 /* ═══ Listings / Contracts filtering ═══ */
