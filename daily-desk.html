@@ -218,6 +218,31 @@ body {
   gap: 8px;
   padding: 0 4px;
 }
+.nav-more-menu {
+  position: fixed;
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  min-width: 160px;
+  z-index: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  padding: 4px 0;
+  display: none;
+}
+.nav-more-menu.open { display: block; }
+.nav-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nav-more-item:hover { color: var(--text); background: var(--ink-light); }
+.nav-more-item.active { color: var(--amber); }
 
 /* ═══ MAIN CONTENT ═══ */
 .content { overflow-y: auto; }
@@ -867,17 +892,9 @@ tbody tr.clickable { cursor: pointer; }
     <div class="nav-tab" data-page="notices" onclick="showPage('notices',this)">
       <span class="tab-icon">📢</span> Notices <span class="tab-count" id="notices-count">—</span>
     </div>
-    <div class="nav-tab" data-page="caravan" id="caravan-nav-tab" onclick="showPage('caravan',this)" style="display:none">
-      <span class="tab-icon">🚗</span> Caravan
-    </div>
-    <div class="nav-tab" data-page="reports" id="reports-nav-tab" onclick="showPage('reports',this)" style="display:none">
-      <span class="tab-icon">📊</span> Reports
-    </div>
-    <div class="nav-tab" data-page="admin" id="admin-nav-tab" onclick="showPage('admin',this)" style="display:none">
-      <span class="tab-icon">⚙</span> Admin
-    </div>
-    <div class="nav-tab" data-page="foundation" id="foundation-nav-tab" onclick="showPage('foundation',this)" style="display:none">
-      <span class="tab-icon">🏛</span> Foundation
+    <div id="nav-more" style="display:none;">
+      <div class="nav-tab" id="nav-more-btn" onclick="navMoreToggle(event)">··· More</div>
+      <div class="nav-more-menu" id="nav-more-menu"></div>
     </div>
     <div class="nav-spacer"></div>
     <div class="nav-add">
@@ -2075,20 +2092,25 @@ async function init() {
     console.error('Failed to load role:', e);
   }
 
-  if (STATE.userRole === 'manager') {
-    document.getElementById('admin-nav-tab').style.display = 'flex';
-    adminLoadTemplates();
-  }
-
+  const moreItems = [];
   if (['manager', 'staff', 'agent'].includes(STATE.userRole)) {
-    document.getElementById('caravan-nav-tab').style.display = 'flex';
+    moreItems.push({ page: 'caravan',    icon: '🚗', label: 'Caravan' });
     cvInitDate();
   }
-
   if (['manager', 'staff'].includes(STATE.userRole)) {
-    document.getElementById('reports-nav-tab').style.display = 'flex';
-    document.getElementById('foundation-nav-tab').style.display = 'flex';
+    moreItems.push({ page: 'reports',    icon: '📊', label: 'Reports' });
+    moreItems.push({ page: 'foundation', icon: '🏛', label: 'Foundation' });
     rptInit();
+  }
+  if (STATE.userRole === 'manager') {
+    moreItems.push({ page: 'admin',      icon: '⚙',  label: 'Admin' });
+    adminLoadTemplates();
+  }
+  if (moreItems.length) {
+    document.getElementById('nav-more').style.display = 'flex';
+    document.getElementById('nav-more-menu').innerHTML = moreItems
+      .map(i => `<div class="nav-more-item" id="nav-more-item-${i.page}" onclick="navMoreSelect('${i.page}')">${i.icon} ${i.label}</div>`)
+      .join('');
   }
 
   await renderAll();
@@ -2106,16 +2128,23 @@ function toggleTheme() {
   }
 }
 
+const MORE_PAGES = ['caravan', 'reports', 'foundation', 'admin'];
+
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-more-item').forEach(i => i.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  el.classList.add('active');
+  document.getElementById('nav-more-menu').classList.remove('open');
+
   const btn = document.getElementById('newBtn');
-  if (name === 'foundation') {
+  if (MORE_PAGES.includes(name)) {
+    document.getElementById('nav-more-btn').classList.add('active');
+    document.getElementById('nav-more-item-' + name)?.classList.add('active');
     btn.style.display = 'none';
-    foundationInit();
+    if (name === 'foundation') foundationInit();
   } else {
+    if (el) el.classList.add('active');
     btn.style.display = '';
     if (name === 'contracts') {
       btn.textContent = '+ New Contract';
@@ -2126,6 +2155,26 @@ function showPage(name, el) {
     }
   }
 }
+
+function navMoreToggle(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('nav-more-menu');
+  if (!menu.classList.contains('open')) {
+    const rect = document.getElementById('nav-more-btn').getBoundingClientRect();
+    menu.style.top  = rect.bottom + 'px';
+    menu.style.left = rect.left   + 'px';
+  }
+  menu.classList.toggle('open');
+}
+
+function navMoreSelect(page) {
+  document.getElementById('nav-more-menu').classList.remove('open');
+  showPage(page, null);
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('nav-more-menu')?.classList.remove('open');
+});
 
 async function renderAll() {
   const officeId = document.getElementById('officeSelect').value;
