@@ -116,55 +116,9 @@ tr:last-child td{border-bottom:none}
     <div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
         <h1 id="greeting" style="font-size:22px;font-weight:700;color:var(--navy);margin-bottom:6px">Welcome</h1>
-        <div id="donor-badge"></div>
+        <div id="donor-msg" style="font-size:14px;margin-top:4px"></div>
       </div>
     </div>
-
-    <!-- ── Agent-only: Your status ── -->
-    <div id="agent-status-section" style="display:none">
-      <div class="card">
-        <div class="card-head">
-          <div class="card-head-title">Your Donation Status</div>
-          <span id="foundation-status" style="font-size:12px;font-weight:500"></span>
-        </div>
-        <div class="card-body">
-          <div class="toggle-row">
-            <div class="toggle-label">
-              Foundation donor
-              <small>Toggle on to enroll or update your pledge</small>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="foundation-toggle" onchange="onToggle()">
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-
-          <div id="foundation-details" style="display:none;border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
-            <div class="form-row">
-              <div class="field">
-                <label>Donation Type</label>
-                <select id="foundation-type" onchange="onTypeChange()">
-                  <option value="fixed_amount">Fixed Amount per Closing</option>
-                  <option value="percentage">Percentage of Commission</option>
-                </select>
-              </div>
-              <div class="field">
-                <label id="foundation-amount-lbl">Amount ($)</label>
-                <input type="number" id="foundation-amount" placeholder="e.g. 50" min="0" step="1">
-              </div>
-            </div>
-            <div style="margin-top:14px">
-              <button class="btn btn-primary btn-sm" onclick="saveDonation(false)">Save</button>
-            </div>
-          </div>
-
-          <p style="font-size:13px;margin-top:14px;line-height:1.5">
-            <strong>All donations are made from Gross Commission and are split with Adams, Cameron &amp; Co. so there is always a matching donation!</strong>
-          </p>
-          <div id="foundation-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>
-        </div>
-      </div>
-    </div><!-- /agent-status-section -->
 
     <!-- ── Section: Office stats ── -->
     <div class="card">
@@ -218,6 +172,52 @@ tr:last-child td{border-bottom:none}
         </ul>
       </div>
     </div>
+
+    <!-- ── Agent-only: Your Donation Status ── -->
+    <div id="agent-status-section" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-title">Your Donation Status</div>
+          <span id="foundation-status" style="font-size:12px;font-weight:500"></span>
+        </div>
+        <div class="card-body">
+          <div class="toggle-row">
+            <div class="toggle-label">
+              Foundation donor
+              <small>Toggle on to enroll or update your pledge</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="foundation-toggle" onchange="onToggle()">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+
+          <div id="foundation-details" style="display:none;border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
+            <div class="form-row">
+              <div class="field">
+                <label>Donation Type</label>
+                <select id="foundation-type" onchange="onTypeChange()">
+                  <option value="fixed_amount">Fixed Amount per Closing</option>
+                  <option value="percentage">Percentage of Commission</option>
+                </select>
+              </div>
+              <div class="field">
+                <label id="foundation-amount-lbl">Amount ($)</label>
+                <input type="number" id="foundation-amount" placeholder="e.g. 50" min="0" step="1">
+              </div>
+            </div>
+            <div style="margin-top:14px">
+              <button class="btn btn-primary btn-sm" onclick="saveDonation(false)">Save</button>
+            </div>
+          </div>
+
+          <p style="font-size:13px;margin-top:14px;line-height:1.5">
+            <strong>All donations are made from Gross Commission and are split with Adams, Cameron &amp; Co. so there is always a matching donation!</strong>
+          </p>
+          <div id="foundation-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>
+        </div>
+      </div>
+    </div><!-- /agent-status-section -->
 
     <!-- ── Agent-only: Gift history ── -->
     <div id="agent-history-section" style="display:none">
@@ -327,10 +327,10 @@ function renderOfficeStats(rows) {
 
 // ── Donation status ────────────────────────────────────────────────────────────
 function renderDonationStatus(active) {
-  const toggleEl   = document.getElementById('foundation-toggle');
-  const detailsEl  = document.getElementById('foundation-details');
-  const statusEl   = document.getElementById('foundation-status');
-  const donorBadge = document.getElementById('donor-badge');
+  const toggleEl  = document.getElementById('foundation-toggle');
+  const detailsEl = document.getElementById('foundation-details');
+  const statusEl  = document.getElementById('foundation-status');
+  const msgEl     = document.getElementById('donor-msg');
 
   const isDonor = !!active;
   toggleEl.checked = isDonor;
@@ -346,11 +346,11 @@ function renderDonationStatus(active) {
     onTypeChange();
     statusEl.textContent = '✓ Active donor';
     statusEl.style.color = 'var(--ok-t)';
-    donorBadge.innerHTML = '<span class="chip-green">Foundation donor</span>';
+    msgEl.innerHTML = '<span style="color:var(--ok-t);font-weight:600">Thank you for being a donor!</span>';
   } else {
     statusEl.textContent = 'Not enrolled';
     statusEl.style.color = 'var(--muted)';
-    donorBadge.innerHTML = '';
+    msgEl.innerHTML = '<span style="color:var(--blue)">Here\'s your opportunity to join us as a donor!</span>';
   }
 }
 
