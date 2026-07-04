@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AC Foundation</title>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --red:#C0392B; --green:#1A7A4C; --bg:#F4F6F9; --surface:#FFFFFF;
+  --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  --ok:#D1FAE5; --ok-t:#059669;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ── Topbar ── */
+.topbar{background:var(--navy);padding:0 20px;display:flex;align-items:center;height:50px;border-bottom:3px solid var(--gold)}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-title{color:#fff;font-size:15px;font-weight:600;margin-left:12px;padding-left:12px;border-left:1px solid rgba(255,255,255,.2)}
+
+/* ── Content ── */
+.content{max-width:720px;margin:0 auto;padding:28px 20px 60px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden}
+.card-head{padding:13px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg)}
+.card-head-title{display:flex;align-items:center;gap:8px}
+.card-body{padding:16px 18px}
+
+/* ── Toggle ── */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.toggle-label{font-size:13px;line-height:1.4}
+.toggle-label small{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.toggle{position:relative;width:34px;height:19px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;border-radius:9px;background:var(--border);cursor:pointer;transition:background .2s}
+.toggle input:checked+.toggle-track{background:var(--blue)}
+.toggle-track::after{content:'';position:absolute;width:15px;height:15px;background:#fff;border-radius:50%;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.toggle input:checked+.toggle-track::after{transform:translateX(15px)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;border:none;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.88}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ── Form fields ── */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.3px;text-transform:uppercase}
+.field select,.field input[type=number]{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);outline:none;width:100%}
+.field select:focus,.field input:focus{border-color:var(--blue)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg)}
+td{padding:10px 14px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+
+/* ── Chips & badges ── */
+.chip-green{background:var(--ok);color:var(--ok-t);padding:2px 8px;border-radius:9px;font-size:11px;font-weight:600;white-space:nowrap}
+.chip-muted{background:#E5E7EB;color:var(--muted);padding:2px 8px;border-radius:9px;font-size:11px;font-weight:600;white-space:nowrap}
+
+/* ── Participation bar ── */
+.bar-bg{background:#E5E7EB;border-radius:4px;height:7px;flex:1;min-width:60px}
+.bar-fill{background:var(--blue);border-radius:4px;height:7px}
+
+/* ── Orgs list ── */
+.org-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.org-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--gold-lt);border:1px solid #EDD898;border-radius:8px}
+.org-icon{font-size:18px;line-height:1;flex-shrink:0}
+.org-body strong{font-size:13px;font-weight:700;display:block}
+.org-body span{font-size:12px;color:var(--muted)}
+
+/* ── Toasts ── */
+.toasts{position:fixed;top:60px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:999;pointer-events:none}
+.toast{padding:9px 14px;border-radius:7px;background:var(--navy);color:#fff;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2);animation:fadeIn .2s}
+.toast.err{background:var(--red)}
+.toast.ok{background:var(--green)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Sign-in modal ── */
+#signinModal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;align-items:center;justify-content:center}
+.signin-box{background:var(--surface);border-radius:14px;padding:36px 40px;text-align:center;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.signin-box h2{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.signin-box p{font-size:13px;color:var(--muted);margin-bottom:22px}
+#g-signin-btn{display:flex;justify-content:center}
+</style>
+</head>
+<body>
+
+<!-- Google Sign-in modal -->
+<div id="signinModal">
+  <div class="signin-box">
+    <h2>Adams Cameron Foundation</h2>
+    <p>Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <span class="topbar-logo">Adams Cameron</span>
+  <span class="topbar-title">Foundation</span>
+</div>
+
+<div class="content">
+  <!-- Loading / error states -->
+  <div id="loading-msg" style="text-align:center;padding:60px;color:var(--muted)">Loading&hellip;</div>
+  <div id="not-agent-msg" style="display:none;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:13px;margin-bottom:20px"></div>
+
+  <div id="main" style="display:none">
+
+    <!-- Greeting -->
+    <div style="margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <h1 id="greeting" style="font-size:22px;font-weight:700;color:var(--navy);margin-bottom:6px">Welcome</h1>
+        <div id="donor-badge"></div>
+      </div>
+    </div>
+
+    <!-- ── Section 1: Office stats ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">Office Participation</div>
+      </div>
+      <div style="padding:0">
+        <table id="stats-table">
+          <tr><td colspan="4" style="padding:20px;color:var(--muted);text-align:center">Loading&hellip;</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Section 2: About ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">About the Foundation</div>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;line-height:1.6;color:var(--text)">
+          The <strong>Adams Cameron Foundation</strong> collects voluntary agent contributions at each
+          real estate closing. Participating agents pledge a fixed dollar amount or a small percentage
+          of their commission — collected by the company and distributed to our partner organizations
+          on a regular basis. There is no minimum commitment and participation can be changed at any time.
+        </p>
+        <ul class="org-list" style="margin-top:16px">
+          <li class="org-item">
+            <span class="org-icon">🫀</span>
+            <div class="org-body"><strong>American Heart Association</strong><span>Fighting heart disease and stroke through research, education, and advocacy</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🎗</span>
+            <div class="org-body"><strong>American Cancer Society</strong><span>Funding cancer research and providing support to patients and families</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🎓</span>
+            <div class="org-body"><strong>Darcy Akers Scholarship</strong><span>Supporting local students pursuing higher education in our community</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🏥</span>
+            <div class="org-body"><strong>AdventHealth Foundation</strong><span>Expanding access to health and wellness care across our region</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── Sections 3+4: Agent-only ── -->
+    <div id="agent-sections">
+
+      <!-- Section 3: Your status -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-title">Your Donation Status</div>
+          <span id="foundation-status" style="font-size:12px;font-weight:500"></span>
+        </div>
+        <div class="card-body">
+          <div class="toggle-row">
+            <div class="toggle-label">
+              Foundation donor
+              <small>Toggle on to enroll or update your pledge</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="foundation-toggle" onchange="onToggle()">
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+
+          <div id="foundation-details" style="display:none;border-top:1px solid var(--border);margin-top:14px;padding-top:14px">
+            <div class="form-row">
+              <div class="field">
+                <label>Donation Type</label>
+                <select id="foundation-type" onchange="onTypeChange()">
+                  <option value="fixed_amount">Fixed Amount per Closing</option>
+                  <option value="percentage">Percentage of Commission</option>
+                </select>
+              </div>
+              <div class="field">
+                <label id="foundation-amount-lbl">Amount ($)</label>
+                <input type="number" id="foundation-amount" placeholder="e.g. 50" min="0" step="1">
+              </div>
+            </div>
+            <div style="margin-top:14px">
+              <button class="btn btn-primary btn-sm" onclick="saveDonation(false)">Save</button>
+            </div>
+          </div>
+
+          <div id="foundation-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>
+        </div>
+      </div>
+
+      <!-- Section 4: Gift history -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-title">Your Gift History</div>
+        </div>
+        <div id="history-content" style="padding:0">
+          <p style="padding:18px;color:var(--muted);font-size:13px">Loading&hellip;</p>
+        </div>
+      </div>
+
+    </div><!-- /agent-sections -->
+  </div><!-- /main -->
+</div><!-- /content -->
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const PROXY_URL = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+let AGENT_ID = null;
+
+const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Load ───────────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const r = await fetch(PROXY_URL + '/api/foundation/me', { headers: H() });
+    const data = await r.json();
+
+    if (!r.ok) {
+      document.getElementById('loading-msg').style.display = 'none';
+      const notEl = document.getElementById('not-agent-msg');
+      notEl.style.display = 'block';
+      notEl.textContent = data.error || 'Unable to load your data.';
+      // Still show sections 1 and 2 via main — just hide agent-sections
+      document.getElementById('agent-sections').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+      renderOfficeStats([]);
+      return;
+    }
+
+    AGENT_ID = data.agent ? data.agent.id : null;
+
+    if (data.agent) {
+      document.getElementById('greeting').textContent = 'Welcome, ' + data.agent.first_name;
+      renderDonationStatus(data.active_donation);
+      renderGiftHistory(data.gift_history);
+      document.getElementById('agent-sections').style.display = 'block';
+    } else {
+      document.getElementById('greeting').textContent = 'Adams Cameron Foundation';
+      document.getElementById('agent-sections').style.display = 'none';
+      const notEl = document.getElementById('not-agent-msg');
+      notEl.style.display = 'block';
+      notEl.textContent = 'Your email is not associated with an active agent record. Office stats and program information are shown below.';
+    }
+
+    renderOfficeStats(data.office_stats);
+
+    document.getElementById('loading-msg').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+
+  } catch (e) {
+    document.getElementById('loading-msg').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Office stats ───────────────────────────────────────────────────────────────
+function renderOfficeStats(rows) {
+  const t = document.getElementById('stats-table');
+  if (!rows || !rows.length) {
+    t.innerHTML = '<tr><td colspan="4" style="padding:18px;color:var(--muted);text-align:center">No participation data.</td></tr>';
+    return;
+  }
+  t.innerHTML =
+    '<thead><tr><th>Office</th><th>Donors</th><th>Agents</th><th>Participation</th></tr></thead>' +
+    '<tbody>' + rows.map(r => {
+      const pct = parseFloat(r.pct) || 0;
+      return '<tr>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td style="font-weight:600">' + (r.active_donor_count || 0) + '</td>' +
+        '<td>' + (r.active_agent_count || 0) + '</td>' +
+        '<td><div style="display:flex;align-items:center;gap:8px">' +
+          '<div class="bar-bg"><div class="bar-fill" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+          '<span style="font-size:12px;font-weight:600;min-width:38px">' + pct + '%</span>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('') + '</tbody>';
+}
+
+// ── Donation status ────────────────────────────────────────────────────────────
+function renderDonationStatus(active) {
+  const toggleEl   = document.getElementById('foundation-toggle');
+  const detailsEl  = document.getElementById('foundation-details');
+  const statusEl   = document.getElementById('foundation-status');
+  const donorBadge = document.getElementById('donor-badge');
+
+  const isDonor = !!active;
+  toggleEl.checked = isDonor;
+  detailsEl.style.display = isDonor ? 'block' : 'none';
+
+  if (isDonor) {
+    const typeEl   = document.getElementById('foundation-type');
+    const amountEl = document.getElementById('foundation-amount');
+    typeEl.value   = active.donation_type || 'fixed_amount';
+    amountEl.value = active.donation_type === 'percentage'
+      ? (active.percentage_rate ?? '')
+      : (active.fixed_amount ?? '');
+    onTypeChange();
+    statusEl.textContent = '✓ Active donor';
+    statusEl.style.color = 'var(--ok-t)';
+    donorBadge.innerHTML = '<span class="chip-green">Foundation donor</span>';
+  } else {
+    statusEl.textContent = 'Not enrolled';
+    statusEl.style.color = 'var(--muted)';
+    donorBadge.innerHTML = '';
+  }
+}
+
+// ── Gift history ───────────────────────────────────────────────────────────────
+function renderGiftHistory(gifts) {
+  const el = document.getElementById('history-content');
+  if (!gifts || !gifts.length) {
+    el.innerHTML = '<p style="padding:18px;color:var(--muted);font-size:13px">No gift history yet. Gifts are recorded when a transaction closes with you as a participating agent.</p>';
+    return;
+  }
+  el.innerHTML =
+    '<table>' +
+      '<thead><tr><th>Closing Date</th><th>Side</th></tr></thead>' +
+      '<tbody>' + gifts.map(g =>
+        '<tr>' +
+          '<td style="font-variant-numeric:tabular-nums">' + fmtDate(g.closing_date) + '</td>' +
+          '<td>' + (g.side === 'buyer' ? 'Buyer-side' : 'Seller-side') + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody>' +
+    '</table>';
+}
+
+// ── Toggle handler ─────────────────────────────────────────────────────────────
+function onToggle() {
+  const toggleEl  = document.getElementById('foundation-toggle');
+  const detailsEl = document.getElementById('foundation-details');
+  if (toggleEl.checked) {
+    detailsEl.style.display = 'block';
+  } else {
+    saveDonation(true);
+  }
+}
+
+// ── Type change handler ────────────────────────────────────────────────────────
+function onTypeChange() {
+  const type     = document.getElementById('foundation-type').value;
+  const lblEl    = document.getElementById('foundation-amount-lbl');
+  const amountEl = document.getElementById('foundation-amount');
+  const isPct    = type === 'percentage';
+  lblEl.textContent    = isPct ? 'Rate (%)' : 'Amount ($)';
+  amountEl.placeholder = isPct ? 'e.g. 0.5' : 'e.g. 50';
+  amountEl.step        = isPct ? '0.01' : '1';
+}
+
+// ── Save donation ──────────────────────────────────────────────────────────────
+async function saveDonation(turningOff) {
+  if (!AGENT_ID) return;
+  const msgEl    = document.getElementById('foundation-msg');
+  const statusEl = document.getElementById('foundation-status');
+  const toggleEl = document.getElementById('foundation-toggle');
+  const badge    = document.getElementById('donor-badge');
+
+  let body;
+  if (turningOff) {
+    body = { is_active: false, end_reason: 'opted_out' };
+  } else {
+    const type = document.getElementById('foundation-type').value || 'fixed_amount';
+    const val  = parseFloat(document.getElementById('foundation-amount').value);
+    if (!val || val <= 0) {
+      msgEl.textContent = 'Enter an amount greater than zero.';
+      msgEl.style.color = 'var(--red)';
+      return;
+    }
+    body = {
+      is_active:       true,
+      donation_type:   type,
+      fixed_amount:    type === 'fixed_amount' ? val : null,
+      percentage_rate: type === 'percentage'   ? val : null,
+    };
+  }
+
+  msgEl.textContent = 'Saving…';
+  msgEl.style.color = 'var(--muted)';
+
+  try {
+    const r = await fetch(PROXY_URL + '/api/foundation/donation/agent/' + AGENT_ID, {
+      method: 'PUT', headers: H(), body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.error || 'HTTP ' + r.status);
+    }
+    msgEl.textContent = 'Saved.';
+    msgEl.style.color = 'var(--ok-t)';
+    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+
+    if (turningOff) {
+      toggleEl.checked = false;
+      document.getElementById('foundation-details').style.display = 'none';
+      statusEl.textContent = 'Not enrolled';
+      statusEl.style.color = 'var(--muted)';
+      badge.innerHTML = '';
+    } else {
+      statusEl.textContent = '✓ Active donor';
+      statusEl.style.color = 'var(--ok-t)';
+      badge.innerHTML = '<span class="chip-green">Foundation donor</span>';
+    }
+  } catch (e) {
+    msgEl.textContent = 'Error: ' + e.message;
+    msgEl.style.color = 'var(--red)';
+    if (turningOff) toggleEl.checked = true; // revert optimistic change
+    toast('Save failed: ' + e.message, 'err');
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  const d = new Date(v + 'T00:00:00');
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+// ── Google auth ────────────────────────────────────────────────────────────────
+function handleCredential(cred) {
+  try {
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    USER_EMAIL = payload.email || '';
+    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
+  } catch (_) {}
+  document.getElementById('signinModal').style.display = 'none';
+  if (USER_EMAIL) load(); else toast('Sign-in failed', 'err');
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt(n => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) {
+      google.accounts.id.renderButton(document.getElementById('g-signin-btn'),
+        { theme:'outline', size:'large', text:'signin_with', shape:'rectangular' });
+      document.getElementById('signinModal').style.display = 'flex';
+    }
+  });
+}
+
+if (USER_EMAIL) {
+  load();
+} else if (window.google?.accounts?.id) {
+  initGoogleSignIn();
+} else {
+  const t = setInterval(() => {
+    if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); }
+  }, 100);
+}
+</script>
+</body>
+</html>
