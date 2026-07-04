@@ -120,53 +120,8 @@ tr:last-child td{border-bottom:none}
       </div>
     </div>
 
-    <!-- ── Section 1: Office stats ── -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-head-title">Office Participation</div>
-      </div>
-      <div style="padding:0">
-        <table id="stats-table">
-          <tr><td colspan="4" style="padding:20px;color:var(--muted);text-align:center">Loading&hellip;</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <!-- ── Section 2: About ── -->
-    <div class="card">
-      <div class="card-head">
-        <div class="card-head-title">About the Foundation</div>
-      </div>
-      <div class="card-body">
-        <p style="font-size:13px;line-height:1.6;color:var(--text)">
-          For agents who contribute to the Foundation, a letter is sent on their behalf to every buyer
-          or seller letting them know that a donation was made in their name to the Adams Cameron Foundation!
-        </p>
-        <ul class="org-list" style="margin-top:16px">
-          <li class="org-item">
-            <span class="org-icon">🫀</span>
-            <div class="org-body"><strong>American Heart Association</strong><span>Fighting heart disease and stroke through research, education, and advocacy</span></div>
-          </li>
-          <li class="org-item">
-            <span class="org-icon">🎗</span>
-            <div class="org-body"><strong>American Cancer Society</strong><span>Funding cancer research and providing support to patients and families</span></div>
-          </li>
-          <li class="org-item">
-            <span class="org-icon">🎓</span>
-            <div class="org-body"><strong>Darcy Akers Scholarship</strong><span>Supporting local students pursuing higher education in our community</span></div>
-          </li>
-          <li class="org-item">
-            <span class="org-icon">🏥</span>
-            <div class="org-body"><strong>AdventHealth Foundation</strong><span>Expanding access to health and wellness care across our region</span></div>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- ── Sections 3+4: Agent-only ── -->
-    <div id="agent-sections">
-
-      <!-- Section 3: Your status -->
+    <!-- ── Agent-only: Your status ── -->
+    <div id="agent-status-section" style="display:none">
       <div class="card">
         <div class="card-head">
           <div class="card-head-title">Your Donation Status</div>
@@ -209,8 +164,63 @@ tr:last-child td{border-bottom:none}
           <div id="foundation-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>
         </div>
       </div>
+    </div><!-- /agent-status-section -->
 
-      <!-- Section 4: Gift history -->
+    <!-- ── Section: Office stats ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">Office Participation</div>
+      </div>
+      <div style="padding:0">
+        <table id="stats-table">
+          <tr><td colspan="4" style="padding:20px;color:var(--muted);text-align:center">Loading&hellip;</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Section: Donors ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">Thank you so much to our donors!</div>
+      </div>
+      <div class="card-body" id="donors-content">
+        <p style="color:var(--muted);font-size:13px">Loading&hellip;</p>
+      </div>
+    </div>
+
+    <!-- ── Section: About ── -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">About the Foundation</div>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;line-height:1.6;color:var(--text)">
+          For agents who contribute to the Foundation, a letter is sent on their behalf to every buyer
+          or seller letting them know that a donation was made in their name to the Adams Cameron Foundation!
+        </p>
+        <ul class="org-list" style="margin-top:16px">
+          <li class="org-item">
+            <span class="org-icon">🫀</span>
+            <div class="org-body"><strong>American Heart Association</strong><span>Fighting heart disease and stroke through research, education, and advocacy</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🎗</span>
+            <div class="org-body"><strong>American Cancer Society</strong><span>Funding cancer research and providing support to patients and families</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🎓</span>
+            <div class="org-body"><strong>Darcy Akers Scholarship</strong><span>Supporting local students pursuing higher education in our community</span></div>
+          </li>
+          <li class="org-item">
+            <span class="org-icon">🏥</span>
+            <div class="org-body"><strong>AdventHealth Foundation</strong><span>Expanding access to health and wellness care across our region</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ── Agent-only: Gift history ── -->
+    <div id="agent-history-section" style="display:none">
       <div class="card">
         <div class="card-head">
           <div class="card-head-title">Your Gift History</div>
@@ -219,8 +229,8 @@ tr:last-child td{border-bottom:none}
           <p style="padding:18px;color:var(--muted);font-size:13px">Loading&hellip;</p>
         </div>
       </div>
+    </div><!-- /agent-history-section -->
 
-    </div><!-- /agent-sections -->
   </div><!-- /main -->
 </div><!-- /content -->
 
@@ -270,16 +280,19 @@ async function load() {
       document.getElementById('greeting').textContent = 'Welcome, ' + data.agent.first_name;
       renderDonationStatus(data.active_donation);
       renderGiftHistory(data.gift_history);
-      document.getElementById('agent-sections').style.display = 'block';
+      document.getElementById('agent-status-section').style.display = 'block';
+      document.getElementById('agent-history-section').style.display = 'block';
     } else {
       document.getElementById('greeting').textContent = 'Adams Cameron Foundation';
-      document.getElementById('agent-sections').style.display = 'none';
+      document.getElementById('agent-status-section').style.display = 'none';
+      document.getElementById('agent-history-section').style.display = 'none';
       const notEl = document.getElementById('not-agent-msg');
       notEl.style.display = 'block';
       notEl.textContent = 'Your email is not associated with an active agent record. Office stats and program information are shown below.';
     }
 
     renderOfficeStats(data.office_stats);
+    renderDonors(data.donors || []);
 
     document.getElementById('loading-msg').style.display = 'none';
     document.getElementById('main').style.display = 'block';
@@ -442,6 +455,18 @@ async function saveDonation(turningOff) {
     if (turningOff) toggleEl.checked = true; // revert optimistic change
     toast('Save failed: ' + e.message, 'err');
   }
+}
+
+// ── Donors list ───────────────────────────────────────────────────────────────
+function renderDonors(donors) {
+  const el = document.getElementById('donors-content');
+  if (!donors || !donors.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">No active donors yet — be the first!</p>';
+    return;
+  }
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">' +
+    donors.map(d => '<span style="font-size:13px">&#10003; ' + esc(d.first_name + ' ' + d.last_name) + '</span>').join('') +
+    '</div>';
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
