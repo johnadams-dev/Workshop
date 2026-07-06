@@ -798,6 +798,7 @@ async function api(method, path, body) {
 
 // ── Auth ────────────────────────────────────────────────────────────────────
 if (_email) {
+  document.getElementById('auth-gate').style.display = 'none'; // skip the gate seamlessly
   initApp();
 } else {
   waitForGoogle();
@@ -842,7 +843,10 @@ async function initApp() {
       document.getElementById('no-access').style.display = 'flex';
       return;
     }
+    // Unexpected error (network, stale session, etc.) — re-show gate and offer sign-in
+    document.getElementById('auth-gate').style.display = '';
     document.getElementById('auth-status').textContent = 'Error: ' + e.message;
+    waitForGoogle();
     return;
   }
 
