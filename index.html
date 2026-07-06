@@ -704,8 +704,9 @@ async function handleCredential(cred) {
       body: JSON.stringify({ idToken: cred.credential }),
     });
     const data = await r.json();
+    localStorage.setItem('ac_is_manager', data.isManager ? '1' : '0');
     if (data.isManager) document.getElementById('managerSection').style.display = '';
-    // After sessionStorage.setItem(SESSION_KEY, data.proxyKey);
+    else document.getElementById('managerSection').style.display = 'none';
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     sessionStorage.setItem('ac_user_email', payload.email || '');
     localStorage.setItem('ac_user_email', payload.email || '');
@@ -769,6 +770,12 @@ function openHotsheet() {
 
   if (window.google?.accounts?.id) { doPrompt(); }
   else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); doPrompt(); } }, 100); }
+}
+
+// Immediately restore manager section from last known role — no network round-trip needed.
+// Google's silent sign-in runs in the background and will update if the role has changed.
+if (localStorage.getItem('ac_is_manager') === '1') {
+  document.getElementById('managerSection').style.display = '';
 }
 
 // Initialize as soon as the Google SDK loads
