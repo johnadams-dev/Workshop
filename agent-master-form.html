@@ -173,6 +173,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:sp .6s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* mode tabs */
+.topbar-center{display:flex;gap:3px}
+.tab-btn{padding:5px 18px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:transparent;color:rgba(255,255,255,.65);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+.tab-btn.active{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.35)}
+.tab-btn:hover:not(.active){background:rgba(255,255,255,.08);color:#fff}
+
+/* staff list */
+.staff-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:9px;transition:background .1s}
+.staff-item:hover{background:#F0F4FA}
+.staff-item.selected{background:#E8F0FB;border-left:3px solid var(--blue)}
+.staff-item.inactive{opacity:.5}
+.role-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;flex-shrink:0}
+.role-admin{background:#FEE2E2;color:#991B1B}
+.role-manager{background:#FEF3C7;color:#B45309}
+.role-coordinator{background:#EFF6FF;color:#1D4ED8}
+
 /* modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
@@ -186,12 +202,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="topbar">
   <div class="topbar-left">
     <span class="topbar-logo">ACC</span>
-    <span class="topbar-title">Agent Records</span>
+    <span class="topbar-title" id="topbar-title">Agent Records</span>
+  </div>
+  <div class="topbar-center">
+    <button class="tab-btn active" id="tab-agents" onclick="switchMode('agents')">Agents</button>
+    <button class="tab-btn" id="tab-staff" onclick="switchMode('staff')">Staff</button>
   </div>
   <div class="topbar-right">
     <span id="issue-summary" style="font-size:11px;color:#8ab4cc"></span>
     <button class="btn btn-secondary btn-sm" id="add-agent-btn" onclick="openNewAgent()" style="display:none">+ Add Agent</button>
-    <button class="btn btn-secondary btn-sm" onclick="exportCsv()">Export</button>
+    <button class="btn btn-secondary btn-sm" id="add-staff-btn" onclick="openNewStaff()" style="display:none">+ Add Staff</button>
+    <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportCsv()">Export</button>
   </div>
 </div>
 
@@ -213,7 +234,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <span class="search-icon">🔍</span>
         <input type="search" id="search" placeholder="Name, email, office, ID…" oninput="filterList()">
       </div>
-      <div class="filter-row">
+      <div class="filter-row" id="filter-row">
         <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
         <button class="filter-btn" onclick="setFilter('active',this)">Active</button>
         <button class="filter-btn f-issues" onclick="setFilter('issues',this)">⚠ Issues</button>
@@ -274,6 +295,37 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="modal-foot">
       <button class="btn btn-primary" onclick="document.getElementById('pw-modal').classList.remove('open')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Staff Modal -->
+<div class="modal-overlay" id="new-staff-modal">
+  <div class="modal">
+    <div class="modal-head">Add Staff Member <button onclick="closeNewStaff()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body">
+      <div class="fg">
+        <div class="field"><label>First Name</label><input type="text" id="ns-first"></div>
+        <div class="field"><label>Last Name</label><input type="text" id="ns-last"></div>
+      </div>
+      <div class="field"><label>Email</label><input type="email" id="ns-email" placeholder="user@adamscameron.com"></div>
+      <div class="field"><label>Title</label><input type="text" id="ns-title" placeholder="e.g. Transaction Coordinator"></div>
+      <div class="fg">
+        <div class="field">
+          <label>Role</label>
+          <select id="ns-role">
+            <option value="">— Select —</option>
+            <option value="coordinator">Coordinator</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="field"><label>Cell Phone</label><input type="tel" id="ns-phone" placeholder="(386) 555-0100"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeNewStaff()">Cancel</button>
+      <button class="btn btn-primary" id="ns-create-btn" onclick="createStaff()">Add Staff</button>
     </div>
   </div>
 </div>
@@ -363,6 +415,7 @@ function setFilter(f, btn) {
 }
 
 function filterList() {
+  if (staffMode) { renderStaffList(); return; }
   const q = document.getElementById('search').value.trim();
   let list = allAgents.filter(a => match(a, q));
   if (currentFilter==='active')   list = list.filter(a => a.active);
@@ -1121,6 +1174,289 @@ async function saveFoundationDonation(agentId, turningOff) {
     if (msgEl) { msgEl.textContent = 'Error: ' + e.message; msgEl.style.color = 'var(--red)'; }
     if (turningOff && toggleEl) toggleEl.checked = true;
     toast('Foundation save failed: ' + e.message, 'err');
+  }
+}
+
+// ── Staff tab ─────────────────────────────────────────────────────────────────
+let staffMode = false, allStaff = [], currentStaffId = null, staffDirtyFlag = false;
+
+async function switchMode(mode) {
+  staffMode = (mode === 'staff');
+  document.getElementById('tab-agents').classList.toggle('active', !staffMode);
+  document.getElementById('tab-staff').classList.toggle('active', staffMode);
+  document.getElementById('topbar-title').textContent = staffMode ? 'Staff Records' : 'Agent Records';
+  document.getElementById('add-agent-btn').style.display = !staffMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('export-btn').style.display   = staffMode ? 'none' : '';
+  document.getElementById('issue-summary').style.display = staffMode ? 'none' : '';
+  document.getElementById('filter-row').style.display    = staffMode ? 'none' : '';
+
+  const emptyEl = document.getElementById('detail-empty');
+  const msgEl   = emptyEl?.querySelector('div:last-child');
+  if (msgEl) msgEl.textContent = staffMode ? 'Select a staff member to view their record' : 'Select an agent to view their record';
+  emptyEl.style.display = 'flex';
+  document.getElementById('detail-content').style.display = 'none';
+  currentStaffId = null; currentId = null;
+  document.getElementById('search').value = '';
+
+  if (staffMode) {
+    if (!allStaff.length) await loadStaff();
+    renderStaffList();
+  } else {
+    filterList();
+  }
+}
+
+async function loadStaff() {
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/staff`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allStaff = await r.json();
+  } catch(e) { toast('Failed to load staff: ' + e.message, 'err'); }
+}
+
+function renderStaffList() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const list = allStaff.filter(s => !q ||
+    [s.first_name, s.last_name, s.email, s.title, s.role].some(v => (v||'').toLowerCase().includes(q))
+  );
+  document.getElementById('list-count').textContent = `${list.length} staff member${list.length !== 1 ? 's' : ''}`;
+  const el = document.getElementById('agent-list');
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">None found</div>';
+    return;
+  }
+  el.innerHTML = list.map(s => {
+    const initials = ((s.first_name||'?')[0] + (s.last_name||'?')[0]).toUpperCase();
+    const roleClass = s.role ? `role-${s.role}` : '';
+    const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '—';
+    return `<div class="staff-item${s.id===currentStaffId?' selected':''}${!s.active?' inactive':''}" onclick="selectStaff(${s.id})">
+      <div class="avatar">${s.photo_url ? `<img src="${esc(s.photo_url)}" alt="" onerror="this.style.display='none'">${initials}` : initials}</div>
+      <div class="agent-info">
+        <div class="agent-name">${esc((s.first_name||'')+' '+(s.last_name||'')).trim() || '(unnamed)'}</div>
+        <div class="agent-meta">${esc(s.email||'')}</div>
+      </div>
+      <span class="role-badge ${roleClass}">${roleLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+async function selectStaff(id) {
+  currentStaffId = id;
+  staffDirtyFlag = false;
+  renderStaffList();
+  document.getElementById('detail-empty').style.display = 'none';
+  document.getElementById('detail-content').style.display = 'block';
+  const s = allStaff.find(x => x.id === id);
+  if (s) renderStaffDetail(s);
+}
+
+function renderStaffDetail(s) {
+  const roleOpts = ['admin','manager','coordinator'].map(r =>
+    `<option value="${r}"${s.role===r?' selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
+  ).join('');
+
+  const staffOfficeIds = (s.offices||[]).map(o => typeof o === 'object' ? o.id : null).filter(Boolean);
+  const officeChecks = offices.map(o =>
+    `<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;cursor:pointer">
+       <input type="checkbox" value="${o.id}" class="staff-office-cb"${staffOfficeIds.includes(o.id)?' checked':''} onchange="staffDirty()">
+       ${esc(o.name)}
+     </label>`
+  ).join('');
+
+  const agentOpts = '<option value="">— Not linked —</option>' +
+    [...allAgents].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).map(a =>
+      `<option value="${a.id}"${a.id===s.agent_id?' selected':''}>${esc((a.last_name||'')+(a.first_name?', '+a.first_name:''))} — ${esc(a.email||'')}</option>`
+    ).join('');
+
+  const initials = ((s.first_name||'?')[0] + (s.last_name||'?')[0]).toUpperCase();
+
+  document.getElementById('detail-content').innerHTML = `
+    <div id="sf-msg" style="display:none;padding:8px 14px;border-radius:7px;font-size:12px;margin-bottom:12px;"></div>
+
+    <div class="agent-header">
+      <div class="photo-wrap">
+        <div class="photo-lg">${s.photo_url?`<img src="${esc(s.photo_url)}" alt="" onerror="this.style.display='none'">`+initials:initials}</div>
+      </div>
+      <div class="header-info">
+        <div class="header-name">${esc((s.first_name||'')+' '+(s.last_name||'')).trim()||'(unnamed)'}</div>
+        <div class="header-email">${esc(s.email||'')}</div>
+        <div class="header-badges">
+          <span class="badge ${s.active?'badge-active':'badge-inactive'}">${s.active?'Active':'Inactive'}</span>
+          ${s.role?`<span class="role-badge role-${s.role}" style="margin-left:2px">${s.role.charAt(0).toUpperCase()+s.role.slice(1)}</span>`:''}
+          ${s.title?`<span class="badge badge-office">${esc(s.title)}</span>`:''}
+        </div>
+      </div>
+      <div class="header-actions">
+        ${USER_ROLE==='admin'&&s.active?`<button class="btn btn-danger btn-sm" onclick="deactivateStaff(${s.id})">Deactivate</button>`:''}
+        ${USER_ROLE==='admin'&&!s.active?`<button class="btn btn-secondary btn-sm" onclick="reactivateStaff(${s.id})">Reactivate</button>`:''}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Identity &amp; Contact</div>
+      <div class="card-body">
+        <div class="fg" style="margin-bottom:10px">
+          <div class="field"><label>First Name</label><input type="text" id="sf-first" value="${esc(s.first_name||'')}" oninput="staffDirty()"></div>
+          <div class="field"><label>Last Name</label><input type="text" id="sf-last" value="${esc(s.last_name||'')}" oninput="staffDirty()"></div>
+        </div>
+        <div class="fg" style="margin-bottom:10px">
+          <div class="field"><label>Email</label><input type="email" id="sf-email" value="${esc(s.email||'')}" oninput="staffDirty()"></div>
+          <div class="field"><label>Title</label><input type="text" id="sf-title" value="${esc(s.title||'')}" placeholder="e.g. Transaction Coordinator" oninput="staffDirty()"></div>
+        </div>
+        <div class="fg">
+          <div class="field"><label>Role</label><select id="sf-role" onchange="staffDirty()">${roleOpts}</select></div>
+          <div class="field"><label>Cell Phone</label><input type="tel" id="sf-cell" value="${esc(s.cell_e164?fmtPhone(s.cell_e164):'')}" oninput="staffDirty()"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Agent Record Link</div>
+      <div class="card-body">
+        <div class="field">
+          <label>Linked Agent</label>
+          <select id="sf-agent" onchange="staffDirty()" style="font-size:12px">${agentOpts}</select>
+        </div>
+        <div class="field-hint" style="margin-top:5px">Links this staff member to their agent record for reporting purposes.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Office Assignments</div>
+      <div class="card-body">
+        ${officeChecks || '<span style="color:var(--muted);font-size:12px">No offices defined</span>'}
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:24px">
+      <button class="btn btn-secondary" id="sf-discard-btn" style="display:none" onclick="selectStaff(${s.id})">Discard</button>
+      <button class="btn btn-primary" id="sf-save-btn" onclick="saveStaff(${s.id})">Save Changes</button>
+    </div>`;
+}
+
+function staffDirty() {
+  if (staffDirtyFlag) return;
+  staffDirtyFlag = true;
+  const d = document.getElementById('sf-discard-btn');
+  if (d) d.style.display = '';
+}
+
+async function saveStaff(id) {
+  const btn = document.getElementById('sf-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+  const rawPhone = (document.getElementById('sf-cell')?.value || '').trim();
+  const digits   = rawPhone.replace(/\D/g, '');
+  const cell_e164 = digits.length === 10 ? '+1' + digits
+    : digits.length === 11 && digits[0] === '1' ? '+' + digits
+    : rawPhone || null;
+
+  const office_ids = [...document.querySelectorAll('.staff-office-cb:checked')].map(el => Number(el.value));
+  const agentVal   = document.getElementById('sf-agent')?.value;
+
+  const body = {
+    first_name: document.getElementById('sf-first')?.value.trim() || null,
+    last_name:  document.getElementById('sf-last')?.value.trim()  || null,
+    email:      document.getElementById('sf-email')?.value.trim() || null,
+    title:      document.getElementById('sf-title')?.value.trim() || null,
+    role:       document.getElementById('sf-role')?.value         || null,
+    cell_e164,
+    agent_id:   agentVal ? Number(agentVal) : null,
+    office_ids,
+  };
+
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/staff/${id}`, { method:'PUT', headers:H(), body:JSON.stringify(body) });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error||'HTTP '+r.status); }
+    const updated = await r.json();
+    const idx = allStaff.findIndex(s => s.id === id);
+    if (idx >= 0) Object.assign(allStaff[idx], updated, {
+      offices: office_ids.map(oid => ({ id: oid, name: (offices.find(o=>o.id===oid)||{}).name }))
+    });
+    staffDirtyFlag = false;
+    renderStaffList();
+    const msgEl = document.getElementById('sf-msg');
+    if (msgEl) {
+      msgEl.style.display = 'block';
+      msgEl.style.background = 'var(--ok)'; msgEl.style.color = 'var(--ok-b)';
+      msgEl.textContent = 'Saved successfully.';
+      setTimeout(() => { msgEl.style.display = 'none'; }, 2500);
+    }
+    const d = document.getElementById('sf-discard-btn');
+    if (d) d.style.display = 'none';
+    toast('Staff record saved', 'ok');
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+  }
+}
+
+async function deactivateStaff(id) {
+  if (!confirm('Deactivate this staff member? They will lose system access.')) return;
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/staff/${id}`, { method:'PUT', headers:H(), body:JSON.stringify({ active: false }) });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error||'HTTP '+r.status); }
+    const idx = allStaff.findIndex(s => s.id === id);
+    if (idx >= 0) allStaff[idx].active = false;
+    toast('Staff member deactivated', 'ok');
+    selectStaff(id);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function reactivateStaff(id) {
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/staff/${id}`, { method:'PUT', headers:H(), body:JSON.stringify({ active: true }) });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error||'HTTP '+r.status); }
+    const idx = allStaff.findIndex(s => s.id === id);
+    if (idx >= 0) allStaff[idx].active = true;
+    toast('Staff member reactivated', 'ok');
+    selectStaff(id);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+function openNewStaff() {
+  ['ns-first','ns-last','ns-email','ns-title','ns-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('ns-role').value = '';
+  document.getElementById('new-staff-modal').classList.add('open');
+}
+function closeNewStaff() { document.getElementById('new-staff-modal').classList.remove('open'); }
+
+async function createStaff() {
+  const email = document.getElementById('ns-email').value.trim();
+  const role  = document.getElementById('ns-role').value;
+  if (!email) { alert('Email is required.'); return; }
+  if (!role)  { alert('Role is required.'); return; }
+  const btn = document.getElementById('ns-create-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  const rawPhone = document.getElementById('ns-phone').value.trim();
+  const digits   = rawPhone.replace(/\D/g, '');
+  const cell_e164 = digits.length === 10 ? '+1' + digits
+    : digits.length === 11 && digits[0] === '1' ? '+' + digits
+    : rawPhone || null;
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/staff`, {
+      method:'POST', headers:H(),
+      body: JSON.stringify({
+        first_name: document.getElementById('ns-first').value.trim() || null,
+        last_name:  document.getElementById('ns-last').value.trim()  || null,
+        email, role, cell_e164,
+        title: document.getElementById('ns-title').value.trim() || null,
+      })
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error||'HTTP '+r.status); }
+    const created = await r.json();
+    closeNewStaff();
+    allStaff = [];
+    await loadStaff();
+    renderStaffList();
+    toast('Staff member added', 'ok');
+    selectStaff(created.id);
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add Staff';
   }
 }
 

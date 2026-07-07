@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Listing / Contract Form</title>
+  <style>
+    @page { size: letter; margin: 0.6in; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; }
+
+    .print-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 100;
+      padding: 8px 18px; background: #003366; color: #fff;
+      border: none; border-radius: 4px; font-size: 13px; cursor: pointer;
+    }
+    @media print { .print-btn, .screen-only { display: none !important; } }
+
+    .form-title {
+      text-align: center; font-size: 14pt; font-weight: bold;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px;
+    }
+    .company-line {
+      text-align: center; font-size: 9pt; color: #444; margin-bottom: 14px;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; font-size: 9pt; }
+    td.label {
+      background: #eee; font-weight: bold; font-size: 8pt;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap; width: 1%; padding-right: 8px;
+    }
+    td.val { min-width: 100px; }
+    .blank { display: inline-block; border-bottom: 1px solid #555; min-width: 120px; }
+
+    .section-head {
+      background: #003366; color: #fff; font-weight: bold;
+      font-size: 9pt; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 4px 8px; margin-top: 10px; margin-bottom: 2px;
+    }
+
+    .sig-row { display: flex; gap: 24px; margin-top: 14px; }
+    .sig-block { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; }
+
+    .loading { text-align: center; padding: 60px; font-size: 14px; color: #666; }
+    .error   { text-align: center; padding: 60px; color: #c00; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">Print</button>
+  <div id="content"><div class="loading">Loading…</div></div>
+
+<script>
+const PROXY = 'https://us-central1-johnAdams-workshop.cloudfunctions.net/proxy/';
+
+async function load() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { document.getElementById('content').innerHTML = '<div class="error">No transaction ID in URL.</div>'; return; }
+
+  const user = JSON.parse(localStorage.getItem('acc_user') || 'null');
+  const email = user?.email || '';
+  const headers = { 'Content-Type': 'application/json', 'x-user-email': email };
+
+  try {
+    const res = await fetch(PROXY + `api/forms/transaction/${encodeURIComponent(id)}`, { headers });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+function fmt(v) { return v || ''; }
+function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''; }
+function fmtDate(v) { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
+function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
+
+function row(label, ...vals) {
+  const cells = vals.map(([w, v]) => `<td class="val" style="width:${w}">${v || '&nbsp;'}</td>`).join('');
+  return `<tr><td class="label">${label}</td>${cells}</tr>`;
+}
+function row2(l1, v1, l2, v2) {
+  return `<tr>
+    <td class="label">${l1}</td><td class="val">${v1 || '&nbsp;'}</td>
+    <td class="label">${l2}</td><td class="val">${v2 || '&nbsp;'}</td>
+  </tr>`;
+}
+
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event }) {
+  const represents = t.represents_seller ? 'Listing' : 'Contract (Buyer)';
+  const la = listing_agent;
+  const ba = buyers_agent || co_buyers_agent;
+
+  document.getElementById('content').innerHTML = `
+    <div class="form-title">Listing / Contract Form</div>
+    <div class="company-line">Adams, Cameron &amp; Co. — Internal Record</div>
+
+    <div class="section-head">Property Information</div>
+    <table>
+      ${row2('Property Address', fmt(t.property_address), 'City', fmt(t.city))}
+      ${row2('MLS Number', fmt(mls_number), 'Type', represents)}
+      ${row2('List Price', fmtMoney(t.current_price), 'Office', fmt(t.office_name))}
+      ${row2('List Date', fmtDate(t.list_date), 'Expiration Date', fmtDate(t.expiration_date))}
+    </table>
+
+    <div class="section-head">Commission</div>
+    <table>
+      ${row2('Total Commission %', t.commission_rate != null ? t.commission_rate + '%' : '', 'Buyer Broker Commission %', t.cooperating_commission != null ? t.cooperating_commission + '%' : '')}
+    </table>
+
+    <div class="section-head">Seller / Landlord</div>
+    <table>
+      ${row2('Name', fmt(t.seller_name), 'Email', fmt(t.seller_email))}
+      ${row2('Mailing Address', fmt(t.seller_mailing_address), 'City', fmt(t.seller_city))}
+      ${row2('State', fmt(t.seller_state), 'Zip', fmt(t.seller_zip))}
+    </table>
+
+    <div class="section-head">Buyer / Tenant</div>
+    <table>
+      ${row2('Name', fmt(t.buyer_name), 'Email', fmt(t.buyer_email))}
+      ${row2('Mailing Address', fmt(t.buyer_mailing_address), 'City', fmt(t.buyer_city))}
+      ${row2('State', fmt(t.buyer_state), 'Zip', fmt(t.buyer_zip))}
+    </table>
+
+    <div class="section-head">Listing Agent</div>
+    <table>
+      ${row2('Name', agentName(la), 'Email', fmt(la?.email))}
+      ${row2('NRDS ID', fmt(la?.nrds_id), 'Office', fmt(la?.agent_office || t.office_name))}
+      ${co_listing_agent ? row2('Co-Listing Agent', agentName(co_listing_agent), 'Email', fmt(co_listing_agent?.email)) : ''}
+    </table>
+
+    <div class="section-head">Buyer's Agent</div>
+    <table>
+      ${row2('Name', agentName(ba), 'Email', fmt(ba?.email))}
+      ${row2('NRDS ID', fmt(ba?.nrds_id), 'Office', fmt(ba?.agent_office))}
+    </table>
+
+    <div class="section-head">Referral (if applicable)</div>
+    <table>
+      <tr><td class="label">Referred By</td><td class="val">&nbsp;</td><td class="label">Referral %</td><td class="val">&nbsp;</td></tr>
+      <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Address</td><td class="val">&nbsp;</td></tr>
+    </table>
+
+    <div class="section-head">Source</div>
+    <table>
+      ${row2('Source of Seller', fmt(t.source_of_seller), 'Source of Buyer', fmt(t.source_of_buyer))}
+    </table>
+
+    <div class="sig-row" style="margin-top:24px;">
+      <div class="sig-block">Coordinator Signature</div>
+      <div class="sig-block">Date</div>
+      <div class="sig-block">Agent Signature</div>
+      <div class="sig-block">Date</div>
+    </div>
+  `;
+}
+
+load();
+</script>
+</body>
+</html>

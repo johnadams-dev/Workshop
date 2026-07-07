@@ -1562,6 +1562,34 @@ tbody tr.clickable { cursor: pointer; }
               <input type="text" id="nl-coop-commission" placeholder="e.g. 3">
             </div>
           </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Name</span>
+              <input type="text" id="nl-seller-name" placeholder="Optional">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Email</span>
+              <input type="email" id="nl-seller-email" placeholder="Optional">
+            </div>
+          </div>
+          <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Mailing Address</span>
+              <input type="text" id="nl-seller-mailing" placeholder="Street address">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
+              <input type="text" id="nl-seller-city" placeholder="City">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">State</span>
+              <input type="text" id="nl-seller-state" placeholder="FL" maxlength="2">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
+              <input type="text" id="nl-seller-zip" placeholder="32174">
+            </div>
+          </div>
         </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
@@ -2677,14 +2705,19 @@ async function nlSaveListing() {
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
-    seller_name:  nlFsDetail?.sellerLandlordName  || null,
-    seller_email: nlFsDetail?.sellerParty1Email   || null,
+    seller_name:            document.getElementById('nl-seller-name').value.trim()    || nlFsDetail?.sellerLandlordName || null,
+    seller_email:           document.getElementById('nl-seller-email').value.trim()   || nlFsDetail?.sellerParty1Email  || null,
+    seller_mailing_address: document.getElementById('nl-seller-mailing').value.trim() || null,
+    seller_city:            document.getElementById('nl-seller-city').value.trim()    || null,
+    seller_state:           document.getElementById('nl-seller-state').value.trim()   || null,
+    seller_zip:             document.getElementById('nl-seller-zip').value.trim()     || null,
   };
 
   try {
-    await POST('/daily-desk/transactions', body);
+    const txn = await POST('/daily-desk/transactions', body);
     closeNewModal();
     await renderAll();
+    if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
   } catch (e) {
     alert('Failed to save listing: ' + e.message);
   }
@@ -2979,6 +3012,24 @@ async function amChooseAction(key) {
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}'s Email</span>
           <input type="email" id="am-party-email" placeholder="Optional">
+        </div>
+      </div>
+      <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}'s Mailing Address</span>
+          <input type="text" id="am-party-mailing" placeholder="Street address">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
+          <input type="text" id="am-party-city" placeholder="City">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">State</span>
+          <input type="text" id="am-party-state" placeholder="FL" maxlength="2">
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
+          <input type="text" id="am-party-zip" placeholder="32174">
         </div>
       </div>
       <div id="am-foundation-section"></div>
@@ -3425,14 +3476,26 @@ async function amSubmit() {
     if (salePrice != null) fields.salePrice = salePrice;
     const closeDate = document.getElementById('am-close-date').value;
     if (closeDate) fields.closeDate = closeDate;
-    const partyName  = document.getElementById('am-party-name').value || null;
-    const partyEmail = document.getElementById('am-party-email').value || null;
+    const partyName    = document.getElementById('am-party-name').value || null;
+    const partyEmail   = document.getElementById('am-party-email').value || null;
+    const partyMailing = document.getElementById('am-party-mailing').value || null;
+    const partyCity    = document.getElementById('am-party-city').value || null;
+    const partyState   = document.getElementById('am-party-state').value || null;
+    const partyZip     = document.getElementById('am-party-zip').value || null;
     if (amState.kind === 'contract') {
-      fields.buyerName  = partyName;
-      fields.buyerEmail = partyEmail;
+      fields.buyerName           = partyName;
+      fields.buyerEmail          = partyEmail;
+      fields.buyerMailingAddress = partyMailing;
+      fields.buyerCity           = partyCity;
+      fields.buyerState          = partyState;
+      fields.buyerZip            = partyZip;
     } else {
-      fields.sellerName  = partyName;
-      fields.sellerEmail = partyEmail;
+      fields.sellerName           = partyName;
+      fields.sellerEmail          = partyEmail;
+      fields.sellerMailingAddress = partyMailing;
+      fields.sellerCity           = partyCity;
+      fields.sellerState          = partyState;
+      fields.sellerZip            = partyZip;
     }
     if (amFoundationDonors?.sellerSide) {
       fields.sellerGiftName    = document.getElementById('am-gift-seller-name')?.value || null;
@@ -3474,8 +3537,30 @@ async function amSubmit() {
 
   try {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, fields });
-    closeActionModal();
     await renderAll();
+    const printMap = {
+      closing:      { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
+      expired:      { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      withdrawn:    { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      fall_through: { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+    };
+    const formInfo = printMap[key];
+    if (formInfo) {
+      document.getElementById('actionModalBody').innerHTML = `
+        <div style="text-align:center; padding:32px 0;">
+          <div style="font-size:36px; margin-bottom:12px;">✓</div>
+          <div style="font-size:16px; font-weight:600; margin-bottom:6px;">Action Recorded</div>
+          <div style="font-size:12px; color:var(--text-muted); font-family:var(--mono); margin-bottom:28px;">${escapeHtml(amState.addr || '')}</div>
+          <a href="./${formInfo.page}?id=${amState.id}" target="_blank"
+             style="display:inline-block; padding:10px 22px; background:var(--accent); color:#fff; border-radius:var(--r); text-decoration:none; font-size:13px; font-family:var(--sans);">
+            Print ${formInfo.label}
+          </a>
+          <br>
+          <button onclick="closeActionModal()" style="margin-top:14px; padding:8px 20px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); font-size:12px; font-family:var(--sans); cursor:pointer;">Done</button>
+        </div>`;
+    } else {
+      closeActionModal();
+    }
   } catch (e) {
     alert('Failed to record action: ' + e.message);
   }
@@ -3693,6 +3778,7 @@ async function ncSaveAccContract() {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
     closeNewContractModal();
     await renderAll();
+    window.open(`./form-listing-contract.html?id=${listingId}`, '_blank');
   } catch (e) {
     alert('Failed to save contract: ' + e.message);
   }
@@ -3737,7 +3823,7 @@ async function ncSaveExternalContract() {
   const { split_pct: extSplitPct, co_agents: extCoAgents, splitError: extSplitErr } = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
   if (extSplitErr) { alert(extSplitErr); return; }
   try {
-    await POST('/daily-desk/contracts', {
+    const txn = await POST('/daily-desk/contracts', {
       property_address:    addr,
       city:                document.getElementById('nc-ext-city').value.trim() || null,
       listing_brokerage:   document.getElementById('nc-ext-list-brokerage').value.trim() || null,
@@ -3759,6 +3845,7 @@ async function ncSaveExternalContract() {
     });
     closeNewContractModal();
     await renderAll();
+    if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
   } catch (e) {
     alert('Failed to save contract: ' + e.message);
   }

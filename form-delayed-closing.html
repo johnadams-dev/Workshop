@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Delayed Contract Closings</title>
+  <style>
+    @page { size: letter; margin: 0.6in; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; }
+
+    .print-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 100;
+      padding: 8px 18px; background: #003366; color: #fff;
+      border: none; border-radius: 4px; font-size: 13px; cursor: pointer;
+    }
+    @media print { .print-btn { display: none !important; } }
+
+    .form-title {
+      text-align: center; font-size: 14pt; font-weight: bold;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px;
+    }
+    .company-line { text-align: center; font-size: 9pt; color: #444; margin-bottom: 14px; }
+
+    table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; font-size: 9pt; }
+    td.label {
+      background: #eee; font-weight: bold; font-size: 8pt;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap; width: 1%; padding-right: 8px;
+    }
+    td.val { min-width: 100px; }
+
+    .section-head {
+      background: #003366; color: #fff; font-weight: bold;
+      font-size: 9pt; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 4px 8px; margin-top: 10px; margin-bottom: 2px;
+    }
+
+    .status-badge {
+      display: inline-block; padding: 3px 10px;
+      border: 2px solid #003366; border-radius: 3px;
+      font-weight: bold; font-size: 10pt; letter-spacing: 0.06em;
+      color: #003366; text-transform: uppercase;
+    }
+
+    .history-table td { padding: 5px 8px; }
+
+    .notes-box {
+      border: 1px solid #000; min-height: 60px; padding: 6px;
+      font-size: 9pt; margin-bottom: 6px;
+    }
+
+    .sig-row { display: flex; gap: 24px; margin-top: 20px; }
+    .sig-block { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; }
+
+    .loading { text-align: center; padding: 60px; font-size: 14px; color: #666; }
+    .error   { text-align: center; padding: 60px; color: #c00; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">Print</button>
+  <div id="content"><div class="loading">Loading…</div></div>
+
+<script>
+const PROXY = 'https://us-central1-johnAdams-workshop.cloudfunctions.net/proxy/';
+
+async function load() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { document.getElementById('content').innerHTML = '<div class="error">No transaction ID in URL.</div>'; return; }
+
+  const user = JSON.parse(localStorage.getItem('acc_user') || 'null');
+  const email = user?.email || '';
+  const headers = { 'Content-Type': 'application/json', 'x-user-email': email };
+
+  try {
+    const res = await fetch(PROXY + `api/forms/transaction/${encodeURIComponent(id)}`, { headers });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+function fmt(v) { return v || ''; }
+function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; }
+function fmtDate(v) { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
+function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
+
+const STATUS_LABEL = {
+  expired:       'Expired',
+  withdrawn:     'Withdrawn',
+  fall_through:  'Contract Fall-Through',
+  active_listing:'Active',
+  under_contract:'Under Contract',
+  closed:        'Closed',
+};
+
+function row2(l1, v1, l2, v2) {
+  return `<tr>
+    <td class="label">${l1}</td><td class="val">${v1 || '&nbsp;'}</td>
+    <td class="label">${l2}</td><td class="val">${v2 || '&nbsp;'}</td>
+  </tr>`;
+}
+
+function render({ transaction: t, mls_number, listing_agent, buyers_agent, closing_event }) {
+  const la = listing_agent;
+  const ba = buyers_agent;
+  const statusLabel = STATUS_LABEL[t.status] || fmt(t.status);
+
+  document.getElementById('content').innerHTML = `
+    <div class="form-title">Delayed Contract Closings</div>
+    <div class="company-line">Adams, Cameron &amp; Co. — Internal Record</div>
+
+    <table style="margin-bottom:14px;">
+      <tr>
+        <td class="label">Status</td>
+        <td class="val"><span class="status-badge">${statusLabel}</span></td>
+        <td class="label">Date</td>
+        <td class="val">${fmtDate(new Date().toISOString().slice(0,10))}</td>
+      </tr>
+    </table>
+
+    <div class="section-head">Property</div>
+    <table>
+      ${row2('Address', fmt(t.property_address), 'City', fmt(t.city))}
+      ${row2('MLS Number', fmt(mls_number), 'Office', fmt(t.office_name))}
+      ${row2('List Price / Contract Price', fmtMoney(t.current_price), 'List Date', fmtDate(t.list_date))}
+      ${row2('Expiration Date', fmtDate(t.expiration_date), '', '')}
+    </table>
+
+    <div class="section-head">Seller</div>
+    <table>
+      ${row2('Name', fmt(t.seller_name), 'Email', fmt(t.seller_email))}
+      ${row2('Mailing Address', fmt(t.seller_mailing_address), 'City / State / Zip', [t.seller_city, t.seller_state, t.seller_zip].filter(Boolean).join(', '))}
+    </table>
+
+    <div class="section-head">Buyer</div>
+    <table>
+      ${row2('Name', fmt(t.buyer_name), 'Email', fmt(t.buyer_email))}
+      ${row2('Mailing Address', fmt(t.buyer_mailing_address), 'City / State / Zip', [t.buyer_city, t.buyer_state, t.buyer_zip].filter(Boolean).join(', '))}
+    </table>
+
+    <div class="section-head">Agents</div>
+    <table>
+      ${row2('Listing Agent', agentName(la), 'NRDS ID', fmt(la?.nrds_id))}
+      ${row2("Buyer's Agent", agentName(ba), 'NRDS ID', fmt(ba?.nrds_id))}
+    </table>
+
+    <div class="section-head">Commission</div>
+    <table>
+      ${row2('Total Commission %', t.commission_rate != null ? t.commission_rate + '%' : '', 'Co-Op Commission %', t.cooperating_commission != null ? t.cooperating_commission + '%' : '')}
+    </table>
+
+    <div class="section-head">Extension / Cancellation Details</div>
+    <table>
+      <tr><td class="label">Reason</td><td colspan="3" class="val">&nbsp;</td></tr>
+      <tr><td class="label">New Close Date (if extension)</td><td class="val">&nbsp;</td><td class="label">Extension #</td><td class="val">&nbsp;</td></tr>
+      <tr><td class="label">Title Company</td><td class="val">${fmt(closing_event?.title_company)}</td><td class="label">Mortgage Company</td><td class="val">${fmt(closing_event?.mortgage_company)}</td></tr>
+    </table>
+
+    <div class="section-head">Notes</div>
+    <div class="notes-box">&nbsp;</div>
+
+    <div class="sig-row">
+      <div class="sig-block">Coordinator Signature</div>
+      <div class="sig-block">Date</div>
+      <div class="sig-block">Manager / Broker Signature</div>
+      <div class="sig-block">Date</div>
+    </div>
+  `;
+}
+
+load();
+</script>
+</body>
+</html>
