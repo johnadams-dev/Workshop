@@ -734,6 +734,7 @@ tbody tr.clickable { cursor: pointer; }
 
 /* ── Caravan print styles ── */
 @media print {
+  html, body { background: #fff !important; }
   body > .shell { display: none !important; }
   .cv-toast { display: none !important; }
   .cv-print-page { display: block !important; page-break-after: always; break-after: page; width: 100%; min-height: 100vh; padding: 0.6in 0.65in; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 10.5pt; color: #000; background: #fff; box-sizing: border-box; position: relative; }
@@ -3363,7 +3364,9 @@ async function amSubmit() {
       cvToast('⏳', 'Looking up listing…');
       try {
         const listing = await cvFetchListing(mlsId);
-        cvQueue.push({ ...listing, entryInstructions, agentComments, caravanDate });
+        const item = { ...listing, entryInstructions, agentComments, caravanDate };
+        cvQueue.push(item);
+        cvSaveItemToDB(item);
         cvRenderQueue();
         cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
         cvSendNotify(listing.addr || listing.fullAddr, listing.city, caravanDate);
@@ -3373,7 +3376,7 @@ async function amSubmit() {
     } else {
       const addr = amState.addr || '';
       const city = txn?.city || '';
-      cvQueue.push({
+      const item = {
         mlsId: '', addr, city,
         state: 'FL', zip: '', fullAddr: addr,
         propType: 'Residential', beds: '', baths: '', sqft: '',
@@ -3382,7 +3385,9 @@ async function amSubmit() {
         yearBuilt: '', garageAttached: '', garageSize: '', pool: '',
         lotDisplay: '', listDate: '', subdivision: '', cooling: '', heating: '',
         entryInstructions, agentComments, caravanDate, _raw: {},
-      });
+      };
+      cvQueue.push(item);
+      cvSaveItemToDB(item);
       cvRenderQueue();
       cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
       cvSendNotify(addr, city, caravanDate);
@@ -4667,8 +4672,10 @@ function cvAddToQueue() {
   const entry         = document.getElementById('cv-res-entry').value.trim();
   const agentComments = document.getElementById('cv-res-agent-comments').value.trim();
   const caravanDate   = document.getElementById('cv-date').value;
-  cvQueue.push({ ...cvPendingListing, entryInstructions: entry, agentComments, caravanDate });
+  const item = { ...cvPendingListing, entryInstructions: entry, agentComments, caravanDate };
+  cvQueue.push(item);
   cvRenderQueue();
+  cvSaveItemToDB(item);
   cvClear();
   cvToast('✓', 'Added ' + (cvPendingListing.addr || 'listing') + ' to caravan.');
   cvSendNotify(cvPendingListing.addr || cvPendingListing.fullAddr, cvPendingListing.city, caravanDate);
@@ -4676,6 +4683,12 @@ function cvAddToQueue() {
 }
 
 function cvRemove(idx) {
+  const item = cvQueue[idx];
+  if (item?._dbId) {
+    fetch(`${PROXY}/daily-desk/caravan-items/${item._dbId}`, {
+      method: 'DELETE', headers: cvHeaders(),
+    }).catch(e => console.warn('[caravan] delete failed:', e.message));
+  }
   cvQueue.splice(idx, 1);
   cvRenderQueue();
 }
@@ -4815,6 +4828,7 @@ async function cvBuildPrintPages(indices) {
   const total = indices.length;
   for (const idx of indices) {
     const item    = cvQueue[idx];
+    await cvEnrichItem(item); // fetch MLS detail if this item was loaded from DB
     const order   = idx + 1;
     const dataUrl = await cvFetchPhotoAsDataUrl(item.photoUrl);
     const photoHtml = dataUrl
@@ -4918,10 +4932,12 @@ async function cvSaveSession() {
     caravan_date: date,
     listings: cvQueue.map((item, i) => ({
       sort_order:         i + 1,
-      mls_id:             item.mlsId,
-      address:            item.addr || item.fullAddr,
-      price:              item.price,
+      mls_id:             item.mlsId             || null,
+      address:            item.addr              || item.fullAddr,
+      city:               item.city              || null,
+      price:              item.price             || null,
       entry_instructions: item.entryInstructions || null,
+      agent_comments:     item.agentComments     || null,
     })),
   };
   try {
@@ -4947,16 +4963,97 @@ async function cvSaveSession() {
   }
 }
 
-// ── Init: default caravan date to next Tuesday ──
+// ── Init: default caravan date to next Tuesday, then load from DB ──
 function cvInitDate() {
   const el = document.getElementById('cv-date');
-  if (!el || el.value) return;
-  const today  = new Date();
-  const daysUntilTuesday = (2 - today.getDay() + 7) % 7 || 7;
-  const tuesday = new Date(today);
-  tuesday.setDate(today.getDate() + daysUntilTuesday);
-  el.valueAsDate = tuesday;
-  el.addEventListener('change', cvRenderQueue);
+  if (!el) return;
+  if (!el.value) {
+    const today = new Date();
+    const daysUntilTuesday = (2 - today.getDay() + 7) % 7 || 7;
+    const tuesday = new Date(today);
+    tuesday.setDate(today.getDate() + daysUntilTuesday);
+    el.valueAsDate = tuesday;
+  }
+  el.addEventListener('change', () => { cvLoadFromDB(el.value); });
+  cvLoadFromDB(el.value);
+}
+
+// ── Load caravan queue from DB for a given date ──
+async function cvLoadFromDB(date) {
+  if (!date) return;
+  try {
+    const r = await fetch(`${PROXY}/daily-desk/caravan-items?date=${encodeURIComponent(date)}`, {
+      headers: cvHeaders(),
+    });
+    if (!r.ok) return;
+    const rows = await r.json();
+    // Merge: keep local items not yet in DB (no _dbId), replace the rest
+    const localOnly = cvQueue.filter(i => !i._dbId);
+    cvQueue.length = 0;
+    for (const row of rows) {
+      cvQueue.push({
+        _dbId:             row.id,
+        mlsId:             row.mls_id  || '',
+        addr:              row.address || '',
+        fullAddr:          row.address || '',
+        city:              row.city    || '',
+        price:             row.price   || '',
+        entryInstructions: row.entry_instructions || '',
+        agentComments:     row.agent_comments     || '',
+        caravanDate:       date,
+        // MLS detail fields populated on-demand at print time via cvEnrichItem()
+        beds: '', baths: '', sqft: '', propType: '', remarks: '',
+        photoUrl: '', agent: '', agentPhone: '', yearBuilt: '',
+        garageAttached: '', garageSize: '', pool: '', lotDisplay: '',
+        listDate: '', subdivision: '', cooling: '', heating: '', _raw: {},
+      });
+    }
+    // Re-append unsaved local items
+    for (const item of localOnly) cvQueue.push(item);
+    cvRenderQueue();
+  } catch (e) {
+    console.warn('[caravan] load from DB failed:', e.message);
+  }
+}
+
+// ── Persist a single item to DB; sets item._dbId ──
+async function cvSaveItemToDB(item) {
+  try {
+    const r = await fetch(`${PROXY}/daily-desk/caravan-items`, {
+      method:  'POST',
+      headers: { ...cvHeaders(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        date:               item.caravanDate || document.getElementById('cv-date').value,
+        mls_id:             item.mlsId      || null,
+        address:            item.addr       || item.fullAddr || '',
+        city:               item.city       || null,
+        price:              item.price      || null,
+        entry_instructions: item.entryInstructions || null,
+        agent_comments:     item.agentComments     || null,
+        sort_order:         cvQueue.indexOf(item),
+      }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      item._dbId = data.id;
+    }
+  } catch (e) {
+    console.warn('[caravan] save item to DB failed:', e.message);
+  }
+}
+
+// ── Enrich a DB-loaded item with live MLS data (called at print time) ──
+async function cvEnrichItem(item) {
+  if (!item.mlsId || item.beds !== '') return; // already enriched or no MLS#
+  try {
+    const listing = await cvFetchListing(item.mlsId);
+    Object.assign(item, listing, {
+      _dbId:             item._dbId,
+      entryInstructions: item.entryInstructions,
+      agentComments:     item.agentComments,
+      caravanDate:       item.caravanDate,
+    });
+  } catch (_) { /* print with whatever data we have */ }
 }
 
 // ── Toast ──
