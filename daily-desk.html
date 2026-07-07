@@ -1170,6 +1170,12 @@ tbody tr.clickable { cursor: pointer; }
                 <div class="cv-field-label">Caravan Date</div>
                 <input type="date" id="cv-date">
               </div>
+              <div class="cv-field" id="cv-past-wrap" style="display:none;">
+                <div class="cv-field-label">Past Caravans</div>
+                <select id="cv-past-sessions" onchange="cvSelectPastSession(this.value)" style="width:100%;padding:6px 8px;background:var(--ink-light);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-size:12px;">
+                  <option value="">— select a previous date —</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1217,18 +1223,6 @@ tbody tr.clickable { cursor: pointer; }
             </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-head"><div class="panel-title">Log Session</div></div>
-            <div class="panel-body">
-              <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px; line-height:1.6;">
-                Records that this caravan was scheduled. No feedback is collected — agents leave the printed sheets at the property.
-              </p>
-              <button class="btn btn-ghost" style="width:100%;" onclick="cvSaveSession()" id="cv-save-btn">
-                💾 Log This Caravan
-              </button>
-              <div id="cv-save-status" style="font-size:12px; color:var(--text-muted); margin-top:8px; display:none;"></div>
-            </div>
-          </div>
 
         </div><!-- /left -->
 
@@ -4903,8 +4897,8 @@ async function cvBuildPrintPages(indices) {
       <div class="pp-rating-section">
         <div class="pp-rating-title">Agent Feedback</div>
         <div>${ratingGridHtml}</div>
-        <div class="pp-comment-label" style="margin-top:10pt;">Comments</div>
-        <div class="pp-comments-big">${Array(10).fill('<div class="pp-comment-line"></div>').join('')}</div>
+        <div class="pp-comment-label" style="margin-top:8pt;">Comments</div>
+        <div class="pp-comments-big" style="gap:4pt;margin-bottom:6pt;">${Array(5).fill('<div class="pp-comment-line"></div>').join('')}</div>
         <div class="pp-rb-row">
           <div class="pp-comment-label" style="margin-bottom:0;white-space:nowrap;">Reviewed By</div>
           <div class="pp-rb-line"></div>
@@ -4976,6 +4970,34 @@ function cvInitDate() {
   }
   el.addEventListener('change', () => { cvLoadFromDB(el.value); });
   cvLoadFromDB(el.value);
+  cvLoadPastSessions();
+}
+
+async function cvLoadPastSessions() {
+  try {
+    const r = await fetch(`${PROXY}/daily-desk/caravan-sessions`, { headers: cvHeaders() });
+    if (!r.ok) return;
+    const rows = await r.json();
+    if (!rows.length) return;
+    const sel  = document.getElementById('cv-past-sessions');
+    const wrap = document.getElementById('cv-past-wrap');
+    sel.innerHTML = '<option value="">— select a previous date —</option>'
+      + rows.map(row => {
+          const label = fmtDate(row.caravan_date) + ' (' + row.item_count + ' propert' + (row.item_count == 1 ? 'y' : 'ies') + ')';
+          return `<option value="${row.caravan_date}">${label}</option>`;
+        }).join('');
+    wrap.style.display = '';
+  } catch (e) {
+    console.warn('[caravan] load past sessions failed:', e.message);
+  }
+}
+
+function cvSelectPastSession(date) {
+  if (!date) return;
+  const el = document.getElementById('cv-date');
+  if (el) el.value = date;
+  cvLoadFromDB(date);
+  document.getElementById('cv-past-sessions').value = '';
 }
 
 // ── Load caravan queue from DB for a given date ──
