@@ -824,7 +824,7 @@ tbody tr.clickable { cursor: pointer; }
   body.print-reports .content { padding: 0; max-width: 100%; }
   body.print-reports #page-reports { padding: 0.6in 0.65in; }
   body.print-reports #page-reports > .section-head, body.print-reports #page-reports .report-card { display: none; }
-  body.print-reports[data-print-target="eom"] #eom-card, body.print-reports[data-print-target="exp"] #exp-card { display: block !important; border: none; background: #fff; color: #000; }
+  body.print-reports[data-print-target="eom"] #eom-card, body.print-reports[data-print-target="exp"] #exp-card, body.print-reports[data-print-target="don"] #don-card { display: block !important; border: none; background: #fff; color: #000; }
   body.print-reports #page-reports .report-card-head .btn, body.print-reports #page-reports .controls { display: none !important; }
   body.print-reports #page-reports .report-card-head { padding-bottom: 8pt; border-bottom: 1pt solid #ccc; margin-bottom: 12pt; }
   body.print-reports #page-reports .office-section { page-break-inside: avoid; }
@@ -1341,6 +1341,20 @@ tbody tr.clickable { cursor: pointer; }
             </div>
           </div>
           <div id="exp-output"></div>
+        </div>
+      </div>
+
+      <div class="report-card" id="don-card">
+        <div class="report-card-head">
+          <div class="report-card-icon">🤝</div>
+          <div>
+            <div class="report-card-title">Active Donations</div>
+            <div class="report-card-desc">Current foundation donation commitments by agent.</div>
+          </div>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint('don')">🖨 Print</button>
+        </div>
+        <div class="report-card-body">
+          <div id="don-output"><div class="report-loading">Loading…</div></div>
         </div>
       </div>
 
@@ -5133,6 +5147,7 @@ function rptInit() {
   document.getElementById('eom-month').value = prev.toISOString().slice(0, 7);
 
   rptLoadExpiring();
+  rptLoadDonations();
 }
 
 function rptPrint(which) {
@@ -5300,6 +5315,50 @@ function rptRenderExpiring(rows, days) {
             <td>${rptStatusChip(r.status)}</td>
           </tr>`;
         }).join('')}</tbody>
+      </table></div>
+    </div>`;
+  });
+  return `<div class="report-output">${html}</div>`;
+}
+
+async function rptLoadDonations() {
+  const out = document.getElementById('don-output');
+  out.innerHTML = '<div class="report-loading">Loading…</div>';
+  try {
+    const rows = await GET('/daily-desk/report/donations');
+    out.innerHTML = rptRenderDonations(rows);
+  } catch (e) {
+    out.innerHTML = `<div class="report-error">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function rptRenderDonations(rows) {
+  if (!rows.length) return `<div class="empty-state">No active donation commitments found.</div>`;
+
+  const fmtAmount = r => {
+    if (r.fixed_amount != null)    return '$' + Number(r.fixed_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (r.percentage_rate != null) return Number(r.percentage_rate).toFixed(2) + '%';
+    return '—';
+  };
+
+  const byType = new Map();
+  rows.forEach(r => {
+    const k = r.donation_type || 'Other';
+    if (!byType.has(k)) byType.set(k, []);
+    byType.get(k).push(r);
+  });
+
+  let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;font-family:var(--mono);">${rows.length} active commitment${rows.length !== 1 ? 's' : ''}</div>`;
+  byType.forEach((typeRows, typeName) => {
+    html += `<div class="office-section">
+      <div class="office-header">${escapeHtml(typeName)} <span style="font-weight:400;color:var(--text-muted)">${typeRows.length} agent${typeRows.length !== 1 ? 's' : ''}</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Agent</th><th>Amount / Rate</th><th>Effective Date</th></tr></thead>
+        <tbody>${typeRows.map(r => `<tr>
+          <td>${escapeHtml(r.first_name + ' ' + r.last_name)}</td>
+          <td class="td-mono">${fmtAmount(r)}</td>
+          <td class="td-mono">${fmtDate(r.effective_date)}</td>
+        </tr>`).join('')}</tbody>
       </table></div>
     </div>`;
   });
