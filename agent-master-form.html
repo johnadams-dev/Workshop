@@ -525,6 +525,7 @@ async function load() {
 
 // ── List ─────────────────────────────────────────────────────────────────────
 const ini = a => ((a.first_name||'?')[0]+(a.last_name||'?')[0]).toUpperCase();
+const agentPhoto = a => a.photo_url || (a.dmg_id ? `https://www.adamscameron.com/Homes/Images/Agent/${a.dmg_id}/Photo.jpg` : null);
 const match = (a,q) => !q || [a.first_name,a.last_name,a.email,a.office,a.pp_id,a.dmg_id,a.nrds_id].some(v => (v||'').toLowerCase().includes(q.toLowerCase()));
 
 function setFilter(f, btn) {
@@ -552,7 +553,8 @@ function filterList() {
   el.innerHTML = list.map(a => {
     const ii = issues(a), hasissue = a.active && ii.length>0;
     const cls = ['agent-item', currentId===a.id?'selected':'', hasissue?'has-issues':'', !a.active?'inactive':''].filter(Boolean).join(' ');
-    const ph = a.photo_url ? `<img src="${a.photo_url}" alt="" onerror="this.style.display='none'">` : ini(a);
+    const _ph = agentPhoto(a);
+    const ph = _ph ? `<img src="${_ph}" alt="" onerror="this.style.display='none'">` : ini(a);
 
     // Status dots: blue=dmg, orange=pp, green=nrds, grey=inactive, red=issue
     const dots = [
@@ -610,7 +612,7 @@ function renderDetail(a) {
     <!-- Header -->
     <div class="agent-header">
       <div class="photo-wrap">
-        <div class="photo-lg" id="aph-${a.id}">${a.photo_url?`<img src="${a.photo_url}" alt="" onerror="this.style.display='none'">`:(ini(a))}</div>
+        <div class="photo-lg" id="aph-${a.id}">${(ph=>ph?`<img src="${ph}" alt="" onerror="this.style.display='none'">`:(ini(a)))(agentPhoto(a))}</div>
       </div>
       <div class="header-info">
         <div class="header-name">${a.first_name} ${a.last_name}</div>
@@ -913,12 +915,6 @@ async function runRecon(agentId, dmgId, agentData) {
     const dnPhoto   = dn.PhotoURL || null;
     const dnDesig   = dn.Designation || null;
     const dnWebsite = dn.WebsiteURL || null;
-    // Update photo if DeltaNet has one and DB doesn't
-    if (dnPhoto) {
-      const phEl = document.getElementById(`aph-${agentId}`);
-      if (phEl && !a.photo_url) phEl.innerHTML = `<img src="${dnPhoto}" alt="" onerror="this.style.display='none'">`;
-    }
-
     // Build reconciliation rows with DeltaNet data
     const dbName   = `${a.first_name||''} ${a.last_name||''}`.trim();
     const dbPhone  = fmtPhone(a.cell_e164) || a.cell_raw || null;
@@ -937,7 +933,7 @@ async function runRecon(agentId, dmgId, agentData) {
       reconRow('Website',        a.website||null,           dnWebsite,               null,  false, false, v => (v||'').replace(/^https?:\/\//i,'').replace(/\/$/,'')),
       reconRow('Active',         a.active?'Yes':'No',       dnActive,                gActive),
       reconRow('Bio',            data.bio?'Present':'—',    data.bio?'Present':null, null),
-      reconRow('Photo',          null,                      dnPhoto?'Present':null,  null,  false, false, v=>v, true),
+      reconRow('Photo',          a.dmg_id?'Derived from dmg_id':null, dnPhoto?'Present':null, null, false, false, v=>v, true),
       reconRow('Last Google sign-in', null,                 null,                    gSignIn, false, true, v=>v, true),
     ];
 
