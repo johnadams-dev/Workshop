@@ -969,8 +969,10 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         push('Insurance Evidence Due', titleDate < floodDate ? titleDate : floodDate,
             'Earlier of title commitment or flood determination');
 
-        push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
-            '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
+        if (!isCash) {
+            push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
+                '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
+        }
 
         const walkDate = new Date(closingDate);
         walkDate.setDate(walkDate.getDate() - 1);
