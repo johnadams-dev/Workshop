@@ -1816,6 +1816,36 @@ tbody tr.clickable { cursor: pointer; }
   </div>
 </div>
 
+<!-- ═══ NOTICE CARAVAN MODAL ═══ -->
+<div class="modal-overlay" id="noticeCaravanModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <div class="modal-title">Add to Caravan</div>
+      <button class="modal-close" onclick="closeNoticeCaravanModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="ncm-addr" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Caravan Date</span>
+        <input type="date" id="ncm-date" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Entry / Showing Instructions</span>
+        <textarea id="ncm-entry" rows="3" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;" placeholder="e.g. Vacant — combo lockbox on front door: 4821"></textarea>
+        <span style="font-size:11px;color:var(--text-dim);">How agents get in. Not on DeltaNet — enter it here.</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Listing Agent Comments <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(optional)</span></span>
+        <textarea id="ncm-comments" rows="2" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;" placeholder="e.g. New roof 2023. Motivated seller."></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="padding:16px 22px;border-top:1px solid var(--ink-border);justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeNoticeCaravanModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmNoticeCaravan()">Add to Caravan</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ DELTANET MATCH MODAL ═══ -->
 <!-- Start Tracking modal -->
 <div class="modal-overlay" id="startTrackingModal">
@@ -4219,7 +4249,10 @@ function renderNoticesUpcoming(rows) {
       <td>${r.has_agreement ? '<span style="color:var(--status-active)">Yes</span>' : '<span style="color:var(--text-muted)">No</span>'}</td>
       <td>${contact}</td>
       <td style="font-size:11px;color:var(--text-muted)">${exp}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="removeNotice('upcoming',${r.id})">Remove</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px" onclick="openNoticeCaravan(${r.id})">Caravan</button>
+        <button class="btn btn-ghost btn-sm" onclick="removeNotice('upcoming',${r.id})">Remove</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -5101,6 +5134,74 @@ function cvToast(ico, msg) {
   t.classList.add('on');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('on'), 3200);
+}
+
+/* ── Notice → Caravan ── */
+let _noticeCaravanId = null;
+
+function openNoticeCaravan(id) {
+  const notice = STATE.noticesUpcoming.find(n => n.id === id);
+  if (!notice) return;
+  _noticeCaravanId = id;
+
+  const addrLabel = notice.has_agreement
+    ? [notice.address, notice.city].filter(Boolean).join(', ')
+    : (notice.city || '');
+  document.getElementById('ncm-addr').textContent = addrLabel ? `Upcoming Listing: ${addrLabel}` : 'Upcoming Listing';
+
+  // Pre-fill caravan date from the caravan tab date field if already set
+  const cvDateEl = document.getElementById('cv-date');
+  document.getElementById('ncm-date').value = cvDateEl?.value || '';
+  document.getElementById('ncm-entry').value = '';
+  document.getElementById('ncm-comments').value = '';
+
+  document.getElementById('noticeCaravanModal').classList.add('open');
+  document.getElementById('ncm-date').focus();
+}
+
+function closeNoticeCaravanModal() {
+  document.getElementById('noticeCaravanModal').classList.remove('open');
+  _noticeCaravanId = null;
+}
+
+function confirmNoticeCaravan() {
+  const caravanDate        = document.getElementById('ncm-date').value.trim();
+  const entryInstructions  = document.getElementById('ncm-entry').value.trim();
+  const agentComments      = document.getElementById('ncm-comments').value.trim();
+
+  if (!caravanDate) {
+    alert('Please enter a caravan date.');
+    document.getElementById('ncm-date').focus();
+    return;
+  }
+
+  const notice = STATE.noticesUpcoming.find(n => n.id === _noticeCaravanId);
+  if (!notice) { closeNoticeCaravanModal(); return; }
+
+  const addr = notice.address || '';
+  const city = notice.city    || '';
+
+  // Prevent duplicates by address+date
+  if (cvQueue.some(i => i.addr === addr && i.caravanDate === caravanDate && addr)) {
+    cvToast('⚠', 'This listing is already in the caravan queue for that date.');
+    closeNoticeCaravanModal();
+    return;
+  }
+
+  cvQueue.push({
+    addr,
+    city,
+    entryInstructions,
+    agentComments,
+    caravanDate,
+    agent: notice.agent_name || '',
+    _raw: notice,
+    _fromNotice: true,
+  });
+  cvRenderQueue();
+  cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
+  cvSendNotify(addr || city, city, caravanDate);
+  closeNoticeCaravanModal();
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
