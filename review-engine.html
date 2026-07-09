@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review Engine · Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --ink:        #0d1117;
+  --ink-mid:    #161b22;
+  --ink-light:  #21262d;
+  --ink-border: #30363d;
+  --amber:      #d29922;
+  --amber-bg:   rgba(210,153,34,.12);
+  --green:      #3fb950;
+  --green-bg:   rgba(63,185,80,.1);
+  --red:        #f85149;
+  --red-bg:     rgba(248,81,73,.1);
+  --blue:       #58a6ff;
+  --blue-bg:    rgba(88,166,255,.1);
+  --text:       #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim:   #484f58;
+  --mono:       'IBM Plex Mono', monospace;
+  --sans:       'IBM Plex Sans', sans-serif;
+  --r:          6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Auth gate ── */
+#auth-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1.5rem;
+}
+#auth-gate h1 { font-size: 1.4rem; color: var(--amber); }
+#auth-gate p  { color: var(--text-muted); font-size: 0.9rem; }
+
+/* ── Topbar ── */
+.topbar {
+  background: var(--ink-mid);
+  border-bottom: 1px solid var(--ink-border);
+  padding: 0 1.5rem;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.topbar-title { font-size: 0.85rem; font-weight: 600; letter-spacing: .05em; color: var(--text-muted); }
+.topbar-title span { color: var(--amber); }
+.topbar-back { font-size: 0.8rem; color: var(--text-muted); text-decoration: none; }
+.topbar-back:hover { color: var(--text); }
+
+/* ── Tabs ── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--ink-border);
+  background: var(--ink-mid);
+  padding: 0 1.5rem;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.75rem 1.25rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+/* ── Content area ── */
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Section header ── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.section-header h2 { font-size: 1rem; font-weight: 600; }
+
+/* ── Table ── */
+.tbl-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+th {
+  background: var(--ink-light);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--ink-border);
+  white-space: nowrap;
+}
+td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--ink-border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 100px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: .03em;
+}
+.badge-green  { background: var(--green-bg);  color: var(--green); }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber); }
+.badge-red    { background: var(--red-bg);    color: var(--red); }
+.badge-blue   { background: var(--blue-bg);   color: var(--blue); }
+.badge-dim    { background: var(--ink-light); color: var(--text-muted); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--r);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: .8; }
+.btn-amber { background: var(--amber); color: #000; }
+.btn-ghost { background: var(--ink-light); color: var(--text); border: 1px solid var(--ink-border); }
+.btn-sm { padding: 0.25rem 0.65rem; font-size: 0.75rem; }
+
+/* ── Filters ── */
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.filters input, .filters select {
+  background: var(--ink-light);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 0.4rem 0.75rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+/* ── Template editor ── */
+.campaign-card {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  margin-bottom: 1.5rem;
+}
+.campaign-card-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--ink-border);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.step-card {
+  border-bottom: 1px solid var(--ink-border);
+  padding: 1rem;
+}
+.step-card:last-child { border-bottom: none; }
+.step-label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+.template-editor { margin-top: 0.75rem; }
+.field-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
+.tpl-input {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+}
+.tpl-textarea {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  font: var(--mono);
+  font-size: 0.78rem;
+  resize: vertical;
+  min-height: 180px;
+  margin-bottom: 0.5rem;
+}
+.merge-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+}
+.from-select {
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 0.35rem 0.6rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+/* ── Rate highlight ── */
+.rate-low  { color: var(--amber); }
+.rate-ok   { color: var(--green); }
+
+/* ── Loading ── */
+.loading { color: var(--text-dim); font-size: 0.82rem; padding: 2rem; text-align: center; }
+
+/* ── Confirm modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--ink-mid);
+  border: 1px solid var(--ink-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: 340px;
+}
+.modal-box h3 { margin-bottom: 0.75rem; font-size: 1rem; }
+.modal-box label { font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; margin-top: 0.75rem; }
+.modal-box select, .modal-box input {
+  width: 100%;
+  background: var(--ink);
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 0.45rem 0.7rem;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+.modal-btn-row { display: flex; gap: 0.5rem; margin-top: 1.25rem; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<!-- Auth gate -->
+<div id="auth-gate">
+  <h1>Review Engine</h1>
+  <p>Sign in with your Adams Cameron account to continue.</p>
+  <div id="g-signin-btn"></div>
+</div>
+
+<!-- App (hidden until auth) -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <span class="topbar-title">Review <span>Engine</span></span>
+    <a href="index.html" class="topbar-back">← Workshop</a>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('funnel')">Funnel</button>
+    <button class="tab-btn" onclick="switchTab('recipients')">Recipients</button>
+    <button class="tab-btn" onclick="switchTab('variants')">A/B Tests</button>
+    <button class="tab-btn" onclick="switchTab('campaigns')">Campaigns</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ── Funnel tab ── -->
+    <div id="tab-funnel" class="tab-panel active">
+      <div class="section-header">
+        <h2>Monthly Funnel</h2>
+        <span style="font-size:0.78rem;color:var(--text-muted)">Target: 15% review rate</span>
+      </div>
+      <div class="tbl-wrap">
+        <table id="funnel-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Recipients</th>
+              <th>Clicked</th>
+              <th>Reviewed</th>
+              <th>Review Rate</th>
+            </tr>
+          </thead>
+          <tbody id="funnel-body"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Recipients tab ── -->
+    <div id="tab-recipients" class="tab-panel">
+      <div class="section-header">
+        <h2>Recipients</h2>
+      </div>
+      <div class="filters">
+        <input type="text" id="filter-agent" placeholder="Filter by agent name" oninput="loadRecipients()">
+        <input type="month" id="filter-month" onchange="loadRecipients()">
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Agent</th>
+              <th>Close Date</th>
+              <th>Side</th>
+              <th>Sent</th>
+              <th>Clicked</th>
+              <th>Reviewed</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="recipients-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── A/B tab ── -->
+    <div id="tab-variants" class="tab-panel">
+      <div class="section-header"><h2>A/B Variant Performance</h2></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Variant</th>
+              <th>Sent</th>
+              <th>Clicked</th>
+              <th>Reviewed</th>
+              <th>Review Rate</th>
+            </tr>
+          </thead>
+          <tbody id="variants-body"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Campaigns tab ── -->
+    <div id="tab-campaigns" class="tab-panel">
+      <div class="section-header">
+        <h2>Campaign Templates</h2>
+        <button class="btn btn-amber btn-sm" onclick="seedCampaign()">Seed Initial Data</button>
+      </div>
+      <p class="merge-hint" style="margin-bottom:1rem">
+        Merge fields: <code>{{customer_name}}</code> <code>{{agent_name}}</code>
+        <code>{{google_link}}</code> <code>{{facebook_link}}</code>
+        <code>{{zillow_link}}</code> <code>{{reply_link}}</code>
+      </p>
+      <div id="campaigns-body"><div class="loading">Loading…</div></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- Confirm-reviewed modal -->
+<div id="confirm-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Mark as Reviewed</h3>
+    <label>Platform</label>
+    <select id="confirm-platform">
+      <option value="google">Google</option>
+      <option value="facebook">Facebook</option>
+      <option value="zillow">Zillow</option>
+    </select>
+    <label>Rating (optional)</label>
+    <input type="number" id="confirm-rating" min="1" max="5" placeholder="1–5">
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="closeConfirmModal()">Cancel</button>
+      <button class="btn btn-amber btn-sm" onclick="submitConfirm()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+let proxyKey  = "";
+let userEmail = "";
+let _pendingConfirmRecipientId = null;
+
+// ── Auth ────────────────────────────────────────────────────────────────────────
+
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail = payload.email || "";
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Use your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+
+    // Check manager role
+    if (localStorage.getItem("ac_is_manager") !== "1") {
+      const mr = await fetch(`${PROXY}/auth/is-manager`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ idToken: response.credential }),
+      });
+      const md = await mr.json();
+      if (!md.isManager) {
+        alert("This tool requires manager or admin access.");
+        window.location.href = "index.html";
+        return;
+      }
+      localStorage.setItem("ac_is_manager", "1");
+    }
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "block";
+    initApp();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+// ── API helpers ─────────────────────────────────────────────────────────────────
+
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+const GET  = (path)       => api(path);
+const POST = (path, body) => api(path, { method: "POST", body: JSON.stringify(body) });
+const PUT  = (path, body) => api(path, { method: "PUT",  body: JSON.stringify(body) });
+
+function esc(str) {
+  if (str == null) return "";
+  return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function fmtMonth(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────────
+
+const TAB_LOADERS = {
+  funnel:     loadFunnel,
+  recipients: loadRecipients,
+  variants:   loadVariants,
+  campaigns:  loadCampaigns,
+};
+const _loaded = {};
+
+function switchTab(name) {
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`tab-${name}`).classList.add("active");
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    if (b.textContent.toLowerCase().includes(name === "variants" ? "a/b" : name)) b.classList.add("active");
+  });
+  if (!_loaded[name]) { _loaded[name] = true; TAB_LOADERS[name](); }
+}
+
+function initApp() {
+  loadFunnel();
+  _loaded.funnel = true;
+}
+
+// ── Funnel tab ──────────────────────────────────────────────────────────────────
+
+async function loadFunnel() {
+  const tbody = document.getElementById("funnel-body");
+  try {
+    const rows = await GET("/review/funnel");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="loading">No data yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const rate = parseFloat(r.review_rate_pct) || 0;
+      const rateCls = rate >= 15 ? "rate-ok" : rate > 0 ? "rate-low" : "";
+      const rateStr = rate > 0 ? `${rate.toFixed(1)}%` : "—";
+      return `<tr>
+        <td>${fmtMonth(r.month)}</td>
+        <td>${r.recipients}</td>
+        <td>${r.clicked}</td>
+        <td>${r.reviewed}</td>
+        <td class="${rateCls}">${rateStr}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+  }
+}
+
+// ── Recipients tab ──────────────────────────────────────────────────────────────
+
+async function loadRecipients() {
+  const tbody = document.getElementById("recipients-body");
+  tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
+  try {
+    const agent = document.getElementById("filter-agent").value.trim();
+    const month = document.getElementById("filter-month").value;
+    let qs = "?limit=100";
+    if (agent) qs += `&agent=${encodeURIComponent(agent)}`;
+    if (month) qs += `&month=${encodeURIComponent(month + "-01")}`;
+    const rows = await GET(`/review/recipients${qs}`);
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="8" class="loading">No recipients found.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const clickBadge   = r.ever_clicked ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
+      const reviewBadge  = r.reviewed     ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
+      const confirmBtn   = r.reviewed ? "" : `<button class="btn btn-ghost btn-sm" onclick="openConfirmModal('${esc(r.recipient_id)}')">Mark Reviewed</button>`;
+      return `<tr>
+        <td>${esc(r.customer_name)}</td>
+        <td>${esc(r.agent_name || "—")}</td>
+        <td>${fmtDate(r.close_date)}</td>
+        <td><span class="badge badge-${r.transaction_side === 'buyer' ? 'blue' : 'amber'}">${esc(r.transaction_side)}</span></td>
+        <td>${r.touches_sent || 0}</td>
+        <td>${clickBadge}</td>
+        <td>${reviewBadge}</td>
+        <td>${confirmBtn}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+  }
+}
+
+function clearFilters() {
+  document.getElementById("filter-agent").value = "";
+  document.getElementById("filter-month").value = "";
+  loadRecipients();
+}
+
+// ── Variants tab ────────────────────────────────────────────────────────────────
+
+async function loadVariants() {
+  const tbody = document.getElementById("variants-body");
+  try {
+    const rows = await GET("/review/variants");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="6" class="loading">No A/B data yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const rate = parseFloat(r.review_rate_pct) || 0;
+      const rateStr = rate > 0 ? `${rate.toFixed(1)}%` : "—";
+      return `<tr>
+        <td style="font-family:var(--mono);font-size:0.75rem;color:var(--text-muted)">${esc(r.step_id.slice(0,8))}…</td>
+        <td>${esc(r.variant_name)}</td>
+        <td>${r.sent_count}</td>
+        <td>${r.clicked_count}</td>
+        <td>${r.reviewed_count}</td>
+        <td>${rateStr}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+  }
+}
+
+// ── Campaigns tab ───────────────────────────────────────────────────────────────
+
+async function loadCampaigns() {
+  const container = document.getElementById("campaigns-body");
+  try {
+    const campaigns = await GET("/review/campaigns");
+    if (!campaigns.length) {
+      container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet. Click "Seed Initial Data" to create the default campaign.</p>`;
+      return;
+    }
+    container.innerHTML = campaigns.map(c => renderCampaign(c)).join("");
+  } catch (e) {
+    container.innerHTML = `<p style="color:var(--red)">${esc(e.message)}</p>`;
+  }
+}
+
+function renderCampaign(c) {
+  const statusBadge = c.is_active
+    ? `<span class="badge badge-green">Active</span>`
+    : `<span class="badge badge-dim">Inactive</span>`;
+  const steps = (c.steps || []).filter(Boolean);
+  return `<div class="campaign-card">
+    <div class="campaign-card-header">
+      ${esc(c.name)} ${statusBadge}
+    </div>
+    ${steps.map(s => renderStep(s)).join("")}
+  </div>`;
+}
+
+function renderStep(s) {
+  const templates = s.templates || [];
+  return `<div class="step-card">
+    <div class="step-label">
+      Day ${s.send_offset_days} • Step ${s.step_order} • ${s.channel.toUpperCase()}
+      ${s.skip_if_reviewed ? ' • <span style="color:var(--green-bg)">Skip if reviewed</span>' : ''}
+    </div>
+    ${templates.map(t => renderTemplateEditor(t)).join("")}
+  </div>`;
+}
+
+function renderTemplateEditor(t) {
+  const tid = esc(t.template_id);
+  const activeBadge = t.is_active
+    ? `<span class="badge badge-green" style="font-size:.68rem">Active</span>`
+    : `<span class="badge badge-dim" style="font-size:.68rem">Inactive</span>`;
+  return `<div class="template-editor" id="tpl-${tid}">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+      <span style="font-size:.75rem;color:var(--text-muted)">Variant: <strong>${esc(t.variant_name)}</strong></span>
+      ${activeBadge}
+      <select class="from-select" id="from-${tid}" onchange="markDirty('${tid}')">
+        <option value="brokerage" ${t.from_name_mode === 'brokerage' ? 'selected' : ''}>From: Adams Cameron & Co.</option>
+        <option value="agent"     ${t.from_name_mode === 'agent'     ? 'selected' : ''}>From: Agent Name</option>
+      </select>
+    </div>
+    <label class="field-label">Subject</label>
+    <input  class="tpl-input"    id="subj-${tid}" value="${esc(t.subject || '')}" oninput="markDirty('${tid}')">
+    <label class="field-label">Body</label>
+    <textarea class="tpl-textarea" id="body-${tid}" oninput="markDirty('${tid}')">${esc(t.body || '')}</textarea>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <button class="btn btn-amber btn-sm" id="save-${tid}" onclick="saveTemplate('${tid}')" disabled>Save</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleTemplateActive('${tid}', ${!t.is_active})">${t.is_active ? 'Deactivate' : 'Activate'}</button>
+    </div>
+  </div>`;
+}
+
+function markDirty(tid) {
+  const btn = document.getElementById(`save-${tid}`);
+  if (btn) btn.disabled = false;
+}
+
+async function saveTemplate(tid) {
+  const subject        = document.getElementById(`subj-${tid}`).value;
+  const body           = document.getElementById(`body-${tid}`).value;
+  const from_name_mode = document.getElementById(`from-${tid}`).value;
+  try {
+    await PUT(`/review/templates/${tid}`, { subject, body, from_name_mode });
+    const btn = document.getElementById(`save-${tid}`);
+    if (btn) { btn.disabled = true; btn.textContent = "Saved ✓"; setTimeout(() => { btn.textContent = "Save"; }, 2000); }
+  } catch (e) {
+    alert("Save failed: " + e.message);
+  }
+}
+
+async function toggleTemplateActive(tid, active) {
+  try {
+    await PUT(`/review/templates/${tid}`, { is_active: active });
+    loadCampaigns();
+  } catch (e) {
+    alert("Update failed: " + e.message);
+  }
+}
+
+async function seedCampaign() {
+  if (!confirm("Seed the default campaign data? This will fail if campaigns already exist.")) return;
+  try {
+    const r = await POST("/review/engine/seed", {});
+    alert(r.message || "Seeded successfully.");
+    _loaded.campaigns = false;
+    loadCampaigns();
+  } catch (e) {
+    alert("Seed failed: " + e.message);
+  }
+}
+
+// ── Confirm-reviewed modal ──────────────────────────────────────────────────────
+
+function openConfirmModal(recipientId) {
+  _pendingConfirmRecipientId = recipientId;
+  document.getElementById("confirm-rating").value = "";
+  document.getElementById("confirm-modal").classList.add("open");
+}
+
+function closeConfirmModal() {
+  _pendingConfirmRecipientId = null;
+  document.getElementById("confirm-modal").classList.remove("open");
+}
+
+async function submitConfirm() {
+  const platform = document.getElementById("confirm-platform").value;
+  const rating   = document.getElementById("confirm-rating").value;
+  try {
+    await POST("/review/confirm", {
+      recipientId: _pendingConfirmRecipientId,
+      platform,
+      rating: rating ? parseInt(rating) : null,
+    });
+    closeConfirmModal();
+    _loaded.recipients = false;
+    loadRecipients();
+    _loaded.funnel = false;
+    loadFunnel();
+  } catch (e) {
+    alert("Failed: " + e.message);
+  }
+}
+</script>
+</body>
+</html>
