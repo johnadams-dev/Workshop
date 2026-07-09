@@ -2660,6 +2660,7 @@ async function openNewModal() {
 }
 function closeNewModal() {
   document.getElementById('newListingModal').classList.remove('open');
+  _stDeltaListingId = null;
 }
 async function nlReset() {
   document.getElementById('nl-step-source').style.display = 'block';
@@ -2820,7 +2821,13 @@ async function nlSaveListing() {
   };
 
   try {
-    const txn = await POST('/daily-desk/transactions', body);
+    let txn;
+    if (_stDeltaListingId) {
+      txn = await POST('/daily-desk/start-tracking', { ...body, delta_listing_id: _stDeltaListingId });
+      _stDeltaListingId = null;
+    } else {
+      txn = await POST('/daily-desk/transactions', body);
+    }
     closeNewModal();
     await renderAll();
     if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
@@ -2844,13 +2851,13 @@ const LISTING_ACTIONS = {
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed (recorded directly from Active).' },
     { key: 'expired',                icon: '⏳', title: 'Expired',                desc: "Listing's term ended without a sale." },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Seller is pulling the listing early.' },
-    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   under_contract: [
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
     { key: 'fall_through',           icon: '↩',  title: 'Fall Through',           desc: 'Contract fell through — listing returns to Active.' },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Pull the listing off market (can be returned to Active).' },
-    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   withdrawn: [
     { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
@@ -2858,7 +2865,7 @@ const LISTING_ACTIONS = {
   closed: [
     { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
     { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
-    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
 };
 
@@ -2867,12 +2874,12 @@ const CONTRACT_ACTIONS = {
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Contract fell through.' },
     { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Extend closing date or update buyer\'s agent.' },
-    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   closed: [
     { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
     { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
-    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
 };
 
@@ -4214,28 +4221,43 @@ async function startTracking(deltaListingId) {
   if (!row) return;
   _stDeltaListingId = deltaListingId;
 
-  document.getElementById('st-address').textContent = row.address || deltaListingId;
+  await openNewModal();   // resets all fields and loads agents
+  nlShowManualForm();     // skip the source-selection step
 
-  // Populate agent select with all agents, pre-select matched agent
-  const stSel = document.getElementById('st-agent');
-  const agents = await loadAllAgents();
-  stSel.innerHTML = buildAgentOptions(agents);
-  if (row.agent_id) stSel.value = String(row.agent_id);
+  // Pre-fill property fields
+  document.getElementById('nl-addr').value = row.address || '';
+  document.getElementById('nl-city').value = row.city    || '';
+  if (row.price_asking != null)
+    document.getElementById('nl-price').value = row.price_asking;
+  if (row.list_date)
+    document.getElementById('nl-list-date').value = row.list_date;
+  if (row.expiration_date)
+    document.getElementById('nl-exp-date').value  = row.expiration_date;
 
-  // Reset co-agent area
-  const stArea = document.getElementById('st-coagent-area');
-  stArea.style.display = 'none';
-  document.getElementById('st-coagent-btn').textContent = '+ co‑agent';
+  // Pre-fill agent
+  if (row.agent_id)
+    document.getElementById('nl-agent').value = String(row.agent_id);
 
-  // Pre-populate co-agent if DeltaNet supplied one
-  if (row.co_agent_id || row.co_agent_name) {
-    await stToggleCoAgent();
-    if (row.co_agent_id) {
-      document.getElementById('st-coagent-sel').value = String(row.co_agent_id);
-    }
+  // Pre-fill MLS IDs
+  if (row.mls_ids && row.mls_ids.length) {
+    const wrap = document.getElementById('nl-mls-wrap');
+    wrap.innerHTML = row.mls_ids.map((id, i) =>
+      i === 0
+        ? `<input type="text" class="nl-mls-id" placeholder="MLS # (optional)" value="${escapeHtml(String(id))}">`
+        : `<div style="display:flex; gap:6px; align-items:center;">` +
+            `<input type="text" class="nl-mls-id" placeholder="MLS #" style="flex:1;" value="${escapeHtml(String(id))}">` +
+            `<span style="cursor:pointer; color:var(--text-dim); font-size:16px; line-height:1;" onclick="this.parentNode.remove()">×</span>` +
+          `</div>`
+    ).join('');
   }
 
-  document.getElementById('startTrackingModal').classList.add('open');
+  // Pre-fill co-agent if DeltaNet supplied one
+  if (row.co_agent_id || row.co_agent_name) {
+    document.getElementById('nl-coagent-area').style.display = 'block';
+    document.getElementById('nl-coagent-btn').textContent = '− co‑agent';
+    if (row.co_agent_id)
+      document.getElementById('nl-coagent-sel').value = String(row.co_agent_id);
+  }
 }
 
 function closeStartTrackingModal() {
