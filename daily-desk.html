@@ -1816,6 +1816,66 @@ tbody tr.clickable { cursor: pointer; }
   </div>
 </div>
 
+<!-- ═══ FIELD CORRECTION MODAL ═══ -->
+<div class="modal-overlay" id="fieldCorrectionModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title">Correct a Field</div>
+      <button class="modal-close" onclick="closeFieldCorrectionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="fc-addr" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Field to Correct</span>
+        <select id="fc-field" onchange="fcPopulateCurrent()" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+          <option value="">— Select a field —</option>
+          <optgroup label="Property">
+            <option value="property_address">Property Address</option>
+            <option value="city">City</option>
+          </optgroup>
+          <optgroup label="Seller / Landlord">
+            <option value="seller_name">Seller Name</option>
+            <option value="seller_email">Seller Email</option>
+            <option value="seller_mailing_address">Seller Mailing Address</option>
+            <option value="seller_city">Seller City</option>
+            <option value="seller_state">Seller State</option>
+            <option value="seller_zip">Seller Zip</option>
+          </optgroup>
+          <optgroup label="Buyer / Tenant">
+            <option value="buyer_name">Buyer Name</option>
+            <option value="buyer_email">Buyer Email</option>
+            <option value="buyer_mailing_address">Buyer Mailing Address</option>
+            <option value="buyer_city">Buyer City</option>
+            <option value="buyer_state">Buyer State</option>
+            <option value="buyer_zip">Buyer Zip</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="source_of_seller">Source of Seller</option>
+            <option value="source_of_buyer">Source of Buyer</option>
+            <option value="notes">Notes</option>
+          </optgroup>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Current Value</span>
+        <div id="fc-current" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);font-family:var(--sans);font-size:13px;min-height:36px;"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Corrected Value</span>
+        <input type="text" id="fc-new-value" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Reason <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(required)</span></span>
+        <input type="text" id="fc-reason" placeholder="e.g. Spelling error on intake form" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+    </div>
+    <div class="btn-row" style="padding:16px 22px;border-top:1px solid var(--ink-border);justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeFieldCorrectionModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="submitFieldCorrection()">Save Correction</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ NOTICE CARAVAN MODAL ═══ -->
 <div class="modal-overlay" id="noticeCaravanModal">
   <div class="modal" style="max-width:460px">
@@ -2002,6 +2062,10 @@ tbody tr.clickable { cursor: pointer; }
 
     <div class="divider">Activity</div>
     <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;" id="drawer-activity">
+    </div>
+
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--ink-border);">
+      <button class="btn btn-ghost btn-sm" id="drawer-correct-btn" onclick="openFieldCorrection()">✏ Correct a Field</button>
     </div>
 
   </div>
@@ -4295,7 +4359,12 @@ async function removeNotice(type, id) {
 }
 
 /* ── Transaction detail drawer ── */
+let _currentDrawerTxnId   = null;
+let _currentDrawerTxnData = null;
+
 async function openDrawer(id) {
+  _currentDrawerTxnId   = id;
+  _currentDrawerTxnData = null;
   document.getElementById('drawerOverlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawerAddr').textContent = 'Loading…';
@@ -4305,6 +4374,7 @@ async function openDrawer(id) {
 
   try {
     const t = await GET(`/daily-desk/transactions/${id}`);
+    _currentDrawerTxnData = t;
     renderDrawer(t);
   } catch (e) {
     document.getElementById('drawerAddr').textContent = 'Error loading transaction';
@@ -4397,9 +4467,16 @@ function renderDrawer(t) {
 
   const actEl = document.getElementById('drawer-activity');
   const events = t.events || [];
-  actEl.innerHTML = events.length ? events.map(ev =>
-    `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`
-  ).join('') : '<div>No activity recorded.</div>';
+  actEl.innerHTML = events.length ? events.map(ev => {
+    if (ev.event_type === 'field_correction') {
+      try {
+        const c = JSON.parse(ev.notes || '{}');
+        const label = FC_FIELD_LABELS[c.field] || c.field;
+        return `<div><strong>${fmtDate(ev.event_date || ev.submitted_at)}</strong> — ✏ <em>${escapeHtml(label)}</em> corrected: "${escapeHtml(c.old)}" → "${escapeHtml(c.new)}"<br><span style="color:var(--text-dim);font-size:11px;">Reason: ${escapeHtml(c.reason)}</span></div>`;
+      } catch { /* fall through */ }
+    }
+    return `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`;
+  }).join('') : '<div>No activity recorded.</div>';
 }
 
 function closeDrawer() {
@@ -5134,6 +5211,80 @@ function cvToast(ico, msg) {
   t.classList.add('on');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('on'), 3200);
+}
+
+/* ── Field Corrections ── */
+const FC_FIELD_LABELS = {
+  property_address:      'Property Address',
+  city:                  'City',
+  seller_name:           'Seller Name',
+  seller_email:          'Seller Email',
+  seller_mailing_address:'Seller Mailing Address',
+  seller_city:           'Seller City',
+  seller_state:          'Seller State',
+  seller_zip:            'Seller Zip',
+  buyer_name:            'Buyer Name',
+  buyer_email:           'Buyer Email',
+  buyer_mailing_address: 'Buyer Mailing Address',
+  buyer_city:            'Buyer City',
+  buyer_state:           'Buyer State',
+  buyer_zip:             'Buyer Zip',
+  source_of_seller:      'Source of Seller',
+  source_of_buyer:       'Source of Buyer',
+  notes:                 'Notes',
+};
+
+let _fcTxnId   = null;
+let _fcTxnData = null;
+
+function openFieldCorrection() {
+  const drawer = document.getElementById('drawer');
+  if (!drawer.classList.contains('open')) return;
+  // _currentDrawerTxnId is set by openDrawer()
+  _fcTxnId   = _currentDrawerTxnId;
+  _fcTxnData = _currentDrawerTxnData;
+  if (!_fcTxnId || !_fcTxnData) return;
+
+  document.getElementById('fc-addr').textContent =
+    [_fcTxnData.property_address, _fcTxnData.city].filter(Boolean).join(', ') || '';
+  document.getElementById('fc-field').value    = '';
+  document.getElementById('fc-current').textContent = '';
+  document.getElementById('fc-new-value').value = '';
+  document.getElementById('fc-reason').value    = '';
+  document.getElementById('fieldCorrectionModal').classList.add('open');
+}
+
+function fcPopulateCurrent() {
+  const field = document.getElementById('fc-field').value;
+  const val   = field && _fcTxnData ? (_fcTxnData[field] ?? '') : '';
+  document.getElementById('fc-current').textContent = val || '(blank)';
+  document.getElementById('fc-new-value').value = val || '';
+  document.getElementById('fc-new-value').focus();
+}
+
+function closeFieldCorrectionModal() {
+  document.getElementById('fieldCorrectionModal').classList.remove('open');
+  _fcTxnId   = null;
+  _fcTxnData = null;
+}
+
+async function submitFieldCorrection() {
+  const fieldName = document.getElementById('fc-field').value;
+  const newValue  = document.getElementById('fc-new-value').value.trim();
+  const reason    = document.getElementById('fc-reason').value.trim();
+
+  if (!fieldName) { alert('Please select a field to correct.'); return; }
+  if (!reason)    { alert('A reason is required.'); document.getElementById('fc-reason').focus(); return; }
+
+  try {
+    await POST(`/daily-desk/transactions/${_fcTxnId}/field-correction`, { fieldName, newValue, reason });
+    closeFieldCorrectionModal();
+    cvToast('✓', 'Correction saved.');
+    // Refresh the drawer so the activity log shows the new event
+    await openDrawer(_currentDrawerTxnId);
+  } catch (e) {
+    alert('Error saving correction: ' + e.message);
+  }
 }
 
 /* ── Notice → Caravan ── */
