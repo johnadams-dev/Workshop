@@ -2082,9 +2082,9 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 /* ═══════════════════════════════════════════════════════════════════
    AUTH STATE
 ═══════════════════════════════════════════════════════════════════ */
-let userEmail   = "";
-let userDisplay = "";
-let proxyKey    = "";
+let userEmail   = localStorage.getItem('dd_user_email')   || "";
+let userDisplay = localStorage.getItem('dd_user_display') || userEmail;
+let proxyKey    = sessionStorage.getItem('dd_proxy_key')  || "";
 
 let STATE = {
   listings:          [],
@@ -2099,6 +2099,12 @@ let STATE = {
 /* ═══════════════════════════════════════════════════════════════════
    GOOGLE SIGN-IN
 ═══════════════════════════════════════════════════════════════════ */
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display       = "grid";
+  window.addEventListener("load", init);
+}
+
 window.addEventListener("load", () => {
   google.accounts.id.initialize({
     client_id:             GOOGLE_CLIENT_ID,
@@ -2118,7 +2124,8 @@ async function handleGoogleSignIn(response) {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail   = payload.email || "";
     userDisplay = payload.name  || userEmail;
-    localStorage.setItem('dd_user_email', userEmail);
+    localStorage.setItem('dd_user_email',   userEmail);
+    localStorage.setItem('dd_user_display', userDisplay);
   } catch { userEmail = ""; }
 
   try {
@@ -2133,6 +2140,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
+    sessionStorage.setItem('dd_proxy_key', proxyKey);
 
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display       = "grid";
