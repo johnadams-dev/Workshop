@@ -403,34 +403,59 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div id="tab-settings" class="tab-panel">
       <div class="section-header"><h2>Review Link Settings</h2></div>
       <p style="color:var(--muted);margin-bottom:1.5rem;font-size:.93rem">
-        These are the destination URLs customers land on after clicking a review link.
-        Each link in the email passes through a tracking redirect first, so you can
-        change these URLs at any time without re-sending emails.
+        Links in emails pass through a tracking redirect before reaching these destinations,
+        so you can update URLs at any time without re-sending.
       </p>
-      <div id="settings-form" style="max-width:640px;display:flex;flex-direction:column;gap:1.2rem">
+
+      <div id="settings-form" style="max-width:680px;display:flex;flex-direction:column;gap:1.6rem">
+
+        <!-- Facebook / Zillow -->
+        <div style="display:flex;flex-direction:column;gap:.9rem">
+          <div>
+            <label style="display:block;font-weight:600;margin-bottom:.3rem">Facebook Reviews URL</label>
+            <input id="setting-facebook" type="url" class="edit-input" style="width:100%"
+                   placeholder="https://www.facebook.com/adamscameron/reviews/…">
+          </div>
+          <div>
+            <label style="display:block;font-weight:600;margin-bottom:.3rem">Zillow Reviews URL</label>
+            <input id="setting-zillow" type="url" class="edit-input" style="width:100%"
+                   placeholder="https://www.zillow.com/profile/AdamsCameronandCo#reviews">
+          </div>
+        </div>
+
+        <!-- Google per-office -->
         <div>
-          <label style="display:block;font-weight:600;margin-bottom:.35rem">Google Review URL</label>
-          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .4rem">
-            Use the "Write a review" link from your Google Business Profile dashboard —
-            it looks like <code>https://g.page/r/…/review</code> or
-            <code>https://search.google.com/local/writereview?placeid=…</code>.
-            The generic business.google.com URL only works for logged-in owners.
+          <h3 style="font-size:1rem;margin:0 0 .35rem">Google Review URLs by Office</h3>
+          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+            Use the <em>Write a review</em> link from each office's Google Business Profile —
+            looks like <code>https://g.page/r/…/review</code>.
+            Leave blank for virtual or unlisted offices; they'll use the fallback below.
           </p>
-          <input id="setting-google" type="url" class="edit-input" style="width:100%"
+          <table style="width:100%;border-collapse:collapse" id="office-google-table">
+            <thead>
+              <tr style="text-align:left;border-bottom:1px solid var(--border)">
+                <th style="padding:.4rem .5rem;font-size:.85rem;color:var(--muted);width:36%">Office</th>
+                <th style="padding:.4rem .5rem;font-size:.85rem;color:var(--muted)">Google Review URL</th>
+              </tr>
+            </thead>
+            <tbody id="office-google-body">
+              <tr><td colspan="2" class="loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Global Google fallback -->
+        <div>
+          <label style="display:block;font-weight:600;margin-bottom:.3rem">
+            Google Fallback URL
+            <span style="font-weight:400;font-size:.85rem;color:var(--muted)">— used when an office has no specific link</span>
+          </label>
+          <input id="setting-google-fallback" type="url" class="edit-input" style="width:100%"
                  placeholder="https://g.page/r/YOUR_PLACE_ID/review">
         </div>
+
         <div>
-          <label style="display:block;font-weight:600;margin-bottom:.35rem">Facebook Reviews URL</label>
-          <input id="setting-facebook" type="url" class="edit-input" style="width:100%"
-                 placeholder="https://www.facebook.com/adamscameron/reviews/…">
-        </div>
-        <div>
-          <label style="display:block;font-weight:600;margin-bottom:.35rem">Zillow Reviews URL</label>
-          <input id="setting-zillow" type="url" class="edit-input" style="width:100%"
-                 placeholder="https://www.zillow.com/profile/AdamsCameronandCo#reviews">
-        </div>
-        <div>
-          <button class="btn btn-amber" onclick="saveSettings()">Save URLs</button>
+          <button class="btn btn-amber" onclick="saveSettings()">Save All Settings</button>
           <span id="settings-status" style="margin-left:1rem;font-size:.9rem;color:var(--muted)"></span>
         </div>
       </div>
@@ -792,9 +817,25 @@ async function seedCampaign() {
 async function loadSettings() {
   try {
     const data = await GET("/review/settings");
-    document.getElementById("setting-google").value   = data.urls.google   || "";
-    document.getElementById("setting-facebook").value = data.urls.facebook || "";
-    document.getElementById("setting-zillow").value   = data.urls.zillow   || "";
+    document.getElementById("setting-facebook").value       = data.facebook        || "";
+    document.getElementById("setting-zillow").value         = data.zillow          || "";
+    document.getElementById("setting-google-fallback").value = data.google_fallback || "";
+
+    const tbody = document.getElementById("office-google-body");
+    if (!data.offices || !data.offices.length) {
+      tbody.innerHTML = `<tr><td colspan="2" style="color:var(--muted);padding:.5rem">No offices found.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.offices.map(o => `
+      <tr>
+        <td style="padding:.4rem .5rem;font-size:.9rem">${esc(o.name)}</td>
+        <td style="padding:.4rem .5rem">
+          <input type="url" class="edit-input" style="width:100%"
+                 data-office-id="${o.id}"
+                 value="${esc(o.google_review_url || '')}"
+                 placeholder="https://g.page/r/…/review">
+        </td>
+      </tr>`).join("");
   } catch (e) {
     document.getElementById("settings-status").textContent = "Failed to load: " + e.message;
   }
@@ -802,12 +843,20 @@ async function loadSettings() {
 
 async function saveSettings() {
   const status = document.getElementById("settings-status");
+  status.style.color = "";
   status.textContent = "Saving…";
+
+  const officeGoogleUrls = {};
+  document.querySelectorAll("[data-office-id]").forEach(inp => {
+    officeGoogleUrls[inp.dataset.officeId] = inp.value.trim() || null;
+  });
+
   try {
     await PUT("/review/settings", {
-      google:   document.getElementById("setting-google").value.trim()   || null,
-      facebook: document.getElementById("setting-facebook").value.trim() || null,
-      zillow:   document.getElementById("setting-zillow").value.trim()   || null,
+      google_fallback: document.getElementById("setting-google-fallback").value.trim() || null,
+      facebook:        document.getElementById("setting-facebook").value.trim()        || null,
+      zillow:          document.getElementById("setting-zillow").value.trim()          || null,
+      officeGoogleUrls,
     });
     status.style.color = "var(--green, #2d7a3a)";
     status.textContent = "Saved.";
