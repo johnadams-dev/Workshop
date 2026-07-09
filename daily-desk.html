@@ -3135,33 +3135,21 @@ async function amLoadFoundationDonors() {
   let html = `<div style="border:1px solid var(--ink-border); border-radius:var(--r); padding:12px 14px; background:rgba(16,185,129,0.06); margin-bottom:14px;">
     <div style="font-size:11px; font-weight:600; color:#065F46; margin-bottom:10px; letter-spacing:.02em;">Adams Cameron Foundation</div>`;
   if (sellerAgents.length) {
-    const defaultName = amState.kind !== 'contract'
-      ? escapeHtml(document.getElementById('am-party-name')?.value || '') : '';
     html += `
     <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Seller-side donor${sellerAgents.length > 1 ? 's' : ''}: ${sellerAgents.map(a => escapeHtml(a.agent_name)).join(', ')}</div>
-    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:${buyerAgents.length ? '14px' : '0'};">
+    <div class="form-row" style="display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:${buyerAgents.length ? '14px' : '0'};">
       <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Seller Name</span>
-        <input type="text" id="am-gift-seller-name" value="${defaultName}" placeholder="Full name">
-      </div>
-      <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Seller Address</span>
+        <span class="field-label" style="${lblStyle}">Seller Mailing Address (for gift letter)</span>
         <input type="text" id="am-gift-seller-addr" placeholder="Mailing address">
       </div>
     </div>`;
   }
   if (buyerAgents.length) {
-    const defaultName = amState.kind === 'contract'
-      ? escapeHtml(document.getElementById('am-party-name')?.value || '') : '';
     html += `
     <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Buyer-side donor${buyerAgents.length > 1 ? 's' : ''}: ${buyerAgents.map(a => escapeHtml(a.agent_name)).join(', ')}</div>
-    <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+    <div class="form-row" style="display:grid; grid-template-columns:1fr; gap:14px;">
       <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Buyer Name</span>
-        <input type="text" id="am-gift-buyer-name" value="${defaultName}" placeholder="Full name">
-      </div>
-      <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Buyer Address</span>
+        <span class="field-label" style="${lblStyle}">Buyer Mailing Address (for gift letter)</span>
         <input type="text" id="am-gift-buyer-addr" placeholder="Mailing address">
       </div>
     </div>`;
@@ -3512,11 +3500,11 @@ async function amSubmit() {
       fields.sellerZip            = partyZip;
     }
     if (amFoundationDonors?.sellerSide) {
-      fields.sellerGiftName    = document.getElementById('am-gift-seller-name')?.value || null;
+      fields.sellerGiftName    = partyName;
       fields.sellerGiftAddress = document.getElementById('am-gift-seller-addr')?.value || null;
     }
     if (amFoundationDonors?.buyerSide) {
-      fields.buyerGiftName    = document.getElementById('am-gift-buyer-name')?.value || null;
+      fields.buyerGiftName    = partyName;
       fields.buyerGiftAddress = document.getElementById('am-gift-buyer-addr')?.value || null;
     }
     fields.titleCompany    = document.getElementById('am-title-company').value || null;

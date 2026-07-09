@@ -1278,8 +1278,8 @@ function renderRosterTable(records) {
     return;
   }
   tbody.innerHTML = records.map((r, i) => {
-    const d = new Date(r.event_date + 'T00:00:00');
-    const dateStr = `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    const [yr, mo, dy] = String(r.event_date).slice(0, 10).split('-').map(Number);
+    const dateStr = `${MONTHS[mo - 1]} ${dy}, ${yr}`;
     const isHire = r.event_type === 'hired';
     const typeBadge = isHire
       ? `<span style="background:#e8f7ee;color:#2d7a50;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600">Hired</span>`
