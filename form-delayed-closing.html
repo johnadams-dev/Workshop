@@ -63,18 +63,17 @@
   <div id="content"><div class="loading">Loading…</div></div>
 
 <script>
-const PROXY = 'https://us-central1-johnAdams-workshop.cloudfunctions.net/proxy/';
+const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
 
 async function load() {
   const id = new URLSearchParams(location.search).get('id');
   if (!id) { document.getElementById('content').innerHTML = '<div class="error">No transaction ID in URL.</div>'; return; }
 
-  const user = JSON.parse(localStorage.getItem('acc_user') || 'null');
-  const email = user?.email || '';
+  const email = localStorage.getItem('dd_user_email') || '';
   const headers = { 'Content-Type': 'application/json', 'x-user-email': email };
 
   try {
-    const res = await fetch(PROXY + `api/forms/transaction/${encodeURIComponent(id)}`, { headers });
+    const res = await fetch(PROXY + `/api/forms/transaction/${encodeURIComponent(id)}`, { headers });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
     const data = await res.json();
     render(data);
