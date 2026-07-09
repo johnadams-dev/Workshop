@@ -1675,6 +1675,7 @@ tbody tr.clickable { cursor: pointer; }
             <select id="nc-acc-rep-type" onchange="ncUpdateAccRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
               <option value="in_house">In-House (Adams Cameron agent)</option>
               <option value="co_broke">Co-Broke (outside brokerage)</option>
+              <option value="fsbo">For Sale by Owner (FSBO)</option>
             </select>
           </div>
           <div id="nc-acc-rep-fields"></div>
@@ -3164,6 +3165,7 @@ async function amChooseAction(key) {
         <select id="am-rep-type" onchange="amUpdateRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
           <option value="in_house">In-House (Adams Cameron agent)</option>
           <option value="co_broke">Co-Broke (outside brokerage)</option>
+          <option value="fsbo">For Sale by Owner (FSBO)</option>
         </select>
       </div>
       <div id="am-rep-fields"></div>`;
@@ -3291,7 +3293,7 @@ function amUpdateRepFields() {
         <input type="text" id="am-source-of-buyer" placeholder="e.g. Sign call, referral, website">
       </div>`;
     amLoadBuyerAgents();
-  } else {
+  } else if (repType === 'co_broke') {
     el.innerHTML = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3307,6 +3309,8 @@ function amUpdateRepFields() {
         <span class="field-label" style="${labelStyle}">Cooperating Agent Email</span>
         <input type="email" id="am-coop-email" placeholder="agent@brokerage.com">
       </div>`;
+  } else {
+    el.innerHTML = '';  // fsbo — no cooperating agent fields
   }
 }
 
@@ -3632,7 +3636,7 @@ async function amSubmit() {
         alert("Please select the buyer's agent.");
         return;
       }
-    } else {
+    } else if (repType === 'co_broke') {
       fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
       fields.cooperatingAgentName = document.getElementById('am-coop-agent').value || null;
       fields.cooperatingAgentEmail = document.getElementById('am-coop-email').value || null;
@@ -3641,6 +3645,7 @@ async function amSubmit() {
         return;
       }
     }
+    // fsbo: no additional fields needed
   }
 
   try {
@@ -3821,7 +3826,7 @@ function ncUpdateAccRepFields() {
         <input type="text" id="nc-acc-source" placeholder="e.g. sign call, referral">
       </div>`;
     ncLoadAccBuyerAgents();
-  } else {
+  } else if (repType === 'co_broke') {
     el.innerHTML = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3837,6 +3842,8 @@ function ncUpdateAccRepFields() {
         <span class="field-label" style="${lblStyle}">Cooperating Agent Email</span>
         <input type="email" id="nc-acc-coop-email" placeholder="agent@brokerage.com">
       </div>`;
+  } else {
+    el.innerHTML = '';  // fsbo — no cooperating agent fields
   }
 }
 
@@ -3873,7 +3880,7 @@ async function ncSaveAccContract() {
     if (accSplitErr) { alert(accSplitErr); return; }
     fields.splitPct  = accSplitPct;
     fields.coAgents  = accCoAgents;
-  } else {
+  } else if (repType === 'co_broke') {
     fields.cooperatingBrokerage = document.getElementById('nc-acc-coop-brokerage').value || null;
     fields.cooperatingAgentName = document.getElementById('nc-acc-coop-agent').value || null;
     fields.cooperatingAgentEmail = document.getElementById('nc-acc-coop-email').value || null;
@@ -3881,6 +3888,7 @@ async function ncSaveAccContract() {
       alert('Please enter the cooperating brokerage and agent.'); return;
     }
   }
+  // fsbo: no cooperating agent fields needed
 
   try {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
