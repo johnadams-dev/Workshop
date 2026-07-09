@@ -72,6 +72,12 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 .progress-bar{height:100%;background:#c9a84c;border-radius:4px;transition:width 1s ease}
 .progress-status{font-size:12px;color:#6b7280;margin-top:10px}
 
+/* ── Cooldown banner ── */
+.cooldown-banner{background:#fefce8;border:1px solid #fde047;border-left:4px solid #eab308;border-radius:8px;padding:13px 16px;margin-bottom:14px;display:none}
+.cooldown-banner.visible{display:block}
+.cooldown-title{font-size:13px;font-weight:700;color:#854d0e;margin-bottom:3px}
+.cooldown-body{font-size:12px;color:#92400e;line-height:1.55}
+
 /* ── Score dashboard ── */
 .score-header{display:flex;align-items:center;gap:22px;margin-bottom:22px;flex-wrap:wrap}
 .overall-ring{position:relative;flex-shrink:0}
@@ -227,6 +233,11 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
             <input type="text" id="f-ext-city" placeholder="Ormond Beach, FL">
           </div>
         </div>
+      </div>
+
+      <div id="cooldown-banner" class="cooldown-banner">
+        <div class="cooldown-title">⏳ Audit recently completed</div>
+        <div class="cooldown-body" id="cooldown-text"></div>
       </div>
 
       <div class="btn-row">
@@ -393,6 +404,7 @@ function setMode(m) {
   document.getElementById('tab-external').classList.toggle('active', m === 'external');
   document.getElementById('form-internal').style.display = m === 'internal' ? 'block' : 'none';
   document.getElementById('form-external').style.display = m === 'external' ? 'block' : 'none';
+  if (m === 'external') hideCooldownBanner();
 }
 
 // ── Load agents ───────────────────────────────────────────────────────────────
@@ -435,6 +447,37 @@ function onAgentChange() {
   const agent = allAgents.find(a => String(a.id) === agentId);
   const cityEl = document.getElementById('f-focus-city');
   cityEl.value = agent ? officeCityDefault(agent.office_name) : '';
+  hideCooldownBanner();
+  if (agentId) checkAuditCooldown(agentId);
+}
+
+const AUDIT_COOLDOWN_DAYS = 7;
+
+function hideCooldownBanner() {
+  document.getElementById('cooldown-banner').classList.remove('visible');
+}
+
+async function checkAuditCooldown(agentId) {
+  try {
+    const r = await fetch(`${PROXY}/api/audits/agent/${agentId}/history`, { headers: H() });
+    if (!r.ok) return;
+    const rows = await r.json();
+    const recent = rows.find(row => row.status === 'complete');
+    if (!recent) return;
+
+    const runAt  = new Date(recent.run_at);
+    const now    = new Date();
+    const daysSince = (now - runAt) / (1000 * 60 * 60 * 24);
+    if (daysSince >= AUDIT_COOLDOWN_DAYS) return;
+
+    const daysLeft = Math.ceil(AUDIT_COOLDOWN_DAYS - daysSince);
+    const runDateStr = runAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    document.getElementById('cooldown-text').textContent =
+      `The last audit for this agent was run on ${runDateStr} — ${Math.floor(daysSince)} day${Math.floor(daysSince) !== 1 ? 's' : ''} ago. ` +
+      `When you update a profile, bio, or photo, search engines and directories like Google, Zillow, and Realtor.com can take several days to re-index the changes. ` +
+      `For the most accurate results, wait until ${daysLeft} more day${daysLeft !== 1 ? 's' : ''} have passed before re-running.`;
+    document.getElementById('cooldown-banner').classList.add('visible');
+  } catch(e) { /* non-critical — silently ignore */ }
 }
 
 // ── Load audit list ───────────────────────────────────────────────────────────
@@ -455,6 +498,22 @@ async function loadAuditList() {
         <div class="audit-list-status status-${row.status}">${row.status}</div>
       </div>`).join('');
   } catch(e) { console.warn('loadAuditList:', e.message); }
+}
+
+// ── Error messaging ───────────────────────────────────────────────────────────
+function friendlyAuditError(raw) {
+  const s = String(raw || '').toLowerCase();
+  const isQuota = s.includes('credit') || s.includes('quota') || s.includes('billing') ||
+                  s.includes('usage limit') || s.includes('balance') ||
+                  s.includes('529') || s.includes('rate_limit') || s.includes('overloaded');
+  if (isQuota) {
+    return 'The AI behind these audits has reached its monthly usage limit. ' +
+           'Online presence audits are thorough — they involve dozens of searches and a detailed analysis — ' +
+           'so the budget can be used up quickly during busy periods. ' +
+           'The allowance resets automatically, so please check back in a day or two. ' +
+           'In the meantime, any profile updates you\'ve already made are still working their way across the internet.';
+  }
+  return raw;
 }
 
 // ── Run audit ─────────────────────────────────────────────────────────────────
@@ -478,6 +537,12 @@ async function runAudit() {
       externalCity:     city,
     };
     currentAgentId = null;
+  }
+
+  // Soft cooldown gate — warn but don't hard-block
+  if (document.getElementById('cooldown-banner').classList.contains('visible')) {
+    const proceed = confirm('This agent was audited recently and changes may not have propagated yet.\n\nRun the audit anyway?');
+    if (!proceed) return;
   }
 
   btn.disabled = true;
@@ -517,19 +582,23 @@ async function runAudit() {
       showView('report');
       loadAuditList();
     } else if (data.status === 'failed') {
-      document.getElementById('prog-icon').textContent = '❌';
-      document.getElementById('prog-title').textContent = 'Audit Failed';
-      document.getElementById('prog-sub').textContent = data.error_message || 'An error occurred.';
+      const msg = friendlyAuditError(data.error_message || 'An error occurred.');
+      const isQuota = msg !== data.error_message;
+      document.getElementById('prog-icon').textContent = isQuota ? '⏸' : '❌';
+      document.getElementById('prog-title').textContent = isQuota ? 'Audit Unavailable' : 'Audit Failed';
+      document.getElementById('prog-sub').textContent = msg;
     } else {
       // Unexpected status — fall back to polling
       startPolling(data.id);
     }
   } catch(e) {
     clearInterval(animTimer);
-    document.getElementById('prog-icon').textContent = '❌';
-    document.getElementById('prog-title').textContent = 'Failed to Start';
-    document.getElementById('prog-sub').textContent = e.message;
-    toast('Audit failed: '+e.message, 'err');
+    const msg = friendlyAuditError(e.message);
+    const isQuota = msg !== e.message;
+    document.getElementById('prog-icon').textContent = isQuota ? '⏸' : '❌';
+    document.getElementById('prog-title').textContent = isQuota ? 'Audit Unavailable' : 'Failed to Start';
+    document.getElementById('prog-sub').textContent = msg;
+    if (!isQuota) toast('Audit failed: ' + e.message, 'err');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Run Audit';
@@ -570,9 +639,11 @@ function startPolling(id) {
         setTimeout(() => { renderReport(data); showView('report'); loadAuditList(); }, 800);
       } else if (data.status === 'failed') {
         clearInterval(pollTimer);
-        document.getElementById('prog-icon').textContent = '❌';
-        document.getElementById('prog-title').textContent = 'Audit Failed';
-        document.getElementById('prog-sub').textContent = data.error_message || 'An error occurred.';
+        const msg = friendlyAuditError(data.error_message || 'An error occurred.');
+        const isQuota = msg !== (data.error_message || 'An error occurred.');
+        document.getElementById('prog-icon').textContent = isQuota ? '⏸' : '❌';
+        document.getElementById('prog-title').textContent = isQuota ? 'Audit Unavailable' : 'Audit Failed';
+        document.getElementById('prog-sub').textContent = msg;
       }
     } catch(e) { console.warn('poll:', e.message); }
   }, 4000);

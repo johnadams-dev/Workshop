@@ -1675,6 +1675,7 @@ tbody tr.clickable { cursor: pointer; }
             <select id="nc-acc-rep-type" onchange="ncUpdateAccRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
               <option value="in_house">In-House (Adams Cameron agent)</option>
               <option value="co_broke">Co-Broke (outside brokerage)</option>
+              <option value="fsbo">For Sale by Owner (FSBO)</option>
             </select>
           </div>
           <div id="nc-acc-rep-fields"></div>
@@ -1812,6 +1813,96 @@ tbody tr.clickable { cursor: pointer; }
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FIELD CORRECTION MODAL ═══ -->
+<div class="modal-overlay" id="fieldCorrectionModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title">Correct a Field</div>
+      <button class="modal-close" onclick="closeFieldCorrectionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="fc-addr" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Field to Correct</span>
+        <select id="fc-field" onchange="fcPopulateCurrent()" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+          <option value="">— Select a field —</option>
+          <optgroup label="Property">
+            <option value="property_address">Property Address</option>
+            <option value="city">City</option>
+          </optgroup>
+          <optgroup label="Seller / Landlord">
+            <option value="seller_name">Seller Name</option>
+            <option value="seller_email">Seller Email</option>
+            <option value="seller_mailing_address">Seller Mailing Address</option>
+            <option value="seller_city">Seller City</option>
+            <option value="seller_state">Seller State</option>
+            <option value="seller_zip">Seller Zip</option>
+          </optgroup>
+          <optgroup label="Buyer / Tenant">
+            <option value="buyer_name">Buyer Name</option>
+            <option value="buyer_email">Buyer Email</option>
+            <option value="buyer_mailing_address">Buyer Mailing Address</option>
+            <option value="buyer_city">Buyer City</option>
+            <option value="buyer_state">Buyer State</option>
+            <option value="buyer_zip">Buyer Zip</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="source_of_seller">Source of Seller</option>
+            <option value="source_of_buyer">Source of Buyer</option>
+            <option value="notes">Notes</option>
+          </optgroup>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Current Value</span>
+        <div id="fc-current" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);font-family:var(--sans);font-size:13px;min-height:36px;"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Corrected Value</span>
+        <input type="text" id="fc-new-value" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Reason <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(required)</span></span>
+        <input type="text" id="fc-reason" placeholder="e.g. Spelling error on intake form" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+    </div>
+    <div class="btn-row" style="padding:16px 22px;border-top:1px solid var(--ink-border);justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeFieldCorrectionModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="submitFieldCorrection()">Save Correction</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NOTICE CARAVAN MODAL ═══ -->
+<div class="modal-overlay" id="noticeCaravanModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <div class="modal-title">Add to Caravan</div>
+      <button class="modal-close" onclick="closeNoticeCaravanModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="ncm-addr" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Caravan Date</span>
+        <input type="date" id="ncm-date" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Entry / Showing Instructions</span>
+        <textarea id="ncm-entry" rows="3" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;" placeholder="e.g. Vacant — combo lockbox on front door: 4821"></textarea>
+        <span style="font-size:11px;color:var(--text-dim);">How agents get in. Not on DeltaNet — enter it here.</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Listing Agent Comments <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(optional)</span></span>
+        <textarea id="ncm-comments" rows="2" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;resize:vertical;" placeholder="e.g. New roof 2023. Motivated seller."></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="padding:16px 22px;border-top:1px solid var(--ink-border);justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeNoticeCaravanModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmNoticeCaravan()">Add to Caravan</button>
     </div>
   </div>
 </div>
@@ -1974,6 +2065,10 @@ tbody tr.clickable { cursor: pointer; }
     <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;" id="drawer-activity">
     </div>
 
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--ink-border);">
+      <button class="btn btn-ghost btn-sm" id="drawer-correct-btn" onclick="openFieldCorrection()">✏ Correct a Field</button>
+    </div>
+
   </div>
 </div>
 
@@ -2023,6 +2118,7 @@ async function handleGoogleSignIn(response) {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail   = payload.email || "";
     userDisplay = payload.name  || userEmail;
+    localStorage.setItem('dd_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -2564,6 +2660,7 @@ async function openNewModal() {
 }
 function closeNewModal() {
   document.getElementById('newListingModal').classList.remove('open');
+  _stDeltaListingId = null;
 }
 async function nlReset() {
   document.getElementById('nl-step-source').style.display = 'block';
@@ -2724,7 +2821,13 @@ async function nlSaveListing() {
   };
 
   try {
-    const txn = await POST('/daily-desk/transactions', body);
+    let txn;
+    if (_stDeltaListingId) {
+      txn = await POST('/daily-desk/start-tracking', { ...body, delta_listing_id: _stDeltaListingId });
+      _stDeltaListingId = null;
+    } else {
+      txn = await POST('/daily-desk/transactions', body);
+    }
     closeNewModal();
     await renderAll();
     if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
@@ -2742,31 +2845,41 @@ const LISTING_ACTIONS = {
     { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
   ],
   active: [
-    { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
-    { key: 'change',         icon: '✎', title: 'Change',          desc: 'Price change, extension, or other update.' },
-    { key: 'under_contract', icon: '🤝', title: 'Under Contract',  desc: 'A buyer has been found for this listing.' },
-    { key: 'closing',        icon: '🔑', title: 'Closing',         desc: 'The contract closed (recorded directly from Active).' },
-    { key: 'expired',        icon: '⏳', title: 'Expired',         desc: "Listing's term ended without a sale." },
-    { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',       desc: 'Seller is pulling the listing early.' },
+    { key: 'caravan',                icon: '🚗', title: 'Add to Caravan',         desc: 'Add this listing to the active caravan queue.' },
+    { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Price change, extension, or other update.' },
+    { key: 'under_contract',         icon: '🤝', title: 'Under Contract',         desc: 'A buyer has been found for this listing.' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed (recorded directly from Active).' },
+    { key: 'expired',                icon: '⏳', title: 'Expired',                desc: "Listing's term ended without a sale." },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Seller is pulling the listing early.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   under_contract: [
-    { key: 'closing',      icon: '🔑', title: 'Closing',      desc: 'The contract closed.' },
-    { key: 'fall_through', icon: '↩',  title: 'Fall Through', desc: 'Contract fell through — listing returns to Active.' },
-    { key: 'withdrawn',    icon: '🚫', title: 'Withdrawn',    desc: 'Pull the listing off market (can be returned to Active).' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
+    { key: 'fall_through',           icon: '↩',  title: 'Fall Through',           desc: 'Contract fell through — listing returns to Active.' },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Pull the listing off market (can be returned to Active).' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
+  ],
+  withdrawn: [
+    { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
   ],
   closed: [
-    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+    { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
 };
 
 const CONTRACT_ACTIONS = {
   under_contract: [
-    { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed.' },
-    { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Contract fell through.' },
-    { key: 'change',    icon: '✎',  title: 'Change',    desc: 'Extend closing date or update buyer\'s agent.' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Contract fell through.' },
+    { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Extend closing date or update buyer\'s agent.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   closed: [
-    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+    { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
 };
 
@@ -2797,6 +2910,10 @@ const ACTION_CHECKLIST = {
     'Recover sign',
     'Withdrawal paperwork uploaded to Form Simplicity',
   ],
+  return_to_market: [
+    'Update MLS status to Active',
+    'Confirm lockbox and sign are in place',
+  ],
   closing: [
     'Confirm commission split in Profit Power',
     'Confirm title company on file',
@@ -2813,8 +2930,9 @@ const ACTION_TITLES = {
   change:         'Change',
   expired:        'Expired',
   withdrawn:      'Withdrawn',
-  fall_through:   'Fall Through',
-  closing:        'Closing',
+  fall_through:     'Fall Through',
+  return_to_market: 'Return to Market',
+  closing:          'Closing',
   under_contract: 'Under Contract',
   caravan:        'Add to Caravan',
 };
@@ -2860,6 +2978,17 @@ function amBackToChoose() {
   amShowChoose();
 }
 async function amChooseAction(key) {
+  const PRINT_FORMS = {
+    print_commission:        'form-commission-disbursement.html',
+    print_listing_contract:  'form-listing-contract.html',
+    print_delayed_closing:   'form-delayed-closing.html',
+  };
+  if (PRINT_FORMS[key]) {
+    window.open(`./${PRINT_FORMS[key]}?id=${amState.id}`, '_blank');
+    closeActionModal();
+    return;
+  }
+
   if (key === 'caravan') {
     const txn   = STATE.listings.find(t => String(t.id) === String(amState.id));
     const mlsId = txn?.mls_id;
@@ -2989,7 +3118,7 @@ async function amChooseAction(key) {
           <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address">
         </div>
       </div>`;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3070,6 +3199,7 @@ async function amChooseAction(key) {
         <select id="am-rep-type" onchange="amUpdateRepFields()" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
           <option value="in_house">In-House (Adams Cameron agent)</option>
           <option value="co_broke">Co-Broke (outside brokerage)</option>
+          <option value="fsbo">For Sale by Owner (FSBO)</option>
         </select>
       </div>
       <div id="am-rep-fields"></div>`;
@@ -3134,25 +3264,36 @@ async function amLoadFoundationDonors() {
   const buyerAgents  = amFoundationDonors.agents.filter(a => ['buyers_agent','co_buyers_agent'].includes(a.role));
   let html = `<div style="border:1px solid var(--ink-border); border-radius:var(--r); padding:12px 14px; background:rgba(16,185,129,0.06); margin-bottom:14px;">
     <div style="font-size:11px; font-weight:600; color:#065F46; margin-bottom:10px; letter-spacing:.02em;">Adams Cameron Foundation</div>`;
+  // For the party whose address is already collected in the closing form,
+  // we skip the address input and pull it from those fields at save time.
+  const isListing = amState.kind !== 'contract';
   if (sellerAgents.length) {
     html += `
     <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Seller-side donor${sellerAgents.length > 1 ? 's' : ''}: ${sellerAgents.map(a => escapeHtml(a.agent_name)).join(', ')}</div>
-    <div class="form-row" style="display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:${buyerAgents.length ? '14px' : '0'};">
+    ${!isListing ? `<div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:${buyerAgents.length ? '14px' : '0'};">
       <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Seller Mailing Address (for gift letter)</span>
+        <span class="field-label" style="${lblStyle}">Seller Name</span>
+        <input type="text" id="am-gift-seller-name" placeholder="Full name">
+      </div>
+      <div class="field" style="${fldStyle}">
+        <span class="field-label" style="${lblStyle}">Seller Address</span>
         <input type="text" id="am-gift-seller-addr" placeholder="Mailing address">
       </div>
-    </div>`;
+    </div>` : ''}`;
   }
   if (buyerAgents.length) {
     html += `
     <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Buyer-side donor${buyerAgents.length > 1 ? 's' : ''}: ${buyerAgents.map(a => escapeHtml(a.agent_name)).join(', ')}</div>
-    <div class="form-row" style="display:grid; grid-template-columns:1fr; gap:14px;">
+    ${isListing ? `<div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
       <div class="field" style="${fldStyle}">
-        <span class="field-label" style="${lblStyle}">Buyer Mailing Address (for gift letter)</span>
+        <span class="field-label" style="${lblStyle}">Buyer Name</span>
+        <input type="text" id="am-gift-buyer-name" placeholder="Full name">
+      </div>
+      <div class="field" style="${fldStyle}">
+        <span class="field-label" style="${lblStyle}">Buyer Address</span>
         <input type="text" id="am-gift-buyer-addr" placeholder="Mailing address">
       </div>
-    </div>`;
+    </div>` : ''}``;
   }
   html += '</div>';
   section.innerHTML = html;
@@ -3185,7 +3326,7 @@ function amUpdateRepFields() {
         <input type="text" id="am-source-of-buyer" placeholder="e.g. Sign call, referral, website">
       </div>`;
     amLoadBuyerAgents();
-  } else {
+  } else if (repType === 'co_broke') {
     el.innerHTML = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3201,6 +3342,8 @@ function amUpdateRepFields() {
         <span class="field-label" style="${labelStyle}">Cooperating Agent Email</span>
         <input type="email" id="am-coop-email" placeholder="agent@brokerage.com">
       </div>`;
+  } else {
+    el.innerHTML = '';  // fsbo — no cooperating agent fields
   }
 }
 
@@ -3469,7 +3612,7 @@ async function amSubmit() {
     fields.notes = document.getElementById('am-notes').value || null;
     const correctedAddr = document.getElementById('am-property-address').value.trim();
     if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
     const effectiveDate = document.getElementById('am-effective-date').value;
     if (effectiveDate) fields.effectiveDate = effectiveDate;
     fields.notes = document.getElementById('am-notes').value || null;
@@ -3499,13 +3642,23 @@ async function amSubmit() {
       fields.sellerState          = partyState;
       fields.sellerZip            = partyZip;
     }
+    const _partyAddr = [
+      document.getElementById('am-party-mailing')?.value,
+      document.getElementById('am-party-city')?.value,
+      document.getElementById('am-party-state')?.value,
+      document.getElementById('am-party-zip')?.value,
+    ].filter(Boolean).join(', ');
     if (amFoundationDonors?.sellerSide) {
-      fields.sellerGiftName    = partyName;
-      fields.sellerGiftAddress = document.getElementById('am-gift-seller-addr')?.value || null;
+      // Listing close: seller is the party — name and address already in the party fields
+      // Contract close: seller is the other party — read from the separate foundation inputs
+      fields.sellerGiftName    = isListing ? partyName : (document.getElementById('am-gift-seller-name')?.value || null);
+      fields.sellerGiftAddress = isListing ? (_partyAddr || null) : (document.getElementById('am-gift-seller-addr')?.value || null);
     }
     if (amFoundationDonors?.buyerSide) {
-      fields.buyerGiftName    = partyName;
-      fields.buyerGiftAddress = document.getElementById('am-gift-buyer-addr')?.value || null;
+      // Contract close: buyer is the party — name and address already in the party fields
+      // Listing close: buyer is the other party — read from the separate foundation inputs
+      fields.buyerGiftName    = !isListing ? partyName : (document.getElementById('am-gift-buyer-name')?.value || null);
+      fields.buyerGiftAddress = !isListing ? (_partyAddr || null) : (document.getElementById('am-gift-buyer-addr')?.value || null);
     }
     fields.titleCompany    = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
@@ -3526,7 +3679,7 @@ async function amSubmit() {
         alert("Please select the buyer's agent.");
         return;
       }
-    } else {
+    } else if (repType === 'co_broke') {
       fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
       fields.cooperatingAgentName = document.getElementById('am-coop-agent').value || null;
       fields.cooperatingAgentEmail = document.getElementById('am-coop-email').value || null;
@@ -3535,17 +3688,22 @@ async function amSubmit() {
         return;
       }
     }
+    // fsbo: no additional fields needed
   }
 
   try {
-    await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, fields });
+    await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
     await renderAll();
     const printMap = {
-      closing:      { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
-      expired:      { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
-      withdrawn:    { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
-      fall_through: { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      closing:          { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
+      expired:          { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      withdrawn:        { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      fall_through:     { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      return_to_market: { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
     };
+    if (key === 'change' && amState.status === 'under_contract') {
+      printMap.change = { page: 'form-delayed-closing.html', label: 'Delayed Contract Closing Form' };
+    }
     const formInfo = printMap[key];
     if (formInfo) {
       document.getElementById('actionModalBody').innerHTML = `
@@ -3715,7 +3873,7 @@ function ncUpdateAccRepFields() {
         <input type="text" id="nc-acc-source" placeholder="e.g. sign call, referral">
       </div>`;
     ncLoadAccBuyerAgents();
-  } else {
+  } else if (repType === 'co_broke') {
     el.innerHTML = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3731,6 +3889,8 @@ function ncUpdateAccRepFields() {
         <span class="field-label" style="${lblStyle}">Cooperating Agent Email</span>
         <input type="email" id="nc-acc-coop-email" placeholder="agent@brokerage.com">
       </div>`;
+  } else {
+    el.innerHTML = '';  // fsbo — no cooperating agent fields
   }
 }
 
@@ -3767,7 +3927,7 @@ async function ncSaveAccContract() {
     if (accSplitErr) { alert(accSplitErr); return; }
     fields.splitPct  = accSplitPct;
     fields.coAgents  = accCoAgents;
-  } else {
+  } else if (repType === 'co_broke') {
     fields.cooperatingBrokerage = document.getElementById('nc-acc-coop-brokerage').value || null;
     fields.cooperatingAgentName = document.getElementById('nc-acc-coop-agent').value || null;
     fields.cooperatingAgentEmail = document.getElementById('nc-acc-coop-email').value || null;
@@ -3775,6 +3935,7 @@ async function ncSaveAccContract() {
       alert('Please enter the cooperating brokerage and agent.'); return;
     }
   }
+  // fsbo: no cooperating agent fields needed
 
   try {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
@@ -4056,28 +4217,43 @@ async function startTracking(deltaListingId) {
   if (!row) return;
   _stDeltaListingId = deltaListingId;
 
-  document.getElementById('st-address').textContent = row.address || deltaListingId;
+  await openNewModal();   // resets all fields and loads agents
+  nlShowManualForm();     // skip the source-selection step
 
-  // Populate agent select with all agents, pre-select matched agent
-  const stSel = document.getElementById('st-agent');
-  const agents = await loadAllAgents();
-  stSel.innerHTML = buildAgentOptions(agents);
-  if (row.agent_id) stSel.value = String(row.agent_id);
+  // Pre-fill property fields
+  document.getElementById('nl-addr').value = row.address || '';
+  document.getElementById('nl-city').value = row.city    || '';
+  if (row.price_asking != null)
+    document.getElementById('nl-price').value = row.price_asking;
+  if (row.list_date)
+    document.getElementById('nl-list-date').value = row.list_date;
+  if (row.expiration_date)
+    document.getElementById('nl-exp-date').value  = row.expiration_date;
 
-  // Reset co-agent area
-  const stArea = document.getElementById('st-coagent-area');
-  stArea.style.display = 'none';
-  document.getElementById('st-coagent-btn').textContent = '+ co‑agent';
+  // Pre-fill agent
+  if (row.agent_id)
+    document.getElementById('nl-agent').value = String(row.agent_id);
 
-  // Pre-populate co-agent if DeltaNet supplied one
-  if (row.co_agent_id || row.co_agent_name) {
-    await stToggleCoAgent();
-    if (row.co_agent_id) {
-      document.getElementById('st-coagent-sel').value = String(row.co_agent_id);
-    }
+  // Pre-fill MLS IDs
+  if (row.mls_ids && row.mls_ids.length) {
+    const wrap = document.getElementById('nl-mls-wrap');
+    wrap.innerHTML = row.mls_ids.map((id, i) =>
+      i === 0
+        ? `<input type="text" class="nl-mls-id" placeholder="MLS # (optional)" value="${escapeHtml(String(id))}">`
+        : `<div style="display:flex; gap:6px; align-items:center;">` +
+            `<input type="text" class="nl-mls-id" placeholder="MLS #" style="flex:1;" value="${escapeHtml(String(id))}">` +
+            `<span style="cursor:pointer; color:var(--text-dim); font-size:16px; line-height:1;" onclick="this.parentNode.remove()">×</span>` +
+          `</div>`
+    ).join('');
   }
 
-  document.getElementById('startTrackingModal').classList.add('open');
+  // Pre-fill co-agent if DeltaNet supplied one
+  if (row.co_agent_id || row.co_agent_name) {
+    document.getElementById('nl-coagent-area').style.display = 'block';
+    document.getElementById('nl-coagent-btn').textContent = '− co‑agent';
+    if (row.co_agent_id)
+      document.getElementById('nl-coagent-sel').value = String(row.co_agent_id);
+  }
 }
 
 function closeStartTrackingModal() {
@@ -4207,7 +4383,10 @@ function renderNoticesUpcoming(rows) {
       <td>${r.has_agreement ? '<span style="color:var(--status-active)">Yes</span>' : '<span style="color:var(--text-muted)">No</span>'}</td>
       <td>${contact}</td>
       <td style="font-size:11px;color:var(--text-muted)">${exp}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="removeNotice('upcoming',${r.id})">Remove</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" style="margin-right:4px" onclick="openNoticeCaravan(${r.id})">Caravan</button>
+        <button class="btn btn-ghost btn-sm" onclick="removeNotice('upcoming',${r.id})">Remove</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -4250,7 +4429,12 @@ async function removeNotice(type, id) {
 }
 
 /* ── Transaction detail drawer ── */
+let _currentDrawerTxnId   = null;
+let _currentDrawerTxnData = null;
+
 async function openDrawer(id) {
+  _currentDrawerTxnId   = id;
+  _currentDrawerTxnData = null;
   document.getElementById('drawerOverlay').classList.add('open');
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawerAddr').textContent = 'Loading…';
@@ -4260,6 +4444,7 @@ async function openDrawer(id) {
 
   try {
     const t = await GET(`/daily-desk/transactions/${id}`);
+    _currentDrawerTxnData = t;
     renderDrawer(t);
   } catch (e) {
     document.getElementById('drawerAddr').textContent = 'Error loading transaction';
@@ -4352,9 +4537,16 @@ function renderDrawer(t) {
 
   const actEl = document.getElementById('drawer-activity');
   const events = t.events || [];
-  actEl.innerHTML = events.length ? events.map(ev =>
-    `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`
-  ).join('') : '<div>No activity recorded.</div>';
+  actEl.innerHTML = events.length ? events.map(ev => {
+    if (ev.event_type === 'field_correction') {
+      try {
+        const c = JSON.parse(ev.notes || '{}');
+        const label = FC_FIELD_LABELS[c.field] || c.field;
+        return `<div><strong>${fmtDate(ev.event_date || ev.submitted_at)}</strong> — ✏ <em>${escapeHtml(label)}</em> corrected: "${escapeHtml(c.old)}" → "${escapeHtml(c.new)}"<br><span style="color:var(--text-dim);font-size:11px;">Reason: ${escapeHtml(c.reason)}</span></div>`;
+      } catch { /* fall through */ }
+    }
+    return `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`;
+  }).join('') : '<div>No activity recorded.</div>';
 }
 
 function closeDrawer() {
@@ -5089,6 +5281,148 @@ function cvToast(ico, msg) {
   t.classList.add('on');
   clearTimeout(t._timer);
   t._timer = setTimeout(() => t.classList.remove('on'), 3200);
+}
+
+/* ── Field Corrections ── */
+const FC_FIELD_LABELS = {
+  property_address:      'Property Address',
+  city:                  'City',
+  seller_name:           'Seller Name',
+  seller_email:          'Seller Email',
+  seller_mailing_address:'Seller Mailing Address',
+  seller_city:           'Seller City',
+  seller_state:          'Seller State',
+  seller_zip:            'Seller Zip',
+  buyer_name:            'Buyer Name',
+  buyer_email:           'Buyer Email',
+  buyer_mailing_address: 'Buyer Mailing Address',
+  buyer_city:            'Buyer City',
+  buyer_state:           'Buyer State',
+  buyer_zip:             'Buyer Zip',
+  source_of_seller:      'Source of Seller',
+  source_of_buyer:       'Source of Buyer',
+  notes:                 'Notes',
+};
+
+let _fcTxnId   = null;
+let _fcTxnData = null;
+
+function openFieldCorrection() {
+  const drawer = document.getElementById('drawer');
+  if (!drawer.classList.contains('open')) return;
+  // _currentDrawerTxnId is set by openDrawer()
+  _fcTxnId   = _currentDrawerTxnId;
+  _fcTxnData = _currentDrawerTxnData;
+  if (!_fcTxnId || !_fcTxnData) return;
+
+  document.getElementById('fc-addr').textContent =
+    [_fcTxnData.property_address, _fcTxnData.city].filter(Boolean).join(', ') || '';
+  document.getElementById('fc-field').value    = '';
+  document.getElementById('fc-current').textContent = '';
+  document.getElementById('fc-new-value').value = '';
+  document.getElementById('fc-reason').value    = '';
+  document.getElementById('fieldCorrectionModal').classList.add('open');
+}
+
+function fcPopulateCurrent() {
+  const field = document.getElementById('fc-field').value;
+  const val   = field && _fcTxnData ? (_fcTxnData[field] ?? '') : '';
+  document.getElementById('fc-current').textContent = val || '(blank)';
+  document.getElementById('fc-new-value').value = val || '';
+  document.getElementById('fc-new-value').focus();
+}
+
+function closeFieldCorrectionModal() {
+  document.getElementById('fieldCorrectionModal').classList.remove('open');
+  _fcTxnId   = null;
+  _fcTxnData = null;
+}
+
+async function submitFieldCorrection() {
+  const fieldName = document.getElementById('fc-field').value;
+  const newValue  = document.getElementById('fc-new-value').value.trim();
+  const reason    = document.getElementById('fc-reason').value.trim();
+
+  if (!fieldName) { alert('Please select a field to correct.'); return; }
+  if (!reason)    { alert('A reason is required.'); document.getElementById('fc-reason').focus(); return; }
+
+  try {
+    await POST(`/daily-desk/transactions/${_fcTxnId}/field-correction`, { fieldName, newValue, reason });
+    closeFieldCorrectionModal();
+    cvToast('✓', 'Correction saved.');
+    // Refresh the drawer so the activity log shows the new event
+    await openDrawer(_currentDrawerTxnId);
+  } catch (e) {
+    alert('Error saving correction: ' + e.message);
+  }
+}
+
+/* ── Notice → Caravan ── */
+let _noticeCaravanId = null;
+
+function openNoticeCaravan(id) {
+  const notice = STATE.noticesUpcoming.find(n => n.id === id);
+  if (!notice) return;
+  _noticeCaravanId = id;
+
+  const addrLabel = notice.has_agreement
+    ? [notice.address, notice.city].filter(Boolean).join(', ')
+    : (notice.city || '');
+  document.getElementById('ncm-addr').textContent = addrLabel ? `Upcoming Listing: ${addrLabel}` : 'Upcoming Listing';
+
+  // Pre-fill caravan date from the caravan tab date field if already set
+  const cvDateEl = document.getElementById('cv-date');
+  document.getElementById('ncm-date').value = cvDateEl?.value || '';
+  document.getElementById('ncm-entry').value = '';
+  document.getElementById('ncm-comments').value = '';
+
+  document.getElementById('noticeCaravanModal').classList.add('open');
+  document.getElementById('ncm-date').focus();
+}
+
+function closeNoticeCaravanModal() {
+  document.getElementById('noticeCaravanModal').classList.remove('open');
+  _noticeCaravanId = null;
+}
+
+function confirmNoticeCaravan() {
+  const caravanDate        = document.getElementById('ncm-date').value.trim();
+  const entryInstructions  = document.getElementById('ncm-entry').value.trim();
+  const agentComments      = document.getElementById('ncm-comments').value.trim();
+
+  if (!caravanDate) {
+    alert('Please enter a caravan date.');
+    document.getElementById('ncm-date').focus();
+    return;
+  }
+
+  const notice = STATE.noticesUpcoming.find(n => n.id === _noticeCaravanId);
+  if (!notice) { closeNoticeCaravanModal(); return; }
+
+  const addr = notice.address || '';
+  const city = notice.city    || '';
+
+  // Prevent duplicates by address+date
+  if (cvQueue.some(i => i.addr === addr && i.caravanDate === caravanDate && addr)) {
+    cvToast('⚠', 'This listing is already in the caravan queue for that date.');
+    closeNoticeCaravanModal();
+    return;
+  }
+
+  cvQueue.push({
+    addr,
+    city,
+    entryInstructions,
+    agentComments,
+    caravanDate,
+    agent: notice.agent_name || '',
+    _raw: notice,
+    _fromNotice: true,
+  });
+  cvRenderQueue();
+  cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
+  cvSendNotify(addr || city, city, caravanDate);
+  closeNoticeCaravanModal();
 }
 
 /* ─────────────────────────────────────────────────────────────────── */

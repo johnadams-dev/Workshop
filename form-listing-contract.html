@@ -43,6 +43,15 @@
     .sig-row { display: flex; gap: 24px; margin-top: 14px; }
     .sig-block { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; }
 
+    .form-header { position: relative; margin-bottom: 14px; }
+    .scenario-badge {
+      position: absolute; top: 0; right: 0;
+      border: 2px solid #003366; border-radius: 3px;
+      padding: 3px 10px; color: #003366;
+      font-weight: bold; font-size: 10pt;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
     .loading { text-align: center; padding: 60px; font-size: 14px; color: #666; }
     .error   { text-align: center; padding: 60px; color: #c00; font-size: 14px; }
   </style>
@@ -52,18 +61,17 @@
   <div id="content"><div class="loading">Loading…</div></div>
 
 <script>
-const PROXY = 'https://us-central1-johnAdams-workshop.cloudfunctions.net/proxy/';
+const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
 
 async function load() {
   const id = new URLSearchParams(location.search).get('id');
   if (!id) { document.getElementById('content').innerHTML = '<div class="error">No transaction ID in URL.</div>'; return; }
 
-  const user = JSON.parse(localStorage.getItem('acc_user') || 'null');
-  const email = user?.email || '';
+  const email = localStorage.getItem('dd_user_email') || '';
   const headers = { 'Content-Type': 'application/json', 'x-user-email': email };
 
   try {
-    const res = await fetch(PROXY + `api/forms/transaction/${encodeURIComponent(id)}`, { headers });
+    const res = await fetch(PROXY + `/api/forms/transaction/${encodeURIComponent(id)}`, { headers });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
     const data = await res.json();
     render(data);
@@ -88,21 +96,43 @@ function row2(l1, v1, l2, v2) {
   </tr>`;
 }
 
+function scenarioLabel(t) {
+  const seller = t.represents_seller;
+  const buyer  = t.represents_buyer;
+  const s      = t.status;
+  if (seller && !buyer) {
+    if (s === 'under_contract') return 'Listing — Under Contract';
+    if (s === 'closed')         return 'Listing — Closed';
+    return 'New Listing';
+  }
+  if (buyer && !seller) {
+    if (s === 'closed') return 'Buyer Contract — Closed';
+    return 'Buyer-Side Contract';
+  }
+  // dual / in-house
+  if (s === 'closed')         return 'In-House Sale — Closed';
+  if (s === 'under_contract') return 'In-House Contract';
+  return 'In-House Listing';
+}
+
 function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event }) {
-  const represents = t.represents_seller ? 'Listing' : 'Contract (Buyer)';
-  const la = listing_agent;
-  const ba = buyers_agent || co_buyers_agent;
+  const la    = listing_agent;
+  const ba    = buyers_agent || co_buyers_agent;
+  const badge = scenarioLabel(t);
 
   document.getElementById('content').innerHTML = `
-    <div class="form-title">Listing / Contract Form</div>
-    <div class="company-line">Adams, Cameron &amp; Co. — Internal Record</div>
+    <div class="form-header">
+      <div class="form-title">Listing / Contract Form</div>
+      <div class="company-line">Adams, Cameron &amp; Co. — Internal Record</div>
+      <span class="scenario-badge">${badge}</span>
+    </div>
 
     <div class="section-head">Property Information</div>
     <table>
       ${row2('Property Address', fmt(t.property_address), 'City', fmt(t.city))}
-      ${row2('MLS Number', fmt(mls_number), 'Type', represents)}
-      ${row2('List Price', fmtMoney(t.current_price), 'Office', fmt(t.office_name))}
-      ${row2('List Date', fmtDate(t.list_date), 'Expiration Date', fmtDate(t.expiration_date))}
+      ${row2('MLS Number', fmt(mls_number), 'Office', fmt(t.office_name))}
+      ${row2('List Price', fmtMoney(t.current_price), 'List Date', fmtDate(t.list_date))}
+      ${row2('Expiration Date', fmtDate(t.expiration_date), '', '')}
     </table>
 
     <div class="section-head">Commission</div>

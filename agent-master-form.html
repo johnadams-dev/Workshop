@@ -303,21 +303,75 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 
 <div class="modal-overlay" id="new-modal">
-  <div class="modal">
+  <div class="modal" style="max-width:520px">
     <div class="modal-head">Add Agent <button onclick="closeNewAgent()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
     <div class="modal-body">
       <div class="field"><label>Email (@adamscameron.com)</label><input type="email" id="na-email" placeholder="firstlast@adamscameron.com"></div>
       <div class="fg"><div class="field"><label>First name</label><input type="text" id="na-first"></div><div class="field"><label>Last name</label><input type="text" id="na-last"></div></div>
       <div class="field"><label>Office</label><select id="na-office"><option value="">— Select —</option></select></div>
       <div class="field"><label>Cell phone</label><input type="tel" id="na-phone" placeholder="(386) 555-0100"></div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 0">
-        <input type="checkbox" id="na-provision-google" checked>
-        Also create Google Workspace account
-      </label>
+      <div class="field"><label>NRDS ID</label><input type="text" id="na-nrds" placeholder="12345678"></div>
+      <div class="field"><label>Personal email <span style="font-weight:400;color:var(--muted)">(welcome email copy)</span></label><input type="email" id="na-personal-email" placeholder="agent@gmail.com"></div>
+      <div class="fg">
+        <div class="field"><label>Designations</label><input type="text" id="na-designations" placeholder="GRI, ABR"></div>
+        <div class="field"><label>Languages</label><input type="text" id="na-languages" placeholder="English, Spanish"></div>
+      </div>
+      <div class="field"><label>Personal website</label><input type="url" id="na-website" placeholder="https://"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="na-provision-google" checked>
+          Create Google Workspace account
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="na-manufactured-homes">
+          Add to Manufactured Homes group
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="na-foundation-toggle" onchange="toggleFoundationFields()">
+          Enroll in Foundation donation
+        </label>
+      </div>
+      <div id="na-foundation-fields" style="display:none;padding-left:20px;margin-top:6px">
+        <div class="fg">
+          <div class="field">
+            <label>Donation type</label>
+            <select id="na-foundation-type">
+              <option value="fixed_amount">Fixed amount per sale</option>
+              <option value="percentage">Percentage of commission</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Amount / Rate</label>
+            <input type="number" id="na-foundation-amount" placeholder="25.00" step="0.01" min="0">
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewAgent()">Cancel</button>
-      <button class="btn btn-primary" id="na-create-btn" onclick="createAgent()">Create</button>
+      <button class="btn btn-primary" id="na-create-btn" onclick="createAgent()">Create &amp; Onboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- Onboarding result checklist -->
+<div class="modal-overlay" id="onboard-result-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">Onboarding Complete <button onclick="closeOnboardResult()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body" id="onboard-result-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="closeOnboardResult()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Termination result checklist -->
+<div class="modal-overlay" id="terminate-result-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">Termination Complete <button onclick="closeTerminateResult()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body" id="terminate-result-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="closeTerminateResult()">Done</button>
     </div>
   </div>
 </div>
@@ -1037,7 +1091,74 @@ async function deactivate(id) {
   openRosterChangeModal('terminated', a, { type: 'deactivate', agentId: id });
 }
 
-async function doDeactivate(id) {
+function showTerminateResult(data) {
+  const STEP_LABELS = {
+    db:                 'Agent deactivated in database',
+    deltanetCustomer:   'DeltaNet past-agent record created',
+    deltanetGroup:      'Added to DeltaNet "Past Agents" group',
+    googleWorkspace:    'Google Workspace account suspended',
+    roster:             'Removed from agent roster spreadsheet',
+    realtyReferral:     'Added to Realty Referral email group',
+    managerEmail:       'Manager notification sent',
+  };
+  const steps = data.steps || {};
+  const items = Object.entries(STEP_LABELS).map(([key, label]) => {
+    const val = steps[key];
+    let icon, color;
+    if (val === 'ok') {
+      icon = '✅'; color = 'var(--text, #333)';
+    } else if (!val || val === 'skipped' || val.startsWith('skipped')) {
+      icon = '⊘'; color = 'var(--muted, #888)';
+    } else {
+      icon = '⚠️'; color = '#b35c00';
+    }
+    const note = (val && val !== 'ok' && val !== 'skipped' && !val.startsWith('skipped'))
+      ? `<br><span style="font-size:11px;padding-left:24px;color:#b35c00">${esc(val)}</span>` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--ink-border,#e8e8e8)">
+      <span style="flex-shrink:0;width:18px;text-align:center">${icon}</span>
+      <span style="color:${color};font-size:13px">${esc(label)}${note}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('terminate-result-body').innerHTML = `
+    <p style="margin-top:0;font-weight:600">${esc(data.firstName||'')} ${esc(data.lastName||'')} has been terminated.</p>
+    ${items}
+  `;
+  document.getElementById('terminate-result-modal').classList.add('open');
+}
+
+function closeTerminateResult() {
+  document.getElementById('terminate-result-modal').classList.remove('open');
+}
+
+async function doTerminate(agentId, rcData) {
+  const a = allAgents.find(x => x.id === agentId);
+  if (!a?.email) { toast('Agent email not found', 'err'); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/admin/agent/terminate`, {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({
+        email:              a.email,
+        personalEmail:      rcData.personalEmail || null,
+        reason:             rcData.reason        || null,
+        destinationCompany: rcData.destinationCompany || null,
+        realtyReferral:     rcData.realtyReferral || false,
+        dateTerminated:     rcData.date           || new Date().toISOString().slice(0, 10),
+        office:             a.office              || null,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast('Termination failed: ' + (data.error || r.status), 'err'); return; }
+    const idx = allAgents.findIndex(x => x.id === agentId);
+    if (idx !== -1) allAgents[idx].active = false;
+    renderTable();
+    showTerminateResult(data);
+  } catch (e) {
+    toast('Termination error: ' + e.message, 'err');
+  }
+}
+
+async function doDeactivate_legacy(id) {
   const a = allAgents.find(x => x.id === id);
   const r = await fetch(`${PROXY_URL}/agent/${id}/deactivate`, { method:'POST', headers:H() });
   if (!r.ok) { toast('Failed: HTTP '+r.status,'err'); return; }
@@ -1074,55 +1195,121 @@ async function reactivate(id) {
 function openNewAgent()  { document.getElementById('new-modal').classList.add('open'); }
 function closeNewAgent() { document.getElementById('new-modal').classList.remove('open'); }
 
+function toggleFoundationFields() {
+  const show = document.getElementById('na-foundation-toggle').checked;
+  document.getElementById('na-foundation-fields').style.display = show ? '' : 'none';
+}
+
 function showTempPassword(email, tempPassword) {
   document.getElementById('pw-email').value = email;
   document.getElementById('pw-pass').value  = tempPassword;
   document.getElementById('pw-modal').classList.add('open');
 }
 
+function showOnboardResult(data) {
+  const STEP_LABELS = {
+    db:                   'Agent record created in database',
+    googleWorkspace:      'Google Workspace account provisioned',
+    universalGroups:      'Added to universal email groups',
+    officeGroup:          'Added to office email group',
+    manufacturedHomesGroup: 'Added to Manufactured Homes group',
+    deltanet:             'DeltaNet account created',
+    roster:               'Added to agent roster spreadsheet',
+    welcomeEmailInternal: 'Internal welcome notification sent',
+    welcomeEmailAgent:    'Welcome email sent to agent',
+    foundation:           'Foundation donation enrollment',
+  };
+
+  const steps = data.steps || {};
+  const items = Object.entries(STEP_LABELS).map(([key, label]) => {
+    const val = steps[key];
+    let icon, color;
+    if (val === 'ok') {
+      icon = '✅'; color = 'var(--text, #333)';
+    } else if (!val || val === 'skipped' || val.startsWith('skipped')) {
+      icon = '⊘'; color = 'var(--muted, #888)';
+    } else {
+      icon = '⚠️'; color = '#b35c00';
+    }
+    const note = (val && val !== 'ok' && val !== 'skipped' && !val.startsWith('skipped')) ? `<br><span style="font-size:11px;padding-left:24px;color:#b35c00">${esc(val)}</span>` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid var(--ink-border,#e8e8e8)">
+      <span style="flex-shrink:0;width:18px;text-align:center">${icon}</span>
+      <span style="color:${color};font-size:13px">${esc(label)}${note}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('onboard-result-body').innerHTML = `
+    <p style="margin-top:0;font-weight:600">${esc(data.firstName||'')} ${esc(data.lastName||'')} has been onboarded.</p>
+    ${items}
+    ${data.dmgId ? `<p style="margin-top:12px;font-size:12px;color:var(--muted,#888)">DeltaNet ID: ${esc(data.dmgId)}</p>` : ''}
+  `;
+  document.getElementById('onboard-result-modal').classList.add('open');
+}
+
+function closeOnboardResult() {
+  document.getElementById('onboard-result-modal').classList.remove('open');
+}
+
 async function createAgent() {
-  const email    = document.getElementById('na-email').value.trim().toLowerCase();
-  const first    = document.getElementById('na-first').value.trim();
-  const last     = document.getElementById('na-last').value.trim();
-  const officeId = document.getElementById('na-office').value;
-  const phone    = document.getElementById('na-phone').value.trim();
-  const provisionGoogle = document.getElementById('na-provision-google').checked;
-  if (!email.endsWith('@adamscameron.com')) { toast('Must be @adamscameron.com','err'); return; }
-  if (!first||!last) { toast('Name required','err'); return; }
+  const email           = document.getElementById('na-email').value.trim().toLowerCase();
+  const first           = document.getElementById('na-first').value.trim();
+  const last            = document.getElementById('na-last').value.trim();
+  const officeEl        = document.getElementById('na-office');
+  const officeName      = officeEl.selectedIndex > 0 ? officeEl.options[officeEl.selectedIndex].text : '';
+  const phone           = document.getElementById('na-phone').value.trim();
+  const nrdsId          = document.getElementById('na-nrds').value.trim();
+  const personalEmail   = document.getElementById('na-personal-email').value.trim();
+  const designations    = document.getElementById('na-designations').value.trim();
+  const languages       = document.getElementById('na-languages').value.trim();
+  const website         = document.getElementById('na-website').value.trim();
+  const provisionGoogle    = document.getElementById('na-provision-google').checked;
+  const manufacturedHomes  = document.getElementById('na-manufactured-homes').checked;
+  const foundationToggle   = document.getElementById('na-foundation-toggle').checked;
+  const foundationType     = foundationToggle ? document.getElementById('na-foundation-type').value : null;
+  const foundationAmount   = foundationToggle ? parseFloat(document.getElementById('na-foundation-amount').value || '0') : null;
+
+  if (!email.endsWith('@adamscameron.com')) { toast('Must be @adamscameron.com', 'err'); return; }
+  if (!first || !last) { toast('Name required', 'err'); return; }
+  if (foundationToggle && (!foundationAmount || foundationAmount <= 0)) { toast('Foundation amount required', 'err'); return; }
 
   const btn = document.getElementById('na-create-btn');
-  btn.disabled = true; btn.textContent = 'Creating…';
+  btn.disabled = true; btn.textContent = 'Onboarding…';
 
   try {
-    const r = await fetch(`${PROXY_URL}/agent/register`, {
-      method:'POST', headers:H(),
-      body: JSON.stringify({ email, firstName:first, lastName:last, office_id: officeId ? +officeId : null, phone }),
+    const r = await fetch(`${PROXY_URL}/admin/agent/onboard`, {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({
+        email, firstName: first, lastName: last,
+        personalEmail: personalEmail || null,
+        office: officeName || null,
+        phone: phone || null,
+        nrdsId: nrdsId || null,
+        designations: designations || null,
+        languages: languages || null,
+        website: website || null,
+        provisionGoogle,
+        manufacturedHomes,
+        foundationDonationType:   foundationType,
+        foundationDonationAmount: foundationAmount,
+      }),
     });
-    if (!r.ok) { toast('Failed: HTTP '+r.status,'err'); return; }
+    const data = await r.json();
+    if (!r.ok) { toast('Onboarding failed: ' + (data.error || r.status), 'err'); return; }
 
     closeNewAgent();
     await load();
     const newAgent = allAgents.find(a => a.email === email);
 
-    if (provisionGoogle) {
-      const gr = await fetch(`${PROXY_URL}/google-admin/users`, {
-        method:'POST', headers:H(),
-        body: JSON.stringify({ email, firstName:first, lastName:last }),
-      });
-      const gd = await gr.json();
-      if (gr.ok) {
-        _pendingRCAfterPW = newAgent ? { eventType: 'hired', agent: newAgent } : null;
-        showTempPassword(gd.email, gd.tempPassword);
-      } else {
-        toast(`Agent created — Google account failed: ${gd.error}`, 'err');
-        if (newAgent) openRosterChangeModal('hired', newAgent);
-      }
-    } else {
-      toast('Agent created','ok');
-      if (newAgent) openRosterChangeModal('hired', newAgent);
+    if (data.tempPassword) {
+      _pendingRCAfterPW = newAgent ? { eventType: 'hired', agent: newAgent } : null;
+      showTempPassword(email, data.tempPassword);
+    } else if (newAgent) {
+      openRosterChangeModal('hired', newAgent);
     }
+
+    showOnboardResult(data);
   } finally {
-    btn.disabled = false; btn.textContent = 'Create';
+    btn.disabled = false; btn.textContent = 'Create & Onboard';
   }
 }
 
@@ -1388,7 +1575,16 @@ async function submitRCModal() {
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
     toast('Roster change logged', 'ok');
     closeRCModal();
-    if (action?.type === 'deactivate') await doDeactivate(action.agentId);
+    if (action?.type === 'deactivate') {
+      const rcData = {
+        personalEmail:      body.personal_email,
+        reason:             (body.reason_codes || []).join(', '),
+        destinationCompany: body.destination_company,
+        realtyReferral:     (body.reason_codes || []).includes('realty_referral'),
+        date:               body.event_date,
+      };
+      await doTerminate(action.agentId, rcData);
+    }
   } catch (e) {
     toast('Failed to log: ' + e.message, 'err');
     btn.disabled = false;

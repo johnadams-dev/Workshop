@@ -415,6 +415,7 @@
     <div class="tab"        data-tab="enrollments"    onclick="switchTab('enrollments')">🤝 Enrollments</div>
     <div class="tab"        data-tab="agents"         onclick="switchTab('agents')">👤 Agents</div>
     <div class="tab"        data-tab="staff"          onclick="switchTab('staff')">🏢 Staff</div>
+    <div class="tab"        data-tab="corrections"    onclick="switchTab('corrections')">📝 Corrections</div>
   </nav>
 
   <!-- Body -->
@@ -533,6 +534,37 @@
             </thead>
             <tbody id="staffBody">
               <tr><td colspan="6" class="loading-block"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CORRECTIONS ─────────────────────────────────────── -->
+    <div id="panel-corrections" class="tab-panel">
+      <div class="section-hdr">
+        <div>
+          <h2>Transaction Field Corrections</h2>
+          <p>Non-contractual data corrections made by staff. Not included in the hotsheet report.</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="loadCorrections()">↻ Refresh</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table id="correctionsTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Property</th>
+                <th>Field</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>Reason</th>
+                <th>Corrected By</th>
+              </tr>
+            </thead>
+            <tbody id="correctionsBody">
+              <tr><td colspan="7" class="loading-block"><div class="spinner"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -667,6 +699,7 @@ function switchTab(tab) {
   if (tab === 'staff')       loadStaff();
   if (tab === 'agents')      loadAgents();
   if (tab === 'enrollments') loadEnrollments();
+  if (tab === 'corrections') loadCorrections();
 }
 
 /* ── OVERVIEW ──────────────────────────────────────────── */
@@ -888,6 +921,58 @@ async function loadStaff() {
       </tr>`).join('');
   } catch(e) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty" style="color:#e08080">${e.message}</td></tr>`;
+  }
+}
+
+/* ── CORRECTIONS ───────────────────────────────────────── */
+const FC_FIELD_LABELS = {
+  property_address:       'Property Address',
+  city:                   'City',
+  seller_name:            'Seller Name',
+  seller_email:           'Seller Email',
+  seller_mailing_address: 'Seller Mailing Address',
+  seller_city:            'Seller City',
+  seller_state:           'Seller State',
+  seller_zip:             'Seller Zip',
+  buyer_name:             'Buyer Name',
+  buyer_email:            'Buyer Email',
+  buyer_mailing_address:  'Buyer Mailing Address',
+  buyer_city:             'Buyer City',
+  buyer_state:            'Buyer State',
+  buyer_zip:              'Buyer Zip',
+  source_of_seller:       'Source of Seller',
+  source_of_buyer:        'Source of Buyer',
+  notes:                  'Notes',
+};
+
+async function loadCorrections() {
+  const tbody = document.getElementById('correctionsBody');
+  tbody.innerHTML = `<tr><td colspan="7" class="loading-block"><div class="spinner"></div></td></tr>`;
+  try {
+    const res = await fetch(`${PROXY_BASE}/admin/corrections`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    const rows = await res.json();
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty">No corrections recorded yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      let c = {};
+      try { c = JSON.parse(r.notes || '{}'); } catch(_) {}
+      const prop = [r.property_address, r.city].filter(Boolean).join(', ') || '—';
+      const field = FC_FIELD_LABELS[c.field] || escHtml(c.field) || '—';
+      return `<tr>
+        <td style="white-space:nowrap;font-size:0.8rem">${fmtDate(r.event_date)}</td>
+        <td style="font-size:0.82rem">${escHtml(prop)}</td>
+        <td style="font-size:0.82rem">${field}</td>
+        <td style="font-size:0.82rem;color:var(--muted)">${escHtml(c.old ?? '—')}</td>
+        <td style="font-size:0.82rem">${escHtml(c.new ?? '—')}</td>
+        <td style="font-size:0.82rem">${escHtml(c.reason || '—')}</td>
+        <td style="font-size:0.82rem">${escHtml(r.staff_name || '—')}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty" style="color:#e08080">${e.message}</td></tr>`;
   }
 }
 

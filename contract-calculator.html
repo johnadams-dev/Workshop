@@ -430,8 +430,7 @@
             <p class="property-info">Property: <strong id="resultPropertyId"></strong></p>
             <div id="datesList"></div>
             <div class="button-group">
-                <button class="action-btn btn-pdf"      onclick="generatePDF()">📄 Download PDF</button>
-                <button class="action-btn btn-print"    onclick="printReport()">🖨️ Print Report</button>
+                <button class="action-btn btn-pdf"      onclick="generatePDF()">📄 PDF / Print</button>
                 <button class="action-btn btn-copy"     onclick="copyToClipboard()">📋 Copy Dates</button>
                 <button class="action-btn btn-calendar" onclick="addToGoogleCalendar()">📅 Add to Calendar</button>
                 <button class="action-btn" id="shareBtn"
@@ -845,7 +844,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
             initialDeposit:    { value: parsed.initialDepositDays      ?? 3,          confidence: 0.90 },
             additionalDeposit: { value: parsed.additionalDepositDays   ?? 10,         confidence: 0.90 },
             financingDays:     { value: parsed.financingDays           ?? 30,         confidence: 0.88 },
-            titleDays:         { value: parsed.titleDays               ?? 15,         confidence: 0.85 },
+            titleDays:         { value: parsed.titleDays               ?? (parsed.transactionType === 'cash' ? 5 : 15), confidence: 0.85 },
             floodDays:         { value: parsed.floodDays               ?? 20,         confidence: 0.87 },
             inspectionDays:    { value: parsed.inspectionDays          ?? 15,         confidence: 0.91 },
             transactionType:   { value: parsed.transactionType         || 'financed', confidence: 0.94 },
@@ -882,6 +881,10 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
             group.style.opacity       = isCash ? '0.5' : '1';
             group.style.pointerEvents = isCash ? 'none' : 'auto';
             isCash ? input.removeAttribute('required') : input.setAttribute('required','required');
+            // Update title days default if still at either known default
+            const titleInput = document.getElementById('titleDays');
+            const curTitle   = parseInt(titleInput.value);
+            if (curTitle === 15 || curTitle === 5) titleInput.value = isCash ? 5 : 15;
         });
     });
 
@@ -970,8 +973,10 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         push('Insurance Evidence Due', titleDate < floodDate ? titleDate : floodDate,
             'Earlier of title commitment or flood determination');
 
-        push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
-            '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
+        if (!isCash) {
+            push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
+                '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
+        }
 
         const walkDate = new Date(closingDate);
         walkDate.setDate(walkDate.getDate() - 1);
