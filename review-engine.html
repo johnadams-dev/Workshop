@@ -309,6 +309,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <button class="tab-btn" onclick="switchTab('recipients')">Recipients</button>
     <button class="tab-btn" onclick="switchTab('variants')">A/B Tests</button>
     <button class="tab-btn" onclick="switchTab('campaigns')">Campaigns</button>
+    <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
   </div>
 
   <div class="content">
@@ -396,6 +397,43 @@ tr:hover td { background: rgba(255,255,255,.02); }
         <code>{{zillow_link}}</code> <code>{{reply_link}}</code>
       </p>
       <div id="campaigns-body"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- ── Settings tab ── -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="section-header"><h2>Review Link Settings</h2></div>
+      <p style="color:var(--muted);margin-bottom:1.5rem;font-size:.93rem">
+        These are the destination URLs customers land on after clicking a review link.
+        Each link in the email passes through a tracking redirect first, so you can
+        change these URLs at any time without re-sending emails.
+      </p>
+      <div id="settings-form" style="max-width:640px;display:flex;flex-direction:column;gap:1.2rem">
+        <div>
+          <label style="display:block;font-weight:600;margin-bottom:.35rem">Google Review URL</label>
+          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .4rem">
+            Use the "Write a review" link from your Google Business Profile dashboard —
+            it looks like <code>https://g.page/r/…/review</code> or
+            <code>https://search.google.com/local/writereview?placeid=…</code>.
+            The generic business.google.com URL only works for logged-in owners.
+          </p>
+          <input id="setting-google" type="url" class="edit-input" style="width:100%"
+                 placeholder="https://g.page/r/YOUR_PLACE_ID/review">
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;margin-bottom:.35rem">Facebook Reviews URL</label>
+          <input id="setting-facebook" type="url" class="edit-input" style="width:100%"
+                 placeholder="https://www.facebook.com/adamscameron/reviews/…">
+        </div>
+        <div>
+          <label style="display:block;font-weight:600;margin-bottom:.35rem">Zillow Reviews URL</label>
+          <input id="setting-zillow" type="url" class="edit-input" style="width:100%"
+                 placeholder="https://www.zillow.com/profile/AdamsCameronandCo#reviews">
+        </div>
+        <div>
+          <button class="btn btn-amber" onclick="saveSettings()">Save URLs</button>
+          <span id="settings-status" style="margin-left:1rem;font-size:.9rem;color:var(--muted)"></span>
+        </div>
+      </div>
     </div>
 
   </div><!-- /content -->
@@ -530,6 +568,7 @@ const TAB_LOADERS = {
   recipients: loadRecipients,
   variants:   loadVariants,
   campaigns:  loadCampaigns,
+  settings:   loadSettings,
 };
 const _loaded = {};
 
@@ -745,6 +784,37 @@ async function seedCampaign() {
     loadCampaigns();
   } catch (e) {
     alert("Seed failed: " + e.message);
+  }
+}
+
+// ── Settings tab ────────────────────────────────────────────────────────────────
+
+async function loadSettings() {
+  try {
+    const data = await GET("/review/settings");
+    document.getElementById("setting-google").value   = data.urls.google   || "";
+    document.getElementById("setting-facebook").value = data.urls.facebook || "";
+    document.getElementById("setting-zillow").value   = data.urls.zillow   || "";
+  } catch (e) {
+    document.getElementById("settings-status").textContent = "Failed to load: " + e.message;
+  }
+}
+
+async function saveSettings() {
+  const status = document.getElementById("settings-status");
+  status.textContent = "Saving…";
+  try {
+    await PUT("/review/settings", {
+      google:   document.getElementById("setting-google").value.trim()   || null,
+      facebook: document.getElementById("setting-facebook").value.trim() || null,
+      zillow:   document.getElementById("setting-zillow").value.trim()   || null,
+    });
+    status.style.color = "var(--green, #2d7a3a)";
+    status.textContent = "Saved.";
+    setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
+  } catch (e) {
+    status.style.color = "var(--danger, #c0392b)";
+    status.textContent = "Error: " + e.message;
   }
 }
 
