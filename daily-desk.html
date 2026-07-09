@@ -2838,34 +2838,41 @@ const LISTING_ACTIONS = {
     { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
   ],
   active: [
-    { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
-    { key: 'change',         icon: '✎', title: 'Change',          desc: 'Price change, extension, or other update.' },
-    { key: 'under_contract', icon: '🤝', title: 'Under Contract',  desc: 'A buyer has been found for this listing.' },
-    { key: 'closing',        icon: '🔑', title: 'Closing',         desc: 'The contract closed (recorded directly from Active).' },
-    { key: 'expired',        icon: '⏳', title: 'Expired',         desc: "Listing's term ended without a sale." },
-    { key: 'withdrawn',      icon: '🚫', title: 'Withdrawn',       desc: 'Seller is pulling the listing early.' },
+    { key: 'caravan',                icon: '🚗', title: 'Add to Caravan',         desc: 'Add this listing to the active caravan queue.' },
+    { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Price change, extension, or other update.' },
+    { key: 'under_contract',         icon: '🤝', title: 'Under Contract',         desc: 'A buyer has been found for this listing.' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed (recorded directly from Active).' },
+    { key: 'expired',                icon: '⏳', title: 'Expired',                desc: "Listing's term ended without a sale." },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Seller is pulling the listing early.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
   ],
   under_contract: [
-    { key: 'closing',      icon: '🔑', title: 'Closing',      desc: 'The contract closed.' },
-    { key: 'fall_through', icon: '↩',  title: 'Fall Through', desc: 'Contract fell through — listing returns to Active.' },
-    { key: 'withdrawn',    icon: '🚫', title: 'Withdrawn',    desc: 'Pull the listing off market (can be returned to Active).' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
+    { key: 'fall_through',           icon: '↩',  title: 'Fall Through',           desc: 'Contract fell through — listing returns to Active.' },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Pull the listing off market (can be returned to Active).' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
   ],
   withdrawn: [
     { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
   ],
   closed: [
-    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+    { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
   ],
 };
 
 const CONTRACT_ACTIONS = {
   under_contract: [
-    { key: 'closing',   icon: '🔑', title: 'Closing',   desc: 'The contract closed.' },
-    { key: 'withdrawn', icon: '🚫', title: 'Withdrawn', desc: 'Contract fell through.' },
-    { key: 'change',    icon: '✎',  title: 'Change',    desc: 'Extend closing date or update buyer\'s agent.' },
+    { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
+    { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Contract fell through.' },
+    { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Extend closing date or update buyer\'s agent.' },
+    { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
   ],
   closed: [
-    { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
+    { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
+    { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing Contract', desc: 'Re-open the listing contract form for printing.' },
   ],
 };
 
@@ -2964,6 +2971,17 @@ function amBackToChoose() {
   amShowChoose();
 }
 async function amChooseAction(key) {
+  const PRINT_FORMS = {
+    print_commission:        'form-commission-disbursement.html',
+    print_listing_contract:  'form-listing-contract.html',
+    print_delayed_closing:   'form-delayed-closing.html',
+  };
+  if (PRINT_FORMS[key]) {
+    window.open(`./${PRINT_FORMS[key]}?id=${amState.id}`, '_blank');
+    closeActionModal();
+    return;
+  }
+
   if (key === 'caravan') {
     const txn   = STATE.listings.find(t => String(t.id) === String(amState.id));
     const mlsId = txn?.mls_id;
@@ -3674,11 +3692,15 @@ async function amSubmit() {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
     await renderAll();
     const printMap = {
-      closing:      { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
-      expired:      { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
-      withdrawn:    { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
-      fall_through: { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      closing:          { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
+      expired:          { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      withdrawn:        { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      fall_through:     { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
+      return_to_market: { page: 'form-delayed-closing.html',         label: 'Delayed Contract Closing Form' },
     };
+    if (key === 'change' && amState.status === 'under_contract') {
+      printMap.change = { page: 'form-delayed-closing.html', label: 'Delayed Contract Closing Form' };
+    }
     const formInfo = printMap[key];
     if (formInfo) {
       document.getElementById('actionModalBody').innerHTML = `
