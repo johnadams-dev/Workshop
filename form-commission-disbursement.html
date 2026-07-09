@@ -97,12 +97,13 @@ function row(label, ...vals) {
   return `<tr><td class="label">${label}</td>${cells}</tr>`;
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event }) {
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals }) {
   const ev = closing_event || {};
   const salePrice = ev.sale_price ?? t.current_price;
   const totalComm = calcCommission(salePrice, t.commission_rate);
   const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission);
   const accComm   = (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
+  const refs = referrals || [];
 
   const la = listing_agent;
   const ba = buyers_agent;
@@ -147,8 +148,19 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
 
     <div class="section-head">Referral (if applicable)</div>
     <table>
+      ${refs.length ? refs.map(r => {
+        const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', other: 'Other' };
+        const name    = r.agent_id ? [r.first_name, r.last_name].filter(Boolean).join(' ') : fmt(r.referral_name);
+        const company = fmt(r.referral_company);
+        const feeLabel = r.fee_type === 'percent' ? `${r.fee_value}%` : fmtMoney(r.fee_value);
+        const feeAmt   = r.fee_type === 'percent' && salePrice
+          ? fmtMoney(Math.round(Number(salePrice) * (Number(r.fee_value) / 100) * 100) / 100)
+          : (r.fee_type === 'fixed' ? fmtMoney(r.fee_value) : '&nbsp;');
+        return `${row2('Referred By', name || '&nbsp;', 'Fee Rate', feeLabel)}
+                ${row2('Referred To', company || '&nbsp;', 'Fee Amt', feeAmt)}`;
+      }).join('') : `
       <tr><td class="label">Referred By</td><td class="val">&nbsp;</td><td class="label">Referral %</td><td class="val">&nbsp;</td></tr>
-      <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Referral Amt</td><td class="val">&nbsp;</td></tr>
+      <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Referral Amt</td><td class="val">&nbsp;</td></tr>`}
     </table>
 
     <div class="section-head">Commission Summary</div>
@@ -168,11 +180,13 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td class="amt">${fmtMoney(coopComm)}</td>
         <td style="font-size:8pt; color:#555;">Paid to buyer's brokerage</td>
       </tr>
-      <tr>
-        <td>Referral Fee</td>
-        <td class="amt">&nbsp;</td>
-        <td>&nbsp;</td>
-      </tr>
+      ${refs.length ? refs.map(r => {
+        const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', other: 'Other' };
+        const label = typeLabel[r.referral_type] || 'Referral';
+        const amt   = r.fee_type === 'fixed' ? fmtMoney(r.fee_value)
+          : (salePrice ? fmtMoney(Math.round(Number(salePrice) * (Number(r.fee_value) / 100) * 100) / 100) : '&nbsp;');
+        return `<tr><td>Referral Fee — ${label}</td><td class="amt">${amt}</td><td style="font-size:8pt;color:#555;">${r.fee_type==='percent'?r.fee_value+'%':''}</td></tr>`;
+      }).join('') : `<tr><td>Referral Fee</td><td class="amt">&nbsp;</td><td>&nbsp;</td></tr>`}
       <tr class="total-row">
         <td>Adams, Cameron Net Commission</td>
         <td class="amt">${fmtMoney(accComm)}</td>

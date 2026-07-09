@@ -1432,6 +1432,44 @@ tbody tr.clickable { cursor: pointer; }
       </div>
     </div><!-- /page-foundation -->
 
+    <!-- ═══ REFERRALS PAGE ═══ -->
+    <div class="page" id="page-referrals">
+
+      <div class="section-head" style="margin-bottom:20px;">
+        <div>
+          <div style="font-size:18px; font-weight:600; margin-bottom:3px;">Referral Fees</div>
+          <div style="font-size:12px; color:var(--text-muted);">Track referral fees due and earned by the referral department.</div>
+        </div>
+      </div>
+
+      <div class="report-card">
+        <div class="report-card-head">
+          <div class="report-card-icon">🤝</div>
+          <div>
+            <div class="report-card-title">Referral Report</div>
+            <div class="report-card-desc">All referral fees across transactions, filterable by year and office.</div>
+          </div>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="window.print()">🖨 Print</button>
+        </div>
+        <div class="report-card-body">
+          <div class="controls">
+            <div class="field-group">
+              <span class="field-label">Year</span>
+              <select id="ref-year"><option value="">All Years</option></select>
+            </div>
+            <div class="field-group">
+              <span class="field-label">Office</span>
+              <select id="ref-office"><option value="">All Offices</option></select>
+            </div>
+            <button class="btn btn-primary" onclick="loadReferralReport()">Run Report</button>
+          </div>
+          <div id="ref-summary" style="display:none;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;"></div>
+          <div id="ref-output"></div>
+        </div>
+      </div>
+
+    </div><!-- /page-referrals -->
+
   </div>
 </div>
 
@@ -1601,6 +1639,16 @@ tbody tr.clickable { cursor: pointer; }
             </div>
           </div>
         </div>
+        <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="nl-has-referral" onchange="toggleReferralSection('nl')">
+            Referral fee on this transaction
+          </label>
+          <div id="nl-referral-section" style="display:none;margin-top:10px;">
+            <div id="nl-referral-rows"></div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nl')" style="margin-top:6px;">+ Add another referral</button>
+          </div>
+        </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="nlBackToSource()">← Back</button>
           <button class="btn btn-primary btn-sm" onclick="nlSaveListing()">Save Listing</button>
@@ -1679,6 +1727,16 @@ tbody tr.clickable { cursor: pointer; }
             </select>
           </div>
           <div id="nc-acc-rep-fields"></div>
+        </div>
+        <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="nc-acc-has-referral" onchange="toggleReferralSection('nc-acc')">
+            Referral fee on this transaction
+          </label>
+          <div id="nc-acc-referral-section" style="display:none;margin-top:10px;">
+            <div id="nc-acc-referral-rows"></div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nc-acc')" style="margin-top:6px;">+ Add another referral</button>
+          </div>
         </div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="ncBackToSource()">← Back</button>
@@ -1784,6 +1842,16 @@ tbody tr.clickable { cursor: pointer; }
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="nc-ext-has-referral" onchange="toggleReferralSection('nc-ext')">
+            Referral fee on this transaction
+          </label>
+          <div id="nc-ext-referral-section" style="display:none;margin-top:10px;">
+            <div id="nc-ext-referral-rows"></div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nc-ext')" style="margin-top:6px;">+ Add another referral</button>
           </div>
         </div>
         <div class="btn-row" style="margin-top:18px">
@@ -2169,10 +2237,11 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
-const GET   = (path)       => api(path);
-const POST  = (path, body) => api(path, { method: "POST",  body: JSON.stringify(body) });
-const PATCH = (path, body) => api(path, { method: "PATCH", body: JSON.stringify(body) });
-const PUT   = (path, body) => api(path, { method: "PUT",   body: JSON.stringify(body) });
+const GET    = (path)       => api(path);
+const POST   = (path, body) => api(path, { method: "POST",   body: JSON.stringify(body) });
+const PATCH  = (path, body) => api(path, { method: "PATCH",  body: JSON.stringify(body) });
+const PUT    = (path, body) => api(path, { method: "PUT",    body: JSON.stringify(body) });
+const DELETE = (path)       => api(path, { method: "DELETE" });
 
 /* ═══════════════════════════════════════════════════════════════════
    FORMATTING HELPERS
@@ -2257,7 +2326,9 @@ async function init() {
   if (['manager', 'staff'].includes(STATE.userRole)) {
     moreItems.push({ page: 'reports',    icon: '📊', label: 'Reports' });
     moreItems.push({ page: 'foundation', icon: '🏛', label: 'Foundation' });
+    moreItems.push({ page: 'referrals',  icon: '🤝', label: 'Referrals' });
     rptInit();
+    refInitFilters();
   }
   if (STATE.userRole === 'manager') {
     moreItems.push({ page: 'admin',      icon: '⚙',  label: 'Checklists' });
@@ -2285,7 +2356,7 @@ function toggleTheme() {
   }
 }
 
-const MORE_PAGES = ['caravan', 'reports', 'foundation', 'admin'];
+const MORE_PAGES = ['caravan', 'reports', 'foundation', 'referrals', 'admin'];
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2300,6 +2371,7 @@ function showPage(name, el) {
     document.getElementById('nav-more-item-' + name)?.classList.add('active');
     btn.style.display = 'none';
     if (name === 'foundation') foundationInit();
+    if (name === 'referrals')  loadReferralReport();
   } else {
     if (el) el.classList.add('active');
     btn.style.display = '';
@@ -2693,6 +2765,9 @@ async function nlReset() {
   document.getElementById('nl-split-primary').value = '50';
   document.getElementById('nl-split-co').value = '50';
   document.getElementById('nl-coagent-sel').value = '';
+  document.getElementById('nl-has-referral').checked = false;
+  document.getElementById('nl-referral-section').style.display = 'none';
+  document.getElementById('nl-referral-rows').innerHTML = '';
   nlFsTransactions = [];
   await nlLoadAgents();
 }
@@ -2836,6 +2911,9 @@ async function nlSaveListing() {
     } else {
       txn = await POST('/daily-desk/transactions', body);
     }
+    if (txn?.id && document.getElementById('nl-has-referral')?.checked) {
+      await _saveReferrals(txn.id, 'nl');
+    }
     closeNewModal();
     await renderAll();
     if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
@@ -2844,13 +2922,245 @@ async function nlSaveListing() {
   }
 }
 
+/* ═══ REFERRAL TRACKING ═══ */
+
+let _referralAgents = null;
+let _referralRowIdx = 0;
+
+async function _ensureReferralAgents() {
+  if (!_referralAgents) {
+    try { _referralAgents = await GET('/daily-desk/agents'); } catch (_) { _referralAgents = []; }
+  }
+  return _referralAgents;
+}
+
+function _buildReferralRow(ns, idx, data = {}) {
+  const lS  = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
+  const iS  = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;';
+  const type = data.referral_type || 'acc_agent';
+  const feeT = data.fee_type || 'percent';
+  const isAcc = type === 'acc_agent';
+  const agentOpts = (_referralAgents || []).map(a =>
+    `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`
+  ).join('');
+  return `<div class="referral-row" data-ns="${ns}" data-ridx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);">
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:8px;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="${lS}">Referral Type</span>
+        <select class="ref-type" onchange="_onReferralTypeChange('${ns}',${idx})" style="${iS}">
+          <option value="acc_agent" ${type==='acc_agent'?'selected':''}>AC&amp;Co Agent</option>
+          <option value="referral_dept" ${type==='referral_dept'?'selected':''}>Referral Department</option>
+          <option value="other" ${type==='other'?'selected':''}>Other</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="${lS}">Fee</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <select class="ref-fee-type" style="${iS}width:auto;flex-shrink:0;">
+            <option value="percent" ${feeT==='percent'?'selected':''}>%</option>
+            <option value="fixed"   ${feeT==='fixed'?'selected':''}>$</option>
+          </select>
+          <input type="text" class="ref-fee-val" value="${data.fee_value != null ? data.fee_value : ''}" placeholder="${feeT==='percent'?'e.g. 25':'e.g. 500'}" style="${iS}">
+        </div>
+      </div>
+      <button type="button" onclick="_removeReferralRow('${ns}',${idx})" style="padding:7px 12px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;align-self:end;">✕</button>
+    </div>
+    <div class="ref-acc-fields" style="display:${isAcc?'block':'none'};margin-bottom:8px;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="${lS}">AC&amp;Co Agent</span>
+        <select class="ref-agent" style="${iS}">
+          <option value="">Select agent…</option>
+          ${agentOpts}
+        </select>
+      </div>
+    </div>
+    <div class="ref-other-fields" style="display:${isAcc?'none':'flex'};gap:8px;margin-bottom:8px;">
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+        <span style="${lS}">Name</span>
+        <input type="text" class="ref-name" value="${escapeHtml(data.referral_name||'')}" placeholder="Referring party name" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+        <span style="${lS}">Company</span>
+        <input type="text" class="ref-company" value="${escapeHtml(data.referral_company||'')}" placeholder="Brokerage or company" style="${iS}">
+      </div>
+    </div>
+    <div>
+      <input type="text" class="ref-notes" value="${escapeHtml(data.notes||'')}" placeholder="Notes (optional)" style="${iS}">
+    </div>
+  </div>`;
+}
+
+function _onReferralTypeChange(ns, idx) {
+  const row = document.querySelector(`.referral-row[data-ns="${ns}"][data-ridx="${idx}"]`);
+  if (!row) return;
+  const type = row.querySelector('.ref-type').value;
+  row.querySelector('.ref-acc-fields').style.display   = type === 'acc_agent' ? 'block' : 'none';
+  row.querySelector('.ref-other-fields').style.display = type === 'acc_agent' ? 'none'  : 'flex';
+}
+
+async function addReferralRow(ns, data = {}) {
+  await _ensureReferralAgents();
+  const idx = _referralRowIdx++;
+  const container = document.getElementById(`${ns}-referral-rows`);
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', _buildReferralRow(ns, idx, data));
+}
+
+function _removeReferralRow(ns, idx) {
+  const row = document.querySelector(`.referral-row[data-ns="${ns}"][data-ridx="${idx}"]`);
+  if (row) row.remove();
+}
+
+function toggleReferralSection(ns) {
+  const checked = document.getElementById(`${ns}-has-referral`).checked;
+  const section = document.getElementById(`${ns}-referral-section`);
+  if (!section) return;
+  section.style.display = checked ? 'block' : 'none';
+  if (checked && document.querySelectorAll(`#${ns}-referral-rows .referral-row`).length === 0) {
+    addReferralRow(ns);
+  }
+}
+
+function collectReferrals(ns) {
+  const rows = document.querySelectorAll(`#${ns}-referral-rows .referral-row`);
+  const out = [];
+  for (const row of rows) {
+    const type    = row.querySelector('.ref-type').value;
+    const feeType = row.querySelector('.ref-fee-type').value;
+    const feeVal  = parseFloat(row.querySelector('.ref-fee-val').value.replace(/[^0-9.]/g, ''));
+    if (isNaN(feeVal)) continue;
+    const obj = { referral_type: type, fee_type: feeType, fee_value: feeVal,
+                  notes: row.querySelector('.ref-notes').value.trim() || null };
+    if (type === 'acc_agent') {
+      obj.agent_id = row.querySelector('.ref-agent').value || null;
+    } else {
+      obj.referral_name    = row.querySelector('.ref-name').value.trim()    || null;
+      obj.referral_company = row.querySelector('.ref-company').value.trim() || null;
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+async function populateReferrals(ns, rows) {
+  await _ensureReferralAgents();
+  if (!rows || !rows.length) return;
+  const checkbox = document.getElementById(`${ns}-has-referral`);
+  if (checkbox) checkbox.checked = true;
+  const section = document.getElementById(`${ns}-referral-section`);
+  if (section) section.style.display = 'block';
+  const container = document.getElementById(`${ns}-referral-rows`);
+  if (container) container.innerHTML = '';
+  for (const r of rows) {
+    const idx = _referralRowIdx++;
+    container.insertAdjacentHTML('beforeend', _buildReferralRow(ns, idx, r));
+  }
+}
+
+async function _saveReferrals(txnId, ns) {
+  const refs = collectReferrals(ns);
+  for (const r of refs) {
+    await POST(`/daily-desk/transactions/${txnId}/referrals`, r);
+  }
+}
+
+async function loadReferralReport() {
+  const year     = document.getElementById('ref-year').value;
+  const officeId = document.getElementById('ref-office').value;
+  const outputEl = document.getElementById('ref-output');
+  const summaryEl = document.getElementById('ref-summary');
+  outputEl.innerHTML = '<div class="report-loading">Loading…</div>';
+  summaryEl.style.display = 'none';
+  try {
+    const params = new URLSearchParams();
+    if (year)     params.set('year',      year);
+    if (officeId) params.set('office_id', officeId);
+    const qs = params.toString();
+    const data = await GET(`/daily-desk/referral-report${qs ? '?' + qs : ''}`);
+    _renderReferralReport(data, summaryEl, outputEl);
+  } catch (e) {
+    outputEl.innerHTML = `<div style="color:#c00;padding:12px;">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function refInitFilters() {
+  const yearSel = document.getElementById('ref-year');
+  if (!yearSel) return;
+  const cur = new Date().getFullYear();
+  for (let y = cur; y >= cur - 5; y--) {
+    yearSel.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
+  }
+  const officeSel = document.getElementById('ref-office');
+  if (officeSel && STATE.offices) {
+    STATE.offices.forEach(o => officeSel.insertAdjacentHTML('beforeend',
+      `<option value="${o.id}">${escapeHtml(o.name)}</option>`));
+  }
+}
+
+function _fmtMoney(v) {
+  return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+}
+function _fmtDate(v) {
+  if (!v) return '—';
+  const d = new Date(v + 'T00:00:00');
+  return d.toLocaleDateString('en-US');
+}
+
+function _renderReferralReport({ summary, records }, summaryEl, outputEl) {
+  const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', other: 'Other' };
+
+  summaryEl.style.display = 'grid';
+  summaryEl.innerHTML = summary.map(s => `
+    <div style="border:1px solid var(--ink-border);border-radius:var(--r);padding:14px;text-align:center;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px;">${typeLabel[s.referral_type]||s.referral_type}</div>
+      <div style="font-size:20px;font-weight:700;">${_fmtMoney(s.total_fees)}</div>
+      <div style="font-size:11px;color:var(--text-dim);">${s.count} closed deal${s.count!==1?'s':''}</div>
+    </div>`).join('');
+
+  if (!records.length) {
+    outputEl.innerHTML = '<div class="empty" style="padding:20px;">No referrals found for the selected filters.</div>';
+    return;
+  }
+
+  outputEl.innerHTML = `
+    <div class="data-table-wrap" style="margin-top:8px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Close Date</th><th>Property</th><th>Office</th>
+            <th>Type</th><th>Referred By</th><th>Company</th>
+            <th>Fee</th><th>Amt Due</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${records.map(r => {
+            const name = r.agent_id ? `${escapeHtml(r.first_name||'')} ${escapeHtml(r.last_name||'')}` : escapeHtml(r.referral_name||'—');
+            const fee  = r.fee_type === 'percent' ? `${r.fee_value}%` : _fmtMoney(r.fee_value);
+            return `<tr>
+              <td>${_fmtDate(r.close_date)}</td>
+              <td>${escapeHtml(r.property_address||'')}</td>
+              <td>${escapeHtml(r.office_name||'')}</td>
+              <td>${typeLabel[r.referral_type]||r.referral_type}</td>
+              <td>${name}</td>
+              <td>${escapeHtml(r.referral_company||'—')}</td>
+              <td>${fee}</td>
+              <td>${_fmtMoney(r.fee_amount)}</td>
+              <td><span class="chip chip-${r.status==='closed'?'success':'neutral'}">${r.status}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
 /* ═══ ROW ACTION MODAL — Change/Expired/Withdrawn/Close ═══ */
 
 // Action definitions per status/kind. Each action has a label, icon, description,
 // optional form fields (rendered in the confirm step), and checklist items added on confirm.
 const LISTING_ACTIONS = {
   coming_soon: [
-    { key: 'caravan',        icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
+    { key: 'caravan',          icon: '🚗', title: 'Add to Caravan',  desc: 'Add this listing to the active caravan queue.' },
+    { key: 'manage_referrals', icon: '↪',  title: 'Referrals',       desc: 'Add or update referral fees for this transaction.' },
   ],
   active: [
     { key: 'caravan',                icon: '🚗', title: 'Add to Caravan',         desc: 'Add this listing to the active caravan queue.' },
@@ -2859,19 +3169,23 @@ const LISTING_ACTIONS = {
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed (recorded directly from Active).' },
     { key: 'expired',                icon: '⏳', title: 'Expired',                desc: "Listing's term ended without a sale." },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Seller is pulling the listing early.' },
+    { key: 'manage_referrals',       icon: '↪',  title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
     { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   under_contract: [
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
     { key: 'fall_through',           icon: '↩',  title: 'Fall Through',           desc: 'Contract fell through — listing returns to Active.' },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Pull the listing off market (can be returned to Active).' },
+    { key: 'manage_referrals',       icon: '↪',  title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
     { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   withdrawn: [
     { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
+    { key: 'manage_referrals', icon: '↪', title: 'Referrals',        desc: 'Add or update referral fees for this transaction.' },
   ],
   closed: [
     { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'manage_referrals',       icon: '↪', title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
     { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
     { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
@@ -2882,10 +3196,12 @@ const CONTRACT_ACTIONS = {
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Contract fell through.' },
     { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Extend closing date or update buyer\'s agent.' },
+    { key: 'manage_referrals',       icon: '↪',  title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
     { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   closed: [
     { key: 'change',                 icon: '✎', title: 'Add Note / Correction',  desc: 'Record a late update to this closed transaction.' },
+    { key: 'manage_referrals',       icon: '↪', title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
     { key: 'print_commission',       icon: '🖨', title: 'Commission Disclosure',  desc: 'Re-open the commission disclosure form for printing.' },
     { key: 'print_listing_contract', icon: '🖨', title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
@@ -2994,6 +3310,29 @@ async function amChooseAction(key) {
   if (PRINT_FORMS[key]) {
     window.open(`./${PRINT_FORMS[key]}?id=${amState.id}`, '_blank');
     closeActionModal();
+    return;
+  }
+
+  if (key === 'manage_referrals') {
+    document.getElementById('actionModalTitle').textContent = 'Manage Referrals';
+    document.getElementById('am-step-choose').style.display = 'none';
+    document.getElementById('am-step-confirm').style.display = 'block';
+    document.querySelector('#am-step-confirm .divider').style.display = 'none';
+    document.getElementById('amChecklistPreview').style.display = 'none';
+    const iS = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;';
+    document.getElementById('amConfirmFields').innerHTML = `
+      <div id="am-referral-rows"></div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('am')" style="margin-top:6px;">+ Add referral</button>`;
+    amState._originalReferrals = [];
+    try {
+      const existing = await GET(`/daily-desk/transactions/${amState.id}/referrals`);
+      amState._originalReferrals = existing || [];
+      if (existing && existing.length) {
+        await populateReferrals('am', existing);
+      }
+    } catch (e) {
+      console.error('Failed to load referrals:', e);
+    }
     return;
   }
 
@@ -3189,6 +3528,16 @@ async function amChooseAction(key) {
           <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Mortgage Company</span>
           <input type="text" id="am-mortgage-company" list="dl-mortgage-companies" placeholder="Optional">
         </div>
+      </div>
+      <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="am-has-referral" onchange="toggleReferralSection('am')">
+          Referral fee on this transaction
+        </label>
+        <div id="am-referral-section" style="display:none;margin-top:10px;">
+          <div id="am-referral-rows"></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('am')" style="margin-top:6px;">+ Add another referral</button>
+        </div>
       </div>`;
   } else if (key === 'under_contract') {
     fieldsHtml = `
@@ -3220,6 +3569,11 @@ async function amChooseAction(key) {
   if (key === 'closing') {
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
+    amState._closingOriginalReferrals = [];
+    GET(`/daily-desk/transactions/${amState.id}/referrals`).then(existing => {
+      amState._closingOriginalReferrals = existing || [];
+      if (existing && existing.length) populateReferrals('am', existing);
+    }).catch(() => {});
   }
 
   const clEl = document.getElementById('amChecklistPreview');
@@ -3699,8 +4053,27 @@ async function amSubmit() {
     // fsbo: no additional fields needed
   }
 
+  if (key === 'manage_referrals') {
+    const orig    = amState._originalReferrals || [];
+    const current = collectReferrals('am');
+    try {
+      for (const r of orig)    await DELETE(`/daily-desk/transactions/${amState.id}/referrals/${r.id}`);
+      for (const r of current) await POST(`/daily-desk/transactions/${amState.id}/referrals`, r);
+      closeActionModal();
+    } catch (e) {
+      alert('Failed to save referrals: ' + e.message);
+    }
+    return;
+  }
+
   try {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
+    if (key === 'closing') {
+      const orig    = amState._closingOriginalReferrals || [];
+      const current = collectReferrals('am');
+      for (const r of orig)    await DELETE(`/daily-desk/transactions/${amState.id}/referrals/${r.id}`);
+      for (const r of current) await POST(`/daily-desk/transactions/${amState.id}/referrals`, r);
+    }
     await renderAll();
     const printMap = {
       closing:          { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
@@ -3777,6 +4150,16 @@ function openNewContractModal() {
   // Reset FS step
   document.getElementById('nc-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
   document.getElementById('nc-fs-agent').value = '';
+
+  // Reset referral toggles
+  ['nc-acc', 'nc-ext'].forEach(ns => {
+    const cb = document.getElementById(`${ns}-has-referral`);
+    if (cb) cb.checked = false;
+    const sec = document.getElementById(`${ns}-referral-section`);
+    if (sec) sec.style.display = 'none';
+    const rows = document.getElementById(`${ns}-referral-rows`);
+    if (rows) rows.innerHTML = '';
+  });
 
   document.getElementById('newContractModal').classList.add('open');
 }
@@ -3947,6 +4330,9 @@ async function ncSaveAccContract() {
 
   try {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
+    if (document.getElementById('nc-acc-has-referral')?.checked) {
+      await _saveReferrals(listingId, 'nc-acc');
+    }
     closeNewContractModal();
     await renderAll();
     window.open(`./form-listing-contract.html?id=${listingId}`, '_blank');
@@ -4014,6 +4400,9 @@ async function ncSaveExternalContract() {
       buyer_name:              ncFsDetail?.buyerLandlordName  || null,
       buyer_email:             ncFsDetail?.buyerParty1Email   || null,
     });
+    if (txn?.id && document.getElementById('nc-ext-has-referral')?.checked) {
+      await _saveReferrals(txn.id, 'nc-ext');
+    }
     closeNewContractModal();
     await renderAll();
     if (txn?.id) window.open(`./form-listing-contract.html?id=${txn.id}`, '_blank');
