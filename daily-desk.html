@@ -2936,34 +2936,34 @@ async function _ensureReferralAgents() {
 
 function _buildReferralRow(ns, idx, data = {}) {
   const lS  = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
-  const iS  = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;';
+  const iS  = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;min-width:0;';
   const type = data.referral_type || 'acc_agent';
   const feeT = data.fee_type || 'percent';
   const isAcc = type === 'acc_agent';
   const agentOpts = (_referralAgents || []).map(a =>
     `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`
   ).join('');
-  return `<div class="referral-row" data-ns="${ns}" data-ridx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);">
-    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:8px;">
-      <div style="display:flex;flex-direction:column;gap:4px;">
+  return `<div class="referral-row" data-ns="${ns}" data-ridx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:8px;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
         <span style="${lS}">Referral Type</span>
         <select class="ref-type" onchange="_onReferralTypeChange('${ns}',${idx})" style="${iS}">
           <option value="acc_agent" ${type==='acc_agent'?'selected':''}>AC&amp;Co Agent</option>
-          <option value="referral_dept" ${type==='referral_dept'?'selected':''}>Referral Department</option>
+          <option value="referral_dept" ${type==='referral_dept'?'selected':''}>Referral Dept</option>
           <option value="other" ${type==='other'?'selected':''}>Other</option>
         </select>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
         <span style="${lS}">Fee</span>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <select class="ref-fee-type" style="${iS}width:auto;flex-shrink:0;">
+        <div style="display:flex;gap:6px;align-items:center;min-width:0;">
+          <select class="ref-fee-type" style="padding:7px 6px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-size:12px;flex-shrink:0;">
             <option value="percent" ${feeT==='percent'?'selected':''}>%</option>
             <option value="fixed"   ${feeT==='fixed'?'selected':''}>$</option>
           </select>
-          <input type="text" class="ref-fee-val" value="${data.fee_value != null ? data.fee_value : ''}" placeholder="${feeT==='percent'?'e.g. 25':'e.g. 500'}" style="${iS}">
+          <input type="text" class="ref-fee-val" value="${data.fee_value != null ? data.fee_value : ''}" placeholder="${feeT==='percent'?'25':'500'}" style="${iS}flex:1;">
         </div>
       </div>
-      <button type="button" onclick="_removeReferralRow('${ns}',${idx})" style="padding:7px 12px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;align-self:end;">✕</button>
+      <button type="button" onclick="_removeReferralRow('${ns}',${idx})" style="padding:7px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;align-self:end;white-space:nowrap;">✕</button>
     </div>
     <div class="ref-acc-fields" style="display:${isAcc?'block':'none'};margin-bottom:8px;">
       <div style="display:flex;flex-direction:column;gap:4px;">
@@ -2974,14 +2974,14 @@ function _buildReferralRow(ns, idx, data = {}) {
         </select>
       </div>
     </div>
-    <div class="ref-other-fields" style="display:${isAcc?'none':'flex'};gap:8px;margin-bottom:8px;">
-      <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+    <div class="ref-other-fields" style="display:${isAcc?'none':'flex'};gap:8px;margin-bottom:8px;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
         <span style="${lS}">Name</span>
-        <input type="text" class="ref-name" value="${escapeHtml(data.referral_name||'')}" placeholder="Referring party name" style="${iS}">
+        <input type="text" class="ref-name" value="${escapeHtml(data.referral_name||'')}" placeholder="Referring party" style="${iS}">
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
         <span style="${lS}">Company</span>
-        <input type="text" class="ref-company" value="${escapeHtml(data.referral_company||'')}" placeholder="Brokerage or company" style="${iS}">
+        <input type="text" class="ref-company" value="${escapeHtml(data.referral_company||'')}" placeholder="Brokerage / company" style="${iS}">
       </div>
     </div>
     <div>
