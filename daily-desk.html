@@ -2849,6 +2849,9 @@ const LISTING_ACTIONS = {
     { key: 'fall_through', icon: '↩',  title: 'Fall Through', desc: 'Contract fell through — listing returns to Active.' },
     { key: 'withdrawn',    icon: '🚫', title: 'Withdrawn',    desc: 'Pull the listing off market (can be returned to Active).' },
   ],
+  withdrawn: [
+    { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
+  ],
   closed: [
     { key: 'change',    icon: '✎', title: 'Add Note / Correction', desc: 'Record a late update to this closed transaction.' },
   ],
@@ -2892,6 +2895,10 @@ const ACTION_CHECKLIST = {
     'Recover sign',
     'Withdrawal paperwork uploaded to Form Simplicity',
   ],
+  return_to_market: [
+    'Update MLS status to Active',
+    'Confirm lockbox and sign are in place',
+  ],
   closing: [
     'Confirm commission split in Profit Power',
     'Confirm title company on file',
@@ -2908,8 +2915,9 @@ const ACTION_TITLES = {
   change:         'Change',
   expired:        'Expired',
   withdrawn:      'Withdrawn',
-  fall_through:   'Fall Through',
-  closing:        'Closing',
+  fall_through:     'Fall Through',
+  return_to_market: 'Return to Market',
+  closing:          'Closing',
   under_contract: 'Under Contract',
   caravan:        'Add to Caravan',
 };
@@ -3084,7 +3092,7 @@ async function amChooseAction(key) {
           <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address">
         </div>
       </div>`;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3579,7 +3587,7 @@ async function amSubmit() {
     fields.notes = document.getElementById('am-notes').value || null;
     const correctedAddr = document.getElementById('am-property-address').value.trim();
     if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
     const effectiveDate = document.getElementById('am-effective-date').value;
     if (effectiveDate) fields.effectiveDate = effectiveDate;
     fields.notes = document.getElementById('am-notes').value || null;
