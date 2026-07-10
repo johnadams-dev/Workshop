@@ -1634,7 +1634,7 @@ tbody tr.clickable { cursor: pointer; }
             Referral fee on this transaction
           </label>
           <div id="nl-referral-section" style="display:none;margin-top:10px;">
-            <div id="nl-referral-rows"></div>
+            <div id="nl-referral-rows" data-default-side="seller"></div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nl')" style="margin-top:6px;">+ Add another referral</button>
           </div>
         </div>
@@ -1723,7 +1723,7 @@ tbody tr.clickable { cursor: pointer; }
             Referral fee on this transaction
           </label>
           <div id="nc-acc-referral-section" style="display:none;margin-top:10px;">
-            <div id="nc-acc-referral-rows"></div>
+            <div id="nc-acc-referral-rows" data-default-side="buyer"></div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nc-acc')" style="margin-top:6px;">+ Add another referral</button>
           </div>
         </div>
@@ -1839,7 +1839,7 @@ tbody tr.clickable { cursor: pointer; }
             Referral fee on this transaction
           </label>
           <div id="nc-ext-referral-section" style="display:none;margin-top:10px;">
-            <div id="nc-ext-referral-rows"></div>
+            <div id="nc-ext-referral-rows" data-default-side="buyer"></div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('nc-ext')" style="margin-top:6px;">+ Add another referral</button>
           </div>
         </div>
@@ -2930,10 +2930,17 @@ function _buildReferralRow(ns, idx, data = {}) {
   const feeT    = data.fee_type || 'percent';
   const isAcc   = type === 'acc_agent';
   const isOther = type === 'other';
+  const side    = data.side || 'seller';
+  const sideLabel = side === 'buyer' ? 'Buyer Side' : 'Seller Side';
+  const sideColor = side === 'buyer' ? 'var(--blue)' : 'var(--amber)';
   const agentOpts = (_referralAgents || []).map(a =>
     `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`
   ).join('');
   return `<div class="referral-row" data-ns="${ns}" data-ridx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
+    <input type="hidden" class="ref-side" value="${side}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:11px;font-weight:600;color:${sideColor};letter-spacing:.03em;">${sideLabel}</span>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:8px;min-width:0;">
       <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
         <span style="${lS}">Referral Type</span>
@@ -3005,6 +3012,7 @@ async function addReferralRow(ns, data = {}) {
   const idx = _referralRowIdx++;
   const container = document.getElementById(`${ns}-referral-rows`);
   if (!container) return;
+  if (!data.side) data = { ...data, side: container.dataset.defaultSide || 'seller' };
   container.insertAdjacentHTML('beforeend', _buildReferralRow(ns, idx, data));
 }
 
@@ -3032,6 +3040,7 @@ function collectReferrals(ns) {
     const feeVal  = parseFloat(row.querySelector('.ref-fee-val').value.replace(/[^0-9.]/g, ''));
     if (isNaN(feeVal)) continue;
     const obj = { referral_type: type, fee_type: feeType, fee_value: feeVal,
+                  side: row.querySelector('.ref-side').value || 'seller',
                   notes: row.querySelector('.ref-notes').value.trim() || null };
     if (type === 'acc_agent') {
       obj.agent_id = row.querySelector('.ref-agent').value || null;
@@ -3326,8 +3335,9 @@ async function amChooseAction(key) {
     document.getElementById('am-step-confirm').style.display = 'block';
     document.querySelector('#am-step-confirm .divider').style.display = 'none';
     document.getElementById('amChecklistPreview').style.display = 'none';
+    const amRefSide = amState.kind === 'contract' ? 'buyer' : 'seller';
     document.getElementById('amConfirmFields').innerHTML = `
-      <div id="am-referral-rows"></div>
+      <div id="am-referral-rows" data-default-side="${amRefSide}"></div>
       <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('am')" style="margin-top:6px;">+ Add referral</button>`;
     amState._originalReferrals = [];
     try {
@@ -3535,16 +3545,7 @@ async function amChooseAction(key) {
           <input type="text" id="am-mortgage-company" list="dl-mortgage-companies" placeholder="Optional">
         </div>
       </div>
-      <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-          <input type="checkbox" id="am-has-referral" onchange="toggleReferralSection('am')">
-          Referral fee on this transaction
-        </label>
-        <div id="am-referral-section" style="display:none;margin-top:10px;">
-          <div id="am-referral-rows"></div>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="addReferralRow('am')" style="margin-top:6px;">+ Add another referral</button>
-        </div>
-      </div>`;
+      `;
   } else if (key === 'under_contract') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
@@ -3575,11 +3576,6 @@ async function amChooseAction(key) {
   if (key === 'closing') {
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
-    amState._closingOriginalReferrals = [];
-    GET(`/daily-desk/transactions/${amState.id}/referrals`).then(existing => {
-      amState._closingOriginalReferrals = existing || [];
-      if (existing && existing.length) populateReferrals('am', existing);
-    }).catch(() => {});
   }
 
   const clEl = document.getElementById('amChecklistPreview');
@@ -4074,12 +4070,6 @@ async function amSubmit() {
 
   try {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
-    if (key === 'closing') {
-      const orig    = amState._closingOriginalReferrals || [];
-      const current = collectReferrals('am');
-      for (const r of orig)    await DELETE(`/daily-desk/transactions/${amState.id}/referrals/${r.id}`);
-      for (const r of current) await POST(`/daily-desk/transactions/${amState.id}/referrals`, r);
-    }
     await renderAll();
     const printMap = {
       closing:          { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },
