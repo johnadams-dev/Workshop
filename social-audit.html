@@ -136,6 +136,8 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 /* ── History list ── */
 .audit-list-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:9px;cursor:pointer;transition:background .1s;border:1px solid transparent}
 .audit-list-row:hover{background:#f9f8f5;border-color:#e0dcd4}
+.audit-list-row.no-click{cursor:default;opacity:.7}
+.audit-list-row.no-click:hover{background:none;border-color:transparent}
 .audit-list-name{font-weight:600;font-size:13px;flex:1}
 .audit-list-ctx{font-size:11px;color:#9ca3af}
 .audit-list-score{font-size:18px;font-weight:700;color:#1a1a2e;width:44px;text-align:right}
@@ -488,15 +490,17 @@ async function loadAuditList() {
     const rows = await r.json();
     const el = document.getElementById('audit-list');
     if (!rows.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">No audits yet — run the first one above.</div>'; return; }
-    el.innerHTML = rows.map(row => `
-      <div class="audit-list-row" onclick="loadReport(${row.id})">
+    el.innerHTML = rows.map(row => {
+      const failed = row.status === 'failed';
+      return `<div class="audit-list-row${failed ? ' no-click' : ''}" ${failed ? '' : `onclick="loadReport(${row.id})"`}>
         <div>
           <div class="audit-list-name">${esc(row.agent_name)}</div>
           <div class="audit-list-ctx">${esc(row.context||'')} &middot; ${fmtDate(row.run_at)}</div>
         </div>
         <div class="audit-list-score">${row.status === 'complete' ? row.overall_score : '—'}</div>
         <div class="audit-list-status status-${row.status}">${row.status}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e) { console.warn('loadAuditList:', e.message); }
 }
 

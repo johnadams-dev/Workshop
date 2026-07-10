@@ -103,11 +103,28 @@ tr:last-child td{border-bottom:none}
 </div>
 
 <div class="topbar" style="justify-content:space-between">
-  <div style="display:flex;align-items:center">
-    <span class="topbar-logo">Adams Cameron</span>
-    <span class="topbar-title">Foundation</span>
+  <div style="display:flex;align-items:center;gap:14px">
+    <a href="./index.html" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none">&#8592; Tools</a>
+    <div style="display:flex;align-items:center">
+      <span class="topbar-logo">Adams Cameron</span>
+      <span class="topbar-title">Foundation</span>
+    </div>
   </div>
-  <a href="./feedback.html?tool=foundation" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none;letter-spacing:.03em">Feedback</a>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a id="don-link" onclick="showDonationsModal()" style="display:none;font-size:12px;color:rgba(255,255,255,.8);text-decoration:none;cursor:pointer;letter-spacing:.03em">Active Donations</a>
+    <a href="./feedback.html?tool=foundation" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none;letter-spacing:.03em">Feedback</a>
+  </div>
+</div>
+
+<!-- Active Donations modal -->
+<div id="don-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:90%;max-width:640px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">
+      <strong style="font-size:15px">Active Donations</strong>
+      <button onclick="closeDonationsModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1">&times;</button>
+    </div>
+    <div id="don-output" style="padding:16px 18px"></div>
+  </div>
 </div>
 
 <div class="content">
@@ -299,6 +316,10 @@ async function load() {
     renderOfficeStats(data.office_stats);
     renderDonors(data.donors || []);
 
+    if (data.staff_role === 'manager' || data.staff_role === 'admin') {
+      document.getElementById('don-link').style.display = '';
+    }
+
     document.getElementById('loading-msg').style.display = 'none';
     document.getElementById('main').style.display = 'block';
 
@@ -483,6 +504,50 @@ function fmtDate(v) {
   const d = new Date(v + 'T00:00:00');
   if (isNaN(d)) return '—';
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+// ── Active Donations (manager/admin only) ─────────────────────────────────────
+async function showDonationsModal() {
+  document.getElementById('don-modal').style.display = 'flex';
+  const out = document.getElementById('don-output');
+  out.innerHTML = '<p style="color:var(--muted)">Loading…</p>';
+  try {
+    const r = await fetch(PROXY_URL + '/daily-desk/report/donations', { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rows = await r.json();
+    out.innerHTML = renderDonations(rows);
+  } catch (e) {
+    out.innerHTML = '<p style="color:var(--red)">Error: ' + esc(e.message) + '</p>';
+  }
+}
+function closeDonationsModal() {
+  document.getElementById('don-modal').style.display = 'none';
+}
+function renderDonations(rows) {
+  if (!rows.length) return '<p style="color:var(--muted);font-size:13px">No active donation commitments found.</p>';
+  const fmtAmt = r => {
+    if (r.fixed_amount    != null) return '$' + Number(r.fixed_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (r.percentage_rate != null) return Number(r.percentage_rate).toFixed(2) + '%';
+    return '—';
+  };
+  const byType = new Map();
+  rows.forEach(r => {
+    const k = r.donation_type || 'Other';
+    if (!byType.has(k)) byType.set(k, []);
+    byType.get(k).push(r);
+  });
+  let html = `<p style="font-size:13px;color:var(--muted);margin-bottom:16px">${rows.length} active commitment${rows.length !== 1 ? 's' : ''}</p>`;
+  byType.forEach((typeRows, typeName) => {
+    html += `<div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:8px">${esc(typeName)} — ${typeRows.length} agent${typeRows.length !== 1 ? 's' : ''}</div>
+      <table><thead><tr><th>Agent</th><th>Amount / Rate</th><th>Effective Date</th></tr></thead>
+      <tbody>${typeRows.map(r => `<tr>
+        <td>${esc(r.first_name + ' ' + r.last_name)}</td>
+        <td style="font-variant-numeric:tabular-nums">${fmtAmt(r)}</td>
+        <td style="font-variant-numeric:tabular-nums">${fmtDate(r.effective_date)}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  });
+  return html;
 }
 
 // ── Google auth ────────────────────────────────────────────────────────────────
