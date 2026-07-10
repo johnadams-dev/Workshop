@@ -3092,13 +3092,13 @@ function refInitFilters() {
   const yearSel = document.getElementById('ref-year');
   if (!yearSel) return;
   const cur = new Date().getFullYear();
-  for (let y = cur; y >= cur - 5; y--) {
-    yearSel.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
-  }
+  let yearOpts = '';
+  for (let y = cur; y >= cur - 5; y--) yearOpts += `<option value="${y}">${y}</option>`;
+  yearSel.innerHTML = yearOpts;
   const officeSel = document.getElementById('ref-office');
   if (officeSel && STATE.offices) {
-    STATE.offices.forEach(o => officeSel.insertAdjacentHTML('beforeend',
-      `<option value="${o.id}">${escapeHtml(o.name)}</option>`));
+    officeSel.innerHTML = '<option value="">All Offices</option>' +
+      STATE.offices.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
   }
 }
 
@@ -5861,11 +5861,10 @@ async function adminCreateTemplate() {
    REPORTS
 ═══════════════════════════════════════════════════════════════════ */
 function rptInit() {
-  const officeOpts = (STATE.offices || []).map(o =>
-    `<option value="${o.id}">${escapeHtml(o.name)}</option>`
-  ).join('');
-  document.getElementById('eom-office').insertAdjacentHTML('beforeend', officeOpts);
-  document.getElementById('exp-office').insertAdjacentHTML('beforeend', officeOpts);
+  const officeOpts = '<option value="">All Offices</option>' +
+    (STATE.offices || []).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+  document.getElementById('eom-office').innerHTML = officeOpts;
+  document.getElementById('exp-office').innerHTML = officeOpts;
 
   const now  = new Date();
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
