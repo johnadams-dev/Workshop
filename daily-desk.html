@@ -2872,7 +2872,7 @@ async function nlSaveListing() {
     transaction_type: 'seller',
     property_address: address,
     city: document.getElementById('nl-city').value.trim() || null,
-    office_id: officeId !== 'all' ? officeId : (agent ? agent.office_id : null),
+    office_id: agent?.office_id || (officeId !== 'all' ? officeId : null),
     agent_id: agentId || null,
     current_price: amParseMoney(document.getElementById('nl-price').value),
     list_date: document.getElementById('nl-list-date').value || null,
@@ -4661,14 +4661,14 @@ function stToggleCoAgent() {
 async function confirmStartTracking() {
   const agentId  = document.getElementById('st-agent').value;
   const officeId = document.getElementById('officeSelect').value;
+  if (!agentId) { alert('Please select a listing agent before starting tracking.'); return; }
   const { split_pct: stSplitPct, co_agents: stCoAgents, splitError: stSplitErr } = collectCoAgent('st-coagent-area', 'st-coagent-sel', 'st-split-primary', 'st-split-co');
   if (stSplitErr) { alert(stSplitErr); return; }
-  const row      = STATE.untracked.find(r => r.delta_listing_id === _stDeltaListingId);
   try {
     await POST('/daily-desk/start-tracking', {
       delta_listing_id: _stDeltaListingId,
-      agent_id:  agentId || null,
-      office_id: (row?.office_id) || (officeId !== 'all' ? officeId : null),
+      agent_id:  agentId,
+      office_id: officeId !== 'all' ? officeId : null,
       split_pct: stSplitPct,
       co_agents: stCoAgents,
     });
