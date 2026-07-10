@@ -3870,10 +3870,10 @@ async function amSubmit() {
         const listing = await cvFetchListing(mlsId);
         const item = { ...listing, entryInstructions, agentComments, caravanDate };
         cvQueue.push(item);
-        cvSaveItemToDB(item);
+        await cvSaveItemToDB(item);
         cvRenderQueue();
         cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
-        cvSendNotify(listing.addr || listing.fullAddr, listing.city, caravanDate);
+        cvSendNotify(caravanDate);
       } catch (e) {
         cvToast('⚠', 'Could not fetch listing: ' + e.message);
       }
@@ -3891,10 +3891,10 @@ async function amSubmit() {
         entryInstructions, agentComments, caravanDate, _raw: {},
       };
       cvQueue.push(item);
-      cvSaveItemToDB(item);
+      await cvSaveItemToDB(item);
       cvRenderQueue();
       cvToast('✓', 'Added to caravan (no MLS# — fetch details on the Caravan tab).');
-      cvSendNotify(addr, city, caravanDate);
+      cvSendNotify(caravanDate);
     }
     return;
   }
@@ -5236,16 +5236,16 @@ function cvSetStatus(state, msg) {
 }
 
 // ── Caravan notification ──
-function cvSendNotify(address, city, caravanDate) {
+function cvSendNotify(caravanDate) {
   fetch(`${PROXY}/daily-desk/caravan-notify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
-    body: JSON.stringify({ userName: userDisplay || userEmail, address, city: city || '', caravanDate: caravanDate || '' }),
+    body: JSON.stringify({ caravanDate: caravanDate || '' }),
   }).catch(e => console.warn('[caravan-notify]', e.message));
 }
 
 // ── Queue management ──
-function cvAddToQueue() {
+async function cvAddToQueue() {
   if (!cvPendingListing) return;
   if (cvQueue.some(i => i.mlsId === cvPendingListing.mlsId)) {
     cvToast('⚠', 'MLS# ' + cvPendingListing.mlsId + ' is already in the queue.');
@@ -5257,10 +5257,10 @@ function cvAddToQueue() {
   const item = { ...cvPendingListing, entryInstructions: entry, agentComments, caravanDate };
   cvQueue.push(item);
   cvRenderQueue();
-  cvSaveItemToDB(item);
+  await cvSaveItemToDB(item);
   cvClear();
   cvToast('✓', 'Added ' + (cvPendingListing.addr || 'listing') + ' to caravan.');
-  cvSendNotify(cvPendingListing.addr || cvPendingListing.fullAddr, cvPendingListing.city, caravanDate);
+  cvSendNotify(caravanDate);
   cvPendingListing = null;
 }
 
