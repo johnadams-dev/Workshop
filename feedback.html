@@ -85,11 +85,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .feed-by{font-size:12px;color:var(--muted)}
 .feed-desc{font-size:13px;color:#4B5563;margin-top:10px;white-space:pre-wrap;line-height:1.6;display:none;border-top:1px solid var(--border);padding-top:10px}
 .feed-desc.open{display:block}
-.status-row{margin-top:10px;display:none;gap:8px;align-items:center}
-.status-row.mgr{display:flex}
-.status-row select{padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;font-family:inherit}
-.status-row button{padding:5px 12px;font-size:12px;background:var(--navy);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit}
-.status-row button:hover{background:#264d78}
+/* ── Manager controls ── */
+.mgr-controls{margin-top:10px;display:none}
+.mgr-controls.show{display:block}
+.mgr-quick{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mgr-select{padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;font-family:inherit}
+.mgr-btn{padding:5px 12px;font-size:12px;background:var(--navy);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit}
+.mgr-btn:hover{background:#264d78}
+.mgr-btn-complete{background:var(--green)}
+.mgr-btn-complete:hover{background:#15803d}
+.mgr-btn-reopen{background:none;color:var(--muted);border:1px solid var(--border)}
+.mgr-btn-reopen:hover{color:var(--text);border-color:#94a3b8}
+.complete-form{margin-top:10px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:6px;padding:12px}
+.complete-form textarea{width:100%;padding:8px 10px;border:1px solid #86EFAC;border-radius:5px;font-size:13px;font-family:inherit;resize:vertical;min-height:72px;background:#fff}
+.complete-form textarea:focus{outline:none;border-color:var(--green)}
+.complete-form-btns{display:flex;gap:8px;margin-top:8px}
+.resolution-display{padding:10px 12px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:6px;font-size:13px}
+.resolution-by{font-size:11px;color:var(--muted);margin-bottom:6px}
+.resolution-note-text{color:#166534;line-height:1.5;white-space:pre-wrap}
 
 /* ── Badges ── */
 .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
@@ -431,6 +444,35 @@ async function loadBrowse() {
   }
 }
 
+function mgrControlsHtml(item) {
+  if (item.status === 'resolved') {
+    const d = item.resolved_at
+      ? new Date(item.resolved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : '';
+    return `
+      <div class="resolution-display">
+        <div class="resolution-by">✓ Completed${item.resolved_by ? ' by ' + esc(item.resolved_by) : ''}${d ? ' · ' + d : ''}</div>
+        <div class="resolution-note-text">${esc(item.resolution_note || '')}</div>
+        <button class="mgr-btn mgr-btn-reopen" style="margin-top:8px" onclick="reopenItem('${item.id}')">↩ Reopen</button>
+      </div>`;
+  }
+  const progressOpt = `<option value="open"${item.status==='open'?' selected':''}>Open</option>
+    <option value="in_progress"${item.status==='in_progress'?' selected':''}>In Progress</option>`;
+  return `
+    <div class="mgr-quick">
+      <select class="mgr-select" id="ssel-${item.id}">${progressOpt}</select>
+      <button class="mgr-btn" onclick="updateStatus('${item.id}')">Set</button>
+      <button class="mgr-btn mgr-btn-complete" onclick="showCompleteForm('${item.id}')">✓ Mark Complete</button>
+    </div>
+    <div id="cform-${item.id}" class="complete-form" style="display:none">
+      <textarea id="cnote-${item.id}" placeholder="Describe what was done or built…"></textarea>
+      <div class="complete-form-btns">
+        <button class="mgr-btn mgr-btn-complete" onclick="submitComplete('${item.id}')">Confirm Complete</button>
+        <button class="mgr-btn mgr-btn-reopen" onclick="hideCompleteForm('${item.id}')">Cancel</button>
+      </div>
+    </div>`;
+}
+
 function renderFeed() {
   const tf = document.getElementById('f-type-filter').value;
   const sf = document.getElementById('f-status-filter').value;
@@ -488,10 +530,8 @@ function renderFeed() {
         <div class="vote-section" id="vote-${item.id}">
           <div style="font-size:12px;color:var(--muted)">Loading…</div>
         </div>
-        <div class="status-row${isMgr?' mgr':''}" onclick="event.stopPropagation()">
-          <label style="font-size:11px;color:var(--muted)">Status:</label>
-          <select id="ssel-${item.id}">${opts}</select>
-          <button onclick="updateStatus('${item.id}')">Save</button>
+        <div class="mgr-controls${isMgr?' show':''}" onclick="event.stopPropagation()">
+          ${isMgr ? mgrControlsHtml(item) : ''}
         </div>
       </div>`;
   }).join('');
@@ -632,12 +672,51 @@ async function submitVote(id) {
 
 async function updateStatus(id) {
   const sel = document.getElementById('ssel-' + id);
+  if (!sel) return;
   try {
     const updated = await PATCH(`/feedback/${id}/status`, { status: sel.value });
     const item = allItems.find(i => i.id === id);
     if (item) item.status = updated.status;
     renderFeed();
   } catch (e) { alert('Failed to update: ' + e.message); }
+}
+
+function showCompleteForm(id) {
+  document.getElementById(`cform-${id}`).style.display = 'block';
+}
+
+function hideCompleteForm(id) {
+  document.getElementById(`cform-${id}`).style.display = 'none';
+  const ta = document.getElementById(`cnote-${id}`);
+  if (ta) ta.value = '';
+}
+
+async function submitComplete(id) {
+  const note = document.getElementById(`cnote-${id}`)?.value?.trim();
+  if (!note) { alert('Please describe what was done before marking complete.'); return; }
+  try {
+    const updated = await PATCH(`/feedback/${id}/status`, { status: 'resolved', resolution_note: note });
+    const item = allItems.find(i => i.id === id);
+    if (item) Object.assign(item, {
+      status: updated.status,
+      resolution_note: updated.resolution_note,
+      resolved_by: updated.resolved_by,
+      resolved_at: updated.resolved_at,
+    });
+    renderFeed();
+  } catch (e) { alert('Failed: ' + e.message); }
+}
+
+async function reopenItem(id) {
+  try {
+    const updated = await PATCH(`/feedback/${id}/status`, { status: 'open' });
+    const item = allItems.find(i => i.id === id);
+    if (item) Object.assign(item, {
+      status: updated.status,
+      resolution_note: null, resolved_by: null, resolved_at: null,
+    });
+    renderFeed();
+  } catch (e) { alert('Failed: ' + e.message); }
 }
 
 // ── Screenshot ────────────────────────────────────────────────────────────────
