@@ -2925,9 +2925,10 @@ async function _ensureReferralAgents() {
 function _buildReferralRow(ns, idx, data = {}) {
   const lS  = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
   const iS  = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;min-width:0;';
-  const type = data.referral_type || 'acc_agent';
-  const feeT = data.fee_type || 'percent';
-  const isAcc = type === 'acc_agent';
+  const type    = data.referral_type || 'acc_agent';
+  const feeT    = data.fee_type || 'percent';
+  const isAcc   = type === 'acc_agent';
+  const isOther = type === 'other';
   const agentOpts = (_referralAgents || []).map(a =>
     `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`
   ).join('');
@@ -2936,9 +2937,10 @@ function _buildReferralRow(ns, idx, data = {}) {
       <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
         <span style="${lS}">Referral Type</span>
         <select class="ref-type" onchange="_onReferralTypeChange('${ns}',${idx})" style="${iS}">
-          <option value="acc_agent" ${type==='acc_agent'?'selected':''}>AC&amp;Co Agent</option>
-          <option value="referral_dept" ${type==='referral_dept'?'selected':''}>Referral Dept</option>
-          <option value="other" ${type==='other'?'selected':''}>Other</option>
+          <option value="acc_agent"       ${type==='acc_agent'?'selected':''}>AC&amp;Co Agent</option>
+          <option value="referral_dept"   ${type==='referral_dept'?'selected':''}>Referral Dept</option>
+          <option value="realty_referral" ${type==='realty_referral'?'selected':''}>Realty Referral</option>
+          <option value="other"           ${type==='other'?'selected':''}>Other</option>
         </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
@@ -2972,6 +2974,16 @@ function _buildReferralRow(ns, idx, data = {}) {
         <input type="text" class="ref-company" value="${escapeHtml(data.referral_company||'')}" placeholder="Brokerage / company" style="${iS}">
       </div>
     </div>
+    <div class="ref-other-extra" style="display:${isOther?'flex':'none'};gap:8px;margin-bottom:8px;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
+        <span style="${lS}">W2</span>
+        <input type="text" class="ref-w2" value="${escapeHtml(data.w2||'')}" placeholder="W2 info" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex:2;min-width:0;">
+        <span style="${lS}">Address</span>
+        <input type="text" class="ref-address" value="${escapeHtml(data.referral_address||'')}" placeholder="Referral party address" style="${iS}">
+      </div>
+    </div>
     <div>
       <input type="text" class="ref-notes" value="${escapeHtml(data.notes||'')}" placeholder="Notes (optional)" style="${iS}">
     </div>
@@ -2984,6 +2996,7 @@ function _onReferralTypeChange(ns, idx) {
   const type = row.querySelector('.ref-type').value;
   row.querySelector('.ref-acc-fields').style.display   = type === 'acc_agent' ? 'block' : 'none';
   row.querySelector('.ref-other-fields').style.display = type === 'acc_agent' ? 'none'  : 'flex';
+  row.querySelector('.ref-other-extra').style.display  = type === 'other'     ? 'flex'  : 'none';
 }
 
 async function addReferralRow(ns, data = {}) {
@@ -3024,6 +3037,10 @@ function collectReferrals(ns) {
     } else {
       obj.referral_name    = row.querySelector('.ref-name').value.trim()    || null;
       obj.referral_company = row.querySelector('.ref-company').value.trim() || null;
+      if (type === 'other') {
+        obj.w2               = row.querySelector('.ref-w2').value.trim()      || null;
+        obj.referral_address = row.querySelector('.ref-address').value.trim() || null;
+      }
     }
     out.push(obj);
   }
