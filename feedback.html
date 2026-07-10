@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback &amp; Support — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280;
+  --red:#DC2626; --green:#16A34A; --amber:#D97706;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ── Auth gate ── */
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:40px 48px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25);max-width:380px;width:90%}
+.signin-icon{font-size:36px;margin-bottom:14px}
+.signin-card h2{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.signin-google{display:flex;justify-content:center}
+
+/* ── Topbar ── */
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em}
+.topbar-link:hover{color:rgba(255,255,255,.85)}
+.topbar-user{font-size:12px;color:rgba(255,255,255,.55)}
+
+/* ── Layout ── */
+.main{max-width:780px;margin:32px auto;padding:0 24px 64px}
+
+/* ── Context banner ── */
+.context-banner{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.tool-pill{background:#F3E8FF;color:#6D28D9;border:1px solid #DDD6FE;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;margin-bottom:24px;border-bottom:2px solid var(--border)}
+.tab{padding:10px 22px;font-size:14px;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy);font-weight:700}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px}
+
+/* ── Form fields ── */
+.field{margin-bottom:18px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+.field input,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);transition:border-color .15s}
+.field textarea{min-height:110px;resize:vertical}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+
+/* ── Type selector ── */
+.type-row{display:flex;gap:8px}
+.type-btn{flex:1;padding:11px 8px;border:2px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);text-align:center;transition:all .15s;font-family:inherit}
+.type-btn:hover{border-color:#94a3b8;color:var(--text)}
+.type-btn.sel-bug{border-color:var(--red);background:#FEF2F2;color:var(--red)}
+.type-btn.sel-suggestion{border-color:var(--blue);background:#EFF6FF;color:var(--blue)}
+.type-btn.sel-question{border-color:var(--green);background:#F0FDF4;color:var(--green)}
+
+/* ── Submit button ── */
+.btn-primary{background:var(--navy);color:#fff;border:none;border-radius:6px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn-primary:hover{background:#264d78}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.success-msg{color:var(--green);font-size:13px;margin-top:12px;font-weight:500;display:none}
+
+/* ── Browse filters ── */
+.browse-filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.browse-filters select{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text);font-family:inherit;cursor:pointer}
+
+/* ── Feed ── */
+.feed{display:flex;flex-direction:column;gap:10px}
+.feed-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.feed-item:hover{border-color:#aab}
+.feed-meta{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
+.feed-summary{font-weight:600;font-size:14px;margin-bottom:3px;line-height:1.4}
+.feed-by{font-size:12px;color:var(--muted)}
+.feed-desc{font-size:13px;color:#4B5563;margin-top:10px;white-space:pre-wrap;line-height:1.6;display:none;border-top:1px solid var(--border);padding-top:10px}
+.feed-desc.open{display:block}
+.status-row{margin-top:10px;display:none;gap:8px;align-items:center}
+.status-row.mgr{display:flex}
+.status-row select{padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;font-family:inherit}
+.status-row button{padding:5px 12px;font-size:12px;background:var(--navy);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:inherit}
+.status-row button:hover{background:#264d78}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.badge-bug{background:#FEE2E2;color:#991B1B}
+.badge-suggestion{background:#DBEAFE;color:#1E40AF}
+.badge-question{background:#D1FAE5;color:#065F46}
+.badge-open{background:#FEF3C7;color:#92400E}
+.badge-in_progress{background:#DBEAFE;color:#1D4ED8}
+.badge-resolved{background:#D1FAE5;color:#065F46}
+.badge-tool{background:#F3E8FF;color:#6D28D9}
+
+.empty{color:var(--muted);text-align:center;padding:40px 0;font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- ── Auth gate ── -->
+<div id="auth-gate">
+  <div class="signin-card">
+    <div class="signin-icon">💬</div>
+    <h2>Feedback &amp; Support</h2>
+    <p>Sign in with your Adams Cameron Google account to report bugs, suggest improvements, or ask process questions.</p>
+    <div class="signin-google">
+      <div id="g_id_onload"
+        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+        data-callback="handleGoogleSignIn"
+        data-auto_select="true">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">ACC</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">Feedback &amp; Support</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./staff-guide.html#feedback">Guide</a>
+      <a class="topbar-link" href="./index.html">← Tools</a>
+      <span class="topbar-user" id="topbar-user"></span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="context-banner" class="context-banner" style="display:none">
+      Reporting about: <span id="context-tool-name" class="tool-pill"></span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-btn-report" onclick="showTab('report')">Report</button>
+      <button class="tab" id="tab-btn-browse" onclick="showTab('browse')">Browse All</button>
+    </div>
+
+    <!-- ── Report tab ── -->
+    <div id="tab-report">
+      <div class="card">
+        <div class="field">
+          <label>Type</label>
+          <div class="type-row">
+            <button type="button" class="type-btn" id="btn-bug"        onclick="selectType('bug')">🐛 Bug</button>
+            <button type="button" class="type-btn" id="btn-suggestion" onclick="selectType('suggestion')">💡 Suggestion</button>
+            <button type="button" class="type-btn" id="btn-question"   onclick="selectType('question')">❓ Question</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Summary <span style="color:var(--red)">*</span></label>
+          <input type="text" id="f-summary" placeholder="One-line description — be specific" maxlength="200">
+        </div>
+        <div class="field">
+          <label>Details <span style="color:var(--muted);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <textarea id="f-desc" placeholder="For bugs: steps to reproduce, what you expected vs. what happened.&#10;For suggestions: what problem it solves and who it helps.&#10;For questions: any context that helps clarify what you need."></textarea>
+        </div>
+        <button class="btn-primary" onclick="submitFeedback()">Submit</button>
+        <div class="success-msg" id="submit-success">✓ Submitted — thank you!</div>
+      </div>
+    </div>
+
+    <!-- ── Browse tab ── -->
+    <div id="tab-browse" style="display:none">
+      <div class="browse-filters">
+        <select id="f-type-filter" onchange="renderFeed()">
+          <option value="">All types</option>
+          <option value="bug">Bug</option>
+          <option value="suggestion">Suggestion</option>
+          <option value="question">Question</option>
+        </select>
+        <select id="f-status-filter" onchange="renderFeed()">
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <select id="f-tool-filter" onchange="renderFeed()">
+          <option value="">All tools</option>
+          <option value="daily-desk">Daily Desk</option>
+          <option value="hotsheet">Hotsheet</option>
+          <option value="floor-time">Floor Time</option>
+          <option value="lockbox">Lockbox</option>
+          <option value="market-notices">Market Notices</option>
+          <option value="review-engine">Review Engine</option>
+          <option value="general">General</option>
+        </select>
+      </div>
+      <div class="feed" id="feed"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY         = 'https://mls-proxy-975684028597.us-east1.run.app';
+const CLIENT_ID     = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const TOOL_NAMES    = {
+  'daily-desk':'Daily Desk','hotsheet':'Hotsheet','floor-time':'Floor Time',
+  'lockbox':'Lockbox','market-notices':'Market Notices',
+  'review-engine':'Review Engine','general':'General',
+};
+
+let userEmail    = localStorage.getItem('dd_user_email')  || '';
+let proxyKey     = sessionStorage.getItem('dd_proxy_key') || '';
+let userRole     = 'unknown';
+let selectedType = null;
+let allItems     = [];
+const toolId     = new URLSearchParams(location.search).get('tool') || 'general';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', init);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID, callback: handleGoogleSignIn,
+    auto_select: true, cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.querySelector('.g_id_signin'),
+    { theme: 'outline', size: 'large', width: 280 }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || '';
+    localStorage.setItem('dd_user_email', userEmail);
+  } catch { userEmail = ''; }
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || '';
+    sessionStorage.setItem('dd_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await init();
+  } catch (e) { alert('Authentication error: ' + e.message); }
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+
+async function api(path, opts = {}) {
+  const res = await fetch(PROXY + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-proxy-key':  proxyKey,
+      'x-user-email': userEmail,
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+const GET   = path      => api(path);
+const POST  = (path, b) => api(path, { method: 'POST',  body: JSON.stringify(b) });
+const PATCH = (path, b) => api(path, { method: 'PATCH', body: JSON.stringify(b) });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  document.getElementById('topbar-user').textContent = userEmail;
+
+  if (toolId !== 'general') {
+    document.getElementById('context-tool-name').textContent = TOOL_NAMES[toolId] || toolId;
+    document.getElementById('context-banner').style.display = 'flex';
+  }
+
+  try { const me = await GET('/lockbox/me'); userRole = me?.role || 'unknown'; } catch {}
+
+  loadBrowse();
+}
+
+// ── Report tab ────────────────────────────────────────────────────────────────
+
+function selectType(type) {
+  selectedType = type;
+  ['bug', 'suggestion', 'question'].forEach(t => {
+    document.getElementById('btn-' + t).className =
+      'type-btn' + (t === type ? ' sel-' + t : '');
+  });
+}
+
+async function submitFeedback() {
+  const summary = document.getElementById('f-summary').value.trim();
+  if (!selectedType) { alert('Please select Bug, Suggestion, or Question.'); return; }
+  if (!summary) { alert('Summary is required.'); return; }
+
+  const btn = document.querySelector('#tab-report .btn-primary');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  try {
+    await POST('/feedback', {
+      tool_id:     toolId,
+      type:        selectedType,
+      summary,
+      description: document.getElementById('f-desc').value.trim() || null,
+    });
+    document.getElementById('f-summary').value = '';
+    document.getElementById('f-desc').value = '';
+    selectedType = null;
+    ['bug', 'suggestion', 'question'].forEach(t => {
+      document.getElementById('btn-' + t).className = 'type-btn';
+    });
+    const msg = document.getElementById('submit-success');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 3500);
+    loadBrowse();
+  } catch (e) {
+    alert('Failed to submit: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit';
+  }
+}
+
+// ── Browse tab ────────────────────────────────────────────────────────────────
+
+async function loadBrowse() {
+  try {
+    allItems = await GET('/feedback');
+    renderFeed();
+  } catch (e) {
+    document.getElementById('feed').innerHTML =
+      `<div class="empty">Could not load submissions: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderFeed() {
+  const tf = document.getElementById('f-type-filter').value;
+  const sf = document.getElementById('f-status-filter').value;
+  const lf = document.getElementById('f-tool-filter').value;
+
+  const items = allItems.filter(i =>
+    (!tf || i.type === tf) && (!sf || i.status === sf) && (!lf || i.tool_id === lf)
+  );
+
+  const isMgr = ['manager', 'admin'].includes(userRole);
+
+  if (!items.length) {
+    document.getElementById('feed').innerHTML = '<div class="empty">No items match the current filters.</div>';
+    return;
+  }
+
+  document.getElementById('feed').innerHTML = items.map(item => {
+    const d = new Date(item.created_at);
+    const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const tool = TOOL_NAMES[item.tool_id] || item.tool_id;
+    const opts = ['open','in_progress','resolved']
+      .map(s => `<option value="${s}"${s===item.status?' selected':''}>${fmtStatus(s)}</option>`)
+      .join('');
+    return `
+      <div class="feed-item" onclick="toggleDesc('${item.id}')">
+        <div class="feed-meta">
+          <span class="badge badge-${item.type}">${fmtType(item.type)}</span>
+          <span class="badge badge-tool">${esc(tool)}</span>
+          <span class="badge badge-${item.status}">${fmtStatus(item.status)}</span>
+        </div>
+        <div class="feed-summary">${esc(item.summary)}</div>
+        <div class="feed-by">${esc(item.submitted_by)} · ${ds}</div>
+        ${item.description
+          ? `<div class="feed-desc" id="desc-${item.id}">${esc(item.description)}</div>`
+          : ''}
+        <div class="status-row${isMgr?' mgr':''}" onclick="event.stopPropagation()">
+          <label style="font-size:11px;color:var(--muted)">Status:</label>
+          <select id="ssel-${item.id}">${opts}</select>
+          <button onclick="updateStatus('${item.id}')">Save</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleDesc(id) {
+  const el = document.getElementById('desc-' + id);
+  if (el) el.classList.toggle('open');
+}
+
+async function updateStatus(id) {
+  const sel = document.getElementById('ssel-' + id);
+  try {
+    const updated = await PATCH(`/feedback/${id}/status`, { status: sel.value });
+    const item = allItems.find(i => i.id === id);
+    if (item) item.status = updated.status;
+    renderFeed();
+  } catch (e) { alert('Failed to update: ' + e.message); }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function showTab(name) {
+  ['report', 'browse'].forEach(t => {
+    document.getElementById('tab-' + t).style.display      = t === name ? 'block' : 'none';
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtType(t) { return {bug:'Bug',suggestion:'Suggestion',question:'Question'}[t] || t; }
+function fmtStatus(s) { return {open:'Open',in_progress:'In Progress',resolved:'Resolved'}[s] || s; }
+</script>
+</body>
+</html>
