@@ -166,6 +166,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <!-- ── Report tab ── -->
     <div id="tab-report">
       <div class="card">
+        <div class="field" id="field-tool-select" style="display:none">
+          <label>Tool <span style="color:var(--red)">*</span></label>
+          <select id="f-tool" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg)">
+            <option value="">Select a tool…</option>
+            <option value="daily-desk">Daily Desk</option>
+            <option value="hotsheet">Hotsheet</option>
+            <option value="floor-time">Floor Time</option>
+            <option value="lockbox">Lockbox</option>
+            <option value="market-notices">Market Notices</option>
+            <option value="review-engine">Review Engine</option>
+            <option value="foundation">Foundation</option>
+            <option value="workshop">None / Not tool-specific</option>
+          </select>
+        </div>
         <div class="field">
           <label>Type</label>
           <div class="type-row">
@@ -220,7 +234,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <option value="market-notices">Market Notices</option>
           <option value="review-engine">Review Engine</option>
           <option value="foundation">Foundation</option>
-          <option value="general">General</option>
+          <option value="workshop">Workshop</option>
         </select>
       </div>
       <div class="feed" id="feed"><div class="empty">Loading…</div></div>
@@ -234,7 +248,7 @@ const CLIENT_ID     = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.google
 const TOOL_NAMES    = {
   'daily-desk':'Daily Desk','hotsheet':'Hotsheet','floor-time':'Floor Time',
   'lockbox':'Lockbox','market-notices':'Market Notices',
-  'review-engine':'Review Engine','foundation':'Foundation','general':'General',
+  'review-engine':'Review Engine','foundation':'Foundation','workshop':'Workshop',
 };
 
 let userEmail      = localStorage.getItem('dd_user_email')  || '';
@@ -243,7 +257,8 @@ let userRole       = 'unknown';
 let selectedType   = null;
 let allItems       = [];
 let screenshotData = null;
-const toolId       = new URLSearchParams(location.search).get('tool') || 'general';
+const urlTool      = new URLSearchParams(location.search).get('tool');
+const toolId       = urlTool || null; // null means user must choose
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -314,9 +329,12 @@ const PATCH = (path, b) => api(path, { method: 'PATCH', body: JSON.stringify(b) 
 async function init() {
   document.getElementById('topbar-user').textContent = userEmail;
 
-  if (toolId !== 'general') {
+  if (toolId) {
     document.getElementById('context-tool-name').textContent = TOOL_NAMES[toolId] || toolId;
     document.getElementById('context-banner').style.display = 'flex';
+    document.getElementById('field-tool-select').style.display = 'none';
+  } else {
+    document.getElementById('field-tool-select').style.display = 'block';
   }
 
   try { const me = await GET('/lockbox/me'); userRole = me?.role || 'unknown'; } catch {}
@@ -339,12 +357,17 @@ async function submitFeedback() {
   if (!selectedType) { alert('Please select Bug, Suggestion, or Question.'); return; }
   if (!summary) { alert('Summary is required.'); return; }
 
+  const effectiveTool = toolId
+    || document.getElementById('f-tool')?.value
+    || 'workshop';
+  if (!toolId && !effectiveTool) { alert('Please select a tool.'); return; }
+
   const btn = document.querySelector('#tab-report .btn-primary');
   btn.disabled = true; btn.textContent = 'Submitting…';
 
   try {
     await POST('/feedback', {
-      tool_id:     toolId,
+      tool_id:     effectiveTool || 'workshop',
       type:        selectedType,
       summary,
       description: document.getElementById('f-desc').value.trim() || null,
