@@ -117,6 +117,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .feed-screenshot{margin-top:10px;display:none}
 .feed-screenshot.open{display:block}
 .feed-screenshot img{max-width:100%;max-height:300px;border-radius:5px;border:1px solid var(--border);cursor:zoom-in}
+
+/* ── Vote section ── */
+.vote-section{margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:none}
+.vote-section.open{display:block}
+.vote-summary-line{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px}
+.vote-thread{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+.vote-entry{background:var(--bg);border-radius:6px;padding:8px 12px;font-size:13px}
+.vote-entry-header{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px;color:var(--muted)}
+.vote-dir-up{color:var(--green);font-weight:700}
+.vote-dir-down{color:var(--red);font-weight:700}
+.vote-comment-text{color:#374151;line-height:1.5}
+.vote-widget-form{background:var(--bg);border-radius:8px;padding:12px 14px;border:1px solid var(--border)}
+.vote-widget-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;display:block}
+.vote-btn-row{display:flex;gap:8px;margin-bottom:10px}
+.vote-btn{padding:7px 16px;border:2px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;font-size:13px;font-family:inherit;font-weight:500;transition:all .15s}
+.vote-btn:hover{border-color:#94a3b8}
+.vote-btn.active-up{border-color:var(--green);background:#F0FDF4;color:#166534}
+.vote-btn.active-down{border-color:var(--red);background:#FEF2F2;color:#991B1B}
+.vote-comment-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;min-height:68px;color:var(--text);background:var(--surface)}
+.vote-comment-input:focus{outline:none;border-color:var(--blue)}
+.vote-submit-row{margin-top:8px;display:flex;align-items:center;gap:10px}
+.vote-submit-btn{padding:5px 16px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500}
+.vote-submit-btn:hover{background:#264d78}
+.vote-submit-btn:disabled{opacity:.4;cursor:not-allowed}
+.vote-saved{font-size:12px;color:var(--green);display:none}
+.vote-err{font-size:12px;color:var(--red);display:none}
 </style>
 </head>
 <body>
@@ -257,6 +283,7 @@ let userRole       = 'unknown';
 let selectedType   = null;
 let allItems       = [];
 let screenshotData = null;
+const voteState    = {}; // keyed by item id: { loaded, votes, myVote, pendingDir }
 const urlTool      = new URLSearchParams(location.search).get('tool');
 const toolId       = urlTool || null; // null means user must choose
 
@@ -323,6 +350,7 @@ async function api(path, opts = {}) {
 const GET   = path      => api(path);
 const POST  = (path, b) => api(path, { method: 'POST',  body: JSON.stringify(b) });
 const PATCH = (path, b) => api(path, { method: 'PATCH', body: JSON.stringify(b) });
+const PUT   = (path, b) => api(path, { method: 'PUT',   body: JSON.stringify(b) });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -426,6 +454,15 @@ function renderFeed() {
     const opts = ['open','in_progress','resolved']
       .map(s => `<option value="${s}"${s===item.status?' selected':''}>${fmtStatus(s)}</option>`)
       .join('');
+    const up   = item.upvotes   || 0;
+    const down = item.downvotes || 0;
+    const cmts = item.comment_count || 0;
+    const voteLine = (up || down || cmts)
+      ? `<div class="vote-summary-line">
+           <span>👍 ${up}</span><span>👎 ${down}</span>
+           ${cmts ? `<span>💬 ${cmts}</span>` : ''}
+         </div>`
+      : '';
     return `
       <div class="feed-item" onclick="toggleDesc('${item.id}')">
         <div class="feed-meta">
@@ -435,6 +472,7 @@ function renderFeed() {
         </div>
         <div class="feed-summary">${esc(item.summary)}</div>
         <div class="feed-by">${esc(item.submitted_by)} · ${ds}</div>
+        ${voteLine}
         ${(item.description || item.screenshot)
           ? `<div class="feed-desc" id="desc-${item.id}">
                ${item.description ? esc(item.description) : ''}
@@ -447,6 +485,9 @@ function renderFeed() {
                  : ''}
              </div>`
           : ''}
+        <div class="vote-section" id="vote-${item.id}">
+          <div style="font-size:12px;color:var(--muted)">Loading…</div>
+        </div>
         <div class="status-row${isMgr?' mgr':''}" onclick="event.stopPropagation()">
           <label style="font-size:11px;color:var(--muted)">Status:</label>
           <select id="ssel-${item.id}">${opts}</select>
@@ -456,11 +497,137 @@ function renderFeed() {
   }).join('');
 }
 
-function toggleDesc(id) {
-  const el   = document.getElementById('desc-' + id);
+async function toggleDesc(id) {
+  const desc = document.getElementById('desc-' + id);
   const shot = document.getElementById('shot-' + id);
-  if (el)   el.classList.toggle('open');
+  const vdiv = document.getElementById('vote-' + id);
+
+  const isOpening = vdiv && !vdiv.classList.contains('open');
+
+  if (desc) desc.classList.toggle('open');
   if (shot) shot.classList.toggle('open');
+
+  if (vdiv) {
+    if (isOpening && !voteState[id]?.loaded) {
+      await loadVotes(id);
+    }
+    vdiv.classList.toggle('open');
+  }
+}
+
+async function loadVotes(id) {
+  try {
+    const votes = await GET(`/feedback/${id}/votes`);
+    const myVote = votes.find(v => v.user_email === userEmail) || null;
+    voteState[id] = {
+      loaded: true, votes, myVote,
+      pendingDir: myVote?.direction !== undefined ? myVote.direction : null,
+    };
+    renderVoteSection(id);
+  } catch (e) {
+    const el = document.getElementById('vote-' + id);
+    if (el) el.innerHTML = `<div style="font-size:12px;color:var(--red)">Could not load votes: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderVoteSection(id) {
+  const el = document.getElementById('vote-' + id);
+  if (!el) return;
+  const state = voteState[id];
+  if (!state) return;
+
+  const { votes, myVote, pendingDir } = state;
+
+  const threadHtml = votes.map(v => {
+    const name   = v.voter_name || v.user_email;
+    const isMe   = v.user_email === userEmail;
+    const dirTag = v.direction === 1  ? '<span class="vote-dir-up">👍</span>' :
+                   v.direction === -1 ? '<span class="vote-dir-down">👎</span>' : '';
+    return `<div class="vote-entry">
+      <div class="vote-entry-header">${dirTag}<span>${esc(name)}${isMe ? ' (you)' : ''}</span></div>
+      ${v.comment ? `<div class="vote-comment-text">${esc(v.comment)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    ${votes.length ? `<div class="vote-thread">${threadHtml}</div>` : ''}
+    <div class="vote-widget-form" onclick="event.stopPropagation()">
+      <span class="vote-widget-label">${myVote ? 'Your vote' : 'Vote or comment'}</span>
+      <div class="vote-btn-row">
+        <button type="button" class="vote-btn ${pendingDir === 1 ? 'active-up' : ''}"
+                id="vbtn-up-${id}" onclick="toggleVoteDir('${id}', 1)">👍 Helpful</button>
+        <button type="button" class="vote-btn ${pendingDir === -1 ? 'active-down' : ''}"
+                id="vbtn-dn-${id}" onclick="toggleVoteDir('${id}', -1)">👎 Not for me</button>
+      </div>
+      <textarea class="vote-comment-input" id="vcmt-${id}"
+                placeholder="Add a comment… (optional if you've voted)"
+                oninput="validateVoteForm('${id}')">${esc(myVote?.comment || '')}</textarea>
+      <div class="vote-submit-row">
+        <button class="vote-submit-btn" id="vsbmt-${id}" onclick="submitVote('${id}')" disabled>
+          ${myVote ? 'Update' : 'Submit'}
+        </button>
+        <span class="vote-saved" id="vsaved-${id}">✓ Saved</span>
+        <span class="vote-err"   id="verr-${id}"></span>
+      </div>
+    </div>`;
+
+  validateVoteForm(id);
+}
+
+function toggleVoteDir(id, dir) {
+  const state = voteState[id];
+  if (!state) return;
+  state.pendingDir = (state.pendingDir === dir) ? null : dir;
+  document.getElementById(`vbtn-up-${id}`)?.classList.toggle('active-up',   state.pendingDir === 1);
+  document.getElementById(`vbtn-dn-${id}`)?.classList.toggle('active-down', state.pendingDir === -1);
+  validateVoteForm(id);
+}
+
+function validateVoteForm(id) {
+  const state   = voteState[id];
+  if (!state) return;
+  const comment = document.getElementById(`vcmt-${id}`)?.value?.trim() || '';
+  const btn     = document.getElementById(`vsbmt-${id}`);
+  if (btn) btn.disabled = !(state.pendingDir !== null || comment.length > 0);
+}
+
+async function submitVote(id) {
+  const state = voteState[id];
+  if (!state) return;
+  const comment = document.getElementById(`vcmt-${id}`)?.value?.trim() || null;
+  const { pendingDir } = state;
+
+  const btn   = document.getElementById(`vsbmt-${id}`);
+  const saved = document.getElementById(`vsaved-${id}`);
+  const err   = document.getElementById(`verr-${id}`);
+
+  if (btn)   { btn.disabled = true; btn.textContent = 'Saving…'; }
+  if (saved) saved.style.display = 'none';
+  if (err)   err.style.display   = 'none';
+
+  try {
+    await PUT(`/feedback/${id}/vote`, { direction: pendingDir, comment: comment || null });
+    const votes   = await GET(`/feedback/${id}/votes`);
+    const myVote  = votes.find(v => v.user_email === userEmail) || null;
+    voteState[id] = { loaded: true, votes, myVote, pendingDir };
+    renderVoteSection(id);
+
+    // Refresh aggregate counts in allItems so they show updated totals on next renderFeed
+    const item = allItems.find(i => i.id === id);
+    if (item) {
+      item.upvotes      = votes.filter(v => v.direction === 1).length;
+      item.downvotes    = votes.filter(v => v.direction === -1).length;
+      item.comment_count = votes.filter(v => v.comment).length;
+    }
+
+    const newSaved = document.getElementById(`vsaved-${id}`);
+    if (newSaved) { newSaved.style.display = 'inline'; setTimeout(() => { newSaved.style.display = 'none'; }, 2500); }
+  } catch (e) {
+    const newBtn = document.getElementById(`vsbmt-${id}`);
+    const newErr = document.getElementById(`verr-${id}`);
+    if (newBtn) { newBtn.disabled = false; newBtn.textContent = state.myVote ? 'Update' : 'Submit'; }
+    if (newErr) { newErr.textContent = e.message; newErr.style.display = 'inline'; }
+  }
 }
 
 async function updateStatus(id) {
