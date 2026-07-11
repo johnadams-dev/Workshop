@@ -925,23 +925,18 @@ tbody tr.clickable { cursor: pointer; }
           <option value="Withdrawal paperwork uploaded to Form Simplicity">FS withdrawal paperwork</option>
           <option value="Send thank-you letter">Send thank-you letter</option>
         </select>
-        <select id="today-sort" onchange="sortAndRenderToday()">
-          <option value="age">Sort: Oldest First</option>
-          <option value="address">Sort: Address</option>
-          <option value="type">Sort: Item Type</option>
-        </select>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Property</th>
-              <th>Item</th>
-              <th>Status</th>
-              <th>Age</th>
+              <th data-sort="property_address" onclick="sortTodayBy('property_address')">Property</th>
+              <th data-sort="title" onclick="sortTodayBy('title')">Item</th>
+              <th data-sort="transaction_status" onclick="sortTodayBy('transaction_status')">Status</th>
+              <th data-sort="created_at" onclick="sortTodayBy('created_at')">Age</th>
               <th style="width:1%"></th>
-              <th>Tool</th>
+              <th data-sort="resource_label" onclick="sortTodayBy('resource_label')">Tool</th>
             </tr>
           </thead>
           <tbody id="today-tbody">
@@ -2445,12 +2440,6 @@ async function renderAll() {
 }
 
 function getSortedToday() {
-  const sort = document.getElementById('today-sort').value;
-  const cmp = sort === 'address'
-    ? (a, b) => a.property_address.localeCompare(b.property_address)
-    : sort === 'type'
-    ? (a, b) => a.title.localeCompare(b.title)
-    : (a, b) => new Date(a.created_at) - new Date(b.created_at); // oldest first
   // Group by office name (backend already orders by office, but re-group for sort-within)
   const groups = new Map();
   STATE.today.forEach(item => {
@@ -2460,7 +2449,7 @@ function getSortedToday() {
   });
   const result = [];
   [...groups.keys()].sort().forEach(office => {
-    result.push(...groups.get(office).sort(cmp));
+    result.push(...tableSort(groups.get(office), tdySort.col, tdySort.dir));
   });
   return result;
 }
@@ -2585,9 +2574,12 @@ function filterToday() {
   if (lastHdr) lastHdr.style.display = hdrHasVisible ? '' : 'none';
 }
 
-function sortAndRenderToday() {
+function sortTodayBy(col) {
+  tdySort.dir = tdySort.col === col ? (tdySort.dir === 'asc' ? 'desc' : 'asc') : 'asc';
+  tdySort.col = col;
   renderTodayTable(getSortedToday());
   filterToday();
+  updateSortHeaders();
 }
 
 // Marks a checklist item complete or not-applicable. Pending items disappear
@@ -4503,12 +4495,13 @@ async function ncSelectFsTransaction(index) {
 /* ═══ Listings / Contracts filtering ═══ */
 const lstSort = { col: 'list_date', dir: 'desc' };
 const ctrSort = { col: 'list_date', dir: 'desc' };
+const tdySort = { col: 'created_at', dir: 'asc' }; // default: oldest first
 
 function tableSort(arr, col, dir) {
   return [...arr].sort((a, b) => {
     let va = a[col], vb = b[col];
     if (col === 'current_price') { va = Number(va) || 0; vb = Number(vb) || 0; }
-    else if (col === 'list_date') { va = va ? new Date(va).getTime() : 0; vb = vb ? new Date(vb).getTime() : 0; }
+    else if (col === 'list_date' || col === 'created_at') { va = va ? new Date(va).getTime() : 0; vb = vb ? new Date(vb).getTime() : 0; }
     else { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase(); }
     const c = va < vb ? -1 : va > vb ? 1 : 0;
     return dir === 'asc' ? c : -c;
@@ -4539,6 +4532,10 @@ function updateSortHeaders() {
   document.querySelectorAll('#page-contracts thead th[data-sort]').forEach(th => {
     th.classList.toggle('sort-asc',  th.dataset.sort === ctrSort.col && ctrSort.dir === 'asc');
     th.classList.toggle('sort-desc', th.dataset.sort === ctrSort.col && ctrSort.dir === 'desc');
+  });
+  document.querySelectorAll('#page-today thead th[data-sort]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === tdySort.col && tdySort.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === tdySort.col && tdySort.dir === 'desc');
   });
 }
 
