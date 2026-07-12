@@ -1586,11 +1586,17 @@ tbody tr.clickable { cursor: pointer; }
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Total Commission %</span>
-              <input type="text" id="nl-commission" placeholder="e.g. 6">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Total Commission</span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <select id="nl-commission-type" onchange="nlSyncCommissionType(this.value)" style="padding:7px 6px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-size:12px;flex-shrink:0;">
+                  <option value="percent" selected>%</option>
+                  <option value="fixed">$</option>
+                </select>
+                <input type="text" id="nl-commission" placeholder="e.g. 6" style="flex:1;">
+              </div>
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission %</span>
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission <span id="nl-coop-commission-unit">(%)</span></span>
               <input type="text" id="nl-coop-commission" placeholder="e.g. 3">
             </div>
           </div>
@@ -1790,8 +1796,14 @@ tbody tr.clickable { cursor: pointer; }
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission %</span>
-              <input type="text" id="nc-ext-coop-commission" placeholder="e.g. 3">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer Broker Commission</span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <select id="nc-ext-commission-type" onchange="ncExtSyncCommissionType(this.value)" style="padding:7px 6px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-size:12px;flex-shrink:0;">
+                  <option value="percent" selected>%</option>
+                  <option value="fixed">$</option>
+                </select>
+                <input type="text" id="nc-ext-coop-commission" placeholder="e.g. 3" style="flex:1;">
+              </div>
             </div>
             <div></div>
           </div>
@@ -1879,34 +1891,14 @@ tbody tr.clickable { cursor: pointer; }
     <div class="modal-body">
       <div id="fc-addr" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;"></div>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Correct</span>
+        <select id="fc-customer" onchange="fcPopulateFieldOptions()" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+          <option value="">Property / Other</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
         <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Field to Correct</span>
         <select id="fc-field" onchange="fcPopulateCurrent()" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
-          <option value="">— Select a field —</option>
-          <optgroup label="Property">
-            <option value="property_address">Property Address</option>
-            <option value="city">City</option>
-          </optgroup>
-          <optgroup label="Seller / Landlord">
-            <option value="seller_name">Seller Name</option>
-            <option value="seller_email">Seller Email</option>
-            <option value="seller_mailing_address">Seller Mailing Address</option>
-            <option value="seller_city">Seller City</option>
-            <option value="seller_state">Seller State</option>
-            <option value="seller_zip">Seller Zip</option>
-          </optgroup>
-          <optgroup label="Buyer / Tenant">
-            <option value="buyer_name">Buyer Name</option>
-            <option value="buyer_email">Buyer Email</option>
-            <option value="buyer_mailing_address">Buyer Mailing Address</option>
-            <option value="buyer_city">Buyer City</option>
-            <option value="buyer_state">Buyer State</option>
-            <option value="buyer_zip">Buyer Zip</option>
-          </optgroup>
-          <optgroup label="Other">
-            <option value="source_of_seller">Source of Seller</option>
-            <option value="source_of_buyer">Source of Buyer</option>
-            <option value="notes">Notes</option>
-          </optgroup>
         </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
@@ -2737,6 +2729,8 @@ async function nlReset() {
   document.getElementById('nl-source').value = '';
   document.getElementById('nl-commission').value = '';
   document.getElementById('nl-coop-commission').value = '';
+  document.getElementById('nl-commission-type').value = 'percent';
+  nlSyncCommissionType('percent');
   document.getElementById('nl-fs-trans-id').value = '';
   document.getElementById('nl-mls-wrap').innerHTML =
     '<input type="text" class="nl-mls-id" placeholder="MLS # (optional)">';
@@ -2860,6 +2854,13 @@ async function nlSaveListing() {
 
   const { split_pct: nlSplitPct, co_agents: nlCoAgents, splitError: nlSplitErr } = collectCoAgent('nl-coagent-area', 'nl-coagent-sel', 'nl-split-primary', 'nl-split-co');
   if (nlSplitErr) { alert(nlSplitErr); return; }
+  const nlCommissionVal = parseFloat(document.getElementById('nl-commission').value.replace(/[^0-9.]/g, ''));
+  const nlCoopCommissionVal = parseFloat(document.getElementById('nl-coop-commission').value.replace(/[^0-9.]/g, ''));
+  const nlCommissionType = confirmCommissionType(
+    [nlCommissionVal, nlCoopCommissionVal],
+    document.getElementById('nl-commission-type').value,
+    ['Total Commission', 'Buyer Broker Commission']
+  );
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -2871,8 +2872,9 @@ async function nlSaveListing() {
     expiration_date: document.getElementById('nl-exp-date').value || null,
     source: document.getElementById('nl-source').value.trim() || null,
     mls_ids,
-    commission_rate: parseFloat(document.getElementById('nl-commission').value.replace(/[^0-9.]/g, '')) || null,
-    cooperating_commission: parseFloat(document.getElementById('nl-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
+    commission_rate: isNaN(nlCommissionVal) ? null : nlCommissionVal,
+    cooperating_commission: isNaN(nlCoopCommissionVal) ? null : nlCoopCommissionVal,
+    commission_type: nlCommissionType,
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
@@ -3069,6 +3071,88 @@ async function _saveReferrals(txnId, ns) {
   for (const r of refs) {
     await POST(`/daily-desk/transactions/${txnId}/referrals`, r);
   }
+}
+
+/* ═══ CLOSING PARTY (BUYER/SELLER CONTACT) ROWS ═══ */
+// Independent people, not shares of one pool — no "must total 100%" rule and
+// no "at least one row" requirement (a closing can proceed with no contact
+// info yet). Mirrors the referral repeatable-row pattern above.
+
+let _customerRowIdx = 0;
+
+function _buildCustomerRow(ns, idx, data = {}) {
+  const lS = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
+  const iS = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;min-width:0;';
+  return `<div class="customer-row" data-ns="${ns}" data-cidx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <button type="button" onclick="_removeCustomerRow('${ns}',${idx})" style="padding:5px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;white-space:nowrap;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Name</span>
+        <input type="text" class="cust-name" value="${escapeHtml(data.name||'')}" placeholder="Full name" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Email</span>
+        <input type="email" class="cust-email" value="${escapeHtml(data.email||'')}" placeholder="Optional" style="${iS}">
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;min-width:0;">
+      <span style="${lS}">Mailing Address</span>
+      <input type="text" class="cust-address" value="${escapeHtml(data.address||'')}" placeholder="Street address" style="${iS}">
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">City</span>
+        <input type="text" class="cust-city" value="${escapeHtml(data.city||'')}" placeholder="City" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">State</span>
+        <input type="text" class="cust-state" value="${escapeHtml(data.state||'')}" placeholder="FL" maxlength="2" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Zip</span>
+        <input type="text" class="cust-zip" value="${escapeHtml(data.zip||'')}" placeholder="32174" style="${iS}">
+      </div>
+    </div>
+  </div>`;
+}
+
+function addCustomerRow(ns, data = {}) {
+  const idx = _customerRowIdx++;
+  const container = document.getElementById(`${ns}-customer-rows`);
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', _buildCustomerRow(ns, idx, data));
+}
+
+function _removeCustomerRow(ns, idx) {
+  const row = document.querySelector(`.customer-row[data-ns="${ns}"][data-cidx="${idx}"]`);
+  if (row) row.remove();
+}
+
+function collectCustomers(ns) {
+  const rows = document.querySelectorAll(`#${ns}-customer-rows .customer-row`);
+  const out = [];
+  for (const row of rows) {
+    const name    = row.querySelector('.cust-name').value.trim();
+    const email   = row.querySelector('.cust-email').value.trim();
+    const address = row.querySelector('.cust-address').value.trim();
+    const city    = row.querySelector('.cust-city').value.trim();
+    const state   = row.querySelector('.cust-state').value.trim();
+    const zip     = row.querySelector('.cust-zip').value.trim();
+    if (!name && !email && !address && !city && !state && !zip) continue;
+    out.push({ name: name || null, email: email || null, address: address || null,
+               city: city || null, state: state || null, zip: zip || null });
+  }
+  return out;
+}
+
+function populateCustomers(ns, rows) {
+  const container = document.getElementById(`${ns}-customer-rows`);
+  if (!container) return;
+  container.innerHTML = '';
+  for (const r of (rows || [])) addCustomerRow(ns, r);
+  if (!rows || !rows.length) addCustomerRow(ns);
 }
 
 async function loadReferralReport() {
@@ -3498,33 +3582,12 @@ async function amChooseAction(key) {
           <input type="date" id="am-close-date">
         </div>
       </div>
-      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}'s Name</span>
-          <input type="text" id="am-party-name" placeholder="Full name">
+      <div style="margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}(s)</span>
+          <button type="button" onclick="addCustomerRow('am')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add another ${closingParty.toLowerCase()}</button>
         </div>
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}'s Email</span>
-          <input type="email" id="am-party-email" placeholder="Optional">
-        </div>
-      </div>
-      <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px;">
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${closingParty}'s Mailing Address</span>
-          <input type="text" id="am-party-mailing" placeholder="Street address">
-        </div>
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
-          <input type="text" id="am-party-city" placeholder="City">
-        </div>
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">State</span>
-          <input type="text" id="am-party-state" placeholder="FL" maxlength="2">
-        </div>
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
-          <input type="text" id="am-party-zip" placeholder="32174">
-        </div>
+        <div id="am-customer-rows"></div>
       </div>
       <div id="am-foundation-section"></div>
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
@@ -3566,6 +3629,7 @@ async function amChooseAction(key) {
     amUpdateRepFields();
   }
   if (key === 'closing') {
+    populateCustomers('am');
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
   }
@@ -3589,6 +3653,40 @@ async function amChooseAction(key) {
 function amParseMoney(v) {
   const digits = String(v || '').replace(/[^0-9.]/g, '');
   return digits ? Number(digits) : null;
+}
+
+/* ═══ COMMISSION TYPE (percent vs. fixed fee) ═══ */
+// commission_rate and cooperating_commission always share one type per
+// transaction row — never mixed units on the same row.
+
+function nlSyncCommissionType(type) {
+  document.getElementById('nl-commission').placeholder = type === 'fixed' ? 'e.g. 6000' : 'e.g. 6';
+  document.getElementById('nl-coop-commission').placeholder = type === 'fixed' ? 'e.g. 3000' : 'e.g. 3';
+  document.getElementById('nl-coop-commission-unit').textContent = type === 'fixed' ? '($)' : '(%)';
+}
+
+function ncExtSyncCommissionType(type) {
+  document.getElementById('nc-ext-coop-commission').placeholder = type === 'fixed' ? 'e.g. 3000' : 'e.g. 3';
+}
+
+// values/fieldLabels are parallel arrays — e.g. both Total Commission and
+// Buyer Broker Commission checked together against the one shared type,
+// since a flip applies to the whole row at once. Uses confirm(), not alert() +
+// return — there's no invalid state here, just an ambiguous one to disambiguate,
+// so it always falls through and returns a type to submit with.
+function confirmCommissionType(values, type, fieldLabels) {
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v == null || isNaN(v)) continue;
+    if (type === 'percent' && v > 20) {
+      const flip = confirm(`${fieldLabels[i]}: ${v}% is over 20% — did you mean to enter this transaction's commission as a flat fee instead of a percent?`);
+      if (flip) return 'fixed';
+    } else if (type === 'fixed' && v < 10) {
+      const flip = confirm(`${fieldLabels[i]}: $${v} is under $10 — did you mean to enter this transaction's commission as a percent instead of a flat fee?`);
+      if (flip) return 'percent';
+    }
+  }
+  return type;
 }
 
 async function amLoadClosingSuggestions() {
@@ -3977,45 +4075,16 @@ async function amSubmit() {
     if (salePrice != null) fields.salePrice = salePrice;
     const closeDate = document.getElementById('am-close-date').value;
     if (closeDate) fields.closeDate = closeDate;
-    const partyName    = document.getElementById('am-party-name').value || null;
-    const partyEmail   = document.getElementById('am-party-email').value || null;
-    const partyMailing = document.getElementById('am-party-mailing').value || null;
-    const partyCity    = document.getElementById('am-party-city').value || null;
-    const partyState   = document.getElementById('am-party-state').value || null;
-    const partyZip     = document.getElementById('am-party-zip').value || null;
-    if (amState.kind === 'contract') {
-      fields.buyerName           = partyName;
-      fields.buyerEmail          = partyEmail;
-      fields.buyerMailingAddress = partyMailing;
-      fields.buyerCity           = partyCity;
-      fields.buyerState          = partyState;
-      fields.buyerZip            = partyZip;
-    } else {
-      fields.sellerName           = partyName;
-      fields.sellerEmail          = partyEmail;
-      fields.sellerMailingAddress = partyMailing;
-      fields.sellerCity           = partyCity;
-      fields.sellerState          = partyState;
-      fields.sellerZip            = partyZip;
-    }
-    const _partyAddr = [
-      document.getElementById('am-party-mailing')?.value,
-      document.getElementById('am-party-city')?.value,
-      document.getElementById('am-party-state')?.value,
-      document.getElementById('am-party-zip')?.value,
-    ].filter(Boolean).join(', ');
-    if (amFoundationDonors?.sellerSide) {
-      // Listing close: seller is the party — name and address already in the party fields
-      // Contract close: seller is the other party — read from the separate foundation inputs
-      fields.sellerGiftName    = isListing ? partyName : (document.getElementById('am-gift-seller-name')?.value || null);
-      fields.sellerGiftAddress = isListing ? (_partyAddr || null) : (document.getElementById('am-gift-seller-addr')?.value || null);
-    }
-    if (amFoundationDonors?.buyerSide) {
-      // Contract close: buyer is the party — name and address already in the party fields
-      // Listing close: buyer is the other party — read from the separate foundation inputs
-      fields.buyerGiftName    = !isListing ? partyName : (document.getElementById('am-gift-buyer-name')?.value || null);
-      fields.buyerGiftAddress = !isListing ? (_partyAddr || null) : (document.getElementById('am-gift-buyer-addr')?.value || null);
-    }
+    fields.customers = collectCustomers('am');
+    // Gift capture for the side NOT being closed here (e.g. a seller-side donor
+    // on a contract closing, which only captures buyer contact info above) —
+    // these inputs only exist in the DOM when that side has a donor agent
+    // (see amLoadFoundationDonors); the closing side's own gift name/address
+    // comes from the transaction_customers rows just submitted, server-side.
+    fields.sellerGiftName    = document.getElementById('am-gift-seller-name')?.value || null;
+    fields.sellerGiftAddress = document.getElementById('am-gift-seller-addr')?.value || null;
+    fields.buyerGiftName     = document.getElementById('am-gift-buyer-name')?.value || null;
+    fields.buyerGiftAddress  = document.getElementById('am-gift-buyer-addr')?.value || null;
     fields.titleCompany    = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
   } else if (key === 'under_contract') {
@@ -4128,6 +4197,8 @@ function openNewContractModal() {
   document.getElementById('nc-ext-contract-date').value = '';
   document.getElementById('nc-ext-close-date').value = '';
   document.getElementById('nc-ext-coop-commission').value = '';
+  document.getElementById('nc-ext-commission-type').value = 'percent';
+  ncExtSyncCommissionType('percent');
   document.getElementById('nc-ext-office').selectedIndex = 0;
   document.getElementById('nc-ext-agent').innerHTML = '<option value="">Select office first…</option>';
   document.getElementById('nc-ext-coagent-area').style.display = 'none';
@@ -4367,6 +4438,12 @@ async function ncSaveExternalContract() {
 
   const { split_pct: extSplitPct, co_agents: extCoAgents, splitError: extSplitErr } = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
   if (extSplitErr) { alert(extSplitErr); return; }
+  const extCoopCommissionVal = parseFloat(document.getElementById('nc-ext-coop-commission').value.replace(/[^0-9.]/g, ''));
+  const extCommissionType = confirmCommissionType(
+    [extCoopCommissionVal],
+    document.getElementById('nc-ext-commission-type').value,
+    ['Buyer Broker Commission']
+  );
   try {
     const txn = await POST('/daily-desk/contracts', {
       property_address:    addr,
@@ -4380,7 +4457,8 @@ async function ncSaveExternalContract() {
       contract_price:      amParseMoney(document.getElementById('nc-ext-contract-price').value),
       contract_date:       document.getElementById('nc-ext-contract-date').value || null,
       expected_close_date:     document.getElementById('nc-ext-close-date').value || null,
-      cooperating_commission:  parseFloat(document.getElementById('nc-ext-coop-commission').value.replace(/[^0-9.]/g, '')) || null,
+      cooperating_commission:  isNaN(extCoopCommissionVal) ? null : extCoopCommissionVal,
+      commission_type:         extCommissionType,
       office_id:               document.getElementById('nc-ext-office').value || null,
       agent_id:                agentId,
       split_pct:               extSplitPct,
@@ -4896,7 +4974,8 @@ function renderDrawer(t) {
     document.getElementById('drawer-buyer-brokerage-label').textContent = 'Listing Brokerage';
     document.getElementById('drawer-buyer-brokerage').textContent = listingAgent ? (listingAgent.external_brokerage || '—') : '—';
     document.getElementById('drawer-party-label').textContent = 'Buyer';
-    document.getElementById('drawer-party').textContent = t.buyer_name || '—';
+    document.getElementById('drawer-party').textContent =
+      (t.customers || []).filter(c => c.role === 'buyer').map(c => c.name).filter(Boolean).join(', ') || '—';
   } else {
     const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = "Buyer's Agent";
@@ -4904,7 +4983,8 @@ function renderDrawer(t) {
     document.getElementById('drawer-buyer-brokerage-label').textContent = "Buyer's Brokerage";
     document.getElementById('drawer-buyer-brokerage').textContent = buyerAgent ? (buyerAgent.external_brokerage || '—') : '—';
     document.getElementById('drawer-party-label').textContent = 'Seller';
-    document.getElementById('drawer-party').textContent = t.seller_name || '—';
+    document.getElementById('drawer-party').textContent =
+      (t.customers || []).filter(c => c.role === 'seller').map(c => c.name).filter(Boolean).join(', ') || '—';
   }
 
   const clEl = document.getElementById('drawer-checklist');
@@ -4931,7 +5011,9 @@ function renderDrawer(t) {
     if (ev.event_type === 'field_correction') {
       try {
         const c = JSON.parse(ev.notes || '{}');
-        const label = FC_FIELD_LABELS[c.field] || c.field;
+        const roleLabel = { seller: 'Seller', buyer: 'Buyer' };
+        const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
+        const label = c.role ? `${roleLabel[c.role] || c.role} — ${fieldLabel}` : fieldLabel;
         return `<div><strong>${fmtDate(ev.event_date || ev.submitted_at)}</strong> — ✏ <em>${escapeHtml(label)}</em> corrected: "${escapeHtml(c.old)}" → "${escapeHtml(c.new)}"<br><span style="color:var(--text-dim);font-size:11px;">Reason: ${escapeHtml(c.reason)}</span></div>`;
       } catch { /* fall through */ }
     }
@@ -5675,23 +5757,20 @@ function cvToast(ico, msg) {
 
 /* ── Field Corrections ── */
 const FC_FIELD_LABELS = {
-  property_address:      'Property Address',
-  city:                  'City',
-  seller_name:           'Seller Name',
-  seller_email:          'Seller Email',
-  seller_mailing_address:'Seller Mailing Address',
-  seller_city:           'Seller City',
-  seller_state:          'Seller State',
-  seller_zip:            'Seller Zip',
-  buyer_name:            'Buyer Name',
-  buyer_email:           'Buyer Email',
-  buyer_mailing_address: 'Buyer Mailing Address',
-  buyer_city:            'Buyer City',
-  buyer_state:           'Buyer State',
-  buyer_zip:             'Buyer Zip',
-  source_of_seller:      'Source of Seller',
-  source_of_buyer:       'Source of Buyer',
-  notes:                 'Notes',
+  property_address: 'Property Address',
+  city:              'City',
+  source_of_seller:  'Source of Seller',
+  source_of_buyer:   'Source of Buyer',
+  commission_type:   'Commission Type (percent/fixed)',
+  notes:             'Notes',
+};
+const FC_CUSTOMER_FIELD_LABELS = {
+  name:    'Name',
+  email:   'Email',
+  address: 'Mailing Address',
+  city:    'City',
+  state:   'State',
+  zip:     'Zip',
 };
 
 let _fcTxnId   = null;
@@ -5707,16 +5786,43 @@ function openFieldCorrection() {
 
   document.getElementById('fc-addr').textContent =
     [_fcTxnData.property_address, _fcTxnData.city].filter(Boolean).join(', ') || '';
-  document.getElementById('fc-field').value    = '';
-  document.getElementById('fc-current').textContent = '';
+
+  const customerSel = document.getElementById('fc-customer');
+  const roleLabel = { seller: 'Seller', buyer: 'Buyer' };
+  customerSel.innerHTML = '<option value="">Property / Other</option>' +
+    (_fcTxnData.customers || []).map(c =>
+      `<option value="${c.id}">${roleLabel[c.role] || c.role}: ${escapeHtml(c.name || '(no name yet)')}</option>`
+    ).join('');
+  customerSel.value = '';
+
+  fcPopulateFieldOptions();
   document.getElementById('fc-new-value').value = '';
   document.getElementById('fc-reason').value    = '';
   document.getElementById('fieldCorrectionModal').classList.add('open');
 }
 
+function fcPopulateFieldOptions() {
+  const customerId = document.getElementById('fc-customer').value;
+  const fieldSel = document.getElementById('fc-field');
+  const labels = customerId ? FC_CUSTOMER_FIELD_LABELS : FC_FIELD_LABELS;
+  fieldSel.innerHTML = '<option value="">— Select a field —</option>' +
+    Object.entries(labels).map(([k, label]) => `<option value="${k}">${label}</option>`).join('');
+  fieldSel.value = '';
+  fcPopulateCurrent();
+}
+
 function fcPopulateCurrent() {
+  const customerId = document.getElementById('fc-customer').value;
   const field = document.getElementById('fc-field').value;
-  const val   = field && _fcTxnData ? (_fcTxnData[field] ?? '') : '';
+  let val = '';
+  if (field) {
+    if (customerId) {
+      const cust = (_fcTxnData.customers || []).find(c => String(c.id) === customerId);
+      val = cust ? (cust[field] ?? '') : '';
+    } else {
+      val = _fcTxnData ? (_fcTxnData[field] ?? '') : '';
+    }
+  }
   document.getElementById('fc-current').textContent = val || '(blank)';
   document.getElementById('fc-new-value').value = val || '';
   document.getElementById('fc-new-value').focus();
@@ -5729,6 +5835,7 @@ function closeFieldCorrectionModal() {
 }
 
 async function submitFieldCorrection() {
+  const customerId = document.getElementById('fc-customer').value;
   const fieldName = document.getElementById('fc-field').value;
   const newValue  = document.getElementById('fc-new-value').value.trim();
   const reason    = document.getElementById('fc-reason').value.trim();
@@ -5737,7 +5844,10 @@ async function submitFieldCorrection() {
   if (!reason)    { alert('A reason is required.'); document.getElementById('fc-reason').focus(); return; }
 
   try {
-    await POST(`/daily-desk/transactions/${_fcTxnId}/field-correction`, { fieldName, newValue, reason });
+    const url = customerId
+      ? `/daily-desk/transactions/${_fcTxnId}/customers/${customerId}/field-correction`
+      : `/daily-desk/transactions/${_fcTxnId}/field-correction`;
+    await POST(url, { fieldName, newValue, reason });
     closeFieldCorrectionModal();
     cvToast('✓', 'Correction saved.');
     // Refresh the drawer so the activity log shows the new event

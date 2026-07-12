@@ -77,13 +77,14 @@ function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US'
 function fmtDate(v) { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
 function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
 
-function calcCommission(salePrice, rate) {
-  if (!salePrice || !rate) return null;
+function calcCommission(salePrice, rate, type) {
+  if (rate == null) return null;
+  if (type === 'fixed') return Math.round(Number(rate) * 100) / 100;
+  if (!salePrice) return null;
   return Math.round(Number(salePrice) * (Number(rate) / 100) * 100) / 100;
 }
-function calcCoopCommission(salePrice, rate) {
-  if (!salePrice || !rate) return null;
-  return Math.round(Number(salePrice) * (Number(rate) / 100) * 100) / 100;
+function calcCoopCommission(salePrice, rate, type) {
+  return calcCommission(salePrice, rate, type);
 }
 
 function row2(l1, v1, l2, v2) {
@@ -97,13 +98,30 @@ function row(label, ...vals) {
   return `<tr><td class="label">${label}</td>${cells}</tr>`;
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals }) {
+function customerBlock(label, c) {
+  return `
+    <div class="section-head">${label}</div>
+    <table>
+      ${row2('Name', fmt(c?.name), 'Email', fmt(c?.email))}
+      ${row2('Mailing Address', fmt(c?.address), 'City', fmt(c?.city))}
+      ${row2('State', fmt(c?.state), 'Zip', fmt(c?.zip))}
+    </table>`;
+}
+function customerSections(label, list) {
+  if (!list.length) return customerBlock(label, null);
+  return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
+}
+
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals, customers }) {
   const ev = closing_event || {};
   const salePrice = ev.sale_price ?? t.current_price;
-  const totalComm = calcCommission(salePrice, t.commission_rate);
-  const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission);
+  const totalComm = calcCommission(salePrice, t.commission_rate, t.commission_type);
+  const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission, t.commission_type);
   const accComm   = (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
   const refs = referrals || [];
+  const custs = customers || [];
+  const sellers = custs.filter(c => c.role === 'seller');
+  const buyers  = custs.filter(c => c.role === 'buyer');
 
   const la = listing_agent;
   const ba = buyers_agent;
@@ -120,19 +138,9 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       ${row2('Mortgage Company', fmt(ev.mortgage_company), 'Office', fmt(t.office_name))}
     </table>
 
-    <div class="section-head">Seller</div>
-    <table>
-      ${row2('Name', fmt(t.seller_name), 'Email', fmt(t.seller_email))}
-      ${row2('Mailing Address', fmt(t.seller_mailing_address), 'City', fmt(t.seller_city))}
-      ${row2('State', fmt(t.seller_state), 'Zip', fmt(t.seller_zip))}
-    </table>
+    ${customerSections('Seller', sellers)}
 
-    <div class="section-head">Buyer</div>
-    <table>
-      ${row2('Name', fmt(t.buyer_name), 'Email', fmt(t.buyer_email))}
-      ${row2('Mailing Address', fmt(t.buyer_mailing_address), 'City', fmt(t.buyer_city))}
-      ${row2('State', fmt(t.buyer_state), 'Zip', fmt(t.buyer_zip))}
-    </table>
+    ${customerSections('Buyer', buyers)}
 
     <div class="section-head">Listing Side</div>
     <table>
@@ -172,12 +180,12 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td style="width:50%">&nbsp;</td>
       </tr>
       <tr>
-        <td>Total Commission (${t.commission_rate != null ? t.commission_rate + '%' : '&nbsp;&nbsp;&nbsp;%'})</td>
+        <td>Total Commission (${t.commission_rate != null ? (t.commission_type === 'fixed' ? '$' + t.commission_rate : t.commission_rate + '%') : '&nbsp;&nbsp;&nbsp;%'})</td>
         <td class="amt">${fmtMoney(totalComm)}</td>
         <td>&nbsp;</td>
       </tr>
       <tr>
-        <td>Co-Op Commission (${t.cooperating_commission != null ? t.cooperating_commission + '%' : '&nbsp;&nbsp;&nbsp;%'})</td>
+        <td>Co-Op Commission (${t.cooperating_commission != null ? (t.commission_type === 'fixed' ? '$' + t.cooperating_commission : t.cooperating_commission + '%') : '&nbsp;&nbsp;&nbsp;%'})</td>
         <td class="amt">${fmtMoney(coopComm)}</td>
         <td style="font-size:8pt; color:#555;">Paid to buyer's brokerage</td>
       </tr>

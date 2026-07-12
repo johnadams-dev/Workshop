@@ -96,6 +96,20 @@ function row2(l1, v1, l2, v2) {
   </tr>`;
 }
 
+function customerBlock(label, c) {
+  return `
+    <div class="section-head">${label}</div>
+    <table>
+      ${row2('Name', fmt(c?.name), 'Email', fmt(c?.email))}
+      ${row2('Mailing Address', fmt(c?.address), 'City', fmt(c?.city))}
+      ${row2('State', fmt(c?.state), 'Zip', fmt(c?.zip))}
+    </table>`;
+}
+function customerSections(label, list) {
+  if (!list.length) return customerBlock(label, null);
+  return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
+}
+
 function scenarioLabel(t) {
   const seller = t.represents_seller;
   const buyer  = t.represents_buyer;
@@ -115,10 +129,13 @@ function scenarioLabel(t) {
   return 'In-House Listing';
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event }) {
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, customers }) {
   const la    = listing_agent;
   const ba    = buyers_agent || co_buyers_agent;
   const badge = scenarioLabel(t);
+  const custs = customers || [];
+  const sellers = custs.filter(c => c.role === 'seller');
+  const buyers  = custs.filter(c => c.role === 'buyer');
 
   document.getElementById('content').innerHTML = `
     <div class="form-header">
@@ -137,22 +154,12 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
 
     <div class="section-head">Commission</div>
     <table>
-      ${row2('Total Commission %', t.commission_rate != null ? t.commission_rate + '%' : '', 'Buyer Broker Commission %', t.cooperating_commission != null ? t.cooperating_commission + '%' : '')}
+      ${row2('Total Commission', t.commission_rate != null ? (t.commission_type === 'fixed' ? '$' + t.commission_rate : t.commission_rate + '%') : '', 'Buyer Broker Commission', t.cooperating_commission != null ? (t.commission_type === 'fixed' ? '$' + t.cooperating_commission : t.cooperating_commission + '%') : '')}
     </table>
 
-    <div class="section-head">Seller / Landlord</div>
-    <table>
-      ${row2('Name', fmt(t.seller_name), 'Email', fmt(t.seller_email))}
-      ${row2('Mailing Address', fmt(t.seller_mailing_address), 'City', fmt(t.seller_city))}
-      ${row2('State', fmt(t.seller_state), 'Zip', fmt(t.seller_zip))}
-    </table>
+    ${customerSections('Seller / Landlord', sellers)}
 
-    <div class="section-head">Buyer / Tenant</div>
-    <table>
-      ${row2('Name', fmt(t.buyer_name), 'Email', fmt(t.buyer_email))}
-      ${row2('Mailing Address', fmt(t.buyer_mailing_address), 'City', fmt(t.buyer_city))}
-      ${row2('State', fmt(t.buyer_state), 'Zip', fmt(t.buyer_zip))}
-    </table>
+    ${customerSections('Buyer / Tenant', buyers)}
 
     <div class="section-head">Listing Agent</div>
     <table>

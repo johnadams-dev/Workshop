@@ -926,24 +926,22 @@ async function loadStaff() {
 
 /* ── CORRECTIONS ───────────────────────────────────────── */
 const FC_FIELD_LABELS = {
-  property_address:       'Property Address',
-  city:                   'City',
-  seller_name:            'Seller Name',
-  seller_email:           'Seller Email',
-  seller_mailing_address: 'Seller Mailing Address',
-  seller_city:            'Seller City',
-  seller_state:           'Seller State',
-  seller_zip:             'Seller Zip',
-  buyer_name:             'Buyer Name',
-  buyer_email:            'Buyer Email',
-  buyer_mailing_address:  'Buyer Mailing Address',
-  buyer_city:             'Buyer City',
-  buyer_state:            'Buyer State',
-  buyer_zip:              'Buyer Zip',
-  source_of_seller:       'Source of Seller',
-  source_of_buyer:        'Source of Buyer',
-  notes:                  'Notes',
+  property_address: 'Property Address',
+  city:              'City',
+  source_of_seller:  'Source of Seller',
+  source_of_buyer:   'Source of Buyer',
+  commission_type:   'Commission Type (percent/fixed)',
+  notes:             'Notes',
 };
+const FC_CUSTOMER_FIELD_LABELS = {
+  name:    'Name',
+  email:   'Email',
+  address: 'Mailing Address',
+  city:    'City',
+  state:   'State',
+  zip:     'Zip',
+};
+const FC_ROLE_LABELS = { seller: 'Seller', buyer: 'Buyer' };
 
 async function loadCorrections() {
   const tbody = document.getElementById('correctionsBody');
@@ -960,7 +958,8 @@ async function loadCorrections() {
       let c = {};
       try { c = JSON.parse(r.notes || '{}'); } catch(_) {}
       const prop = [r.property_address, r.city].filter(Boolean).join(', ') || '—';
-      const field = FC_FIELD_LABELS[c.field] || escHtml(c.field) || '—';
+      const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
+      const field = c.role ? `${FC_ROLE_LABELS[c.role] || c.role} — ${escHtml(fieldLabel)}` : (escHtml(fieldLabel) || '—');
       return `<tr>
         <td style="white-space:nowrap;font-size:0.8rem">${fmtDate(r.event_date)}</td>
         <td style="font-size:0.82rem">${escHtml(prop)}</td>

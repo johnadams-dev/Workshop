@@ -103,10 +103,26 @@ function row2(l1, v1, l2, v2) {
   </tr>`;
 }
 
-function render({ transaction: t, mls_number, listing_agent, buyers_agent, closing_event }) {
+function customerBlock(label, c) {
+  return `
+    <div class="section-head">${label}</div>
+    <table>
+      ${row2('Name', fmt(c?.name), 'Email', fmt(c?.email))}
+      ${row2('Mailing Address', fmt(c?.address), 'City / State / Zip', [c?.city, c?.state, c?.zip].filter(Boolean).join(', '))}
+    </table>`;
+}
+function customerSections(label, list) {
+  if (!list.length) return customerBlock(label, null);
+  return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
+}
+
+function render({ transaction: t, mls_number, listing_agent, buyers_agent, closing_event, customers }) {
   const la = listing_agent;
   const ba = buyers_agent;
   const statusLabel = STATUS_LABEL[t.status] || fmt(t.status);
+  const custs = customers || [];
+  const sellers = custs.filter(c => c.role === 'seller');
+  const buyers  = custs.filter(c => c.role === 'buyer');
 
   document.getElementById('content').innerHTML = `
     <div class="form-title">Delayed Contract Closings</div>
@@ -129,17 +145,9 @@ function render({ transaction: t, mls_number, listing_agent, buyers_agent, closi
       ${row2('Expiration Date', fmtDate(t.expiration_date), '', '')}
     </table>
 
-    <div class="section-head">Seller</div>
-    <table>
-      ${row2('Name', fmt(t.seller_name), 'Email', fmt(t.seller_email))}
-      ${row2('Mailing Address', fmt(t.seller_mailing_address), 'City / State / Zip', [t.seller_city, t.seller_state, t.seller_zip].filter(Boolean).join(', '))}
-    </table>
+    ${customerSections('Seller', sellers)}
 
-    <div class="section-head">Buyer</div>
-    <table>
-      ${row2('Name', fmt(t.buyer_name), 'Email', fmt(t.buyer_email))}
-      ${row2('Mailing Address', fmt(t.buyer_mailing_address), 'City / State / Zip', [t.buyer_city, t.buyer_state, t.buyer_zip].filter(Boolean).join(', '))}
-    </table>
+    ${customerSections('Buyer', buyers)}
 
     <div class="section-head">Agents</div>
     <table>
@@ -149,7 +157,7 @@ function render({ transaction: t, mls_number, listing_agent, buyers_agent, closi
 
     <div class="section-head">Commission</div>
     <table>
-      ${row2('Total Commission %', t.commission_rate != null ? t.commission_rate + '%' : '', 'Co-Op Commission %', t.cooperating_commission != null ? t.cooperating_commission + '%' : '')}
+      ${row2('Total Commission', t.commission_rate != null ? (t.commission_type === 'fixed' ? '$' + t.commission_rate : t.commission_rate + '%') : '', 'Co-Op Commission', t.cooperating_commission != null ? (t.commission_type === 'fixed' ? '$' + t.cooperating_commission : t.cooperating_commission + '%') : '')}
     </table>
 
     <div class="section-head">Extension / Cancellation Details</div>
