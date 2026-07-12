@@ -1039,10 +1039,10 @@ tbody tr.clickable { cursor: pointer; }
         <table>
           <thead>
             <tr>
-              <th>Address</th>
-              <th>Agent</th>
-              <th>List Price</th>
-              <th>Cached</th>
+              <th data-sort="address" onclick="sortUntrackedBy('address')">Address</th>
+              <th data-sort="agent_name" onclick="sortUntrackedBy('agent_name')">Agent</th>
+              <th data-sort="price_asking" onclick="sortUntrackedBy('price_asking')">List Price</th>
+              <th data-sort="cached_at" onclick="sortUntrackedBy('cached_at')">Cached</th>
               <th></th>
             </tr>
           </thead>
@@ -2421,8 +2421,8 @@ async function renderAll() {
   renderTodayTable(getSortedToday());
   renderListingsTable(tableSort(STATE.listings, lstSort.col, lstSort.dir));
   renderContractsTable(tableSort(STATE.contracts, ctrSort.col, ctrSort.dir));
+  renderUntrackedTable(tableSort(STATE.untracked, utkSort.col, utkSort.dir));
   updateSortHeaders();
-  renderUntrackedTable(STATE.untracked);
   renderNoticesUpcoming(STATE.noticesUpcoming);
   renderNoticesBuyer(STATE.noticesBuyer);
 
@@ -4574,12 +4574,13 @@ async function ncSelectFsTransaction(index) {
 const lstSort = { col: 'list_date', dir: 'desc' };
 const ctrSort = { col: 'list_date', dir: 'desc' };
 const tdySort = { col: 'created_at', dir: 'asc' }; // default: oldest first
+const utkSort = { col: 'cached_at', dir: 'desc' };
 
 function tableSort(arr, col, dir) {
   return [...arr].sort((a, b) => {
     let va = a[col], vb = b[col];
-    if (col === 'current_price') { va = Number(va) || 0; vb = Number(vb) || 0; }
-    else if (col === 'list_date' || col === 'created_at') { va = va ? new Date(va).getTime() : 0; vb = vb ? new Date(vb).getTime() : 0; }
+    if (col === 'current_price' || col === 'price_asking') { va = Number(va) || 0; vb = Number(vb) || 0; }
+    else if (col === 'list_date' || col === 'created_at' || col === 'cached_at') { va = va ? new Date(va).getTime() : 0; vb = vb ? new Date(vb).getTime() : 0; }
     else { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase(); }
     const c = va < vb ? -1 : va > vb ? 1 : 0;
     return dir === 'asc' ? c : -c;
@@ -4602,6 +4603,13 @@ function sortContractsBy(col) {
   updateSortHeaders();
 }
 
+function sortUntrackedBy(col) {
+  utkSort.dir = utkSort.col === col ? (utkSort.dir === 'asc' ? 'desc' : 'asc') : (col === 'price_asking' || col === 'cached_at' ? 'desc' : 'asc');
+  utkSort.col = col;
+  renderUntrackedTable(tableSort(STATE.untracked, utkSort.col, utkSort.dir));
+  updateSortHeaders();
+}
+
 function updateSortHeaders() {
   document.querySelectorAll('#page-listings thead th[data-sort]').forEach(th => {
     th.classList.toggle('sort-asc',  th.dataset.sort === lstSort.col && lstSort.dir === 'asc');
@@ -4614,6 +4622,10 @@ function updateSortHeaders() {
   document.querySelectorAll('#page-today thead th[data-sort]').forEach(th => {
     th.classList.toggle('sort-asc',  th.dataset.sort === tdySort.col && tdySort.dir === 'asc');
     th.classList.toggle('sort-desc', th.dataset.sort === tdySort.col && tdySort.dir === 'desc');
+  });
+  document.querySelectorAll('#page-untracked thead th[data-sort]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === utkSort.col && utkSort.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === utkSort.col && utkSort.dir === 'desc');
   });
 }
 
@@ -4923,7 +4935,7 @@ async function openDrawer(id) {
 function renderDrawer(t) {
   document.getElementById('drawerAddr').textContent = t.property_address || '—';
 
-  const mlsLink = (t.id_links || []).find(l => ['mls_stellar','mls_beaches','mls_fcmls'].includes(l.system) && l.id_type === 'listing');
+  const mlsLink = (t.id_links || []).find(l => l.system && l.system.startsWith('mls_') && l.id_type === 'listing');
   const fsLink  = (t.id_links || []).find(l => l.system === 'form_simplicity');
 
   document.getElementById('drawerSub').textContent =
