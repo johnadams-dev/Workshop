@@ -894,6 +894,9 @@ tbody tr.clickable { cursor: pointer; }
     <div class="nav-tab alert" data-page="untracked" onclick="showPage('untracked',this)">
       <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count" id="untracked-count">—</span>
     </div>
+    <div class="nav-tab alert" data-page="statusmismatch" onclick="showPage('statusmismatch',this)">
+      <span class="tab-icon">🔄</span> Status Mismatches <span class="tab-count" id="statusmismatch-count">—</span>
+    </div>
     <div class="nav-tab" data-page="notices" onclick="showPage('notices',this)">
       <span class="tab-icon">📢</span> Notices <span class="tab-count" id="notices-count">—</span>
     </div>
@@ -1047,6 +1050,39 @@ tbody tr.clickable { cursor: pointer; }
             </tr>
           </thead>
           <tbody id="untracked-tbody">
+            <tr><td colspan="5" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- ═══ STATUS MISMATCHES PAGE ═══ -->
+    <div class="page" id="page-statusmismatch">
+
+      <div class="alert-banner" id="statusmismatch-banner" style="display:none">
+        <div class="alert-icon">!</div>
+        <div class="alert-text">
+          <div class="alert-title" id="statusmismatch-banner-title"></div>
+          <div class="alert-sub">DeltaNet reports a different status than what's on file. Click a row to review and correct it — nothing here is changed automatically.</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title">Status Mismatches — DeltaNet vs. Our Records</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="property_address" onclick="sortMismatchBy('property_address')">Address</th>
+              <th data-sort="agent_name" onclick="sortMismatchBy('agent_name')">Agent</th>
+              <th>Our Status</th>
+              <th>DeltaNet Status</th>
+              <th data-sort="cached_at" onclick="sortMismatchBy('cached_at')">Cached</th>
+            </tr>
+          </thead>
+          <tbody id="statusmismatch-tbody">
             <tr><td colspan="5" class="empty">Loading…</td></tr>
           </tbody>
         </table>
@@ -2135,6 +2171,7 @@ let STATE = {
   contracts:         [],
   today:             [],
   untracked:         [],
+  statusMismatches:  [],
   userRole:          "unknown",
   offices:           [],
   closingSuggestions: null,
@@ -2385,15 +2422,16 @@ async function renderAll() {
   const officeId = document.getElementById('officeSelect').value;
   const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
 
-  let summary = {}, listings = [], contracts = [], today = [], untracked = [],
+  let summary = {}, listings = [], contracts = [], today = [], untracked = [], statusMismatches = [],
       noticesUpcoming = [], noticesBuyer = [];
   try {
-    [summary, listings, contracts, today, untracked, noticesUpcoming, noticesBuyer] = await Promise.all([
+    [summary, listings, contracts, today, untracked, statusMismatches, noticesUpcoming, noticesBuyer] = await Promise.all([
       GET(`/daily-desk/summary${qs}`),
       GET(`/daily-desk/listings${qs}`),
       GET(`/daily-desk/contracts${qs}`),
       GET(`/daily-desk/today${qs}`),
       GET(`/daily-desk/untracked${qs}`),
+      GET(`/daily-desk/status-mismatches${qs}`),
       GET('/notices/upcoming'),
       GET('/notices/buyer-needs'),
     ]);
@@ -2406,6 +2444,7 @@ async function renderAll() {
   STATE.contracts        = contracts        || [];
   STATE.today            = today            || [];
   STATE.untracked        = untracked        || [];
+  STATE.statusMismatches = statusMismatches || [];
   STATE.noticesUpcoming  = noticesUpcoming  || [];
   STATE.noticesBuyer     = noticesBuyer     || [];
 
@@ -2416,12 +2455,14 @@ async function renderAll() {
   document.getElementById('listings-count').textContent  = STATE.listings.length;
   document.getElementById('contracts-count').textContent = STATE.contracts.length;
   document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
+  document.getElementById('statusmismatch-count').textContent = STATE.statusMismatches.length;
   document.getElementById('notices-count').textContent   = noticesTotal || '—';
 
   renderTodayTable(getSortedToday());
   renderListingsTable(tableSort(STATE.listings, lstSort.col, lstSort.dir));
   renderContractsTable(tableSort(STATE.contracts, ctrSort.col, ctrSort.dir));
   renderUntrackedTable(tableSort(STATE.untracked, utkSort.col, utkSort.dir));
+  renderMismatchTable(tableSort(STATE.statusMismatches, mmSort.col, mmSort.dir));
   updateSortHeaders();
   renderNoticesUpcoming(STATE.noticesUpcoming);
   renderNoticesBuyer(STATE.noticesBuyer);
@@ -4575,6 +4616,7 @@ const lstSort = { col: 'list_date', dir: 'desc' };
 const ctrSort = { col: 'list_date', dir: 'desc' };
 const tdySort = { col: 'created_at', dir: 'asc' }; // default: oldest first
 const utkSort = { col: 'cached_at', dir: 'desc' };
+const mmSort  = { col: 'property_address', dir: 'asc' };
 
 function tableSort(arr, col, dir) {
   return [...arr].sort((a, b) => {
@@ -4610,6 +4652,13 @@ function sortUntrackedBy(col) {
   updateSortHeaders();
 }
 
+function sortMismatchBy(col) {
+  mmSort.dir = mmSort.col === col ? (mmSort.dir === 'asc' ? 'desc' : 'asc') : (col === 'cached_at' ? 'desc' : 'asc');
+  mmSort.col = col;
+  renderMismatchTable(tableSort(STATE.statusMismatches, mmSort.col, mmSort.dir));
+  updateSortHeaders();
+}
+
 function updateSortHeaders() {
   document.querySelectorAll('#page-listings thead th[data-sort]').forEach(th => {
     th.classList.toggle('sort-asc',  th.dataset.sort === lstSort.col && lstSort.dir === 'asc');
@@ -4626,6 +4675,10 @@ function updateSortHeaders() {
   document.querySelectorAll('#page-untracked thead th[data-sort]').forEach(th => {
     th.classList.toggle('sort-asc',  th.dataset.sort === utkSort.col && utkSort.dir === 'asc');
     th.classList.toggle('sort-desc', th.dataset.sort === utkSort.col && utkSort.dir === 'desc');
+  });
+  document.querySelectorAll('#page-statusmismatch thead th[data-sort]').forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === mmSort.col && mmSort.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === mmSort.col && mmSort.dir === 'desc');
   });
 }
 
@@ -4686,6 +4739,38 @@ function renderUntrackedTable(rows) {
                   <button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button>
                 </div>
               </td>
+            </tr>`;
+  }).join('');
+}
+
+/* ── DeltaNet "Status Mismatches" page ── */
+function renderMismatchTable(rows) {
+  const tbody  = document.getElementById('statusmismatch-tbody');
+  const banner = document.getElementById('statusmismatch-banner');
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No status mismatches found.</td></tr>';
+    banner.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'flex';
+  document.getElementById('statusmismatch-banner-title').textContent =
+    `${rows.length} transaction${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? "doesn't" : "don't"} match DeltaNet's reported status`;
+
+  tbody.innerHTML = rows.map(r => {
+    const [chipClass, chipLabel] = statusChip(r.status);
+    const sub = [r.city, r.office_name].filter(Boolean).join(' &middot; ');
+    return `
+            <tr>
+              <td>
+                <div class="addr-cell"><span class="tbl-link" onclick="openDrawer('${escapeJs(r.id)}')">${escapeHtml(r.property_address) || 'Unknown address'}</span></div>
+                <div class="addr-sub">${sub || '—'}</div>
+              </td>
+              <td>${escapeHtml(r.agent_name) || '—'}</td>
+              <td><span class="chip ${chipClass}">${chipLabel}</span></td>
+              <td>${escapeHtml(r.dn_status) || '—'}</td>
+              <td>${fmtDate(r.cached_at)}</td>
             </tr>`;
   }).join('');
 }
