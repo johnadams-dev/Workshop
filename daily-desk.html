@@ -612,7 +612,9 @@ tbody tr.clickable { cursor: pointer; }
   height: 100vh;
   background: var(--ink-mid);
   border-left: 1px solid var(--ink-border);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   z-index: 410;
   transform: translateX(100%);
   transition: transform .2s ease;
@@ -621,14 +623,14 @@ tbody tr.clickable { cursor: pointer; }
 .drawer-head {
   padding: 20px 22px;
   border-bottom: 1px solid var(--ink-border);
-  position: sticky; top: 0;
+  flex-shrink: 0;
   background: var(--ink-mid);
-  z-index: 1;
 }
 .drawer-head-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .drawer-addr { font-size: 16px; font-weight: 600; }
 .drawer-sub { font-size: 12px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
-.drawer-body { padding: 20px 22px; }
+.drawer-body { padding: 20px 22px; flex: 1; overflow-y: auto; }
+.drawer-foot { padding: 12px 22px; border-top: 1px solid var(--ink-border); flex-shrink: 0; background: var(--ink-mid); }
 
 .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 20px; }
 .dfield-key { font-family: var(--mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
@@ -2147,10 +2149,9 @@ tbody tr.clickable { cursor: pointer; }
     <div style="font-size:12px; color:var(--text-muted); display:flex; flex-direction:column; gap:8px;" id="drawer-activity">
     </div>
 
-    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--ink-border);">
-      <button class="btn btn-ghost btn-sm" id="drawer-correct-btn" onclick="openFieldCorrection()">✏ Correct a Field</button>
-    </div>
-
+  </div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost btn-sm" id="drawer-correct-btn" onclick="openFieldCorrection()">✏ Correct a Field</button>
   </div>
 </div>
 
