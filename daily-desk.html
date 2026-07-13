@@ -957,6 +957,8 @@ tbody tr.clickable { cursor: pointer; }
         <input id="lst-q" type="text" placeholder="Search address, agent, MLS #…" oninput="filterListings()">
         <select id="lst-status" onchange="filterListings()">
           <option value="">All Statuses</option>
+          <option value="on_market">On Market</option>
+          <option value="off_market">Off Market</option>
           <option value="coming_soon">Coming Soon</option>
           <option value="active">Active</option>
           <option value="under_contract">Under Contract</option>
@@ -4682,15 +4684,21 @@ function updateSortHeaders() {
   });
 }
 
+const STATUS_GROUPS = {
+  on_market:  ['coming_soon', 'active', 'under_contract'],
+  off_market: ['closed', 'expired', 'withdrawn'],
+};
+
 function filterListings() {
   const q = document.getElementById('lst-q').value.toLowerCase();
   const status = document.getElementById('lst-status').value;
   const attn = document.getElementById('lst-attn').value;
+  const statusGroup = STATUS_GROUPS[status];
 
   document.querySelectorAll('#listings-tbody .lst-row').forEach(row => {
     const text = row.textContent.toLowerCase();
     const matchesQ = !q || text.includes(q);
-    const matchesStatus = !status || row.dataset.status === status;
+    const matchesStatus = !status || (statusGroup ? statusGroup.includes(row.dataset.status) : row.dataset.status === status);
     const matchesAttn = !attn || row.dataset.attn === '1';
     row.style.display = (matchesQ && matchesStatus && matchesAttn) ? '' : 'none';
   });
