@@ -4863,14 +4863,23 @@ async function confirmStartTracking() {
 let matchDeltaListingId = null;
 let matchListings = [];
 
-function openMatchModal(deltaListingId) {
+async function openMatchModal(deltaListingId) {
   matchDeltaListingId = deltaListingId;
   const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
   document.getElementById('matchModalAddr').textContent = row ? (row.address || deltaListingId) : deltaListingId;
   document.getElementById('match-q').value = '';
-  document.getElementById('match-listing-list').innerHTML = '<div class="empty">Type to search listings.</div>';
-  matchListings = (STATE.listings || []).concat(STATE.contracts || []);
+  document.getElementById('match-listing-list').innerHTML = '<div class="empty">Loading…</div>';
   document.getElementById('matchModal').classList.add('open');
+  try {
+    const [allListings, allContracts] = await Promise.all([
+      GET('/daily-desk/listings'),
+      GET('/daily-desk/contracts'),
+    ]);
+    matchListings = allListings.concat(allContracts);
+    document.getElementById('match-listing-list').innerHTML = '<div class="empty">Type to search listings.</div>';
+  } catch (e) {
+    document.getElementById('match-listing-list').innerHTML = '<div class="empty">Failed to load listings.</div>';
+  }
 }
 
 function closeMatchModal() {
