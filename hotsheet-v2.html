@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adams Cameron Hotsheet (v2)</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand:      #0f2942;
+    --brand-light:#1a3d60;
+    --gold:       #c8972a;
+    --gold-light: #f59e0b;
+    --green:      #15803d;
+    --red:        #b91c1c;
+    --bg:         #f4f1ec;
+    --surface:    #ffffff;
+    --border:     #e2ddd5;
+    --text:       #1c1917;
+    --text-light: #6b6560;
+    --inhouse-bg: #fffbeb;
+    --inhouse-border: #f59e0b;
+    --radius:     12px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Sign-in gate ── */
+  #auth-gate {
+    position: fixed; inset: 0; background: var(--brand);
+    display: flex; align-items: center; justify-content: center; z-index: 999;
+  }
+  #auth-gate .box {
+    background: var(--surface); border-radius: var(--radius); padding: 48px 40px;
+    text-align: center; width: 360px; box-shadow: 0 8px 48px rgba(0,0,0,.35);
+  }
+  #auth-gate .icon {
+    width: 52px; height: 52px; background: var(--gold); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 20px;
+  }
+  #auth-gate .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--gold); margin-bottom: 8px;
+  }
+  #auth-gate h1 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--brand); margin-bottom: 6px; }
+  #auth-gate p { font-size: 13px; color: var(--text-light); margin-bottom: 24px; line-height: 1.5; }
+  #auth-gate .foot { font-size: 11px; color: var(--text-light); margin-top: 16px; }
+  #auth-gate a { display: inline-block; margin-top: 16px; font-size: 12px; color: var(--text-light); text-decoration: none; }
+
+  /* ── Header ── */
+  .site-header {
+    background: var(--brand);
+    color: white;
+    padding: 20px 24px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .header-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .header-logo span { color: var(--gold); }
+  .header-v2-badge {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--brand);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .header-subtitle {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+  }
+  .header-count {
+    background: var(--gold);
+    color: var(--brand);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+  .header-link { font-size: 12px; color: rgba(255,255,255,.6); text-decoration: none; letter-spacing: .03em; }
+
+  /* ── Date picker form ── */
+  .date-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .date-form label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    white-space: nowrap;
+  }
+  .date-form input[type="date"] {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 6px 10px;
+    color-scheme: dark;
+  }
+  .date-form input[type="date"]:focus { outline: none; border-color: var(--gold); }
+  .date-form select {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 6px 10px;
+    color-scheme: dark;
+    cursor: pointer;
+    max-width: 220px;
+  }
+  .date-form select:focus { outline: none; border-color: var(--gold); }
+  .date-form select option { background: #1a3d60; }
+  .date-btn {
+    background: var(--gold);
+    border: none;
+    border-radius: 6px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 7px 16px;
+  }
+  .date-btn:hover { background: #d9a43a; }
+  .date-btn:disabled { opacity: .6; cursor: default; }
+  .date-sep { color: rgba(255,255,255,0.4); font-size: 13px; }
+
+  /* ── Category filter tabs ── */
+  .filter-bar {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 0;
+    margin-top: 4px;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: rgba(255,255,255,0.55);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .filter-tab:hover { color: rgba(255,255,255,0.85); }
+  .filter-tab.active {
+    color: white;
+    border-bottom-color: var(--gold);
+  }
+
+  /* ── Main content ── */
+  .main { max-width: 1400px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 40px; }
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--brand);
+    padding-bottom: 10px;
+  }
+  .section-emoji { font-size: 20px; }
+  .section-title h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--brand);
+    flex: 1;
+  }
+  .section-count {
+    background: var(--brand);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 12px;
+  }
+
+  /* ── Cards grid ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .card:hover {
+    box-shadow: 0 8px 24px rgba(15,41,66,0.12);
+    transform: translateY(-2px);
+  }
+  .card-inhouse {
+    border-color: var(--inhouse-border);
+    background: var(--inhouse-bg);
+  }
+  .card-change { border-left: 4px solid var(--gold-light); }
+  .card-buyer  { border-left: 4px solid #0ea5e9; }
+
+  /* Photo */
+  .photo-img.photo-card {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+  }
+  .photo-placeholder.photo-card {
+    width: 100%;
+    height: 200px;
+    background: #e8e3da;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a09590;
+    font-size: 13px;
+  }
+
+  /* Card body */
+  .card-body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .card-mls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+  .prop-link { text-decoration: none; }
+  .prop-link .card-address { text-decoration: underline; text-decoration-color: rgba(15,41,66,0.3); text-underline-offset: 3px; }
+  .prop-link:hover .card-address { color: var(--gold); text-decoration-color: var(--gold); }
+  .card-address {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brand);
+    line-height: 1.3;
+    transition: color 0.15s;
+  }
+
+  .card-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--brand);
+  }
+  .closed-price { color: var(--green); }
+  .contract-price { font-size: 14px; color: var(--green); font-weight: 600; }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .card-agent {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 13px;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .card-office { color: var(--text-light); font-size: 11px; }
+  .card-contact { font-size: 11px; color: #0369a1; text-decoration: none; }
+  .card-contact:hover { text-decoration: underline; }
+  .card-date { font-size: 11px; color: var(--text-light); }
+  .card-comments { font-size: 12px; color: var(--text-light); line-height: 1.5; }
+  .card-footer-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-light); }
+
+  .card-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    font-size: 12px;
+    background: #f8f5f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .col-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-light); margin-bottom: 2px; }
+
+  /* Badges */
+  .mls-badge { background: #1e3a5f; color: white; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-inhouse  { background: #f59e0b; color: white; }
+  .badge-soon     { background: #0ea5e9; color: white; }
+  .badge-double   { background: #3b82f6; color: white; }
+  .badge-triple   { background: #7c3aed; color: white; }
+  .badge-homerun  { background: #15803d; color: white; font-size: 11px; padding: 3px 9px; }
+  .badge-cmg      { background: #0ea5e9; color: white; }
+  .badge-acctitle { background: #0d9488; color: white; }
+  .change-label   { background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .card-double  { border-color: #93c5fd; background: #eff6ff; }
+  .card-triple  { border-color: #c4b5fd; background: #f5f3ff; }
+  .card-homerun { border: 2px solid #86efac; background: #f0fdf4; }
+  .homerun-banner {
+    background: linear-gradient(135deg, #15803d, #16a34a);
+    color: white;
+    text-align: center;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin: -12px -12px 8px -12px;
+    border-radius: 8px 8px 0 0;
+  }
+  .section-note {
+    padding: 8px 14px;
+    background: #f8fafc;
+    font-size: 11px;
+    color: var(--text-light);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-light); font-size: 15px; }
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-light); font-size: 14px; }
+
+  @media (max-width: 600px) {
+    .card-grid { grid-template-columns: 1fr; }
+    .header-top { flex-direction: column; align-items: flex-start; }
+    .date-form { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
+<div id="auth-gate">
+  <div class="box">
+    <div class="icon">📋</div>
+    <div class="eyebrow">ADAMS CAMERON &amp; CO.</div>
+    <h1>Hotsheet <span style="color:var(--gold)">v2</span></h1>
+    <p>Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <div class="foot">Access restricted to @adamscameron.com accounts.</div>
+    <a href="./index.html">← Tools</a>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header class="site-header">
+    <div class="header-top">
+      <div>
+        <div class="header-logo">Adams<span>,</span> Cameron <span>&</span> Co.<span class="header-v2-badge">v2</span></div>
+        <div class="header-subtitle" id="headerSubtitle">Daily Hotsheet</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <a href="./feedback.html?tool=hotsheet-v2" class="header-link">Feedback</a>
+        <a href="./index.html" class="header-link">← Tools</a>
+        <div class="header-count" id="headerCount">0 items</div>
+      </div>
+    </div>
+
+    <form class="date-form" id="dateForm">
+      <label>From</label>
+      <input type="date" id="sinceInput">
+      <span class="date-sep">→</span>
+      <label>To</label>
+      <input type="date" id="untilInput">
+      <button class="date-btn" type="submit" id="updateBtn">Update</button>
+      <span class="date-sep">·</span>
+      <label for="officeFilter">Office</label>
+      <select id="officeFilter">
+        <option value="">All offices</option>
+      </select>
+    </form>
+
+    <nav class="filter-bar" id="filterBar"></nav>
+  </header>
+
+  <main class="main" id="main">
+    <div class="loading">Loading…</div>
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG / AUTH — same pattern as daily-desk.html
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROPERTY_BASE    = "https://adamscameron.com/";
+
+let userEmail = localStorage.getItem('hs_user_email')   || "";
+let proxyKey  = sessionStorage.getItem('hs_proxy_key')  || "";
+
+let STATE = { data: null, offices: [], userRole: "unknown", activeCategory: "all" };
+
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display       = "block";
+  window.addEventListener("load", init);
+}
+
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail = payload.email || "";
+    localStorage.setItem('hs_user_email', userEmail);
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+    sessionStorage.setItem('hs_proxy_key', proxyKey);
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "block";
+
+    await init();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════════════════════════════ */
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+const GET = (path) => api(path);
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORMATTING HELPERS (ported from the legacy hotsheet-page.js renderers)
+═══════════════════════════════════════════════════════════════════ */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtPrice(p) { return p || "—"; }
+function parseDateSafe(d) {
+  const s = String(d);
+  return new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + 'T12:00:00' : s);
+}
+function fmtDate(d) {
+  if (!d) return "";
+  const dt = parseDateSafe(d);
+  if (isNaN(dt)) return String(d).split("T")[0];
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+}
+
+const ACC_OFFICES = new Set([
+  "1100 dunlawton, po", "422 s. woodland, del", "4600 s. atlantic, pi",
+  "54 s. atlantic, ob", "600 s. atlantic, db", "759 w. granada, ob",
+  "commercial", "manufactured home division", "3118 s. atlantic, dbs",
+]);
+function isACC(office) { return ACC_OFFICES.has((office || "").toLowerCase().trim()); }
+function officeKey(s) { return (s || "").toLowerCase().trim(); }
+
+let _officeMap = new Map();
+function resolveOffice(raw) { return _officeMap.get(officeKey(raw)) || ""; }
+
+function propLink(mlsIds, text) {
+  const id = (mlsIds || []).find(id => /^[A-Z0-9]+$/i.test(id));
+  if (id) return `<a href="${PROPERTY_BASE}${id}" target="_blank" class="prop-link">${text}</a>`;
+  return `<span>${text}</span>`;
+}
+
+function photoEl(item, size = "card") {
+  const rawUrl = item.photoUrl || item.primary_photo_url;
+  if (!rawUrl) return `<div class="photo-placeholder photo-${size}"><span>No Photo</span></div>`;
+  const url = `${PROXY}/photo-proxy?key=${encodeURIComponent(proxyKey)}&url=${encodeURIComponent(rawUrl)}`;
+  return `<img src="${url}" alt="Property photo" class="photo-img photo-${size}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=\\'photo-placeholder photo-${size}\\'><span>No Photo</span></div>'">`;
+}
+
+function mlsBadges(mlsIds) {
+  return (mlsIds || []).map(id => `<span class="mls-badge">${escapeHtml(id)}</span>`).join(" ");
+}
+
+function statusBadge(item) {
+  if (item.dnStatus === "Coming Soon") return `<span class="badge badge-soon">Coming Soon</span>`;
+  return "";
+}
+
+function inHouseBadge(listingOff, sellingOff, repBuyer, repSeller) {
+  const repB = (repBuyer  || "").toLowerCase();
+  const repS = (repSeller || "").toLowerCase();
+  const lACC = repS === "yes" || (!repS && isACC(listingOff));
+  const sACC = repB === "yes" || (!repB && isACC(sellingOff));
+  if (lACC && sACC) return `<span class="badge badge-inhouse">IN-HOUSE</span>`;
+  return "";
+}
+
+function closingTier(item) {
+  const repB = (item.representBuyer  || "").toLowerCase();
+  const repS = (item.representSeller || "").toLowerCase();
+  const lACC = repS === "yes" || (!repS && isACC(item.listingOffice));
+  const sACC = repB === "yes" || (!repB && isACC(item.sellingOffice));
+  const cmg      = /cmg/i.test(item.mortgageCompany || "");
+  const accTitle = /(ac title|adams.{0,5}cameron)/i.test(item.titleCompany || "");
+  const both = lACC && sACC;
+  let tier = null;
+  if (both) {
+    if (cmg && accTitle) tier = "homerun";
+    else if (cmg || accTitle) tier = "triple";
+    else tier = "double";
+  }
+  return { lACC, sACC, both, cmg, accTitle, tier };
+}
+
+/* ── Card renderers ── */
+function listingCard(item) {
+  const addr = item.address || "Address TBD";
+  return `
+  <div class="card" data-category="listings" data-office="${resolveOffice(item.listingOffice)}">
+    <div class="card-photo">${photoEl(item, "card")}</div>
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(addr)}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)} ${statusBadge(item)}</div>
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        ${item.brba ? `<span>🛏 ${escapeHtml(item.brba)}</span>` : ""}
+        ${item.sqft ? `<span>📐 ${Number(item.sqft).toLocaleString()} sqft</span>` : ""}
+      </div>
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+      </div>
+      ${item.listDate ? `<div class="card-date">Listed ${fmtDate(item.listDate)}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+function contractCard(item, isManager = false) {
+  const addr = item.address || "Address TBD";
+  const repB = (item.representBuyer  || "").toLowerCase();
+  const repS = (item.representSeller || "").toLowerCase();
+  const lACC = repS === "yes" || (!repS && isACC(item.listingOffice));
+  const sACC = repB === "yes" || (!repB && isACC(item.sellingOffice));
+  const ih   = inHouseBadge(item.listingOffice, item.sellingOffice, item.representBuyer, item.representSeller);
+
+  const sellingFirst  = item.sellingAgentFirst || (sACC && !lACC ? item.agentFirst  : "");
+  const sellingLast   = item.sellingAgentLast  || (sACC && !lACC ? item.agentLast   : "");
+  const sellingOffice = item.sellingOffice     || (sACC && !lACC ? item.listingOffice : "");
+  const listingFirst  = item.agentFirst || "";
+  const listingLast   = item.agentLast  || "";
+  const listingOffice = item.listingOffice || "";
+  const officeAttr = [...new Set([resolveOffice(listingOffice), resolveOffice(sellingOffice)].filter(Boolean))].join("|");
+  return `
+  <div class="card${lACC && sACC ? " card-inhouse" : ""}" data-category="contracts" data-office="${officeAttr}">
+    <div class="card-photo">${photoEl(item, "card")}</div>
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(addr)}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)} ${ih}</div>
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}${isManager && item.contractPrice ? ` <span class="contract-price">→ ${item.contractPrice}</span>` : ""}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        ${item.contractDate ? `<span>📅 Contract ${fmtDate(item.contractDate)}</span>` : ""}
+      </div>
+      <div class="card-two-col">
+        <div>
+          <div class="col-label">Listing</div>
+          <strong>${escapeHtml(listingFirst)} ${escapeHtml(listingLast)}</strong>
+          ${listingOffice ? `<div class="card-office">${escapeHtml(listingOffice)}</div>` : ""}
+        </div>
+        <div>
+          <div class="col-label">Selling</div>
+          <strong>${escapeHtml(sellingFirst)} ${escapeHtml(sellingLast)}</strong>
+          ${sellingOffice ? `<div class="card-office">${escapeHtml(sellingOffice)}</div>` : ""}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closingCard(item, isManager = false) {
+  const { tier, cmg, accTitle } = closingTier(item);
+
+  const tierBadge = tier === "homerun" ? `<span class="badge badge-homerun">🏠 Home Run</span>`
+                  : tier === "triple"  ? `<span class="badge badge-triple">⚾ Triple</span>`
+                  : tier === "double"  ? `<span class="badge badge-double">⚾ Double</span>`
+                  : "";
+  const cmgBadge   = cmg      ? `<span class="badge badge-cmg">CMG Mortgage</span>`  : "";
+  const titleBadge = accTitle ? `<span class="badge badge-acctitle">AC Title</span>` : "";
+  const cardClass = tier === "homerun" ? " card-homerun"
+                  : tier === "triple"  ? " card-triple"
+                  : tier === "double"  ? " card-double"
+                  : "";
+  const officeAttr = [...new Set([resolveOffice(item.listingOffice), resolveOffice(item.sellingOffice)].filter(Boolean))].join("|");
+
+  return `
+  <div class="card${cardClass}" data-category="closings" data-office="${officeAttr}">
+    ${tier === "homerun" ? `<div class="homerun-banner">🏠 HOME RUN — All Four Bases Covered!</div>` : ""}
+    <div class="card-photo">${photoEl(item, "card")}</div>
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(item.address || "Address TBD")}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)} ${tierBadge}${cmgBadge}${titleBadge}</div>
+      </div>
+      <div class="card-price closed-price">${fmtPrice(item.salePrice)}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        ${item.closeDate ? `<span>🎉 Closed ${fmtDate(item.closeDate)}</span>` : ""}
+        ${isManager && item.buyerName ? `<span>👤 ${escapeHtml(item.buyerName)}</span>` : ""}
+      </div>
+      <div class="card-two-col">
+        <div>
+          <div class="col-label">Listing</div>
+          <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+          ${item.listingOffice ? `<div class="card-office">${escapeHtml(item.listingOffice)}</div>` : ""}
+        </div>
+        <div>
+          <div class="col-label">Selling</div>
+          <strong>${escapeHtml(item.sellingAgentFirst)} ${escapeHtml(item.sellingAgentLast)}</strong>
+          ${item.sellingOffice ? `<div class="card-office">${escapeHtml(item.sellingOffice)}</div>` : ""}
+        </div>
+      </div>
+      ${item.mortgageCompany || item.titleCompany ? `
+      <div class="card-footer-row">
+        ${item.mortgageCompany ? `<span>🏦 ${escapeHtml(item.mortgageCompany)}</span>` : ""}
+        ${item.titleCompany   ? `<span>📄 ${escapeHtml(item.titleCompany)}</span>`   : ""}
+      </div>` : ""}
+    </div>
+  </div>`;
+}
+
+function changeCard(item) {
+  return `
+  <div class="card card-change" data-category="changes" data-office="${resolveOffice(item.listingOffice)}">
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(item.address || "Address TBD")}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)}</div>
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        <span class="change-label">${escapeHtml(item.change || "Change")}</span>
+      </div>
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function upcomingCard(item) {
+  const addr = item.address || "";
+  const contactHref = (item.contact || item.agentEmail)
+    ? `${item.contactMethod === "phone" ? "tel:" : "mailto:"}${item.contact || item.agentEmail}` : "";
+  return `
+  <div class="card" data-category="upcoming" data-office="${resolveOffice(item.agentOffice)}">
+    ${item.photoUrl ? `<div class="card-photo">${photoEl(item, "card")}</div>` : ""}
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(addr || item.city || "Location TBD")}</h3>`)}
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}</div>
+      <div class="card-meta">
+        ${item.brba ? `<span>🛏 ${escapeHtml(item.brba)}</span>` : ""}
+        ${item.expectedDate ? `<span>📅 Expected ${fmtDate(item.expectedDate)}</span>` : ""}
+      </div>
+      ${item.comments ? `<div class="card-comments">${escapeHtml(item.comments)}</div>` : ""}
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.agentOffice ? `<span class="card-office">${escapeHtml(item.agentOffice)}</span>` : ""}
+        ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
+      </div>
+      <div class="card-date">Submitted ${fmtDate(item.timestamp)}</div>
+    </div>
+  </div>`;
+}
+
+function buyerCard(item) {
+  const contactHref = (item.contact || item.agentEmail)
+    ? `${item.contactMethod === "phone" ? "tel:" : "mailto:"}${item.contact || item.agentEmail}` : "";
+  return `
+  <div class="card card-buyer" data-category="buyers" data-office="${resolveOffice(item.agentOffice)}">
+    <div class="card-body">
+      <div class="card-header">
+        <h3 class="card-address">🔍 Buyer Need — ${escapeHtml(item.city || "Location TBD")}</h3>
+      </div>
+      <div class="card-price">${item.maxPrice ? `Up to ${item.maxPrice}` : "Price flexible"}</div>
+      <div class="card-meta">
+        ${item.minBrba ? `<span>🛏 Min ${escapeHtml(item.minBrba)}</span>` : ""}
+      </div>
+      ${item.comments ? `<div class="card-comments">${escapeHtml(item.comments)}</div>` : ""}
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.agentOffice ? `<span class="card-office">${escapeHtml(item.agentOffice)}</span>` : ""}
+        ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
+      </div>
+      <div class="card-date">Submitted ${fmtDate(item.timestamp)}</div>
+    </div>
+  </div>`;
+}
+
+function openHouseCard(item) {
+  return `
+  <div class="card" data-category="openhouses" data-office="${resolveOffice(item.listingOffice)}">
+    <div class="card-photo">${photoEl(item, "card")}</div>
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(item.address || "Address TBD")}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)}</div>
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        ${item.brba ? `<span>🛏 ${escapeHtml(item.brba)}</span>` : ""}
+        ${item.openDate ? `<span>🏠 ${fmtDate(item.openDate)}</span>` : ""}
+        ${item.openStart && item.openEnd ? `<span>⏰ ${item.openStart} – ${item.openEnd}</span>` : ""}
+      </div>
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function section(title, emoji, category, cards, note = "") {
+  if (!cards.length) return "";
+  return `
+  <section class="section" data-section="${category}">
+    <div class="section-title">
+      <span class="section-emoji">${emoji}</span>
+      <h2>${title}</h2>
+      <span class="section-count">${cards.length}</span>
+    </div>
+    ${note ? `<div class="section-note">${note}</div>` : ""}
+    <div class="card-grid">${cards.join("")}</div>
+  </section>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FETCH + RENDER
+═══════════════════════════════════════════════════════════════════ */
+function toETDate(d) { return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); }
+
+async function fetchAndRender() {
+  const btn = document.getElementById('updateBtn');
+  btn.disabled = true;
+  document.getElementById('main').innerHTML = '<div class="loading">Loading…</div>';
+
+  try {
+    const since = document.getElementById('sinceInput').value;
+    const until = document.getElementById('untilInput').value;
+    const qs = new URLSearchParams();
+    if (since) qs.set('since', since);
+    if (until) qs.set('until', until);
+
+    const data = await GET(`/hotsheet-v2/report?${qs}`);
+    STATE.data = data;
+    STATE.offices = data.offices || [];
+
+    _officeMap = new Map();
+    for (const o of STATE.offices) {
+      _officeMap.set(officeKey(o.name), o.name);
+      for (const a of (o.aliases || [])) _officeMap.set(officeKey(a), o.name);
+    }
+
+    const sel = document.getElementById('officeFilter');
+    const prevOffice = sel.value;
+    sel.innerHTML = '<option value="">All offices</option>' +
+      STATE.offices.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('');
+    sel.value = prevOffice;
+
+    if (!document.getElementById('sinceInput').value) document.getElementById('sinceInput').value = toETDate(new Date(data.since));
+    if (!document.getElementById('untilInput').value) document.getElementById('untilInput').value = toETDate(new Date(data.until));
+
+    render();
+  } catch (e) {
+    document.getElementById('main').innerHTML = `<div class="empty">Error loading report: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function render() {
+  const data = STATE.data;
+  if (!data) return;
+  const isManager = STATE.userRole === 'manager';
+
+  const sinceDisp = new Date(data.since).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" });
+  const untilDisp = new Date(data.until).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" });
+  document.getElementById('headerSubtitle').textContent = `Daily Hotsheet · ${sinceDisp} → ${untilDisp}`;
+
+  const totalItems = data.newListings.length + data.newContracts.length + data.closings.length +
+    data.changes.length + data.upcoming.length + data.buyerNeeds.length + data.openHouses.length;
+  document.getElementById('headerCount').textContent = `${totalItems} items`;
+
+  const categories = [
+    { id: "all",        label: `All (${totalItems})`,                     base: "All" },
+    { id: "listings",   label: `Listings (${data.newListings.length})`,   base: "Listings" },
+    { id: "contracts",  label: `Contracts (${data.newContracts.length})`, base: "Contracts" },
+    { id: "closings",   label: `Closings (${data.closings.length})`,      base: "Closings" },
+    { id: "changes",    label: `Changes (${data.changes.length})`,        base: "Changes" },
+    { id: "upcoming",   label: `Upcoming (${data.upcoming.length})`,      base: "Upcoming" },
+    { id: "buyers",     label: `Buyer Needs (${data.buyerNeeds.length})`, base: "Buyer Needs" },
+    { id: "openhouses", label: `Open Houses (${data.openHouses.length})`, base: "Open Houses" },
+  ];
+  document.getElementById('filterBar').innerHTML = categories.map(c =>
+    `<button class="filter-tab${c.id === STATE.activeCategory ? " active" : ""}" data-filter="${c.id}" data-label="${c.base}">${c.label}</button>`
+  ).join("");
+
+  const sections = [
+    section("New Listings",                "🏡", "listings",   data.newListings.map(listingCard)),
+    section("New Contracts",               "📋", "contracts",  data.newContracts.map(c => contractCard(c, isManager))),
+    section("Closings", "🎉", "closings", data.closings.map(c => closingCard(c, isManager)),
+      `<strong>⚾ Baseball Awards:</strong>&nbsp;` +
+      `<span class="badge badge-double">⚾ Double</span> Both sides ACC &nbsp;` +
+      `<span class="badge badge-triple">⚾ Triple</span> Both sides + CMG or AC Title &nbsp;` +
+      `<span class="badge badge-homerun">🏠 Home Run</span> Both sides + CMG + AC Title`),
+    section("Changes / Withdrawn / Expired","🔄", "changes",   data.changes.map(changeCard)),
+    section("Upcoming Listings",           "📅", "upcoming",   data.upcoming.map(upcomingCard)),
+    section("Buyer Needs",                 "🔍", "buyers",     data.buyerNeeds.map(buyerCard)),
+    section("Open Houses",                 "🏠", "openhouses", [...data.openHouses].sort((a, b) => {
+      const d = (a.openDate || "").localeCompare(b.openDate || "");
+      if (d !== 0) return d;
+      return (a.openStart || "").localeCompare(b.openStart || "");
+    }).map(openHouseCard)),
+  ].filter(Boolean).join("");
+
+  document.getElementById('main').innerHTML = totalItems === 0
+    ? `<div class="empty">No hotsheet activity found for this date range.</div>`
+    : sections;
+
+  applyFilters();
+}
+
+function applyFilters() {
+  const office = document.getElementById('officeFilter').value;
+  const allSections = document.querySelectorAll(".section");
+  let grandTotal = 0;
+
+  allSections.forEach(sec => {
+    const cat = sec.dataset.section;
+    const catVisible = STATE.activeCategory === "all" || STATE.activeCategory === cat;
+    let officeCount = 0;
+
+    sec.querySelectorAll(".card").forEach(card => {
+      const offices = (card.dataset.office || "").split("|").filter(Boolean);
+      const matchesOffice = !office || offices.length === 0 || offices.includes(office);
+      card.style.display = (catVisible && matchesOffice) ? "" : "none";
+      if (matchesOffice) officeCount++;
+    });
+
+    sec.style.display = (catVisible && officeCount > 0) ? "" : "none";
+
+    const badge = sec.querySelector(".section-count");
+    if (badge) badge.textContent = officeCount;
+
+    const tab = document.querySelector(`.filter-tab[data-filter="${cat}"]`);
+    if (tab) tab.textContent = `${tab.dataset.label} (${officeCount})`;
+
+    grandTotal += officeCount;
+  });
+
+  const allTab = document.querySelector('.filter-tab[data-filter="all"]');
+  if (allTab) allTab.textContent = `All (${grandTotal})`;
+}
+
+document.getElementById('filterBar').addEventListener("click", e => {
+  const btn = e.target.closest(".filter-tab");
+  if (!btn) return;
+  STATE.activeCategory = btn.dataset.filter;
+  document.querySelectorAll(".filter-tab").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  applyFilters();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+document.getElementById('officeFilter').addEventListener("change", () => {
+  applyFilters();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+document.getElementById('dateForm').addEventListener("submit", e => {
+  e.preventDefault();
+  fetchAndRender();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+async function init() {
+  try {
+    const me = await GET('/lockbox/me');
+    STATE.userRole = (me || {}).role || 'unknown';
+  } catch (e) {
+    console.error('Failed to load role:', e);
+  }
+
+  await fetchAndRender();
+}
+</script>
+
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hotsheet v2',email:localStorage.getItem('hs_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
