@@ -214,6 +214,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <span id="issue-summary" style="font-size:11px;color:#8ab4cc"></span>
     <button class="btn btn-secondary btn-sm" id="add-agent-btn" onclick="openNewAgent()" style="display:none">+ Add Agent</button>
     <button class="btn btn-secondary btn-sm" id="add-staff-btn" onclick="openNewStaff()" style="display:none">+ Add Staff</button>
+    <button class="btn btn-secondary btn-sm" id="sync-pp-btn" onclick="syncProfitPowerIds()" style="display:none">Sync PP IDs</button>
     <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportCsv()">Export</button>
   </div>
 </div>
@@ -563,6 +564,7 @@ async function load() {
 
     // Show "+ Add Agent" only to admins
     document.getElementById('add-agent-btn').style.display = USER_ROLE === 'admin' ? '' : 'none';
+    document.getElementById('sync-pp-btn').style.display = (USER_ROLE === 'admin' || USER_ROLE === 'manager') ? '' : 'none';
 
     const sel = document.getElementById('na-office');
     sel.innerHTML = '<option value="">— Select —</option>' +
@@ -1066,6 +1068,22 @@ async function save() {
   } catch(e) {
     toast('Save failed: '+e.message, 'err');
     if (btn) { btn.disabled=false; btn.textContent='Save'; }
+  }
+}
+
+async function syncProfitPowerIds() {
+  const btn = document.getElementById('sync-pp-btn');
+  if (btn) { btn.disabled=true; btn.textContent='Syncing…'; }
+  try {
+    const r = await fetch(`${PROXY_URL}/profit-power/sync-associate-ids`, { method:'POST', headers:H() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+    toast(`Profit Power IDs: ${data.updated} of ${data.checked} filled in`, 'ok');
+    await load();
+  } catch(e) {
+    toast('Profit Power sync failed: '+e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='Sync PP IDs'; }
   }
 }
 
@@ -1774,6 +1792,7 @@ async function switchMode(mode) {
   document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : staffMode ? 'Staff Records' : 'Agent Records';
   document.getElementById('add-agent-btn').style.display = !staffMode && !rosterMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('sync-pp-btn').style.display = !staffMode && !rosterMode && (USER_ROLE === 'admin' || USER_ROLE === 'manager') ? '' : 'none';
   document.getElementById('export-btn').style.display   = (staffMode || rosterMode) ? 'none' : '';
   document.getElementById('issue-summary').style.display = (staffMode || rosterMode) ? 'none' : '';
   document.getElementById('filter-row').style.display    = (staffMode || rosterMode) ? 'none' : '';
