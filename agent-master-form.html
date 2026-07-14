@@ -747,7 +747,8 @@ function renderDetail(a) {
           <div class="field"><label>Last name</label><input type="text" value="${esc(a.last_name)}" onchange="chg('lastName',this.value)"></div>
           <div class="field">
             <label>Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(Google primary — auth key)</span></label>
-            <input type="email" value="${esc(a.email)}" readonly title="Change via Google Workspace admin, then update here">
+            <input type="email" value="${esc(a.email)}" onchange="chgEmail(this)">
+            <span class="field-hint h-warn">Editing this only updates our record — it does not rename the Google Workspace account. Use this to fix a record after the address was already changed in Google (or before requesting the change), not as a way to rename the Workspace account itself. Sign-in, DeltaNet sync, and Google reconciliation will all break until the Workspace account's email matches.</span>
           </div>
           <div class="field">
             <label>Office</label>
@@ -1038,6 +1039,17 @@ async function applyDnNrds(id, nrdsId) {
 
 // ── Edit / Save ───────────────────────────────────────────────────────────────
 function chg(f, v) { pending[f] = v; document.getElementById('save-bar')?.classList.add('on'); }
+
+function chgEmail(el) {
+  const original = allAgents.find(a => a.id === currentId)?.email || '';
+  const next = el.value.trim();
+  if (next.toLowerCase() === (original || '').toLowerCase()) { delete pending.email; return; }
+  if (!confirm(`Change this agent's email to "${next}"?\n\nThis only updates our record — it will NOT rename the Google Workspace account. Sign-in, DeltaNet sync, and Google reconciliation will break until the Workspace account's email matches this value.`)) {
+    el.value = original;
+    return;
+  }
+  chg('email', next);
+}
 function discard() { pending = {}; document.getElementById('save-bar')?.classList.remove('on'); selectAgent(currentId); }
 
 async function save() {
