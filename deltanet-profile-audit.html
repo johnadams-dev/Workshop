@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeltaNet Profile Audit — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;color:#1a1a2e;min-height:100vh}
+
+/* ── Auth gate ── */
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#1a1a2e}
+.auth-card{background:#fff;border-radius:16px;padding:48px 40px;text-align:center;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.4)}
+.auth-logo{width:60px;height:60px;background:#c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1a2e;font-size:20px;margin:0 auto 18px}
+.auth-brand{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9a84c}
+.auth-title{font-size:22px;font-weight:700;color:#1a1a2e;margin:8px 0 6px}
+.auth-sub{font-size:13px;color:#6b7280;margin-bottom:28px;line-height:1.5}
+#g-signin-btn{display:flex;justify-content:center}
+
+/* ── App ── */
+#app{display:none}
+.header{background:#1a1a2e;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.header-left{display:flex;align-items:center;gap:14px}
+.header-logo{width:34px;height:34px;background:#c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1a1a2e;font-size:13px;flex-shrink:0}
+.header-brand{color:#c9a84c;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.header-title{color:#fff;font-size:16px;font-weight:300}
+.header-right{display:flex;align-items:center;gap:12px}
+.header-user{font-size:12px;color:#9a9ab8}
+
+.container{max-width:900px;margin:28px auto;padding:0 20px 80px}
+
+/* ── Cards ── */
+.card{background:#fff;border-radius:14px;padding:28px 30px;margin-bottom:18px;box-shadow:0 2px 14px rgba(0,0,0,.06)}
+.card-title{font-size:17px;font-weight:700;margin-bottom:4px;color:#1a1a2e}
+.card-sub{font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5}
+
+/* ── Picker ── */
+.fg{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af}
+.field select{padding:9px 12px;border:1px solid #e0dcd4;border-radius:8px;font-size:13px;color:#1a1a2e;background:#fff;outline:none;font-family:inherit;min-width:220px}
+.self-label{font-size:14px;font-weight:600;color:#1a1a2e;display:none}
+
+.btn{padding:9px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:#1a1a2e;color:#fff}
+.btn-primary:hover{background:#2d3a5c}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:#fff;color:#1a1a2e;border:1px solid #e0dcd4}
+.btn-ghost:hover{border-color:#1a1a2e}
+.btn-gold{background:#c9a84c;color:#fff}
+.btn-gold:hover{background:#b8963e}
+
+/* ── Score dashboard ── */
+.score-header{display:flex;align-items:center;gap:22px;margin-bottom:22px;flex-wrap:wrap}
+.overall-ring{position:relative;flex-shrink:0}
+.overall-ring svg{transform:rotate(-90deg)}
+.ring-score{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-num{font-size:28px;font-weight:700;color:#1a1a2e;line-height:1}
+.ring-lbl{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em}
+.score-meta{flex:1}
+.score-name{font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:3px}
+.score-date{font-size:12px;color:#9ca3af}
+.trend-line{font-size:12px;font-weight:600;margin-top:6px}
+.trend-up{color:#10b981}
+.trend-down{color:#ef4444}
+.trend-flat{color:#9ca3af}
+
+.section-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9ca3af;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:#e0dcd4}
+
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.cat-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9f8f5;border-radius:9px}
+.cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cat-label{flex:1;font-size:12px;font-weight:600;color:#374151}
+.cat-score{font-size:15px;font-weight:700;color:#1a1a2e;margin-left:auto}
+.cat-bar-wrap{width:70px;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;flex-shrink:0}
+.cat-bar{height:100%;border-radius:3px;transition:width .8s ease}
+.dot-green{background:#10b981}
+.dot-yellow{background:#f59e0b}
+.dot-red{background:#ef4444}
+
+.cat-row.coming-soon{opacity:.55}
+.coming-soon-badge{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#e5e7eb;color:#6b7280;padding:2px 7px;border-radius:10px;margin-left:auto}
+
+/* ── Benchmark ── */
+.bench-row{display:grid;grid-template-columns:1fr 70px 70px 70px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f0ede7;font-size:12px}
+.bench-row:last-child{border-bottom:none}
+.bench-head{font-weight:700;color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.bench-you{font-weight:700;color:#1a1a2e}
+.bench-note{font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.5}
+
+/* ── Toast ── */
+.toast-area{position:fixed;top:70px;right:16px;z-index:300;display:flex;flex-direction:column;gap:7px}
+.toast{background:#1a1a2e;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);animation:tin .2s ease;max-width:300px}
+.toast.ok{background:#065f46}.toast.err{background:#991b1b}
+@keyframes tin{from{transform:translateX(12px);opacity:0}to{transform:none;opacity:1}}
+
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.spin-dark{border-color:rgba(0,0,0,.15);border-top-color:#1a1a2e}
+
+.empty-state{text-align:center;padding:40px 20px;color:#9ca3af;font-size:13px}
+
+@media(max-width:640px){.cat-grid{grid-template-columns:1fr}.bench-row{grid-template-columns:1fr 55px 55px 55px}}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="auth-card">
+    <div class="auth-logo">AC</div>
+    <div class="auth-brand">Adams Cameron &amp; Co.</div>
+    <div class="auth-title">DeltaNet Profile Audit</div>
+    <div class="auth-sub">Sign in with your Adams Cameron account to check profile completeness.</div>
+    <div id="g-signin-btn"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="header-left">
+      <div class="header-logo">AC</div>
+      <div>
+        <div class="header-brand">Adams Cameron &amp; Co.</div>
+        <div class="header-title">DeltaNet Profile Audit</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="header-user" id="header-user"></span>
+      <a href="./index.html" style="font-size:12px;color:#9a9ab8;text-decoration:none;letter-spacing:.03em">← Tools</a>
+    </div>
+  </div>
+
+  <div class="toast-area" id="toasts"></div>
+
+  <div class="container">
+
+    <div class="card">
+      <div class="card-title">Run an Audit</div>
+      <div class="card-sub">Scores how completely a DeltaNet profile is filled out — photo, bio, reviews, lead settings, and more — against company benchmarks.</div>
+      <div class="fg">
+        <div class="field">
+          <label for="f-agent">Agent</label>
+          <select id="f-agent" onchange="onAgentChange()"></select>
+          <div class="self-label" id="f-agent-self"></div>
+        </div>
+        <button class="btn btn-primary" id="run-btn" onclick="runAudit()">Run Audit</button>
+      </div>
+      <div id="baseline-row" style="margin-top:16px;display:none">
+        <button class="btn btn-ghost" id="baseline-btn" onclick="runBaselineSeed()">Run Baseline for All Agents</button>
+        <span id="baseline-result" style="font-size:12px;color:#6b7280;margin-left:10px"></span>
+      </div>
+    </div>
+
+    <div id="empty-state" class="card">
+      <div class="empty-state">Select an agent and run an audit to see their profile completeness.</div>
+    </div>
+
+    <div id="report" style="display:none">
+      <div class="card">
+        <div class="score-header">
+          <div class="overall-ring">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#f0ede7" stroke-width="8"/>
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#c9a84c" stroke-width="8"
+                      stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                      id="ring-arc" stroke-linecap="round"/>
+            </svg>
+            <div class="ring-score">
+              <div class="ring-num" id="ring-num">—</div>
+              <div class="ring-lbl">/ 100</div>
+            </div>
+          </div>
+          <div class="score-meta">
+            <div class="score-name" id="report-agent-name">—</div>
+            <div class="score-date" id="report-date">—</div>
+            <div class="trend-line" id="trend-line"></div>
+          </div>
+        </div>
+
+        <div class="section-label">Category Scores</div>
+        <div class="cat-grid" id="cat-grid"></div>
+      </div>
+
+      <div class="card" id="bench-card" style="display:none">
+        <div class="card-title">Company Benchmark</div>
+        <div class="card-sub" id="bench-sub"></div>
+        <div class="bench-row bench-head">
+          <div>Category</div><div>You</div><div>Average</div><div>Top 10%</div>
+        </div>
+        <div id="bench-body"></div>
+        <div class="bench-note" id="bench-note"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══ CONFIG ═══ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID  = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+let userEmail   = localStorage.getItem('dpa_user_email')   || "";
+let userDisplay = localStorage.getItem('dpa_user_display') || userEmail;
+let proxyKey    = sessionStorage.getItem('dpa_proxy_key')  || "";
+let userRole    = 'unknown';
+let allAgents   = [];
+let currentAgentId = null;
+
+/* ═══ AUTH ═══ */
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display       = "block";
+  window.addEventListener("load", init);
+}
+
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail   = payload.email || "";
+    userDisplay = payload.name  || userEmail;
+    localStorage.setItem('dpa_user_email',   userEmail);
+    localStorage.setItem('dpa_user_display', userDisplay);
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+    sessionStorage.setItem('dpa_proxy_key', proxyKey);
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "block";
+
+    await init();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+/* ═══ API HELPERS ═══ */
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+const GET  = (path)       => api(path);
+const POST = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+function toast(msg, type) {
+  const a = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast${type ? ' '+type : ''}`;
+  el.textContent = msg;
+  a.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+function scoreColor(s) {
+  if (s == null) return '#d1d5db';
+  if (s >= 75) return '#10b981';
+  if (s >= 50) return '#f59e0b';
+  return '#ef4444';
+}
+function dotClass(s) {
+  if (s == null) return 'dot-yellow';
+  if (s >= 75) return 'dot-green';
+  if (s >= 50) return 'dot-yellow';
+  return 'dot-red';
+}
+
+/* ═══ CATEGORIES ═══ */
+const CATEGORIES = [
+  { key: 'photo',                 label: 'Photo' },
+  { key: 'bio',                   label: 'Bio Quality' },
+  { key: 'leadDelegation',        label: 'Lead Delegation' },
+  { key: 'nrds',                  label: 'NRDS ID' },
+  { key: 'designationsLanguages', label: 'Designations & Languages' },
+  { key: 'reviews',                label: 'Reviews' },
+  { key: 'leadSms',               label: 'Lead SMS' },
+  { key: 'socialLinks',           label: 'Social Media Links' },
+  { key: 'customerCount',         label: 'Customer Database' },
+];
+const BENCH_KEY = {
+  photo: 'photo', bio: 'bio', leadDelegation: 'lead_delegation', nrds: 'nrds',
+  designationsLanguages: 'designations_languages', reviews: 'reviews',
+  leadSms: 'lead_sms', socialLinks: 'social_links', customerCount: 'customer_count_score',
+};
+const COMING_SOON = ['Mortgage Setup', 'MCFL Enabled', 'MCFL Auto-Postings', 'Social Connector'];
+
+/* ═══ INIT ═══ */
+async function init() {
+  document.getElementById('header-user').textContent = userDisplay || userEmail;
+
+  await loadAgents();
+  try {
+    const me = await GET('/lockbox/me');
+    userRole = (me || {}).role || 'unknown';
+  } catch (e) {
+    console.error('Failed to load role:', e);
+  }
+  applyRoleRestrictions();
+
+  if (currentAgentId) loadAgentAudit(currentAgentId);
+}
+
+async function loadAgents() {
+  try {
+    allAgents = await GET('/daily-desk/agents');
+    allAgents.sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''));
+    const sel = document.getElementById('f-agent');
+    sel.innerHTML = '<option value="">— Select agent —</option>' +
+      allAgents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`).join('');
+  } catch (e) {
+    toast('Failed to load agents: ' + e.message, 'err');
+  }
+}
+
+function applyRoleRestrictions() {
+  document.getElementById('baseline-row').style.display = userRole === 'manager' ? 'block' : 'none';
+  if (userRole === 'manager') return; // full picker stays
+
+  const myAgent = allAgents.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
+  const sel = document.getElementById('f-agent');
+  const selfLabel = document.getElementById('f-agent-self');
+  sel.style.display = 'none';
+  selfLabel.style.display = 'block';
+  if (myAgent) {
+    selfLabel.textContent = `${myAgent.first_name} ${myAgent.last_name} · ${myAgent.office_name || ''}`;
+    currentAgentId = myAgent.id;
+  } else {
+    selfLabel.style.color = '#9ca3af';
+    selfLabel.textContent = 'No agent record linked to your account — contact your manager.';
+    document.getElementById('run-btn').disabled = true;
+  }
+}
+
+function onAgentChange() {
+  const val = document.getElementById('f-agent').value;
+  currentAgentId = val ? parseInt(val, 10) : null;
+  if (currentAgentId) loadAgentAudit(currentAgentId);
+}
+
+/* ═══ RUN / LOAD ═══ */
+async function runAudit() {
+  if (!currentAgentId) { toast('Select an agent first.', 'err'); return; }
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Running…';
+  try {
+    await POST('/deltanet-audit/run', { agentId: currentAgentId });
+    toast('Audit complete.', 'ok');
+    await loadAgentAudit(currentAgentId);
+  } catch (e) {
+    toast('Audit failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Audit';
+  }
+}
+
+async function loadAgentAudit(agentId) {
+  try {
+    const data = await GET(`/deltanet-audit/agent/${agentId}`);
+    if (!data.latest) {
+      document.getElementById('empty-state').style.display = 'block';
+      document.getElementById('report').style.display = 'none';
+      return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('report').style.display = 'block';
+    renderReport(data);
+  } catch (e) {
+    toast('Failed to load audit: ' + e.message, 'err');
+  }
+}
+
+/* ═══ RENDER ═══ */
+function renderReport(data) {
+  const { latest, previous, benchmarks } = data;
+  const agent = allAgents.find(a => a.id === currentAgentId);
+  const name = agent ? `${agent.first_name} ${agent.last_name}` : `Agent #${currentAgentId}`;
+
+  const score = latest.total_score || 0;
+  const circ = 251.2;
+  const offset = circ - (circ * score / 100);
+  const arc = document.getElementById('ring-arc');
+  arc.setAttribute('stroke-dashoffset', offset);
+  arc.setAttribute('stroke', scoreColor(score));
+  document.getElementById('ring-num').textContent = score;
+
+  document.getElementById('report-agent-name').textContent = name;
+  document.getElementById('report-date').textContent = latest.cached
+    ? 'Audited ' + fmtDate(latest.run_at) + ' (cached)'
+    : 'Audited ' + fmtDate(latest.run_at);
+
+  const trendEl = document.getElementById('trend-line');
+  if (latest.status === 'failed') {
+    trendEl.className = 'trend-line trend-down';
+    trendEl.textContent = latest.error_message || 'Audit failed — no DeltaNet match found.';
+  } else if (!previous) {
+    trendEl.className = 'trend-line trend-flat';
+    trendEl.textContent = 'First audit';
+  } else {
+    const delta = (latest.total_score || 0) - (previous.total_score || 0);
+    trendEl.className = 'trend-line ' + (delta > 0 ? 'trend-up' : delta < 0 ? 'trend-down' : 'trend-flat');
+    trendEl.textContent = (delta > 0 ? '▲ +' : delta < 0 ? '▼ ' : '— ') + delta + ' pts since ' + fmtDate(previous.run_at);
+  }
+
+  const detail = latest.detail || {};
+  const catHtml = CATEGORIES.map(c => {
+    const d = detail[c.key];
+    const pts = d ? d.points : 0;
+    const max = d ? d.maxPoints : 0;
+    const pct = max ? Math.round((pts / max) * 100) : 0;
+    return `<div class="cat-row">
+      <div class="cat-dot ${dotClass(pct)}"></div>
+      <div class="cat-label">${c.label}</div>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${scoreColor(pct)}"></div></div>
+      <div class="cat-score">${pts}/${max}</div>
+    </div>`;
+  }).join('') + COMING_SOON.map(label => `<div class="cat-row coming-soon">
+      <div class="cat-dot" style="background:#d1d5db"></div>
+      <div class="cat-label">${label}</div>
+      <div class="coming-soon-badge">Coming Soon</div>
+    </div>`).join('');
+  document.getElementById('cat-grid').innerHTML = catHtml;
+
+  renderBenchmarks(benchmarks, score, detail);
+}
+
+function renderBenchmarks(bench, score, detail) {
+  const card = document.getElementById('bench-card');
+  if (!bench || !bench.available) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  document.getElementById('bench-sub').textContent =
+    `Compared against the most recent audit of each of ${bench.n} agents who've run this report.`;
+
+  let rows = `<div class="bench-row">
+      <div><strong>Overall</strong></div>
+      <div class="bench-you">${score}</div>
+      <div>${bench.avg_total != null ? Math.round(bench.avg_total) : '—'}</div>
+      <div>${bench.p90_total != null ? Math.round(bench.p90_total) : '—'}</div>
+    </div>`;
+  rows += CATEGORIES.map(c => {
+    const bk = BENCH_KEY[c.key];
+    const d = detail[c.key];
+    const pts = d ? d.points : 0;
+    const avg = bench['avg_' + bk], p90 = bench['p90_' + bk];
+    return `<div class="bench-row">
+      <div>${c.label}</div>
+      <div class="bench-you">${pts}</div>
+      <div>${avg != null ? Number(avg).toFixed(1) : '—'}</div>
+      <div>${p90 != null ? Number(p90).toFixed(1) : '—'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('bench-body').innerHTML = rows;
+  document.getElementById('bench-note').textContent = bench.preliminary
+    ? `Preliminary — based on only ${bench.n} agents so far. Comparisons will firm up as more agents run this audit.`
+    : '';
+}
+
+/* ═══ MANAGER: BASELINE SEED ═══ */
+async function runBaselineSeed() {
+  const btn = document.getElementById('baseline-btn');
+  const resultEl = document.getElementById('baseline-result');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin spin-dark"></span> Seeding…';
+  resultEl.textContent = '';
+  try {
+    const r = await POST('/deltanet-audit/baseline-seed');
+    resultEl.textContent = `Seeded ${r.succeeded} of ${r.total} agents — ${r.skipped} skipped (recent), ${r.failed} failed.`;
+    toast('Baseline seed complete.', 'ok');
+    if (currentAgentId) loadAgentAudit(currentAgentId);
+  } catch (e) {
+    toast('Baseline seed failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Baseline for All Agents';
+  }
+}
+</script>
+</body>
+</html>
