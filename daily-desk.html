@@ -2176,6 +2176,7 @@ let STATE = {
   untracked:         [],
   statusMismatches:  [],
   userRole:          "unknown",
+  isAdmin:           false,
   offices:           [],
   closingSuggestions: null,
 };
@@ -2333,6 +2334,11 @@ async function init() {
   } catch (e) {
     console.error('Failed to load role:', e);
   }
+
+  try {
+    const sm = await GET('/staff/me');
+    STATE.isAdmin = sm?.role === 'admin';
+  } catch (e) { STATE.isAdmin = false; }
 
   const moreItems = [];
   if (['manager', 'staff', 'agent'].includes(STATE.userRole)) {
@@ -3415,6 +3421,19 @@ function openActionModal(id, addr, kind, status) {
 function closeActionModal() {
   document.getElementById('actionModal').classList.remove('open');
 }
+
+async function deleteTransaction(id, address) {
+  const msg = `Delete "${address}"?\n\nThis will permanently remove the transaction and all related records (participants, events, customers, checklist progress, etc.).\n\nThis cannot be undone.`;
+  if (!confirm(msg)) return;
+  try {
+    await DELETE(`/daily-desk/transactions/${id}`);
+    closeActionModal();
+    cvToast('✓', 'Transaction deleted.');
+    await renderAll();
+  } catch (e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
 function amShowChoose() {
   document.getElementById('am-step-choose').style.display = 'flex';
   document.getElementById('am-step-confirm').style.display = 'none';
@@ -3438,6 +3457,19 @@ function amShowChoose() {
       </div>
     </div>
   `).join('');
+
+  if (STATE.isAdmin) {
+    listEl.innerHTML += `
+      <div style="border-top:1px solid var(--ink-border);margin-top:10px;padding-top:10px">
+        <div class="action-item" onclick="deleteTransaction('${amState.id}','${(amState.address||'').replace(/'/g,"\\'")}')">
+          <div class="action-item-icon">🗑</div>
+          <div class="action-item-text">
+            <div class="action-item-title" style="color:var(--red)">Delete Transaction</div>
+            <div class="action-item-desc">Permanently remove this transaction and all related data. Cannot be undone.</div>
+          </div>
+        </div>
+      </div>`;
+  }
 }
 function amBackToChoose() {
   amShowChoose();
