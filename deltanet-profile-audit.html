@@ -72,7 +72,8 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 .section-label::after{content:'';flex:1;height:1px;background:#e0dcd4}
 
 .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-.cat-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9f8f5;border-radius:9px}
+.cat-item{display:flex;flex-direction:column;background:#f9f8f5;border-radius:9px;overflow:hidden}
+.cat-row{display:flex;align-items:center;gap:10px;padding:10px 12px}
 .cat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .cat-label{flex:1;font-size:12px;font-weight:600;color:#374151}
 .cat-score{font-size:15px;font-weight:700;color:#1a1a2e;margin-left:auto}
@@ -81,6 +82,10 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 .dot-green{background:#10b981}
 .dot-yellow{background:#f59e0b}
 .dot-red{background:#ef4444}
+
+.cat-tip{padding:0 12px 10px 32px;font-size:11px;color:#6b7280;line-height:1.6}
+.cat-tip a{color:#c9a84c;text-decoration:none;font-weight:600;margin-right:10px;white-space:nowrap}
+.cat-tip a:hover{text-decoration:underline}
 
 .cat-row.coming-soon{opacity:.55}
 .coming-soon-badge{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#e5e7eb;color:#6b7280;padding:2px 7px;border-radius:10px;margin-left:auto}
@@ -327,6 +332,52 @@ const BENCH_KEY = {
 };
 const COMING_SOON = ['Mortgage Setup', 'MCFL Enabled', 'MCFL Auto-Postings', 'Social Connector'];
 
+// Shown under any category scoring below 100%. `links` may be empty (e.g.
+// leadDelegation — unclear as of 2026-07 whether this is agent-editable at
+// all; revisit once confirmed rather than pointing at a settings page that
+// might not exist).
+const CATEGORY_TIPS = {
+  photo: {
+    text: 'Upload a professional headshot.',
+    links: [{ label: 'Photo Updater', url: './photo-updater.html' }],
+  },
+  bio: {
+    text: 'Write a fuller bio — or let AI draft one for you from a short questionnaire.',
+    links: [{ label: 'Bio Creator', url: './bio-creator.html' }],
+  },
+  leadDelegation: {
+    text: 'This may not be a self-service setting — contact your office administrator to review your lead delegation settings.',
+    links: [],
+  },
+  nrds: {
+    text: "Look up your NRDS ID, then add it under Miscellaneous on your profile.",
+    links: [
+      { label: 'Look up NRDS ID', url: 'https://login.connect.realtor/#!/forgotmember' },
+      { label: 'Add to profile', url: 'https://online.adamscameron.com/profile' },
+    ],
+  },
+  designationsLanguages: {
+    text: 'Add your designations and languages under Profile.',
+    links: [{ label: 'Profile settings', url: 'https://online.adamscameron.com/profile' }],
+  },
+  reviews: {
+    text: "Ask happy clients for a review, or add reviews you've already received elsewhere (Google, Zillow, Realtor.com) — one at a time or via CSV import.",
+    links: [{ label: 'Add reviews', url: 'https://online.adamscameron.com/marketing/reviews' }],
+  },
+  leadSms: {
+    text: 'Add a mobile number under Phone Numbers to get lead notifications by text.',
+    links: [{ label: 'Phone Numbers settings', url: 'https://online.adamscameron.com/profile' }],
+  },
+  socialLinks: {
+    text: 'Add your social media profile links under Social Media.',
+    links: [{ label: 'Social Media settings', url: 'https://online.adamscameron.com/profile' }],
+  },
+  customerCount: {
+    text: 'Import your contacts under DeltaNET.ai to grow your tracked customer database.',
+    links: [{ label: 'DeltaNET.ai', url: 'https://online.adamscameron.com/profile' }],
+  },
+};
+
 /* ═══ INIT ═══ */
 async function init() {
   document.getElementById('header-user').textContent = userDisplay || userEmail;
@@ -452,17 +503,23 @@ function renderReport(data) {
     const pts = d ? d.points : 0;
     const max = d ? d.maxPoints : 0;
     const pct = max ? Math.round((pts / max) * 100) : 0;
-    return `<div class="cat-row">
-      <div class="cat-dot ${dotClass(pct)}"></div>
-      <div class="cat-label">${c.label}</div>
-      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${scoreColor(pct)}"></div></div>
-      <div class="cat-score">${pts}/${max}</div>
+    const tip = pct < 100 ? CATEGORY_TIPS[c.key] : null;
+    const tipHtml = tip ? `<div class="cat-tip">${tip.text} ${tip.links.map(l =>
+      `<a href="${l.url}" target="_blank" rel="noopener">${l.label} →</a>`).join('')}</div>` : '';
+    return `<div class="cat-item">
+      <div class="cat-row">
+        <div class="cat-dot ${dotClass(pct)}"></div>
+        <div class="cat-label">${c.label}</div>
+        <div class="cat-bar-wrap"><div class="cat-bar" style="width:${pct}%;background:${scoreColor(pct)}"></div></div>
+        <div class="cat-score">${pts}/${max}</div>
+      </div>
+      ${tipHtml}
     </div>`;
-  }).join('') + COMING_SOON.map(label => `<div class="cat-row coming-soon">
+  }).join('') + COMING_SOON.map(label => `<div class="cat-item"><div class="cat-row coming-soon">
       <div class="cat-dot" style="background:#d1d5db"></div>
       <div class="cat-label">${label}</div>
       <div class="coming-soon-badge">Coming Soon</div>
-    </div>`).join('');
+    </div></div>`).join('');
   document.getElementById('cat-grid').innerHTML = catHtml;
 
   renderBenchmarks(benchmarks, score, detail);
