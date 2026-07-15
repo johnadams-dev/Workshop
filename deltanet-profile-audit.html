@@ -176,7 +176,7 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
             </svg>
             <div class="ring-score">
               <div class="ring-num" id="ring-num">—</div>
-              <div class="ring-lbl">/ 100</div>
+              <div class="ring-lbl" id="ring-lbl">/ 90</div>
             </div>
           </div>
           <div class="score-meta">
@@ -317,7 +317,6 @@ function dotClass(s) {
 const CATEGORIES = [
   { key: 'photo',                 label: 'Photo' },
   { key: 'bio',                   label: 'Bio Quality' },
-  { key: 'leadDelegation',        label: 'Lead Delegation' },
   { key: 'nrds',                  label: 'NRDS ID' },
   { key: 'designationsLanguages', label: 'Designations & Languages' },
   { key: 'reviews',                label: 'Reviews' },
@@ -326,16 +325,13 @@ const CATEGORIES = [
   { key: 'customerCount',         label: 'Customer Database' },
 ];
 const BENCH_KEY = {
-  photo: 'photo', bio: 'bio', leadDelegation: 'lead_delegation', nrds: 'nrds',
+  photo: 'photo', bio: 'bio', nrds: 'nrds',
   designationsLanguages: 'designations_languages', reviews: 'reviews',
   leadSms: 'lead_sms', socialLinks: 'social_links', customerCount: 'customer_count_score',
 };
 const COMING_SOON = ['Mortgage Setup', 'MCFL Enabled', 'MCFL Auto-Postings', 'Social Connector'];
 
-// Shown under any category scoring below 100%. `links` may be empty (e.g.
-// leadDelegation — unclear as of 2026-07 whether this is agent-editable at
-// all; revisit once confirmed rather than pointing at a settings page that
-// might not exist).
+// Shown under any category scoring below 100%.
 const CATEGORY_TIPS = {
   photo: {
     text: 'Upload a professional headshot.',
@@ -344,10 +340,6 @@ const CATEGORY_TIPS = {
   bio: {
     text: 'Write a fuller bio — or let AI draft one for you from a short questionnaire.',
     links: [{ label: 'Bio Creator', url: './bio-creator.html' }],
-  },
-  leadDelegation: {
-    text: 'This may not be a self-service setting — contact your office administrator to review your lead delegation settings.',
-    links: [],
   },
   nrds: {
     text: "Look up your NRDS ID, then add it under Miscellaneous on your profile.",
@@ -472,12 +464,15 @@ function renderReport(data) {
   const name = agent ? `${agent.first_name} ${agent.last_name}` : `Agent #${currentAgentId}`;
 
   const score = latest.total_score || 0;
+  const maxScore = latest.max_score || 90;
+  const pct = maxScore ? Math.round((score / maxScore) * 100) : 0;
   const circ = 251.2;
-  const offset = circ - (circ * score / 100);
+  const offset = circ - (circ * pct / 100);
   const arc = document.getElementById('ring-arc');
   arc.setAttribute('stroke-dashoffset', offset);
-  arc.setAttribute('stroke', scoreColor(score));
+  arc.setAttribute('stroke', scoreColor(pct));
   document.getElementById('ring-num').textContent = score;
+  document.getElementById('ring-lbl').textContent = '/ ' + maxScore;
 
   document.getElementById('report-agent-name').textContent = name;
   document.getElementById('report-date').textContent = latest.cached
