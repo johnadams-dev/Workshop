@@ -534,9 +534,10 @@ function renderFeed() {
   const sf = document.getElementById('f-status-filter').value;
   const lf = document.getElementById('f-tool-filter').value;
 
-  const items = allItems.filter(i =>
-    (!tf || i.type === tf) && (!sf || i.status === sf) && (!lf || i.tool_id === lf)
-  );
+  const STATUS_ORDER = { in_progress: 0, open: 1, resolved: 2 };
+  const items = allItems
+    .filter(i => (!tf || i.type === tf) && (!sf || i.status === sf) && (!lf || i.tool_id === lf))
+    .sort((a, b) => (STATUS_ORDER[a.status] ?? 1) - (STATUS_ORDER[b.status] ?? 1));
 
   const isMgr = ['manager', 'admin'].includes(userRole);
 
