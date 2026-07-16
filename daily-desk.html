@@ -533,6 +533,7 @@ tbody tr.clickable { cursor: pointer; }
   max-width: 92vw;
   max-height: 86vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .modal-head {
   padding: 18px 22px;
@@ -548,6 +549,13 @@ tbody tr.clickable { cursor: pointer; }
 }
 .modal-close:hover { color: var(--text); }
 .modal-body { padding: 22px; }
+/* .field wrappers (label + one input/select) rely entirely on inline layout
+   styles per-instance — there's no shared width rule, so an unstyled <input>'s
+   intrinsic width can exceed its grid track share on any 3+/4-column .form-row
+   and blow out the modal horizontally (seen on the New Listing seller-address
+   row). Constrain every .field's input/select to its wrapper's width. */
+.form-row .field { min-width: 0; }
+.field input, .field select, .field textarea { width: 100%; box-sizing: border-box; }
 
 /* Branch choice cards */
 .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -1640,34 +1648,13 @@ tbody tr.clickable { cursor: pointer; }
               <input type="text" id="nl-coop-commission" placeholder="e.g. 3">
             </div>
           </div>
-          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Name</span>
-              <input type="text" id="nl-seller-name" placeholder="Optional">
-            </div>
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Email</span>
-              <input type="email" id="nl-seller-email" placeholder="Optional">
-            </div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller(s)</span>
+            <button type="button" onclick="addCustomerRow('nl')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add another seller</button>
           </div>
-          <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px;">
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Mailing Address</span>
-              <input type="text" id="nl-seller-mailing" placeholder="Street address">
-            </div>
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
-              <input type="text" id="nl-seller-city" placeholder="City">
-            </div>
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">State</span>
-              <input type="text" id="nl-seller-state" placeholder="FL" maxlength="2">
-            </div>
-            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
-              <input type="text" id="nl-seller-zip" placeholder="32174">
-            </div>
-          </div>
+          <div id="nl-customer-rows"></div>
         </div>
         <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
@@ -1757,6 +1744,13 @@ tbody tr.clickable { cursor: pointer; }
             </select>
           </div>
           <div id="nc-acc-rep-fields"></div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer(s)</span>
+            <button type="button" onclick="addCustomerRow('nc-acc')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add another buyer</button>
+          </div>
+          <div id="nc-acc-customer-rows"></div>
         </div>
         <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
@@ -1879,6 +1873,13 @@ tbody tr.clickable { cursor: pointer; }
               </div>
             </div>
           </div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Buyer(s)</span>
+            <button type="button" onclick="addCustomerRow('nc-ext')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add another buyer</button>
+          </div>
+          <div id="nc-ext-customer-rows"></div>
         </div>
         <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
@@ -2276,7 +2277,12 @@ function fmtMoney(v) {
 }
 function fmtDate(v) {
   if (!v) return '—';
-  const d = new Date(v);
+  // Bare YYYY-MM-DD (date-only columns — list_date, expiration_date, contract_date,
+  // etc.) must be parsed as LOCAL midnight, not UTC midnight, or it displays as the
+  // day before whenever the browser is west of UTC (e.g. US Eastern, where all
+  // contracts are recorded). Full timestamps (cached_at, submitted_at, ...) already
+  // carry their own offset and parse correctly as-is.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : new Date(v);
   if (isNaN(d.getTime())) return '—';
   return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
 }
@@ -2793,12 +2799,7 @@ async function nlReset() {
   document.getElementById('nl-has-referral').checked = false;
   document.getElementById('nl-referral-section').style.display = 'none';
   document.getElementById('nl-referral-rows').innerHTML = '';
-  document.getElementById('nl-seller-name').value = '';
-  document.getElementById('nl-seller-email').value = '';
-  document.getElementById('nl-seller-mailing').value = '';
-  document.getElementById('nl-seller-city').value = '';
-  document.getElementById('nl-seller-state').value = '';
-  document.getElementById('nl-seller-zip').value = '';
+  populateCustomers('nl');
   nlFsTransactions = [];
   await nlLoadAgents();
 }
@@ -2889,9 +2890,15 @@ async function selectFsTransaction(index) {
   const internal = nlAgents.find(a => a.email?.toLowerCase() === agentEmail?.toLowerCase());
   if (internal) document.getElementById('nl-agent').value = String(internal.id);
 
-  // Fetch full FS transaction detail to capture party names silently
+  // Fetch full FS transaction detail and prefill the seller row so it's
+  // visible/editable rather than silently carried in a hidden variable.
   nlFsDetail = null;
-  try { nlFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id }); } catch (_) {}
+  try {
+    nlFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id });
+    if (nlFsDetail?.sellerLandlordName || nlFsDetail?.sellerParty1Email) {
+      populateCustomers('nl', [{ name: nlFsDetail.sellerLandlordName || '', email: nlFsDetail.sellerParty1Email || '' }]);
+    }
+  } catch (_) {}
 }
 
 async function nlSaveListing() {
@@ -2934,12 +2941,7 @@ async function nlSaveListing() {
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
-    seller_name:            document.getElementById('nl-seller-name').value.trim()    || nlFsDetail?.sellerLandlordName || null,
-    seller_email:           document.getElementById('nl-seller-email').value.trim()   || nlFsDetail?.sellerParty1Email  || null,
-    seller_mailing_address: document.getElementById('nl-seller-mailing').value.trim() || null,
-    seller_city:            document.getElementById('nl-seller-city').value.trim()    || null,
-    seller_state:           document.getElementById('nl-seller-state').value.trim()   || null,
-    seller_zip:             document.getElementById('nl-seller-zip').value.trim()     || null,
+    sellers: collectCustomers('nl'),
   };
 
   try {
@@ -3139,7 +3141,7 @@ let _customerRowIdx = 0;
 function _buildCustomerRow(ns, idx, data = {}) {
   const lS = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
   const iS = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;min-width:0;';
-  return `<div class="customer-row" data-ns="${ns}" data-cidx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
+  return `<div class="customer-row" data-ns="${ns}" data-cidx="${idx}" data-cid="${escapeHtml(data.id || '')}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
       <button type="button" onclick="_removeCustomerRow('${ns}',${idx})" style="padding:5px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;white-space:nowrap;">✕</button>
     </div>
@@ -3197,7 +3199,7 @@ function collectCustomers(ns) {
     const state   = row.querySelector('.cust-state').value.trim();
     const zip     = row.querySelector('.cust-zip').value.trim();
     if (!name && !email && !address && !city && !state && !zip) continue;
-    out.push({ name: name || null, email: email || null, address: address || null,
+    out.push({ id: row.dataset.cid || null, name: name || null, email: email || null, address: address || null,
                city: city || null, state: state || null, zip: zip || null });
   }
   return out;
@@ -3209,6 +3211,36 @@ function populateCustomers(ns, rows) {
   container.innerHTML = '';
   for (const r of (rows || [])) addCustomerRow(ns, r);
   if (!rows || !rows.length) addCustomerRow(ns);
+}
+
+/* ═══ SELLER/BUYER MANAGEMENT (Change action) ═══ */
+// Add/remove transaction_customers rows from the Change action — separate from
+// the closing-time customer capture above (that always creates fresh rows; this
+// diffs against what's already on the transaction). Reuses the same row widget
+// under the 'am-manage' namespace.
+function amCustomerManagementHtml() {
+  const label = amState.kind === 'contract' ? 'Buyer' : 'Seller';
+  return `
+    <div style="margin-bottom:14px; padding-top:14px; border-top:1px solid var(--ink-border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${label}(s)</span>
+        <button type="button" onclick="addCustomerRow('am-manage')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add ${label.toLowerCase()}</button>
+      </div>
+      <div id="am-manage-customer-rows"></div>
+    </div>`;
+}
+
+async function amLoadManageCustomers() {
+  const role = amState.kind === 'contract' ? 'buyer' : 'seller';
+  let rows = [];
+  try {
+    const txn = await GET(`/daily-desk/transactions/${amState.id}`);
+    rows = (txn.customers || []).filter(c => c.role === role);
+  } catch (e) {
+    console.error('Failed to load customers:', e);
+  }
+  amState._originalCustomerIds = rows.map(r => r.id);
+  populateCustomers('am-manage', rows);
 }
 
 async function loadReferralReport() {
@@ -3411,8 +3443,32 @@ const ACTION_TITLES = {
 let amState = { id: null, addr: null, kind: null, status: null, actionKey: null };
 let amFoundationDonors = null;
 
+// The post-action "Action Recorded ✓" screen (see amSubmit) overwrites
+// #actionModalBody's innerHTML entirely, destroying #am-step-choose/
+// #am-step-confirm — and closeActionModal() only hides the modal, it never
+// restores that HTML. Without this reset, opening the modal on the NEXT
+// transaction calls amShowChoose(), which throws trying to touch elements
+// that no longer exist, leaving the stale success screen from the previous
+// transaction on screen. Always rebuild the skeleton on open so the modal
+// never depends on what state a prior action left it in.
+const ACTION_MODAL_SKELETON = `
+      <!-- Step 1: pick the action -->
+      <div id="am-step-choose" class="action-list"></div>
+
+      <!-- Step 2: confirm + checklist preview -->
+      <div id="am-step-confirm" style="display:none">
+        <div id="amConfirmFields"></div>
+        <div class="divider">Checklist additions</div>
+        <div class="checklist" id="amChecklistPreview"></div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-ghost btn-sm" onclick="amBackToChoose()">← Back</button>
+          <button class="btn btn-primary btn-sm" onclick="amSubmit()">Confirm</button>
+        </div>
+      </div>`;
+
 function openActionModal(id, addr, kind, status) {
   amState = { id, addr, kind, status, actionKey: null };
+  document.getElementById('actionModalBody').innerHTML = ACTION_MODAL_SKELETON;
   document.getElementById('actionModalAddr').textContent = addr;
   document.getElementById('actionModalTitle').textContent = 'Actions';
   document.getElementById('actionModal').classList.add('open');
@@ -3705,6 +3761,9 @@ async function amChooseAction(key) {
       </div>
       <div id="am-rep-fields"></div>`;
   }
+  if (key === 'change') {
+    fieldsHtml += amCustomerManagementHtml();
+  }
   fieldsEl.innerHTML = fieldsHtml;
 
   if (key === 'under_contract') {
@@ -3714,6 +3773,9 @@ async function amChooseAction(key) {
     populateCustomers('am');
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
+  }
+  if (key === 'change') {
+    await amLoadManageCustomers();
   }
 
   const clEl = document.getElementById('amChecklistPreview');
@@ -4198,6 +4260,15 @@ async function amSubmit() {
     // fsbo: no additional fields needed
   }
 
+  if (key === 'change') {
+    const currentRows = collectCustomers('am-manage');
+    const currentIds  = new Set(currentRows.filter(r => r.id).map(r => r.id));
+    const removedIds  = (amState._originalCustomerIds || []).filter(id => !currentIds.has(id));
+    const addRows     = currentRows.filter(r => !r.id).map(({ id, ...rest }) => rest);
+    if (addRows.length)   fields.addCustomers = addRows;
+    if (removedIds.length) fields.removeCustomerIds = removedIds;
+  }
+
   if (key === 'manage_referrals') {
     const orig    = amState._originalReferrals || [];
     const current = collectReferrals('am');
@@ -4301,6 +4372,9 @@ function openNewContractModal() {
     const rows = document.getElementById(`${ns}-referral-rows`);
     if (rows) rows.innerHTML = '';
   });
+
+  populateCustomers('nc-acc');
+  populateCustomers('nc-ext');
 
   document.getElementById('newContractModal').classList.add('open');
 }
@@ -4469,6 +4543,9 @@ async function ncSaveAccContract() {
   }
   // fsbo: no cooperating agent fields needed
 
+  const accBuyers = collectCustomers('nc-acc');
+  if (accBuyers.length) fields.buyers = accBuyers;
+
   try {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
     if (document.getElementById('nc-acc-has-referral')?.checked) {
@@ -4545,8 +4622,7 @@ async function ncSaveExternalContract() {
       agent_id:                agentId,
       split_pct:               extSplitPct,
       co_agents:               extCoAgents,
-      buyer_name:              ncFsDetail?.buyerLandlordName  || null,
-      buyer_email:             ncFsDetail?.buyerParty1Email   || null,
+      buyers:                  collectCustomers('nc-ext'),
     });
     if (txn?.id && document.getElementById('nc-ext-has-referral')?.checked) {
       await _saveReferrals(txn.id, 'nc-ext');
@@ -4647,9 +4723,15 @@ async function ncSelectFsTransaction(index) {
     document.getElementById('nc-ext-agent').value = String(internal.id);
   }
 
-  // Fetch full FS transaction detail to capture party names silently
+  // Fetch full FS transaction detail and prefill the buyer row so it's
+  // visible/editable rather than silently carried in a hidden variable.
   ncFsDetail = null;
-  try { ncFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id }); } catch (_) {}
+  try {
+    ncFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id });
+    if (ncFsDetail?.buyerLandlordName || ncFsDetail?.buyerParty1Email) {
+      populateCustomers('nc-ext', [{ name: ncFsDetail.buyerLandlordName || '', email: ncFsDetail.buyerParty1Email || '' }]);
+    }
+  } catch (_) {}
 }
 
 /* ═══ Listings / Contracts filtering ═══ */
@@ -6276,7 +6358,7 @@ function rptRenderExpiring(rows, days) {
       <div class="tbl-wrap"><table>
         <thead><tr><th>Expires</th><th>Days Left</th><th>Address</th><th>Agent</th><th>List Price</th><th>Listed</th><th>Status</th></tr></thead>
         <tbody>${officeRows.map(r => {
-          const expDate = new Date(r.expiration_date); expDate.setHours(0,0,0,0);
+          const expDate = new Date(r.expiration_date + 'T00:00:00'); // local midnight, not UTC — see fmtDate note
           const daysLeft = Math.round((expDate - today) / 86400000);
           const urgency = daysLeft <= 14 ? 'exp-urgent' : daysLeft <= 30 ? 'exp-warn' : '';
           return `<tr class="${urgency}">
