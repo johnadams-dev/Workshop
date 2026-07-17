@@ -145,6 +145,32 @@ header {
 .photo-toolbar { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--cream-dark); display: flex; gap: 0.75rem; align-items: center; background: var(--cream); font-size: 0.8rem; }
 .photo-toolbar button { background: transparent; border: none; color: var(--slate); text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
 
+/* ── PHOTO TILES (larger, drag-and-drop reorder) ── */
+.photo-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; padding: 1.25rem; }
+.photo-tile {
+  border: 1px solid var(--border-mid); border-radius: var(--r); background: var(--card); overflow: hidden;
+  cursor: grab; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.photo-tile:active { cursor: grabbing; }
+.photo-tile.excluded { opacity: 0.4; }
+.photo-tile.dragging { opacity: 0.3; }
+.photo-tile.drag-over { box-shadow: 0 0 0 3px var(--gold); transform: scale(1.02); }
+.photo-tile-img-wrap { position: relative; width: 100%; aspect-ratio: 4/3; background: var(--cream-dark); }
+.photo-tile-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.photo-tile-order {
+  position: absolute; top: 8px; left: 8px; background: rgba(26,26,46,0.75); color: var(--cream);
+  font-family: monospace; font-size: 0.7rem; padding: 2px 8px; border-radius: 100px;
+}
+.photo-tile-reorder { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.photo-tile-reorder button {
+  background: rgba(26,26,46,0.75); color: var(--cream); border: none; border-radius: 4px;
+  width: 24px; height: 22px; cursor: pointer; font-size: 0.7rem;
+}
+.photo-tile-reorder button:disabled { opacity: 0.35; cursor: not-allowed; }
+.photo-tile-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.photo-tile-body .photo-title-input { font-size: 0.85rem; }
+.photo-tile-exclude { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--slate); }
+
 /* ── SHARE / SUCCESS ── */
 .share-box { display: flex; gap: 0.5rem; margin-top: 1rem; }
 .share-box input { flex: 1; border: 1px solid var(--border-mid); border-radius: 7px; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; background: var(--cream); }
@@ -237,6 +263,7 @@ header {
         <button class="btn btn-ghost" onclick="startNewTour()">Start a New One</button>
       </div>
     </div>
+    <button class="btn btn-ghost" onclick="setStep(1)">← Back to Listings</button>
   </div>
 
   <!-- STEP 3: Curation (photos first, so the music pick is informed by the property) -->
@@ -244,16 +271,19 @@ header {
     <div class="panel">
       <div class="panel-head">
         <div class="panel-title" id="curateAddress">Curate photos</div>
-        <div class="panel-sub">Reorder with the arrows, add an optional title, uncheck any you want to leave out.</div>
+        <div class="panel-sub">Drag to reorder (or use the arrows), add an optional title, uncheck any you want to leave out.</div>
       </div>
       <div class="photo-toolbar">
         <span id="photoCount">0 photos</span>
         <button onclick="selectAllPhotos(true)">Select all</button>
         <button onclick="selectAllPhotos(false)">Select none</button>
       </div>
-      <div id="photoList"></div>
+      <div id="photoList" class="photo-tiles"></div>
     </div>
-    <button class="btn btn-primary btn-block" onclick="goToGenerate()">Continue to Music →</button>
+    <div style="display:flex;gap:0.75rem;">
+      <button class="btn btn-ghost" onclick="setStep(1)">← Back to Listings</button>
+      <button class="btn btn-primary" style="flex:1" onclick="goToGenerate()">Continue to Music →</button>
+    </div>
   </div>
 
   <!-- STEP 4: Generate music -->
@@ -261,14 +291,22 @@ header {
     <div class="panel">
       <div class="panel-head">
         <div class="panel-title" id="generateAddress">—</div>
-        <div class="panel-sub">Now that you've seen the photos, pick a feel for the song — about 60 seconds, instrumental recommended.</div>
+        <div class="panel-sub">Now that you've seen the photos, pick a song for the tour.</div>
       </div>
       <div class="genre-grid" style="padding:1.5rem 1.5rem 0;margin-bottom:0.75rem;">
-        <button type="button" class="genre-chip active" id="tabCreateNew" onclick="showMusicTab('new')">🎵 Create New</button>
-        <button type="button" class="genre-chip" id="tabExisting" onclick="showMusicTab('existing')">📼 Use Existing Recording</button>
+        <button type="button" class="genre-chip active" id="tabExisting" onclick="showMusicTab('existing')">📼 Reuse a Song</button>
+        <button type="button" class="genre-chip" id="tabCreateNew" onclick="showMusicTab('new')">🎵 Create New</button>
       </div>
 
-      <div class="panel-body" id="createNewTab">
+      <div class="panel-body" id="existingTab">
+        <div class="panel-sub" style="margin-bottom:0.75rem">No-lyrics songs, free to reuse on any listing — no need to generate something new if one of these works.</div>
+        <label style="font-size:0.8rem;color:var(--slate);display:flex;align-items:center;gap:6px;margin-bottom:1rem;">
+          <input type="checkbox" id="showAllRecordings" onchange="loadRecordings()"> Also show songs with lyrics (from other listings)
+        </label>
+        <div id="recordingsList"><div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div></div>
+      </div>
+
+      <div class="panel-body" id="createNewTab" style="display:none">
         <div class="genre-grid" id="genreGrid"></div>
         <div class="genre-note" id="genreNote"></div>
         <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
@@ -277,13 +315,11 @@ header {
           <button class="btn btn-ghost btn-block" style="margin-top:1rem" onclick="resetGenerate()">🔁 Try a Different Genre</button>
         </div>
       </div>
-
-      <div class="panel-body" id="existingTab" style="display:none">
-        <div class="panel-sub" style="margin-bottom:1rem">Reuse a previously generated track from any listing — free, no new AI fees.</div>
-        <div id="recordingsList"><div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div></div>
-      </div>
     </div>
-    <button class="btn btn-primary btn-block" id="saveBtn" style="display:none" onclick="doSave()">Save Tour</button>
+    <div style="display:flex;gap:0.75rem;">
+      <button class="btn btn-ghost" onclick="setStep(3)">← Back to Photos</button>
+      <button class="btn btn-primary" style="flex:1;display:none" id="saveBtn" onclick="doSave()">Save Tour</button>
+    </div>
   </div>
 
   <!-- STEP 5: Done -->
@@ -523,8 +559,22 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Clears anything left over from a previously picked listing — matters now
+// that Back navigation makes "pick listing A, go back, pick listing B"
+// reachable, and without this B would inherit A's editingTourId/music/photos.
+function resetTourState() {
+  STATE.editingTourId = null;
+  STATE.deltaListingId = null;
+  STATE.address = '';
+  STATE.city = '';
+  STATE.photos = [];
+  STATE.music = { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000, genre: null, lyrics: null };
+  window._recordingsLoaded = false;
+}
+
 async function selectListing(i) {
   if (i === '') return;
+  resetTourState();
   const l = window._listings[i];
   STATE.transactionId = l.transaction_id;
   STATE.mlsId = l.mls_id;
@@ -536,6 +586,7 @@ async function selectListing(i) {
 async function pickByMls() {
   const mlsId = document.getElementById('mlsDirect').value.trim();
   if (!mlsId) return;
+  resetTourState();
   STATE.transactionId = null;
   STATE.mlsId = mlsId;
   await afterListingPicked();
@@ -607,8 +658,12 @@ function goToGenerate() {
   document.getElementById('generateBtn').disabled = false;
   document.getElementById('generateBtn').innerHTML = '🎵 Generate Song';
   document.getElementById('generateResult').style.display = hasMusic ? 'block' : 'none';
-  document.getElementById('saveBtn').style.display = hasMusic ? 'block' : 'none';
   if (hasMusic) document.getElementById('audioPreview').src = STATE.music.audio_url;
+
+  // Already has a song (editing) -> show it on the Create New tab with a
+  // regenerate option; otherwise default to Reuse so nobody feels pushed
+  // into generating something new.
+  showMusicTab(hasMusic ? 'new' : 'existing');
 }
 
 function resetGenerate() {
@@ -643,16 +698,18 @@ function showMusicTab(tab) {
   document.getElementById('tabExisting').classList.toggle('active', tab === 'existing');
   document.getElementById('createNewTab').style.display = tab === 'new' ? 'block' : 'none';
   document.getElementById('existingTab').style.display = tab === 'existing' ? 'block' : 'none';
-  document.getElementById('saveBtn').style.display = (tab === 'new' && !STATE.music.audio_url) ? 'none' : document.getElementById('saveBtn').style.display;
+  document.getElementById('saveBtn').style.display = STATE.music.audio_url ? 'block' : 'none';
   if (tab === 'existing' && !window._recordingsLoaded) loadRecordings();
 }
 
 async function loadRecordings() {
   window._recordingsLoaded = true;
   const el = document.getElementById('recordingsList');
+  el.innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div>`;
+  const showAll = document.getElementById('showAllRecordings').checked;
   try {
-    const { recordings } = await GET('/camerons-stage/recordings');
-    if (!recordings.length) { el.innerHTML = `<div class="state-msg">No recordings generated yet — create the first one.</div>`; return; }
+    const { recordings } = await GET('/camerons-stage/recordings' + (showAll ? '' : '?no_lyrics=1'));
+    if (!recordings.length) { el.innerHTML = `<div class="state-msg">${showAll ? 'No recordings generated yet — create the first one.' : 'No no-lyrics recordings yet — check "Also show songs with lyrics," or create a new one.'}</div>`; return; }
     window._recordings = recordings;
     el.innerHTML = recordings.map((r, i) => `
       <div class="photo-row" style="grid-template-columns:1fr auto;">
@@ -681,6 +738,8 @@ function pickRecording(i) {
 /* ═══════════════════════════════════════════════════════════════════
    CURATION
 ═══════════════════════════════════════════════════════════════════ */
+let dragFromIndex = null;
+
 function renderPhotos() {
   const el = document.getElementById('photoList');
   document.getElementById('photoCount').textContent = `${STATE.photos.filter(p => p.included).length} of ${STATE.photos.length} included`;
@@ -689,14 +748,23 @@ function renderPhotos() {
     return;
   }
   el.innerHTML = STATE.photos.map((p, i) => `
-    <div class="photo-row ${p.included ? '' : 'excluded'}">
-      <img class="photo-thumb" src="${p.url}" loading="lazy">
-      <input class="photo-title-input" placeholder="Optional title (e.g. Primary Suite)" value="${escapeHtml(p.title || '')}" oninput="STATE.photos[${i}].title=this.value">
-      <div class="reorder-btns">
-        <button onclick="movePhoto(${i},-1)" ${i === 0 ? 'disabled' : ''}>▲</button>
-        <button onclick="movePhoto(${i},1)" ${i === STATE.photos.length - 1 ? 'disabled' : ''}>▼</button>
+    <div class="photo-tile ${p.included ? '' : 'excluded'}" draggable="true"
+         ondragstart="onTileDragStart(event, ${i})" ondragover="onTileDragOver(event, ${i})"
+         ondragleave="onTileDragLeave(event)" ondrop="onTileDrop(event, ${i})" ondragend="onTileDragEnd(event)">
+      <div class="photo-tile-img-wrap">
+        <img src="${p.url}" loading="lazy">
+        <span class="photo-tile-order">${i + 1}</span>
+        <div class="photo-tile-reorder">
+          <button onclick="movePhoto(${i},-1)" ${i === 0 ? 'disabled' : ''} title="Move earlier">▲</button>
+          <button onclick="movePhoto(${i},1)" ${i === STATE.photos.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
+        </div>
       </div>
-      <input type="checkbox" ${p.included ? 'checked' : ''} onchange="STATE.photos[${i}].included=this.checked; renderPhotos()">
+      <div class="photo-tile-body">
+        <input class="photo-title-input" placeholder="Optional title (e.g. Primary Suite)" value="${escapeHtml(p.title || '')}" oninput="STATE.photos[${i}].title=this.value">
+        <label class="photo-tile-exclude">
+          <input type="checkbox" ${p.included ? 'checked' : ''} onchange="STATE.photos[${i}].included=this.checked; renderPhotos()"> Include in tour
+        </label>
+      </div>
     </div>
   `).join('');
 }
@@ -711,6 +779,35 @@ function movePhoto(i, dir) {
 function selectAllPhotos(val) {
   STATE.photos.forEach(p => p.included = val);
   renderPhotos();
+}
+
+/* ── Drag-and-drop reorder (native HTML5 DnD, no library) ── */
+function onTileDragStart(e, i) {
+  dragFromIndex = i;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(i)); // Firefox requires data to be set to allow the drag
+  e.currentTarget.classList.add('dragging');
+}
+function onTileDragOver(e, i) {
+  e.preventDefault();
+  if (i !== dragFromIndex) e.currentTarget.classList.add('drag-over');
+}
+function onTileDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onTileDrop(e, i) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragFromIndex === null || dragFromIndex === i) return;
+  const [moved] = STATE.photos.splice(dragFromIndex, 1);
+  STATE.photos.splice(i, 0, moved);
+  dragFromIndex = null;
+  renderPhotos();
+}
+function onTileDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.photo-tile.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragFromIndex = null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
