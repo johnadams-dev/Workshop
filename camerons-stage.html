@@ -32,6 +32,8 @@
   --border-mid: rgba(26,26,46,0.16);
   --shadow:     0 2px 20px rgba(26,26,46,0.08);
   --shadow-lg:  0 8px 40px rgba(26,26,46,0.14);
+  --red:        #c0392b;
+  --green:      #27ae60;
   --r:          10px;
   --r-lg:       14px;
 }
@@ -47,1163 +49,518 @@ body {
   line-height: 1.5;
 }
 
+/* ── AUTH GATE ── */
+#auth-gate {
+  position: fixed; inset: 0; background: var(--ink);
+  display: flex; align-items: center; justify-content: center; z-index: 999;
+}
+#auth-gate .box { text-align: center; color: var(--cream); }
+#auth-gate h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; margin-bottom: 1.5rem; }
+#auth-gate .box a { display: inline-block; margin-top: 16px; font-size: 12px; color: rgba(250,248,243,0.55); text-decoration: none; letter-spacing: .03em; }
+
 /* ── HEADER ── */
 header {
   background: var(--ink);
   padding: 0 2rem;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: sticky; top: 0; z-index: 100;
   box-shadow: 0 2px 24px rgba(0,0,0,0.3);
 }
-.header-inner {
-  max-width: 860px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  height: 62px;
-  gap: 14px;
-}
-.header-sep { width: 1px; height: 26px; background: rgba(255,255,255,0.12); }
-.header-brand {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 19px;
-  font-weight: 500;
-  color: var(--cream);
-}
-.header-brand span { color: var(--gold); font-style: italic; }
-.header-spacer { flex: 1; }
-.header-eyebrow {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 300;
-  letter-spacing: 0.04em;
-}
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 20px;
-  padding: 5px 14px;
-  color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all .2s;
-}
-.back-btn:hover { border-color: var(--gold); color: var(--gold); }
-
-/* ── PAGE LAYOUT ── */
-.page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+.header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 1rem; height: 64px; }
+.back-link { color: var(--muted); font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.back-link:hover { color: var(--gold); }
+.header-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+.logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--cream); }
+.logo span { color: var(--gold); }
+.header-tool { font-size: 0.8rem; color: var(--muted); font-weight: 300; }
+.header-badge {
+  margin-left: auto; font-family: monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid rgba(201,168,76,0.3); padding: 3px 10px; border-radius: 100px; background: rgba(201,168,76,0.08);
 }
 
-/* ── SECTION CARDS ── */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 1.5rem;
-  margin-bottom: 1.25rem;
-  box-shadow: var(--shadow);
-}
-.card-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--gold);
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.app { max-width: 780px; margin: 0 auto; padding: 2.5rem 2rem; display: none; }
 
-/* ── INPUTS ── */
-input[type=text], textarea, select {
-  width: 100%;
-  background: var(--cream);
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 9px 12px;
-  color: var(--ink);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  outline: none;
-  transition: border-color .2s;
-}
-input[type=text]:focus, textarea:focus, select:focus {
-  border-color: var(--gold);
-  background: #fff;
-}
-input::placeholder { color: var(--muted); }
-textarea { resize: vertical; min-height: 64px; }
-
-/* ── LOOKUP ROW ── */
-.lookup-row { display: flex; gap: 10px; align-items: center; }
-.lookup-row input { flex: 1; }
-.lookup-btn {
-  background: var(--ink);
-  color: var(--gold);
-  border: none;
-  border-radius: var(--r);
-  padding: 0 1.25rem;
-  height: 38px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: 'DM Sans', sans-serif;
-  transition: background .2s;
-}
-.lookup-btn:hover { background: var(--ink-soft); }
-.lookup-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-/* ── PROPERTY PREVIEW ── */
-.prop-preview {
-  display: none;
-  gap: 1rem;
-  align-items: flex-start;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-.prop-preview.show { display: flex; }
-.prop-thumb {
-  width: 120px;
-  height: 82px;
-  border-radius: var(--r);
-  background: var(--cream-dark);
-  flex-shrink: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 28px;
-}
-.prop-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.prop-info { flex: 1; min-width: 0; }
-.prop-address { font-size: 15px; font-weight: 500; margin-bottom: 3px; }
-.prop-meta { font-size: 13px; color: var(--slate); }
-.prop-pills { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.pill {
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 20px;
-  background: var(--cream-dark);
-  color: var(--slate);
-  border: 1px solid var(--border-mid);
-}
-.pill.status-active { background: rgba(72,160,100,0.1); color: #2d7a4a; border-color: rgba(72,160,100,0.25); }
-.mls-err { font-size: 12px; color: #c0392b; margin-top: 8px; display: none; }
-
-/* ── CLASSICAL BAR ── */
-.classical-bar {
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 0.85rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  margin-bottom: 1rem;
-  background: var(--cream);
-  transition: all .18s;
-  gap: 1rem;
-}
-.classical-bar:hover { border-color: var(--gold); background: #fff; }
-.classical-bar.selected {
-  border: 2px solid var(--gold);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
-}
-.classical-left { display: flex; align-items: center; gap: 12px; }
-.classical-icon { font-size: 22px; line-height: 1; }
-.classical-name { font-size: 15px; font-weight: 500; margin-bottom: 2px; }
-.classical-desc { font-size: 12px; color: var(--slate); }
-.classical-badge {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: var(--ink);
-  color: var(--gold);
-  padding: 3px 10px;
-  border-radius: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* ── GENRE DIVIDER ── */
-.genre-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 0.75rem;
-}
-.genre-divider::before, .genre-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-mid);
-}
-
-/* ── GENRE GRID ── */
-.genre-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-  gap: 8px;
-}
-.genre-btn {
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 0.75rem 0.5rem;
-  text-align: center;
-  cursor: pointer;
-  background: var(--cream);
-  transition: all .18s;
-  position: relative;
-}
-.genre-btn:hover { border-color: var(--gold); background: #fff; }
-.genre-btn.selected {
-  border: 2px solid var(--gold);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
-}
-.genre-emoji { font-size: 22px; margin-bottom: 5px; }
-.genre-name { font-size: 12px; font-weight: 500; color: var(--ink); }
-.genre-vibe { font-size: 10px; color: var(--muted); margin-top: 2px; }
-
-.no-lyrics-note {
-  display: none;
-  margin-top: 0.9rem;
-  padding: 0.65rem 1rem;
-  background: rgba(201,168,76,0.07);
-  border-left: 3px solid var(--gold);
-  border-radius: 0 var(--r) var(--r) 0;
-  font-size: 12px;
-  color: var(--slate);
-  line-height: 1.6;
-}
-.no-lyrics-note.show { display: block; }
-
-/* ── STYLE TOGGLE ── */
-.style-toggle { display: flex; gap: 10px; }
-.style-opt {
-  flex: 1;
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 1rem;
-  cursor: pointer;
-  background: var(--cream);
-  transition: all .18s;
-}
-.style-opt:hover { background: #fff; border-color: var(--border-mid); }
-.style-opt.selected {
-  border: 2px solid var(--ink);
-  background: #fff;
-}
-.style-label {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 3px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.style-desc { font-size: 12px; color: var(--slate); }
-
-/* ── AGENT FIELDS ── */
-.agent-section { display: none; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
-.agent-section.show { display: block; }
-.agent-header-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--cream-dark);
-  border-radius: var(--r);
-  padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--border);
-}
-.agent-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--gold);
-  font-size: 20px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-.agent-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.agent-hname { font-size: 14px; font-weight: 500; margin-bottom: 1px; }
-.agent-hsub { font-size: 12px; color: var(--slate); }
-.agent-pulled {
-  font-size: 11px;
-  color: #2d7a4a;
-  margin-top: 3px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-.field-grid.single { grid-template-columns: 1fr; }
-.field-group label { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 5px; }
-
-/* ── CTA BUTTON ── */
-.stage-btn {
-  width: 100%;
-  background: var(--ink);
-  color: var(--gold);
-  border: none;
-  border-radius: var(--r-lg);
-  padding: 1.05rem;
-  font-size: 16px;
-  font-weight: 600;
-  font-family: 'DM Sans', sans-serif;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  letter-spacing: 0.01em;
-  transition: background .2s;
-  margin-top: 1.25rem;
-}
-.stage-btn:hover { background: var(--ink-soft); }
-.stage-btn:disabled { opacity: .45; cursor: not-allowed; }
-
-/* ── STUDIO PANEL ── */
-.studio-panel {
-  display: none;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  margin-top: 1.25rem;
-  box-shadow: var(--shadow);
-}
-.studio-panel.show { display: block; }
-.studio-title { font-size: 17px; font-weight: 500; margin-bottom: 5px; }
-.studio-sub { font-size: 13px; color: var(--slate); margin-bottom: 2rem; }
-.steps-track { display: flex; justify-content: center; align-items: flex-start; }
-.step-col { display: flex; flex-direction: column; align-items: center; width: 72px; }
+/* ── STEP INDICATOR ── */
+.steps { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
 .step-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--border-mid);
-  margin-bottom: 6px;
-  transition: background .3s;
+  flex: 1; height: 4px; border-radius: 100px; background: var(--cream-dark); transition: background 0.2s;
 }
-.step-dot.active { background: var(--gold); }
-.step-dot.done { background: var(--ink); }
-.step-lbl { font-size: 10px; color: var(--muted); text-align: center; font-weight: 500; letter-spacing: 0.04em; }
-.step-line-wrap { padding-top: 5px; }
-.step-line { width: 42px; height: 1px; background: var(--border-mid); transition: background .3s; }
-.step-line.done { background: var(--ink); }
+.step-dot.active, .step-dot.done { background: var(--gold); }
 
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
-.pulse { animation: pulse 1.4s infinite; }
+.panel { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden; margin-bottom: 1.5rem; }
+.panel-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--cream-dark); }
+.panel-title { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; }
+.panel-sub { font-size: 0.8rem; color: var(--slate); margin-top: 4px; }
+.panel-body { padding: 1.5rem; }
 
-/* ── RESULT PANEL ── */
-.result-panel {
-  display: none;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 1.5rem;
-  margin-top: 1.25rem;
-  box-shadow: var(--shadow);
+/* ── LISTING PICKER ── */
+.listing-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--cream-dark); cursor: pointer; transition: background 0.1s;
 }
-.result-panel.show { display: block; }
-.video-wrap {
-  background: var(--ink);
-  border-radius: var(--r);
-  aspect-ratio: 16/9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--gold);
-  font-size: 52px;
-  margin-bottom: 1rem;
-  overflow: hidden;
-  position: relative;
-}
-.video-wrap video { width: 100%; height: 100%; object-fit: cover; }
-.video-placeholder-icon { position: absolute; }
-.result-address { font-size: 16px; font-weight: 500; margin-bottom: 3px; }
-.result-genre { font-size: 13px; color: var(--slate); margin-bottom: 1.25rem; }
+.listing-row:last-child { border-bottom: none; }
+.listing-row:hover { background: var(--cream); }
+.listing-row h3 { font-size: 0.92rem; font-weight: 500; }
+.listing-row .meta { font-size: 0.75rem; color: var(--slate); margin-top: 2px; }
+.chip { font-family: monospace; font-size: 0.65rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 9px; border-radius: 100px; white-space: nowrap; }
+.chip-amber { background: rgba(201,168,76,0.12); color: #7a5a10; border: 1px solid rgba(201,168,76,0.3); }
+.chip-blue  { background: rgba(52,90,140,0.10); color: #2a4a70; border: 1px solid rgba(52,90,140,0.25); }
+.chip-neutral { background: rgba(26,26,46,0.06); color: var(--muted); border: 1px solid var(--border); }
 
-/* ── SHARE BUTTONS ── */
-.share-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.share-btn {
-  flex: 1;
-  min-width: 72px;
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 0.55rem 0.25rem;
-  text-align: center;
-  cursor: pointer;
-  background: var(--cream);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--slate);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  transition: all .18s;
-  font-family: 'DM Sans', sans-serif;
-  text-decoration: none;
-}
-.share-btn:hover { background: #fff; border-color: var(--gold); color: var(--ink); }
-.share-btn.fb:hover  { background: #1877f2; border-color: #1877f2; color: #fff; }
-.share-btn.x:hover   { background: #000; border-color: #000; color: #fff; }
-.share-btn.ig:hover  { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); border-color: transparent; color: #fff; }
-.share-btn.tt:hover  { background: #010101; border-color: #010101; color: #fff; }
-.dl-btn {
-  width: 100%;
-  background: var(--cream-dark);
-  border: 1px solid var(--border-mid);
-  border-radius: var(--r);
-  padding: 0.65rem;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 10px;
-  font-family: 'DM Sans', sans-serif;
-  transition: all .18s;
-}
-.dl-btn:hover { background: #fff; border-color: var(--gold); }
-.link-row { display: flex; gap: 8px; }
-.link-row input {
-  flex: 1;
-  font-size: 12px;
-  color: var(--slate);
-  background: var(--cream-dark);
-  cursor: text;
-}
-.copy-btn {
-  background: var(--ink);
-  color: var(--gold);
-  border: none;
-  border-radius: var(--r);
-  padding: 0 1rem;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: 'DM Sans', sans-serif;
-  transition: background .2s;
-}
-.copy-btn:hover { background: var(--ink-soft); }
+.mls-fallback { padding: 1.5rem; border-top: 1px solid var(--cream-dark); }
+.mls-fallback label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); display: block; margin-bottom: 6px; }
+.mls-row { display: flex; }
+.mls-row input { flex: 1; border: 1px solid var(--border-mid); border-right: none; background: var(--cream); font-family: monospace; font-size: 0.95rem; padding: 8px 12px; border-radius: 7px 0 0 7px; outline: none; }
+.mls-row button { background: var(--gold); border: none; padding: 8px 16px; font-size: 0.78rem; font-weight: 500; cursor: pointer; border-radius: 0 7px 7px 0; }
+.mls-row button:hover { background: var(--gold-light); }
 
-/* ── TOAST ── */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: var(--ink);
-  color: var(--cream);
-  border-radius: var(--r);
-  padding: 11px 16px;
-  font-size: 13px;
-  display: none;
-  align-items: center;
-  gap: 8px;
-  z-index: 300;
-  box-shadow: var(--shadow-lg);
-  animation: fadeUp .2s ease;
-  max-width: 320px;
-}
-.toast.show { display: flex; }
-@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+/* ── BUTTONS ── */
+.btn { border: none; padding: 0.75rem 1.4rem; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.15s, transform 0.1s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.btn-primary { background: var(--ink); color: var(--cream); }
+.btn-primary:hover:not(:disabled) { background: var(--ink-soft); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-gold { background: var(--gold); color: var(--ink); }
+.btn-gold:hover:not(:disabled) { background: var(--gold-light); }
+.btn-ghost { background: transparent; color: var(--slate); border: 1px solid var(--border-mid); }
+.btn-ghost:hover { background: var(--cream); }
+.btn-block { width: 100%; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── RESPONSIVE ── */
-@media (max-width: 600px) {
-  .field-grid { grid-template-columns: 1fr; }
-  .style-toggle { flex-direction: column; }
-  .genre-grid { grid-template-columns: repeat(3, 1fr); }
-  .share-row { gap: 6px; }
-}
+/* ── CURATION ── */
+.photo-row { display: grid; grid-template-columns: 64px 1fr auto auto; gap: 0.9rem; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--cream-dark); }
+.photo-row:last-child { border-bottom: none; }
+.photo-row.excluded { opacity: 0.45; }
+.photo-thumb { width: 64px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--cream-dark); }
+.photo-title-input { width: 100%; border: 1px solid var(--border-mid); border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; font-family: inherit; }
+.reorder-btns { display: flex; flex-direction: column; gap: 2px; }
+.reorder-btns button { background: var(--cream); border: 1px solid var(--border-mid); border-radius: 4px; width: 22px; height: 18px; cursor: pointer; font-size: 0.65rem; line-height: 1; }
+.reorder-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
+.photo-toolbar { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--cream-dark); display: flex; gap: 0.75rem; align-items: center; background: var(--cream); font-size: 0.8rem; }
+.photo-toolbar button { background: transparent; border: none; color: var(--slate); text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
+
+/* ── SHARE / SUCCESS ── */
+.share-box { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.share-box input { flex: 1; border: 1px solid var(--border-mid); border-radius: 7px; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; background: var(--cream); }
+
+.state-msg { padding: 3rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
+.state-msg .icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--cream); padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 1000; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
-
 <body>
+
+<div id="auth-gate">
+  <div class="box">
+    <h1>Cameron's <span style="color:var(--gold)">Stage</span></h1>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <a href="./index.html">← Tools</a>
+  </div>
+</div>
 
 <header>
   <div class="header-inner">
-    <a href="./index.html" class="back-btn">← Home</a>
-    <div class="header-sep"></div>
-    <div class="header-brand">Cameron's <span>Stage</span></div>
-    <div class="header-spacer"></div>
-    <div class="header-eyebrow">Adams, Cameron & Co.</div>
+    <a href="./index.html" class="back-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      All Tools
+    </a>
+    <div class="header-divider"></div>
+    <div class="logo">John <span>Adams</span></div>
+    <span class="header-tool">/ Cameron's Stage</span>
+    <span class="header-badge">Beta</span>
   </div>
 </header>
 
-<div class="page">
-
-  <!-- ── LISTING LOOKUP ── -->
-  <div class="card">
-    <div class="card-label">🏠 The Listing</div>
-    <div class="lookup-row">
-      <input type="text" id="mlsInput" placeholder="Enter MLS number" onkeydown="if(event.key==='Enter') lookupListing()" />
-      <button class="lookup-btn" id="lookupBtn" onclick="lookupListing()">Look up</button>
-    </div>
-    <div class="mls-err" id="mlsErr"></div>
-    <div class="prop-preview" id="propPreview">
-      <div class="prop-thumb" id="propThumb">🏡</div>
-      <div class="prop-info">
-        <div class="prop-address" id="propAddress"></div>
-        <div class="prop-meta" id="propMeta"></div>
-        <div class="prop-pills" id="propPills"></div>
-      </div>
-    </div>
+<div class="app" id="app">
+  <div class="steps">
+    <div class="step-dot" id="dot-1"></div>
+    <div class="step-dot" id="dot-2"></div>
+    <div class="step-dot" id="dot-3"></div>
+    <div class="step-dot" id="dot-4"></div>
   </div>
 
-  <!-- ── GENRE PICKER ── -->
-  <div class="card">
-    <div class="card-label">🎵 Pick Your Sound</div>
-
-    <div class="classical-bar" id="genre-classical" onclick="selectGenre('classical')">
-      <div class="classical-left">
-        <div class="classical-icon">🎻</div>
-        <div>
-          <div class="classical-name">Classical</div>
-          <div class="classical-desc">Elegant instrumental score — perfect for luxury and traditional tours</div>
-        </div>
+  <!-- STEP 1: Listing picker -->
+  <div id="step-listing">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Pick a listing</div>
+        <div class="panel-sub">Your active listings, from Daily Desk's transaction records.</div>
       </div>
-      <span class="classical-badge">Instrumental · No Lyrics</span>
-    </div>
-
-    <div class="genre-divider">or pick a style</div>
-
-    <div class="genre-grid" id="genreGrid"></div>
-
-    <div class="no-lyrics-note" id="noLyricsNote">
-      🎻 Classical generates an elegant instrumental score — no lyrics overlay. The music sets the mood while your photos tell the story.
-    </div>
-  </div>
-
-  <!-- ── VIDEO STYLE ── -->
-  <div class="card">
-    <div class="card-label">🎬 Video Style</div>
-    <div class="style-toggle">
-      <div class="style-opt selected" id="optUnbranded" onclick="selectStyle('unbranded')">
-        <div class="style-label">📋 The Demo</div>
-        <div class="style-desc">Clean video for MLS — no agent info, fully compliant</div>
-      </div>
-      <div class="style-opt" id="optBranded" onclick="selectStyle('branded')">
-        <div class="style-label">⭐ The Single</div>
-        <div class="style-desc">Branded for social media, Google Ads, and sharing</div>
-      </div>
-    </div>
-
-    <div class="agent-section" id="agentSection">
-      <div class="agent-header-card">
-        <div class="agent-avatar" id="agentAvatar">👤</div>
-        <div style="flex:1;min-width:0">
-          <div class="agent-hname" id="agentHName">Loading your profile…</div>
-          <div class="agent-hsub" id="agentHSub"></div>
-          <div class="agent-pulled" id="agentPulled" style="display:none">
-            ✓ Pulled from DeltaNet — edit anything below
-          </div>
-        </div>
-      </div>
-      <div class="field-grid">
-        <div class="field-group">
-          <label>Agent Name</label>
-          <input type="text" id="agentName" placeholder="Your name" />
-        </div>
-        <div class="field-group">
-          <label>Phone</label>
-          <input type="text" id="agentPhone" placeholder="(386) 555-0100" />
-        </div>
-      </div>
-      <div class="field-grid">
-        <div class="field-group">
-          <label>Email</label>
-          <input type="text" id="agentEmail" placeholder="you@adamscameron.com" />
-        </div>
-        <div class="field-group">
-          <label>Website</label>
-          <input type="text" id="agentWebsite" placeholder="https://adamscameron.com/you" />
-        </div>
-      </div>
-      <div class="field-grid single">
-        <div class="field-group">
-          <label>Custom message for this listing (optional)</label>
-          <textarea id="agentMessage" placeholder="e.g. Call me for a private showing — this one won't last!"></textarea>
+      <div id="listingList"><div class="state-msg"><span class="icon">⏳</span>Loading your listings…</div></div>
+      <div class="mls-fallback">
+        <label>Or look up by MLS #</label>
+        <div class="mls-row">
+          <input type="text" id="mlsDirect" placeholder="e.g. 1225064" onkeydown="if(event.key==='Enter') pickByMls()">
+          <button onclick="pickByMls()">Look Up</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── CTA ── -->
-  <button class="stage-btn" id="stageBtn" onclick="takeTheStage()">
-    ▶ Take the Stage
-  </button>
-
-  <!-- ── STUDIO PANEL ── -->
-  <div class="studio-panel" id="studioPanel">
-    <div class="studio-title pulse" id="studioTitle">Writing your track…</div>
-    <div class="studio-sub" id="studioSub">Gemini is composing lyrics from your property description</div>
-    <div class="steps-track">
-      <div class="step-col">
-        <div class="step-dot" id="dot1"></div>
-        <div class="step-lbl" id="lbl1">Lyrics</div>
+  <!-- STEP 2: Existing tour check -->
+  <div id="step-existing" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="existingAddress">—</div>
+        <div class="panel-sub">This listing already has a saved tour.</div>
       </div>
-      <div class="step-line-wrap"><div class="step-line" id="line1"></div></div>
-      <div class="step-col">
-        <div class="step-dot" id="dot2"></div>
-        <div class="step-lbl">Music</div>
-      </div>
-      <div class="step-line-wrap"><div class="step-line" id="line2"></div></div>
-      <div class="step-col">
-        <div class="step-dot" id="dot3"></div>
-        <div class="step-lbl">Video</div>
-      </div>
-      <div class="step-line-wrap"><div class="step-line" id="line3"></div></div>
-      <div class="step-col">
-        <div class="step-dot" id="dot4"></div>
-        <div class="step-lbl">Ready</div>
+      <div class="panel-body" style="display:flex;gap:0.75rem;">
+        <button class="btn btn-gold" onclick="editExistingTour()">Edit Existing Tour</button>
+        <button class="btn btn-ghost" onclick="startNewTour()">Start a New One</button>
       </div>
     </div>
   </div>
 
-  <!-- ── RESULT PANEL ── -->
-  <div class="result-panel" id="resultPanel">
-    <div class="video-wrap" id="videoWrap">
-      <span class="video-placeholder-icon" id="videoIcon">▶</span>
-    </div>
-    <div class="result-address" id="resultAddress"></div>
-    <div class="result-genre" id="resultGenre"></div>
-    <div class="share-row">
-      <a class="share-btn fb" id="shareFb" href="#" target="_blank">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-        Facebook
-      </a>
-      <a class="share-btn x" id="shareX" href="#" target="_blank">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        X / Twitter
-      </a>
-      <a class="share-btn ig" id="shareIg" href="#" target="_blank">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-        Instagram
-      </a>
-      <a class="share-btn tt" id="shareTt" href="#" target="_blank">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.77 1.52V6.76a4.85 4.85 0 01-1-.07z"/></svg>
-        TikTok
-      </a>
-    </div>
-    <button class="dl-btn" id="dlBtn" onclick="downloadVideo()">
-      ⬇ Download Video
-    </button>
-    <div class="link-row">
-      <input type="text" id="shareLink" readonly placeholder="Your share link will appear here" />
-      <button class="copy-btn" onclick="copyLink()">⎘ Copy</button>
+  <!-- STEP 3: Generate -->
+  <div id="step-generate" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="generateAddress">—</div>
+        <div class="panel-sub">An instrumental song will be generated automatically for this listing — about 60 seconds, no lyrics.</div>
+      </div>
+      <div class="panel-body">
+        <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
+        <div id="generateResult" style="margin-top:1rem;display:none;">
+          <audio controls style="width:100%" id="audioPreview"></audio>
+          <button class="btn btn-gold btn-block" style="margin-top:1rem" onclick="goToCuration()">Continue to Photos →</button>
+        </div>
+      </div>
     </div>
   </div>
 
-</div><!-- /page -->
+  <!-- STEP 4: Curation -->
+  <div id="step-curate" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Curate photos</div>
+        <div class="panel-sub">Reorder with the arrows, add an optional title, uncheck any you want to leave out.</div>
+      </div>
+      <div class="photo-toolbar">
+        <span id="photoCount">0 photos</span>
+        <button onclick="selectAllPhotos(true)">Select all</button>
+        <button onclick="selectAllPhotos(false)">Select none</button>
+      </div>
+      <div id="photoList"></div>
+    </div>
+    <button class="btn btn-primary btn-block" id="saveBtn" onclick="doSave()">Save Tour</button>
+  </div>
 
-<div class="toast" id="toastEl"><span id="toastTxt"></span></div>
+  <!-- STEP 5: Done -->
+  <div id="step-done" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🎉 Tour ready</div>
+        <div class="panel-sub">Share this link with your client, or paste it into your MLS listing's virtual tour field.</div>
+      </div>
+      <div class="panel-body">
+        <div class="share-box">
+          <input type="text" id="tourUrl" readonly>
+          <button class="btn btn-gold" onclick="copyTourUrl()">Copy</button>
+        </div>
+        <a id="previewLink" href="#" target="_blank" class="btn btn-ghost btn-block" style="margin-top:1rem">Preview Tour →</a>
+        <button class="btn btn-ghost btn-block" style="margin-top:0.75rem" onclick="location.reload()">Start Another Tour</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-// ── CONSTANTS ──────────────────────────────────────────────────────
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
-const SESSION_KEY  = 'ac_proxy_key';
-const STAGE_BASE   = PROXY_BASE + '/stage';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG / AUTH
+═══════════════════════════════════════════════════════════════════ */
+const PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
-function apiHeaders() {
-  return {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'x-proxy-key': sessionStorage.getItem(SESSION_KEY) || PROXY_KEY,
-  };
+let userEmail = localStorage.getItem('cs_user_email') || "";
+let proxyKey  = sessionStorage.getItem('cs_proxy_key') || "";
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', init);
 }
 
-// ── GENRES ────────────────────────────────────────────────────────
-const GENRES = [
-  { id:'reggaeton',   name:'Reggaeton',    emoji:'🌴', vibe:'Latin heat',        lyrics:true  },
-  { id:'hiphop',      name:'Hip Hop',      emoji:'🎤', vibe:'Urban energy',      lyrics:true  },
-  { id:'country',     name:'Country',      emoji:'🤠', vibe:'Heartfelt & warm',  lyrics:true  },
-  { id:'gospel',      name:'Gospel',       emoji:'🙏', vibe:'Soul & spirit',     lyrics:true  },
-  { id:'classicrock', name:'Classic Rock', emoji:'🎸', vibe:'Bold & powerful',   lyrics:true  },
-  { id:'pop',         name:'Pop',          emoji:'⭐', vibe:'Catchy & bright',   lyrics:true  },
-  { id:'jazz',        name:'Jazz',         emoji:'🎷', vibe:'Smooth & cool',     lyrics:true  },
-  { id:'swing',       name:'Swing',        emoji:'🕺', vibe:'Fun & danceable',   lyrics:true  },
-  { id:'ragtime',     name:'Ragtime',      emoji:'🎹', vibe:'Classic & clever',  lyrics:true  },
-  { id:'rnb',         name:'R&B',          emoji:'💜', vibe:'Soulful & smooth',  lyrics:true  },
-  { id:'disco',       name:'Disco',        emoji:'🪩', vibe:'Funky & festive',   lyrics:true  },
-  { id:'kpop',        name:'K-Pop',        emoji:'✨', vibe:'Bright & dynamic',  lyrics:true  },
-];
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
+  google.accounts.id.prompt();
+});
 
-// ── STATE ─────────────────────────────────────────────────────────
-let selectedGenre  = null;
-let selectedStyle  = 'unbranded';
-let listingData    = null;
-let agentData      = null;
-let currentJobId   = null;
-let pollInterval   = null;
-let currentVideoUrl = null;
-
-// ── BUILD GENRE GRID ──────────────────────────────────────────────
-(function buildGrid() {
-  const grid = document.getElementById('genreGrid');
-  GENRES.forEach(g => {
-    const btn = document.createElement('div');
-    btn.className = 'genre-btn';
-    btn.id = 'genre-' + g.id;
-    btn.innerHTML = `<div class="genre-emoji">${g.emoji}</div><div class="genre-name">${g.name}</div><div class="genre-vibe">${g.vibe}</div>`;
-    btn.onclick = () => selectGenre(g.id);
-    grid.appendChild(btn);
-  });
-})();
-
-// ── GENRE SELECTION ───────────────────────────────────────────────
-function selectGenre(id) {
-  if (selectedGenre) {
-    const prev = document.getElementById('genre-' + selectedGenre);
-    if (prev) prev.classList.remove('selected');
-  }
-  const classicBar = document.getElementById('genre-classical');
-  classicBar.classList.remove('selected');
-
-  selectedGenre = id;
-
-  if (id === 'classical') {
-    classicBar.classList.add('selected');
-  } else {
-    const btn = document.getElementById('genre-' + id);
-    if (btn) btn.classList.add('selected');
-  }
-  document.getElementById('noLyricsNote').classList.toggle('show', id === 'classical');
-}
-
-// ── STYLE SELECTION ───────────────────────────────────────────────
-function selectStyle(style) {
-  selectedStyle = style;
-  document.getElementById('optUnbranded').classList.toggle('selected', style === 'unbranded');
-  document.getElementById('optBranded').classList.toggle('selected',   style === 'branded');
-  const sec = document.getElementById('agentSection');
-  sec.classList.toggle('show', style === 'branded');
-  if (style === 'branded' && !agentData) fetchAgentInfo();
-}
-
-// ── LISTING LOOKUP ────────────────────────────────────────────────
-async function lookupListing() {
-  const mls = document.getElementById('mlsInput').value.trim();
-  if (!mls) { showErr('Please enter an MLS number.'); return; }
-
-  const btn = document.getElementById('lookupBtn');
-  btn.disabled = true;
-  btn.textContent = 'Looking up…';
-  hideErr();
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || "";
+    localStorage.setItem('cs_user_email', userEmail);
+    localStorage.setItem('ac_user_email', userEmail); // shared key used by usage-logging convention
+  } catch { userEmail = ""; }
 
   try {
-    const params = new URLSearchParams({ mls_id: mls, status: '0,1,2,3,4', limit: '5' });
-    const res  = await fetch(`${PROXY_BASE}/deltanet/listings?${params}`, { headers: apiHeaders() });
-    const body = await res.json();
-
-    if (!res.ok) throw new Error(body.error || 'DeltaNet error ' + res.status);
-
-    const hits = body?.listings || body?.data || body?.results || [];
-    if (!hits.length) throw new Error('MLS# ' + mls + ' not found. Check the number and try again.');
-
-    listingData = hits[0];
-    renderListingPreview(listingData);
-    toast('✓ Listing loaded!');
-
-  } catch (e) {
-    showErr(e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Look up';
-  }
-}
-
-function renderListingPreview(l) {
-  const street = [l.address, l.address2, l.unit_number ? '#'+l.unit_number : null].filter(Boolean).join(' ');
-  const region = [l.city, l.state, l.zip_code].filter(Boolean).join(', ');
-  const fullAddr = [street, region].filter(Boolean).join(', ');
-
-  document.getElementById('propAddress').textContent = fullAddr || 'Address unavailable';
-
-  const beds  = l.bedrooms      ? l.bedrooms + ' bed'  : '';
-  const baths = l.bathrooms_full || l.bathrooms ? (l.bathrooms_full || l.bathrooms) + ' bath' : '';
-  const sqft  = l.home_size     ? Number(l.home_size).toLocaleString() + ' sqft' : '';
-  document.getElementById('propMeta').textContent = [beds, baths, sqft].filter(Boolean).join(' · ');
-
-  const pills = document.getElementById('propPills');
-  pills.innerHTML = '';
-  if (l.price_asking) addPill(pills, '$' + Number(l.price_asking).toLocaleString());
-  if (l.status_display_text || l.status) {
-    const s = l.status_display_text || l.status;
-    addPill(pills, s, /active/i.test(s) ? 'status-active' : '');
-  }
-  const photoCount = Array.isArray(l.photo_data) ? l.photo_data.length : (l.photo_count || 0);
-  if (photoCount) addPill(pills, photoCount + ' photos');
-
-  // Primary photo
-  const thumb = document.getElementById('propThumb');
-  const photoUrl = l.primary_photo_url || (Array.isArray(l.photo_data) && l.photo_data[0]?.url);
-  if (photoUrl) {
-    thumb.innerHTML = `<img src="${escHtml(photoUrl)}" alt="Listing photo" onerror="this.parentElement.textContent='🏡'">`;
-  }
-
-  document.getElementById('propPreview').classList.add('show');
-
-  // If branded is already selected, populate agent info
-  if (selectedStyle === 'branded' && !agentData) fetchAgentInfo();
-}
-
-function addPill(container, text, cls='') {
-  const span = document.createElement('span');
-  span.className = 'pill ' + cls;
-  span.textContent = text;
-  container.appendChild(span);
-}
-
-// ── EMAIL RESOLUTION (Google sign-in fallback) ────────────────────
-// Tries sessionStorage first (set by index.html's Google One Tap flow).
-// If empty — e.g. the agent landed here directly — prompts Google
-// sign-in ourselves so the agent profile can still be auto-filled.
-function ensureUserEmail() {
-  return new Promise((resolve) => {
-    const cached = sessionStorage.getItem('ac_user_email');
-    if (cached) return resolve(cached);
-
-    const onCredential = (cred) => {
-      try {
-        const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-        const email = payload.email || '';
-        if (email) sessionStorage.setItem('ac_user_email', email);
-        resolve(email);
-      } catch (_) { resolve(''); }
-    };
-
-    const doPrompt = () => {
-      google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: onCredential });
-      google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) resolve('');
-      });
-    };
-
-    if (window.google?.accounts?.id) { doPrompt(); }
-    else {
-      const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); doPrompt(); } }, 100);
-      setTimeout(() => { clearInterval(t); resolve(''); }, 5000);
-    }
-  });
-}
-
-// ── AGENT INFO FROM DELTANET ──────────────────────────────────────
-async function fetchAgentInfo() {
-  document.getElementById('agentHName').textContent = 'Loading your profile…';
-  document.getElementById('agentPulled').style.display = 'none';
-
-  try {
-    const email = await ensureUserEmail();
-    if (!email) throw new Error('Sign-in required to auto-fill agent info');
-
-    const res  = await fetch(`${STAGE_BASE}/agent?email=${encodeURIComponent(email)}`, { headers: apiHeaders() });
-    if (!res.ok) throw new Error('Could not load agent profile');
-    agentData = await res.json();
-    populateAgentFields(agentData);
-
-  } catch (e) {
-    // Graceful fallback — agent can fill in manually
-    document.getElementById('agentHName').textContent = 'Enter your details below';
-    document.getElementById('agentHSub').textContent  = 'Adams, Cameron & Co.';
-    console.warn('[Stage] Agent fetch failed:', e.message);
-  }
-}
-
-function populateAgentFields(agent) {
-  document.getElementById('agentHName').textContent  = agent.DisplayName || '';
-  document.getElementById('agentHSub').textContent   = agent.Subtitle || 'Adams, Cameron & Co.';
-  document.getElementById('agentPulled').style.display = 'flex';
-  document.getElementById('agentName').value    = agent.DisplayName  || '';
-  document.getElementById('agentPhone').value   = agent.CellPhone    || agent.OfficePhone || '';
-  document.getElementById('agentEmail').value   = agent.PublicEmail  || '';
-  document.getElementById('agentWebsite').value = agent.WebsiteURL   || '';
-  if (agent.PhotoURL) {
-    document.getElementById('agentAvatar').innerHTML = `<img src="${escHtml(agent.PhotoURL)}" alt="${escHtml(agent.DisplayName)}" onerror="this.parentElement.textContent='👤'">`;
-  }
-}
-
-// ── TAKE THE STAGE ────────────────────────────────────────────────
-async function takeTheStage() {
-  if (!listingData)   { toast('⚠ Please look up a listing first'); return; }
-  if (!selectedGenre) { toast('⚠ Please pick your sound'); return; }
-
-  const btn = document.getElementById('stageBtn');
-  btn.disabled = true;
-
-  // Reset and show studio
-  resetStudio();
-  document.getElementById('resultPanel').classList.remove('show');
-  document.getElementById('studioPanel').classList.add('show');
-  document.getElementById('studioPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-  try {
-    const payload = {
-      mls_id:     document.getElementById('mlsInput').value.trim(),
-      genre:      selectedGenre,
-      style:      selectedStyle,
-      agent_override: selectedStyle === 'branded' ? {
-        name:    document.getElementById('agentName').value.trim(),
-        phone:   document.getElementById('agentPhone').value.trim(),
-        email:   document.getElementById('agentEmail').value.trim(),
-        website: document.getElementById('agentWebsite').value.trim(),
-        message: document.getElementById('agentMessage').value.trim(),
-      } : null,
-    };
-
-    const res  = await fetch(`${STAGE_BASE}/generate`, {
-      method:  'POST',
-      headers: apiHeaders(),
-      body:    JSON.stringify(payload),
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
     });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Server error ' + res.status);
-
-    currentJobId = body.job_id;
-    startPolling();
-
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || "";
+    sessionStorage.setItem('cs_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await init();
   } catch (e) {
-    document.getElementById('studioPanel').classList.remove('show');
-    btn.disabled = false;
-    toast('⚠ ' + e.message);
+    alert('Authentication error: ' + e.message);
   }
 }
 
-// ── POLLING ───────────────────────────────────────────────────────
-let pollStep = 0;
-let pollAttempts = 0;
-const MAX_POLL_ATTEMPTS = 15; // ~60s @ 4s interval
-
-function startPolling() {
-  pollStep = 0;
-  pollAttempts = 0;
-  advanceStudio(0);
-  pollInterval = setInterval(pollStatus, 4000);
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail, ...(opts.headers || {}) };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
 }
+const GET  = (p)    => api(p);
+const POST = (p, b) => api(p, { method: 'POST', body: JSON.stringify(b) });
+const PUT  = (p, b) => api(p, { method: 'PUT',  body: JSON.stringify(b) });
 
-async function pollStatus() {
-  if (!currentJobId) return;
-  try {
-    const res  = await fetch(`${STAGE_BASE}/status/${currentJobId}`, { headers: apiHeaders() });
-    const body = await res.json();
-
-    if (!res.ok) throw new Error(body.error || 'Status check failed');
-
-    const status = body.status || 'pending';
-
-    // Advance studio steps based on status
-    if (status === 'lyrics_done'  && pollStep < 1) advanceStudio(1);
-    if (status === 'music_done'   && pollStep < 2) advanceStudio(2);
-    if (status === 'render_done'  && pollStep < 3) advanceStudio(3);
-    if (status === 'complete') {
-      clearInterval(pollInterval);
-      advanceStudio(4);
-      currentVideoUrl = body.video_url || null;
-      setTimeout(() => showResult(body), 800);
-    }
-    if (status === 'error') {
-      clearInterval(pollInterval);
-      document.getElementById('studioPanel').classList.remove('show');
-      document.getElementById('stageBtn').disabled = false;
-      toast('⚠ Video generation failed. Please try again.');
-    }
-    if (status === 'pending') {
-      pollAttempts++;
-      if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-        clearInterval(pollInterval);
-        showQueued(body);
-      }
-    }
-  } catch (e) {
-    console.error('[Stage] Poll error:', e.message);
-  }
-}
-
-// ── STUDIO ANIMATION ──────────────────────────────────────────────
-const STEP_MSGS = [
-  () => selectedGenre === 'classical'
-    ? ['Composing the score…', 'Writing a Classical instrumental arrangement']
-    : ['Writing your track…', 'Gemini is composing lyrics from your property description'],
-  () => {
-    const g = GENRES.find(x => x.id === selectedGenre);
-    return ['Recording the music…', `Lyria 3 Pro is performing your ${g?.name || ''} track`];
-  },
-  () => ['Editing the video…', 'Assembling photos and music into your video'],
-  () => ['Uploading to the stage…', 'Saving your video and generating your share link'],
-];
-
-function advanceStudio(step) {
-  pollStep = step;
-  const dots  = ['dot1','dot2','dot3','dot4'];
-  const lines = ['line1','line2','line3'];
-
-  // Mark previous steps done
-  for (let i = 0; i < step; i++) {
-    document.getElementById(dots[i]).classList.remove('active');
-    document.getElementById(dots[i]).classList.add('done');
-    if (i < 3) document.getElementById(lines[i]).classList.add('done');
-  }
-  if (step < 4) {
-    document.getElementById(dots[step]).classList.add('active');
-    const msgs = STEP_MSGS[step]();
-    document.getElementById('studioTitle').textContent = msgs[0];
-    document.getElementById('studioSub').textContent   = msgs[1];
-    if (step === 0) {
-      document.getElementById('lbl1').textContent = selectedGenre === 'classical' ? 'Score' : 'Lyrics';
-    }
-  }
-}
-
-function resetStudio() {
-  clearInterval(pollInterval);
-  pollAttempts = 0;
-  ['dot1','dot2','dot3','dot4'].forEach(id => {
-    document.getElementById(id).classList.remove('active','done');
-  });
-  ['line1','line2','line3'].forEach(id => {
-    document.getElementById(id).classList.remove('done');
-  });
-  document.getElementById('studioTitle').classList.add('pulse');
-}
-
-// ── QUEUED (poll cap reached) ──────────────────────────────────────
-function showQueued(jobData) {
-  document.getElementById('studioTitle').classList.remove('pulse');
-  document.getElementById('studioTitle').textContent = '🎶 Your request is queued';
-  document.getElementById('studioSub').textContent   = "We're still working on the lyrics and music — check The Marquee gallery later for your video.";
-  document.getElementById('stageBtn').disabled = false;
-  toast('⏳ Still queued — check back later for your video');
-}
-
-// ── SHOW RESULT ───────────────────────────────────────────────────
-function showResult(jobData) {
-  document.getElementById('studioPanel').classList.remove('show');
-
-  const g     = GENRES.find(x => x.id === selectedGenre);
-  const gName = selectedGenre === 'classical'
-    ? 'Classical instrumental'
-    : (g?.name || '') + ' mix';
-  const style = selectedStyle === 'branded' ? 'The Single' : 'The Demo';
-
-  const street  = [listingData?.address, listingData?.address2].filter(Boolean).join(' ');
-  document.getElementById('resultAddress').textContent = street || 'Your listing';
-  document.getElementById('resultGenre').textContent   = `${gName} · ${style}`;
-
-  // Video player or placeholder
-  const videoWrap = document.getElementById('videoWrap');
-  if (currentVideoUrl) {
-    document.getElementById('videoIcon').style.display = 'none';
-    videoWrap.innerHTML = `<video controls playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover">
-      <source src="${escHtml(currentVideoUrl)}" type="video/mp4">
-    </video>`;
-  }
-
-  // Share link
-  const shareId  = jobData.share_id || '';
-  const shareUrl = shareId ? `https://johnadams.org/stage/v/${shareId}` : window.location.href;
-  document.getElementById('shareLink').value = shareUrl;
-
-  // Social share URLs
-  const encoded  = encodeURIComponent(shareUrl);
-  const caption  = encodeURIComponent('🎵 Check out this property — ' + (street || 'new listing') + ' by Adams Cameron!');
-  document.getElementById('shareX').href  = `https://twitter.com/intent/tweet?text=${caption}&url=${encoded}`;
-  document.getElementById('shareFb').href = `https://www.facebook.com/sharer/sharer.php?u=${encoded}`;
-  document.getElementById('shareIg').href = shareUrl; // Instagram doesn't support direct URL share; opens link
-  document.getElementById('shareTt').href = shareUrl; // TikTok same
-
-  document.getElementById('resultPanel').classList.add('show');
-  document.getElementById('stageBtn').disabled = false;
-  document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  toast('✓ Your track is ready!');
-}
-
-// ── DOWNLOAD ──────────────────────────────────────────────────────
-function downloadVideo() {
-  if (!currentVideoUrl) { toast('⚠ No video available yet'); return; }
-  const a = document.createElement('a');
-  a.href = currentVideoUrl;
-  a.download = 'camerons-stage-' + (listingData?.mls_id || 'listing') + '.mp4';
-  a.click();
-}
-
-// ── COPY LINK ─────────────────────────────────────────────────────
-function copyLink() {
-  const val = document.getElementById('shareLink').value;
-  if (!val) return;
-  navigator.clipboard.writeText(val)
-    .then(() => toast('⎘ Link copied!'))
-    .catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = val;
-      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      try { document.execCommand('copy'); toast('⎘ Link copied!'); } catch (_) { toast('⚠ Copy failed'); }
-      document.body.removeChild(ta);
-    });
-}
-
-// ── HELPERS ───────────────────────────────────────────────────────
-function showErr(msg) {
-  const el = document.getElementById('mlsErr');
-  el.textContent = '⚠ ' + msg;
-  el.style.display = 'block';
-}
-function hideErr() {
-  document.getElementById('mlsErr').style.display = 'none';
-}
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-let toastTimer = null;
 function toast(msg) {
-  const el = document.getElementById('toastEl');
-  document.getElementById('toastTxt').textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-// ── EXPOSE GLOBALS (Google Sites sandbox compat) ──────────────────
-[lookupListing, selectGenre, selectStyle, takeTheStage,
- copyLink, downloadVideo].forEach(fn => { window[fn.name] = fn; });
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let STATE = {
+  transactionId: null, mlsId: null, address: '', city: '',
+  deltaListingId: null, photos: [],
+  music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
+  editingTourId: null,
+};
 
+function setStep(n) {
+  ['step-listing', 'step-existing', 'step-generate', 'step-curate', 'step-done'].forEach(id => document.getElementById(id).style.display = 'none');
+  const map = { 1: 'step-listing', 2: 'step-existing', 3: 'step-generate', 4: 'step-curate', 5: 'step-done' };
+  document.getElementById(map[n]).style.display = 'block';
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.toggle('active', i === Math.min(n, 4));
+    dot.classList.toggle('done', i < n);
+  }
+}
+
+async function init() {
+  setStep(1);
+  try {
+    const data = await GET('/camerons-stage/my-listings');
+    renderListings(data.listings || [], data.warning);
+  } catch (e) {
+    document.getElementById('listingList').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load listings.<br><small>${e.message}</small></div>`;
+  }
+}
+
+function statusChip(status) {
+  if (status === 'active_listing') return ['chip-amber', 'Active'];
+  if (status === 'under_contract') return ['chip-blue', 'Under Contract'];
+  return ['chip-neutral', status || '—'];
+}
+
+function renderListings(listings, warning) {
+  const el = document.getElementById('listingList');
+  if (!listings.length) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">🏠</span>${warning || 'No listings found under your name yet.'}<br><small>Use the MLS lookup below instead.</small></div>`;
+    return;
+  }
+  el.innerHTML = listings.map((l, i) => {
+    const [cls, label] = statusChip(l.status);
+    return `<div class="listing-row" onclick="selectListing(${i})">
+      <div><h3>${escapeHtml(l.address || 'Untitled listing')}</h3><div class="meta">${escapeHtml(l.city || '')}${l.mls_id ? ' · MLS# ' + escapeHtml(l.mls_id) : ''}</div></div>
+      <span class="chip ${cls}">${label}</span>
+    </div>`;
+  }).join('');
+  window._listings = listings;
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function selectListing(i) {
+  const l = window._listings[i];
+  STATE.transactionId = l.transaction_id;
+  STATE.mlsId = l.mls_id;
+  STATE.address = l.address;
+  STATE.city = l.city;
+  await afterListingPicked();
+}
+
+async function pickByMls() {
+  const mlsId = document.getElementById('mlsDirect').value.trim();
+  if (!mlsId) return;
+  STATE.transactionId = null;
+  STATE.mlsId = mlsId;
+  await afterListingPicked();
+}
+
+async function afterListingPicked() {
+  // Check for an existing tour first, if we know the transaction
+  if (STATE.transactionId) {
+    try {
+      const { tour } = await GET(`/camerons-stage/library/${STATE.transactionId}`);
+      if (tour) {
+        STATE._existingTour = tour;
+        document.getElementById('existingAddress').textContent = STATE.address || tour.address || 'Existing tour';
+        setStep(2);
+        return;
+      }
+    } catch (e) { /* fall through to generate */ }
+  }
+  await loadListingPhotosAndGoToGenerate();
+}
+
+async function loadListingPhotosAndGoToGenerate() {
+  document.getElementById('generateAddress').textContent = STATE.address || ('MLS #' + STATE.mlsId);
+  setStep(3);
+  try {
+    const { listing } = await GET(`/camerons-stage/listing/${encodeURIComponent(STATE.mlsId)}`);
+    if (!listing) { toast('Could not find that listing in DeltaNet.'); return; }
+    STATE.deltaListingId = listing._delta_listing_id || null;
+    if (!STATE.address) STATE.address = listing.UnparsedAddress || listing.Address || listing.address || listing.StreetAddress || ('MLS #' + STATE.mlsId);
+    if (!STATE.city) STATE.city = listing.city_cleaned || listing.City || listing.city || '';
+    document.getElementById('generateAddress').textContent = STATE.address;
+    STATE.photos = (listing.photo_data || []).map((p, i) => ({
+      photo_id: p.id, url: p.url, width: p.width, height: p.height, title: '', included: true, order: i,
+    }));
+  } catch (e) {
+    toast('Listing lookup failed: ' + e.message);
+  }
+}
+
+function editExistingTour() {
+  const tour = STATE._existingTour;
+  STATE.editingTourId = tour.id;
+  STATE.deltaListingId = tour.delta_listing_id;
+  STATE.mlsId = tour.mls_id || STATE.mlsId;
+  STATE.address = tour.address || STATE.address;
+  STATE.music = { audio_url: tour.audio_url, music_track_id: tour.music_track_id, music_prompt: tour.music_prompt, music_length_ms: tour.music_length_ms || 60000 };
+  STATE.photos = (tour.photo_config || []).map((p, i) => ({ ...p, order: i }));
+  goToCuration();
+}
+
+async function startNewTour() {
+  await loadListingPhotosAndGoToGenerate();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   GENERATE
+═══════════════════════════════════════════════════════════════════ */
+async function doGenerate() {
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating (about 30-60s)…';
+  try {
+    const data = await POST('/camerons-stage/generate', { address: STATE.address, city: STATE.city });
+    STATE.music = data;
+    document.getElementById('audioPreview').src = data.audio_url;
+    document.getElementById('generateResult').style.display = 'block';
+    btn.style.display = 'none';
+  } catch (e) {
+    toast('Song generation failed: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '🎵 Generate Song';
+  }
+}
+
+function goToCuration() {
+  setStep(4);
+  renderPhotos();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CURATION
+═══════════════════════════════════════════════════════════════════ */
+function renderPhotos() {
+  const el = document.getElementById('photoList');
+  document.getElementById('photoCount').textContent = `${STATE.photos.filter(p => p.included).length} of ${STATE.photos.length} included`;
+  if (!STATE.photos.length) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">📷</span>No photos found for this listing.</div>`;
+    return;
+  }
+  el.innerHTML = STATE.photos.map((p, i) => `
+    <div class="photo-row ${p.included ? '' : 'excluded'}">
+      <img class="photo-thumb" src="${p.url}" loading="lazy">
+      <input class="photo-title-input" placeholder="Optional title (e.g. Primary Suite)" value="${escapeHtml(p.title || '')}" oninput="STATE.photos[${i}].title=this.value">
+      <div class="reorder-btns">
+        <button onclick="movePhoto(${i},-1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button onclick="movePhoto(${i},1)" ${i === STATE.photos.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      <input type="checkbox" ${p.included ? 'checked' : ''} onchange="STATE.photos[${i}].included=this.checked; renderPhotos()">
+    </div>
+  `).join('');
+}
+
+function movePhoto(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= STATE.photos.length) return;
+  [STATE.photos[i], STATE.photos[j]] = [STATE.photos[j], STATE.photos[i]];
+  renderPhotos();
+}
+
+function selectAllPhotos(val) {
+  STATE.photos.forEach(p => p.included = val);
+  renderPhotos();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SAVE
+═══════════════════════════════════════════════════════════════════ */
+async function doSave() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  const photo_config = STATE.photos.map((p, i) => ({
+    photo_id: p.photo_id, url: p.url, width: p.width, height: p.height,
+    title: p.title || '', included: !!p.included, order: i,
+  }));
+
+  try {
+    let result;
+    if (STATE.editingTourId) {
+      result = await PUT(`/camerons-stage/tours/${STATE.editingTourId}`, {
+        photo_config, music_prompt: STATE.music.music_prompt, music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url,
+      });
+      document.getElementById('tourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${STATE.editingTourId}`;
+      document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${STATE.editingTourId}`;
+    } else {
+      result = await POST('/camerons-stage/tours', {
+        transaction_id: STATE.transactionId, delta_listing_id: STATE.deltaListingId, mls_id: STATE.mlsId, address: STATE.address,
+        music_prompt: STATE.music.music_prompt, music_length_ms: STATE.music.music_length_ms,
+        music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, photo_config,
+      });
+      document.getElementById('tourUrl').value = result.tour_url;
+      document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${result.id}`;
+    }
+    setStep(5);
+  } catch (e) {
+    toast('Save failed: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Save Tour';
+  }
+}
+
+function copyTourUrl() {
+  const input = document.getElementById('tourUrl');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => toast('Link copied'));
+}
 </script>
+
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:"Cameron's Stage",email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
