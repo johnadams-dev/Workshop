@@ -56,6 +56,7 @@ body { font-family: 'DM Sans', sans-serif; color: var(--cream); }
 #footer .contact { font-size: 0.75rem; color: rgba(250,248,243,0.75); display: flex; gap: 10px; flex-wrap: wrap; }
 #footer .contact a { color: inherit; text-decoration: none; }
 #footer .contact a:hover { text-decoration: underline; }
+#footer .brand-logo { margin-left: auto; width: auto; height: 32px; border-radius: 0; border: none; background: none; object-fit: contain; }
 
 #unmute {
   position: fixed; top: 16px; right: 16px; z-index: 20;
@@ -91,6 +92,7 @@ body { font-family: 'DM Sans', sans-serif; color: var(--cream); }
       <a id="listingLink" href="#" target="_blank" style="display:none">View Full Listing →</a>
     </div>
   </div>
+  <img class="brand-logo" src="./images/ac-logo.png" onerror="this.style.display='none'" alt="Adams, Cameron &amp; Co.">
 </div>
 
 <div id="tapOverlay" onclick="startPlayback()">
@@ -203,8 +205,15 @@ function updateCaption() {
 
 function buildFooter() {
   const a = tour.agent || {};
-  if (!a.name && !a.phone && !a.email) return;
+  // Every branded page shows this footer (and its Adams, Cameron logo)
+  // regardless of whether agent contact details are on file — only the
+  // agent-specific fields below are conditional.
   document.getElementById('footer').style.display = 'flex';
+  if (!a.name && !a.phone && !a.email) {
+    document.getElementById('agentPhoto').style.display = 'none';
+    document.getElementById('agentName').parentElement.style.display = 'none';
+    return;
+  }
   document.getElementById('agentName').textContent = a.name || 'Your Agent';
   if (a.photo_url) document.getElementById('agentPhoto').src = a.photo_url;
   const phoneEl = document.getElementById('agentPhone');
