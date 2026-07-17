@@ -149,6 +149,7 @@ async function main() {
   buildCaptionLines();
   buildStage();
   if (isBranded) buildFooter();
+  logView();
 
   const audio = document.getElementById('audio');
   audio.src = tour.audio_url;
@@ -285,6 +286,17 @@ function startSlideshow() {
     slideIndex = (slideIndex + 1) % slides.length;
     show(slideIndex);
   }, segmentMs);
+}
+
+// Fire-and-forget pageview log for future reporting (which channel/device
+// drives views, branded vs MLS link usage). document.referrer is often
+// empty — many in-app browsers and referrer policies strip it — that's
+// expected, not a bug; still log it (as null) rather than skip the call.
+function logView() {
+  fetch(`${PROXY}/camerons-stage/tours/${encodeURIComponent(tourId)}/view`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ referrer: document.referrer || null, brand: isBranded }),
+  }).catch(() => {});
 }
 
 function showError(msg) {
