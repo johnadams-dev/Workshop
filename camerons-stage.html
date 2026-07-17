@@ -105,6 +105,13 @@ header {
 .chip-amber { background: rgba(201,168,76,0.12); color: #7a5a10; border: 1px solid rgba(201,168,76,0.3); }
 .chip-blue  { background: rgba(52,90,140,0.10); color: #2a4a70; border: 1px solid rgba(52,90,140,0.25); }
 .chip-neutral { background: rgba(26,26,46,0.06); color: var(--muted); border: 1px solid var(--border); }
+.chip-green { background: rgba(39,174,96,0.10); color: #1a7a42; border: 1px solid rgba(39,174,96,0.25); }
+
+.select-field {
+  width: 100%; border: 1px solid var(--border-mid); background: var(--cream); color: var(--ink);
+  font-family: inherit; font-size: 0.9rem; padding: 10px 12px; border-radius: 7px; outline: none; cursor: pointer;
+}
+.select-field:focus { border-color: var(--gold); }
 
 .mls-fallback { padding: 1.5rem; border-top: 1px solid var(--cream-dark); }
 .mls-fallback label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); display: block; margin-bottom: 6px; }
@@ -198,14 +205,14 @@ header {
         <div class="panel-title">Select an agent</div>
         <div class="panel-sub">Pick which agent's listing you're building a tour for.</div>
       </div>
-      <div id="agentPickerList"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
+      <div class="panel-body" id="agentPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
     </div>
     <div class="panel" id="listingPickerPanel" style="display:none">
       <div class="panel-head">
         <div class="panel-title">Pick a listing</div>
-        <div class="panel-sub" id="listingPickerSub">Your active listings, from Daily Desk's transaction records.</div>
+        <div class="panel-sub" id="listingPickerSub">Your active, under contract, and closed listings.</div>
       </div>
-      <div id="listingList"><div class="state-msg"><span class="icon">⏳</span>Loading listings…</div></div>
+      <div class="panel-body" id="listingPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading listings…</div></div>
       <div class="mls-fallback">
         <label>Or look up by MLS #</label>
         <div class="mls-row">
@@ -254,7 +261,12 @@ header {
         <div class="panel-title" id="generateAddress">—</div>
         <div class="panel-sub">Now that you've seen the photos, pick a feel for the song — about 60 seconds, instrumental recommended.</div>
       </div>
-      <div class="panel-body">
+      <div class="genre-grid" style="padding:1.5rem 1.5rem 0;margin-bottom:0.75rem;">
+        <button type="button" class="genre-chip active" id="tabCreateNew" onclick="showMusicTab('new')">🎵 Create New</button>
+        <button type="button" class="genre-chip" id="tabExisting" onclick="showMusicTab('existing')">📼 Use Existing Recording</button>
+      </div>
+
+      <div class="panel-body" id="createNewTab">
         <div class="genre-grid" id="genreGrid"></div>
         <div class="genre-note" id="genreNote"></div>
         <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
@@ -262,6 +274,11 @@ header {
           <audio controls style="width:100%" id="audioPreview"></audio>
           <button class="btn btn-ghost btn-block" style="margin-top:1rem" onclick="resetGenerate()">🔁 Try a Different Genre</button>
         </div>
+      </div>
+
+      <div class="panel-body" id="existingTab" style="display:none">
+        <div class="panel-sub" style="margin-bottom:1rem">Reuse a previously generated track from any listing — free, no new AI fees.</div>
+        <div id="recordingsList"><div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div></div>
       </div>
     </div>
     <button class="btn btn-primary btn-block" id="saveBtn" style="display:none" onclick="doSave()">Save Tour</button>
@@ -272,14 +289,30 @@ header {
     <div class="panel">
       <div class="panel-head">
         <div class="panel-title">🎉 Tour ready</div>
-        <div class="panel-sub">Share this link with your client, or paste it into your MLS listing's virtual tour field.</div>
+        <div class="panel-sub">MLS does not allow agent name or contact info on virtual tours — use the unbranded link there. The branded link (with your contact info) is for social media, Zillow, Realtor.com, and Homes.com.</div>
       </div>
       <div class="panel-body">
+        <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">MLS link (unbranded — no agent info)</label>
         <div class="share-box">
-          <input type="text" id="tourUrl" readonly>
-          <button class="btn btn-gold" onclick="copyTourUrl()">Copy</button>
+          <input type="text" id="mlsTourUrl" readonly>
+          <button class="btn btn-gold" onclick="copyUrl('mlsTourUrl')">Copy</button>
         </div>
-        <a id="previewLink" href="#" target="_blank" class="btn btn-ghost btn-block" style="margin-top:1rem">Preview Tour →</a>
+
+        <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin:1rem 0 6px;">Social / Zillow / Realtor.com link (branded)</label>
+        <div class="share-box">
+          <input type="text" id="brandedTourUrl" readonly>
+          <button class="btn btn-gold" onclick="copyUrl('brandedTourUrl')">Copy</button>
+        </div>
+
+        <div id="listingPageRow" style="margin-top:1rem;display:none">
+          <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Full listing page (for reference)</label>
+          <div class="share-box">
+            <input type="text" id="listingPageUrl" readonly>
+            <button class="btn btn-gold" onclick="copyUrl('listingPageUrl')">Copy</button>
+          </div>
+        </div>
+
+        <a id="previewLink" href="#" target="_blank" class="btn btn-ghost btn-block" style="margin-top:1.25rem">Preview Unbranded Tour →</a>
         <button class="btn btn-ghost btn-block" style="margin-top:0.75rem" onclick="location.reload()">Start Another Tour</button>
       </div>
     </div>
@@ -403,30 +436,31 @@ async function loadListings(agentId) {
     document.getElementById('agentPickerPanel').style.display = 'none';
     document.getElementById('listingPickerPanel').style.display = 'block';
     document.getElementById('listingPickerSub').textContent = STATE.agentLabel
-      ? `Listings for ${STATE.agentLabel}.`
-      : `Your active listings, from Daily Desk's transaction records.`;
+      ? `Active, under contract, and closed listings for ${STATE.agentLabel}.`
+      : `Your active, under contract, and closed listings.`;
     renderListings(data.listings || [], data.warning);
   } catch (e) {
-    document.getElementById('listingList').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load listings.<br><small>${e.message}</small></div>`;
+    document.getElementById('listingPickerBody').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load listings.<br><small>${e.message}</small></div>`;
   }
 }
 
 async function loadAgentPicker() {
-  const el = document.getElementById('agentPickerList');
+  const el = document.getElementById('agentPickerBody');
   try {
-    const agents = await GET('/daily-desk/agents');
+    const agents = await GET('/daily-desk/agents'); // already ordered by last_name, first_name
     if (!agents.length) { el.innerHTML = `<div class="state-msg">No active agents found.</div>`; return; }
     window._agents = agents;
-    el.innerHTML = agents.map((a, i) => `
-      <div class="listing-row" onclick="pickAgent(${i})">
-        <div><h3>${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</h3><div class="meta">${escapeHtml(a.office_name || '')}</div></div>
-      </div>`).join('');
+    el.innerHTML = `<select class="select-field" id="agentSelect" onchange="pickAgent(this.value)">
+      <option value="">— Select an agent —</option>
+      ${agents.map((a, i) => `<option value="${i}">${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</option>`).join('')}
+    </select>`;
   } catch (e) {
     el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load the agent list.<br><small>${e.message}</small></div>`;
   }
 }
 
 async function pickAgent(i) {
+  if (i === '') return;
   const a = window._agents[i];
   STATE.agentId = a.id;
   STATE.agentEmail = a.email || null;
@@ -461,23 +495,25 @@ function selectGenre(id) {
 function statusChip(status) {
   if (status === 'active_listing') return ['chip-amber', 'Active'];
   if (status === 'under_contract') return ['chip-blue', 'Under Contract'];
+  if (status === 'closed') return ['chip-green', 'Closed'];
   return ['chip-neutral', status || '—'];
 }
 
 function renderListings(listings, warning) {
-  const el = document.getElementById('listingList');
+  const el = document.getElementById('listingPickerBody');
   if (!listings.length) {
     el.innerHTML = `<div class="state-msg"><span class="icon">🏠</span>${warning || 'No listings found under your name yet.'}<br><small>Use the MLS lookup below instead.</small></div>`;
+    window._listings = [];
     return;
   }
-  el.innerHTML = listings.map((l, i) => {
-    const [cls, label] = statusChip(l.status);
-    return `<div class="listing-row" onclick="selectListing(${i})">
-      <div><h3>${escapeHtml(l.address || 'Untitled listing')}</h3><div class="meta">${escapeHtml(l.city || '')}${l.mls_id ? ' · MLS# ' + escapeHtml(l.mls_id) : ''}</div></div>
-      <span class="chip ${cls}">${label}</span>
-    </div>`;
-  }).join('');
   window._listings = listings;
+  el.innerHTML = `<select class="select-field" id="listingSelect" onchange="selectListing(this.value)">
+    <option value="">— Select a listing —</option>
+    ${listings.map((l, i) => {
+      const [, label] = statusChip(l.status);
+      return `<option value="${i}">${escapeHtml(l.address || 'Untitled listing')}${l.city ? ', ' + escapeHtml(l.city) : ''} (${label})</option>`;
+    }).join('')}
+  </select>`;
 }
 
 function escapeHtml(str) {
@@ -486,6 +522,7 @@ function escapeHtml(str) {
 }
 
 async function selectListing(i) {
+  if (i === '') return;
   const l = window._listings[i];
   STATE.transactionId = l.transaction_id;
   STATE.mlsId = l.mls_id;
@@ -544,7 +581,7 @@ function editExistingTour() {
   STATE.deltaListingId = tour.delta_listing_id;
   STATE.mlsId = tour.mls_id || STATE.mlsId;
   STATE.address = tour.address || STATE.address;
-  STATE.music = { audio_url: tour.audio_url, music_track_id: tour.music_track_id, music_prompt: tour.music_prompt, music_length_ms: tour.music_length_ms || 60000 };
+  STATE.music = { audio_url: tour.audio_url, music_track_id: tour.music_track_id, music_prompt: tour.music_prompt, music_length_ms: tour.music_length_ms || 60000, genre: tour.genre, lyrics: tour.lyrics || null };
   STATE.photos = (tour.photo_config || []).map((p, i) => ({ ...p, order: i }));
   document.getElementById('curateAddress').textContent = STATE.address || 'Curate photos';
   setStep(3);
@@ -597,6 +634,49 @@ async function doGenerate() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   USE EXISTING RECORDING
+═══════════════════════════════════════════════════════════════════ */
+function showMusicTab(tab) {
+  document.getElementById('tabCreateNew').classList.toggle('active', tab === 'new');
+  document.getElementById('tabExisting').classList.toggle('active', tab === 'existing');
+  document.getElementById('createNewTab').style.display = tab === 'new' ? 'block' : 'none';
+  document.getElementById('existingTab').style.display = tab === 'existing' ? 'block' : 'none';
+  document.getElementById('saveBtn').style.display = (tab === 'new' && !STATE.music.audio_url) ? 'none' : document.getElementById('saveBtn').style.display;
+  if (tab === 'existing' && !window._recordingsLoaded) loadRecordings();
+}
+
+async function loadRecordings() {
+  window._recordingsLoaded = true;
+  const el = document.getElementById('recordingsList');
+  try {
+    const { recordings } = await GET('/camerons-stage/recordings');
+    if (!recordings.length) { el.innerHTML = `<div class="state-msg">No recordings generated yet — create the first one.</div>`; return; }
+    window._recordings = recordings;
+    el.innerHTML = recordings.map((r, i) => `
+      <div class="photo-row" style="grid-template-columns:1fr auto;">
+        <div>
+          <div style="font-weight:500">${escapeHtml(r.genre || 'Instrumental')}${r.address ? ' — ' + escapeHtml(r.address) : ''}</div>
+          <audio controls style="width:100%;margin-top:6px" src="${r.audio_url}"></audio>
+        </div>
+        <button class="btn btn-gold" style="height:fit-content" onclick="pickRecording(${i})">Use This</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load recordings.<br><small>${e.message}</small></div>`;
+  }
+}
+
+function pickRecording(i) {
+  const r = window._recordings[i];
+  STATE.music = {
+    audio_url: r.audio_url, music_track_id: r.music_track_id, music_prompt: r.music_prompt,
+    music_length_ms: r.music_length_ms || 60000, genre: r.genre, lyrics: r.lyrics || null,
+  };
+  document.getElementById('saveBtn').style.display = 'block';
+  toast('Recording selected — click Save Tour to use it.');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    CURATION
 ═══════════════════════════════════════════════════════════════════ */
 function renderPhotos() {
@@ -645,23 +725,37 @@ async function doSave() {
   }));
 
   try {
-    let result;
+    let id;
     if (STATE.editingTourId) {
-      result = await PUT(`/camerons-stage/tours/${STATE.editingTourId}`, {
-        photo_config, music_prompt: STATE.music.music_prompt, music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url,
+      await PUT(`/camerons-stage/tours/${STATE.editingTourId}`, {
+        photo_config, genre: STATE.music.genre, music_prompt: STATE.music.music_prompt,
+        music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, lyrics: STATE.music.lyrics,
       });
-      document.getElementById('tourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${STATE.editingTourId}`;
-      document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${STATE.editingTourId}`;
+      id = STATE.editingTourId;
     } else {
-      result = await POST('/camerons-stage/tours', {
+      const result = await POST('/camerons-stage/tours', {
         transaction_id: STATE.transactionId, delta_listing_id: STATE.deltaListingId, mls_id: STATE.mlsId, address: STATE.address,
-        agent_email: STATE.agentEmail,
+        agent_email: STATE.agentEmail, genre: STATE.music.genre,
         music_prompt: STATE.music.music_prompt, music_length_ms: STATE.music.music_length_ms,
-        music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, photo_config,
+        music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, lyrics: STATE.music.lyrics, photo_config,
       });
-      document.getElementById('tourUrl').value = result.tour_url;
-      document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${result.id}`;
+      id = result.id;
     }
+
+    document.getElementById('mlsTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}`;
+    document.getElementById('brandedTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
+    document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${id}`;
+
+    // Fetch the saved tour back to get the agent's website for the listing-page link
+    try {
+      const tour = await GET(`/camerons-stage/tours/${id}`);
+      if (tour.agent?.website && tour.mls_id) {
+        const base = tour.agent.website.replace(/\/+$/, '');
+        document.getElementById('listingPageUrl').value = `${base}/${tour.mls_id}`;
+        document.getElementById('listingPageRow').style.display = 'block';
+      }
+    } catch (e) { /* listing-page link is a nice-to-have, not blocking */ }
+
     setStep(5);
   } catch (e) {
     toast('Save failed: ' + e.message);
@@ -670,8 +764,8 @@ async function doSave() {
   }
 }
 
-function copyTourUrl() {
-  const input = document.getElementById('tourUrl');
+function copyUrl(id) {
+  const input = document.getElementById(id);
   input.select();
   navigator.clipboard.writeText(input.value).then(() => toast('Link copied'));
 }
