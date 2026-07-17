@@ -164,12 +164,34 @@ function unmuteAudio() {
 
 function buildStage() {
   const stage = document.getElementById('stage');
+  // Only current/next/previous images actually get a real src (see
+  // loadSlideImage/unloadSlideImage below) — data-src holds the real URL
+  // until then. Setting src on every slide up front made mobile browsers
+  // try to decode/hold every full-size photo in memory simultaneously
+  // (they're all stacked in the viewport via position:absolute, so
+  // loading="lazy" never kicked in either), which is what was causing
+  // images to go blank partway through a tour on phones.
   stage.innerHTML = includedPhotos.map((p, i) => `
     <div class="slide" data-i="${i}">
-      <img src="${p.url}">
+      <img data-src="${p.url}">
       ${p.title ? `<div class="slide-title show">${escapeHtml(p.title)}</div>` : ''}
     </div>
   `).join('');
+  // Warm the first couple of slides so the tour starts instantly.
+  loadSlideImage(0);
+  loadSlideImage(1 % includedPhotos.length);
+}
+
+function loadSlideImage(i) {
+  const slide = document.querySelector(`.slide[data-i="${i}"]`);
+  const img = slide && slide.querySelector('img');
+  if (img && !img.src && img.dataset.src) img.src = img.dataset.src;
+}
+
+function unloadSlideImage(i) {
+  const slide = document.querySelector(`.slide[data-i="${i}"]`);
+  const img = slide && slide.querySelector('img');
+  if (img && img.src) img.removeAttribute('src');
 }
 
 // Groups per-word timestamps (from ElevenLabs' /v1/music/detailed with
@@ -237,6 +259,15 @@ function startSlideshow() {
   const show = (i) => {
     slides.forEach(s => s.classList.remove('active'));
     slides[i]?.classList.add('active');
+
+    const total = slides.length;
+    const next = (i + 1) % total;
+    const prev = (i - 1 + total) % total;
+    loadSlideImage(i);
+    loadSlideImage(next); // preload so the next transition doesn't flash blank
+    for (let k = 0; k < total; k++) {
+      if (k !== i && k !== next && k !== prev) unloadSlideImage(k);
+    }
   };
   show(0);
   slideTimer = setInterval(() => {
