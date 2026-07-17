@@ -150,6 +150,8 @@ header {
 }
 .genre-chip:hover { border-color: var(--gold); }
 .genre-chip.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.genre-note { font-size: 0.78rem; color: var(--slate); margin: -0.75rem 0 1.25rem; min-height: 1.2em; }
+.genre-note .warn { color: #9a6b10; }
 
 .state-msg { padding: 3rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
 .state-msg .icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
@@ -189,14 +191,21 @@ header {
     <div class="step-dot" id="dot-4"></div>
   </div>
 
-  <!-- STEP 1: Listing picker -->
+  <!-- STEP 1: Agent picker (staff only) + Listing picker -->
   <div id="step-listing">
-    <div class="panel">
+    <div class="panel" id="agentPickerPanel" style="display:none">
+      <div class="panel-head">
+        <div class="panel-title">Select an agent</div>
+        <div class="panel-sub">Pick which agent's listing you're building a tour for.</div>
+      </div>
+      <div id="agentPickerList"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
+    </div>
+    <div class="panel" id="listingPickerPanel" style="display:none">
       <div class="panel-head">
         <div class="panel-title">Pick a listing</div>
-        <div class="panel-sub">Your active listings, from Daily Desk's transaction records.</div>
+        <div class="panel-sub" id="listingPickerSub">Your active listings, from Daily Desk's transaction records.</div>
       </div>
-      <div id="listingList"><div class="state-msg"><span class="icon">⏳</span>Loading your listings…</div></div>
+      <div id="listingList"><div class="state-msg"><span class="icon">⏳</span>Loading listings…</div></div>
       <div class="mls-fallback">
         <label>Or look up by MLS #</label>
         <div class="mls-row">
@@ -221,29 +230,11 @@ header {
     </div>
   </div>
 
-  <!-- STEP 3: Generate -->
-  <div id="step-generate" style="display:none">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title" id="generateAddress">—</div>
-        <div class="panel-sub">A ~60 second song will be generated automatically for this listing. Instrumental is recommended, but you can pick a genre with vocals instead.</div>
-      </div>
-      <div class="panel-body">
-        <div class="genre-grid" id="genreGrid"></div>
-        <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
-        <div id="generateResult" style="margin-top:1rem;display:none;">
-          <audio controls style="width:100%" id="audioPreview"></audio>
-          <button class="btn btn-gold btn-block" style="margin-top:1rem" onclick="goToCuration()">Continue to Photos →</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- STEP 4: Curation -->
+  <!-- STEP 3: Curation (photos first, so the music pick is informed by the property) -->
   <div id="step-curate" style="display:none">
     <div class="panel">
       <div class="panel-head">
-        <div class="panel-title">Curate photos</div>
+        <div class="panel-title" id="curateAddress">Curate photos</div>
         <div class="panel-sub">Reorder with the arrows, add an optional title, uncheck any you want to leave out.</div>
       </div>
       <div class="photo-toolbar">
@@ -253,7 +244,27 @@ header {
       </div>
       <div id="photoList"></div>
     </div>
-    <button class="btn btn-primary btn-block" id="saveBtn" onclick="doSave()">Save Tour</button>
+    <button class="btn btn-primary btn-block" onclick="goToGenerate()">Continue to Music →</button>
+  </div>
+
+  <!-- STEP 4: Generate music -->
+  <div id="step-generate" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="generateAddress">—</div>
+        <div class="panel-sub">Now that you've seen the photos, pick a feel for the song — about 60 seconds, instrumental recommended.</div>
+      </div>
+      <div class="panel-body">
+        <div class="genre-grid" id="genreGrid"></div>
+        <div class="genre-note" id="genreNote"></div>
+        <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
+        <div id="generateResult" style="margin-top:1rem;display:none;">
+          <audio controls style="width:100%" id="audioPreview"></audio>
+          <button class="btn btn-ghost btn-block" style="margin-top:1rem" onclick="resetGenerate()">🔁 Try a Different Genre</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" id="saveBtn" style="display:none" onclick="doSave()">Save Tour</button>
   </div>
 
   <!-- STEP 5: Done -->
@@ -350,12 +361,13 @@ let STATE = {
   deltaListingId: null, photos: [], genre: 'instrumental',
   music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
   editingTourId: null,
+  agentId: null, agentEmail: null, agentLabel: null,
 };
-let GENRES = [{ id: 'instrumental', label: 'Instrumental' }]; // overwritten by /genres on load
+let GENRES = [{ id: 'instrumental', label: 'Instrumental', hasVocals: false, cached: false }]; // overwritten by /genres on load
 
 function setStep(n) {
-  ['step-listing', 'step-existing', 'step-generate', 'step-curate', 'step-done'].forEach(id => document.getElementById(id).style.display = 'none');
-  const map = { 1: 'step-listing', 2: 'step-existing', 3: 'step-generate', 4: 'step-curate', 5: 'step-done' };
+  ['step-listing', 'step-existing', 'step-curate', 'step-generate', 'step-done'].forEach(id => document.getElementById(id).style.display = 'none');
+  const map = { 1: 'step-listing', 2: 'step-existing', 3: 'step-curate', 4: 'step-generate', 5: 'step-done' };
   document.getElementById(map[n]).style.display = 'block';
   for (let i = 1; i <= 4; i++) {
     const dot = document.getElementById('dot-' + i);
@@ -366,12 +378,7 @@ function setStep(n) {
 
 async function init() {
   setStep(1);
-  try {
-    const data = await GET('/camerons-stage/my-listings');
-    renderListings(data.listings || [], data.warning);
-  } catch (e) {
-    document.getElementById('listingList').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load listings.<br><small>${e.message}</small></div>`;
-  }
+  await loadListings();
   try {
     const g = await GET('/camerons-stage/genres');
     if (g.genres && g.genres.length) { GENRES = g.genres; STATE.genre = g.default || STATE.genre; }
@@ -379,10 +386,71 @@ async function init() {
   renderGenreGrid();
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   AGENT PICKER (staff only — agents always see just their own listings)
+═══════════════════════════════════════════════════════════════════ */
+async function loadListings(agentId) {
+  document.getElementById('listingList').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading listings…</div>`;
+  try {
+    const q = agentId ? `?agent_id=${agentId}` : '';
+    const data = await GET('/camerons-stage/my-listings' + q);
+    if (data.requiresAgentSelection) {
+      document.getElementById('agentPickerPanel').style.display = 'block';
+      document.getElementById('listingPickerPanel').style.display = 'none';
+      await loadAgentPicker();
+      return;
+    }
+    document.getElementById('agentPickerPanel').style.display = 'none';
+    document.getElementById('listingPickerPanel').style.display = 'block';
+    document.getElementById('listingPickerSub').textContent = STATE.agentLabel
+      ? `Listings for ${STATE.agentLabel}.`
+      : `Your active listings, from Daily Desk's transaction records.`;
+    renderListings(data.listings || [], data.warning);
+  } catch (e) {
+    document.getElementById('listingList').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load listings.<br><small>${e.message}</small></div>`;
+  }
+}
+
+async function loadAgentPicker() {
+  const el = document.getElementById('agentPickerList');
+  try {
+    const agents = await GET('/daily-desk/agents');
+    if (!agents.length) { el.innerHTML = `<div class="state-msg">No active agents found.</div>`; return; }
+    window._agents = agents;
+    el.innerHTML = agents.map((a, i) => `
+      <div class="listing-row" onclick="pickAgent(${i})">
+        <div><h3>${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</h3><div class="meta">${escapeHtml(a.office_name || '')}</div></div>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load the agent list.<br><small>${e.message}</small></div>`;
+  }
+}
+
+async function pickAgent(i) {
+  const a = window._agents[i];
+  STATE.agentId = a.id;
+  STATE.agentEmail = a.email || null;
+  STATE.agentLabel = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+  await loadListings(a.id);
+}
+
 function renderGenreGrid() {
   document.getElementById('genreGrid').innerHTML = GENRES.map(g => `
-    <button type="button" class="genre-chip ${g.id === STATE.genre ? 'active' : ''}" onclick="selectGenre('${g.id}')">${escapeHtml(g.label)}</button>
+    <button type="button" class="genre-chip ${g.id === STATE.genre ? 'active' : ''}" onclick="selectGenre('${g.id}')">${g.hasVocals ? '🎤 ' : ''}${escapeHtml(g.label)}</button>
   `).join('');
+  renderGenreNote();
+}
+
+function renderGenreNote() {
+  const g = GENRES.find(x => x.id === STATE.genre);
+  const note = document.getElementById('genreNote');
+  if (!g) { note.textContent = ''; return; }
+  const bits = [];
+  if (g.hasVocals) bits.push(`🎤 Custom song about this property!`);
+  bits.push(g.cached
+    ? `Served instantly from our library — no fees.`
+    : `<span class="warn">ACC pays AI fees</span> for this one — generated fresh for this listing.`);
+  note.innerHTML = bits.join(' ');
 }
 
 function selectGenre(id) {
@@ -445,24 +513,26 @@ async function afterListingPicked() {
         setStep(2);
         return;
       }
-    } catch (e) { /* fall through to generate */ }
+    } catch (e) { /* fall through to curation */ }
   }
-  await loadListingPhotosAndGoToGenerate();
+  await loadListingPhotosAndGoToCurate();
 }
 
-async function loadListingPhotosAndGoToGenerate() {
-  document.getElementById('generateAddress').textContent = STATE.address || ('MLS #' + STATE.mlsId);
+async function loadListingPhotosAndGoToCurate() {
+  document.getElementById('curateAddress').textContent = STATE.address || ('MLS #' + STATE.mlsId);
   setStep(3);
+  document.getElementById('photoList').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>`;
   try {
     const { listing } = await GET(`/camerons-stage/listing/${encodeURIComponent(STATE.mlsId)}`);
     if (!listing) { toast('Could not find that listing in DeltaNet.'); return; }
     STATE.deltaListingId = listing._delta_listing_id || null;
     if (!STATE.address) STATE.address = listing.UnparsedAddress || listing.Address || listing.address || listing.StreetAddress || ('MLS #' + STATE.mlsId);
     if (!STATE.city) STATE.city = listing.city_cleaned || listing.City || listing.city || '';
-    document.getElementById('generateAddress').textContent = STATE.address;
+    document.getElementById('curateAddress').textContent = STATE.address;
     STATE.photos = (listing.photo_data || []).map((p, i) => ({
       photo_id: p.id, url: p.url, width: p.width, height: p.height, title: '', included: true, order: i,
     }));
+    renderPhotos();
   } catch (e) {
     toast('Listing lookup failed: ' + e.message);
   }
@@ -476,16 +546,38 @@ function editExistingTour() {
   STATE.address = tour.address || STATE.address;
   STATE.music = { audio_url: tour.audio_url, music_track_id: tour.music_track_id, music_prompt: tour.music_prompt, music_length_ms: tour.music_length_ms || 60000 };
   STATE.photos = (tour.photo_config || []).map((p, i) => ({ ...p, order: i }));
-  goToCuration();
+  document.getElementById('curateAddress').textContent = STATE.address || 'Curate photos';
+  setStep(3);
+  renderPhotos();
 }
 
 async function startNewTour() {
-  await loadListingPhotosAndGoToGenerate();
+  await loadListingPhotosAndGoToCurate();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    GENERATE
 ═══════════════════════════════════════════════════════════════════ */
+function goToGenerate() {
+  document.getElementById('generateAddress').textContent = STATE.address || ('MLS #' + STATE.mlsId);
+  setStep(4);
+  renderGenreGrid();
+
+  const hasMusic = !!STATE.music.audio_url;
+  document.getElementById('generateBtn').style.display = hasMusic ? 'none' : 'flex';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('generateBtn').innerHTML = '🎵 Generate Song';
+  document.getElementById('generateResult').style.display = hasMusic ? 'block' : 'none';
+  document.getElementById('saveBtn').style.display = hasMusic ? 'block' : 'none';
+  if (hasMusic) document.getElementById('audioPreview').src = STATE.music.audio_url;
+}
+
+function resetGenerate() {
+  document.getElementById('generateResult').style.display = 'none';
+  document.getElementById('saveBtn').style.display = 'none';
+  document.getElementById('generateBtn').style.display = 'flex';
+}
+
 async function doGenerate() {
   const btn = document.getElementById('generateBtn');
   btn.disabled = true;
@@ -495,17 +587,13 @@ async function doGenerate() {
     STATE.music = data;
     document.getElementById('audioPreview').src = data.audio_url;
     document.getElementById('generateResult').style.display = 'block';
+    document.getElementById('saveBtn').style.display = 'block';
     btn.style.display = 'none';
   } catch (e) {
     toast('Song generation failed: ' + e.message);
     btn.disabled = false;
     btn.innerHTML = '🎵 Generate Song';
   }
-}
-
-function goToCuration() {
-  setStep(4);
-  renderPhotos();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -567,6 +655,7 @@ async function doSave() {
     } else {
       result = await POST('/camerons-stage/tours', {
         transaction_id: STATE.transactionId, delta_listing_id: STATE.deltaListingId, mls_id: STATE.mlsId, address: STATE.address,
+        agent_email: STATE.agentEmail,
         music_prompt: STATE.music.music_prompt, music_length_ms: STATE.music.music_length_ms,
         music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, photo_config,
       });
