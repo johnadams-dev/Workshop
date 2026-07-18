@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <style>
 :root {
@@ -114,6 +115,14 @@ header {
 .select-field:focus { border-color: var(--gold); }
 
 .mls-fallback { padding: 1.5rem; border-top: 1px solid var(--cream-dark); }
+
+/* ── TOUR REPORT ── */
+.report-stats { display: flex; gap: 1.5rem; padding: 1.5rem 1.5rem 0; }
+.report-stat-num { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 600; color: var(--ink); line-height: 1; }
+.report-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 4px; }
+.report-chart-wrap { padding: 1.5rem; }
+.report-chart-title { font-size: 0.85rem; font-weight: 500; color: var(--slate); margin-bottom: 0.75rem; }
+.report-chart-wrap canvas { max-height: 240px; }
 .mls-fallback label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); display: block; margin-bottom: 6px; }
 .mls-row { display: flex; }
 .mls-row input { flex: 1; border: 1px solid var(--border-mid); border-right: none; background: var(--cream); font-family: monospace; font-size: 0.95rem; padding: 8px 12px; border-radius: 7px 0 0 7px; outline: none; }
@@ -173,7 +182,8 @@ header {
 
 /* ── SHARE / SUCCESS ── */
 .share-box { display: flex; gap: 0.5rem; margin-top: 1rem; }
-.share-box input { flex: 1; border: 1px solid var(--border-mid); border-radius: 7px; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; background: var(--cream); }
+.share-box input { flex: 1; min-width: 0; border: 1px solid var(--border-mid); border-radius: 7px; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; background: var(--cream); }
+.share-box .btn { flex-shrink: 0; white-space: nowrap; }
 
 /* ── GENRE PICKER ── */
 .genre-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
@@ -239,6 +249,7 @@ header {
       <div class="panel-head">
         <div class="panel-title">Pick a listing</div>
         <div class="panel-sub" id="listingPickerSub">Your active, under contract, and closed listings.</div>
+        <div class="panel-sub" style="margin-top:0.4rem;font-size:0.78rem;">If it already has a tour, you'll see how it's performing (views over time, where they're coming from). If not, we'll start building one.</div>
       </div>
       <div class="panel-body" id="listingPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading listings…</div></div>
       <div class="mls-fallback">
@@ -256,14 +267,33 @@ header {
     <div class="panel">
       <div class="panel-head">
         <div class="panel-title" id="existingAddress">—</div>
-        <div class="panel-sub">This listing already has a saved tour.</div>
+        <div class="panel-sub">This listing already has a saved tour. Here's how it's performing.</div>
       </div>
-      <div class="panel-body" style="display:flex;gap:0.75rem;">
-        <button class="btn btn-gold" onclick="editExistingTour()">Edit Existing Tour</button>
-        <button class="btn btn-ghost" onclick="startNewTour()">Start a New One</button>
+      <div class="report-stats">
+        <div>
+          <div class="report-stat-num" id="totalViews">—</div>
+          <div class="report-stat-label">Total Views</div>
+        </div>
+      </div>
+      <div id="reportEmptyState" class="state-msg" style="display:none">
+        <span class="icon">📊</span>No views yet — once you share the tour link, views will show up here.
+      </div>
+      <div id="reportCharts">
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Views over time, by source</div>
+          <canvas id="viewsChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Device type</div>
+          <canvas id="deviceChart" height="220"></canvas>
+        </div>
       </div>
     </div>
-    <button class="btn btn-ghost" onclick="setStep(1)">← Back to Listings</button>
+    <div style="display:flex;gap:0.75rem;">
+      <button class="btn btn-ghost" onclick="setStep(1)">← Back to Listings</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="editExistingTour()">Edit Existing Tour</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="startNewTour()">Start a New One</button>
+    </div>
   </div>
 
   <!-- STEP 3: Curation (photos first, so the music pick is informed by the property) -->
@@ -334,12 +364,14 @@ header {
         <div class="share-box">
           <input type="text" id="mlsTourUrl" readonly>
           <button class="btn btn-gold" onclick="copyUrl('mlsTourUrl')">Copy</button>
+          <a id="previewMlsLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
         </div>
 
         <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin:1rem 0 6px;">Social / Zillow / Realtor.com link (branded)</label>
         <div class="share-box">
           <input type="text" id="brandedTourUrl" readonly>
           <button class="btn btn-gold" onclick="copyUrl('brandedTourUrl')">Copy</button>
+          <a id="previewBrandedLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
         </div>
 
         <div id="listingPageRow" style="margin-top:1rem;display:none">
@@ -350,8 +382,7 @@ header {
           </div>
         </div>
 
-        <a id="previewLink" href="#" target="_blank" class="btn btn-ghost btn-block" style="margin-top:1.25rem">Preview Unbranded Tour →</a>
-        <button class="btn btn-ghost btn-block" style="margin-top:0.75rem" onclick="location.reload()">Start Another Tour</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:1.25rem" onclick="location.reload()">Start Another Tour</button>
       </div>
     </div>
   </div>
@@ -599,8 +630,7 @@ async function afterListingPicked() {
       const { tour } = await GET(`/camerons-stage/library/${STATE.transactionId}`);
       if (tour) {
         STATE._existingTour = tour;
-        document.getElementById('existingAddress').textContent = STATE.address || tour.address || 'Existing tour';
-        setStep(2);
+        await showTourReport(tour);
         return;
       }
     } catch (e) { /* fall through to curation */ }
@@ -626,6 +656,67 @@ async function loadListingPhotosAndGoToCurate() {
   } catch (e) {
     toast('Listing lookup failed: ' + e.message);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOUR REPORT
+═══════════════════════════════════════════════════════════════════ */
+const REPORT_COLORS = ['#c9a84c', '#5a5a78', '#2a4a70', '#1a7a42', '#7a5a10', '#8a2020', '#8a8aa8'];
+
+async function showTourReport(tour) {
+  document.getElementById('existingAddress').textContent = STATE.address || tour.address || 'Existing tour';
+  setStep(2);
+  document.getElementById('reportEmptyState').style.display = 'none';
+  document.getElementById('reportCharts').style.display = 'block';
+  document.getElementById('totalViews').textContent = '—';
+  try {
+    const data = await GET(`/camerons-stage/tours/${tour.id}/analytics`);
+    document.getElementById('totalViews').textContent = data.total_views;
+    if (!data.total_views) {
+      document.getElementById('reportCharts').style.display = 'none';
+      document.getElementById('reportEmptyState').style.display = 'block';
+      return;
+    }
+    renderViewsChart(data.series);
+    renderDeviceChart(data.device_breakdown);
+  } catch (e) {
+    toast('Could not load the tour report: ' + e.message);
+  }
+}
+
+function renderViewsChart(series) {
+  const days = [...new Set(series.map(r => r.day))].sort();
+  const hosts = [...new Set(series.map(r => r.referrer_host))];
+  const datasets = hosts.map((host, i) => ({
+    label: host,
+    data: days.map(d => (series.find(r => r.day === d && r.referrer_host === host) || {}).count || 0),
+    backgroundColor: REPORT_COLORS[i % REPORT_COLORS.length],
+    borderColor: REPORT_COLORS[i % REPORT_COLORS.length],
+    fill: true,
+    tension: 0.3,
+  }));
+  if (window._viewsChart) window._viewsChart.destroy();
+  window._viewsChart = new Chart(document.getElementById('viewsChart'), {
+    type: 'line',
+    data: { labels: days, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, x: { stacked: true } },
+      plugins: { legend: { position: 'bottom' } },
+    },
+  });
+}
+
+function renderDeviceChart(breakdown) {
+  if (window._deviceChart) window._deviceChart.destroy();
+  window._deviceChart = new Chart(document.getElementById('deviceChart'), {
+    type: 'pie',
+    data: {
+      labels: breakdown.map(d => d.device_type),
+      datasets: [{ data: breakdown.map(d => d.count), backgroundColor: REPORT_COLORS }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+  });
 }
 
 function editExistingTour() {
@@ -843,7 +934,8 @@ async function doSave() {
 
     document.getElementById('mlsTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}`;
     document.getElementById('brandedTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
-    document.getElementById('previewLink').href = `./camerons-stage-view.html?id=${id}`;
+    document.getElementById('previewMlsLink').href = `./camerons-stage-view.html?id=${id}`;
+    document.getElementById('previewBrandedLink').href = `./camerons-stage-view.html?id=${id}&brand=1`;
 
     // Fetch the saved tour back to get the agent's website for the listing-page link
     try {
