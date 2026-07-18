@@ -244,6 +244,9 @@ header {
         <div class="panel-sub">Pick which agent's listing you're building a tour for.</div>
       </div>
       <div class="panel-body" id="agentPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
+      <div style="padding:0 1.5rem 1.5rem;">
+        <button class="btn btn-ghost btn-block" onclick="showOverviewReport()">📊 View Overview Report — All Tours</button>
+      </div>
     </div>
     <div class="panel" id="listingPickerPanel" style="display:none">
       <div class="panel-head">
@@ -294,6 +297,36 @@ header {
       <button class="btn btn-ghost" style="flex:1" onclick="editExistingTour()">Edit Existing Tour</button>
       <button class="btn btn-ghost" style="flex:1" onclick="startNewTour()">Start a New One</button>
     </div>
+  </div>
+
+  <!-- Overview report (staff only) — company-wide, reached from the agent picker -->
+  <div id="step-overview" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">📊 All Tours — Overview</div>
+        <div class="panel-sub">Company-wide performance across every saved tour.</div>
+      </div>
+      <div class="report-stats">
+        <div>
+          <div class="report-stat-num" id="overviewTotalViews">—</div>
+          <div class="report-stat-label">Total Views</div>
+        </div>
+      </div>
+      <div id="overviewEmptyState" class="state-msg" style="display:none">
+        <span class="icon">📊</span>No views yet across any tour.
+      </div>
+      <div id="overviewCharts">
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Views over time, by source</div>
+          <canvas id="overviewViewsChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Device type</div>
+          <canvas id="overviewDeviceChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" onclick="hideOverviewReport()">← Back</button>
   </div>
 
   <!-- STEP 3: Curation (photos first, so the music pick is informed by the property) -->
@@ -467,8 +500,10 @@ let STATE = {
 };
 let GENRES = [{ id: 'instrumental', label: 'Instrumental', hasVocals: false, cached: false }]; // overwritten by /genres on load
 
+const ALL_STEPS = ['step-listing', 'step-existing', 'step-curate', 'step-generate', 'step-done', 'step-overview'];
+
 function setStep(n) {
-  ['step-listing', 'step-existing', 'step-curate', 'step-generate', 'step-done'].forEach(id => document.getElementById(id).style.display = 'none');
+  ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
   const map = { 1: 'step-listing', 2: 'step-existing', 3: 'step-curate', 4: 'step-generate', 5: 'step-done' };
   document.getElementById(map[n]).style.display = 'block';
   for (let i = 1; i <= 4; i++) {
@@ -476,6 +511,19 @@ function setStep(n) {
     dot.classList.toggle('active', i === Math.min(n, 4));
     dot.classList.toggle('done', i < n);
   }
+}
+
+// Staff-only: an aggregate report across every tour, reachable from the
+// agent picker instead of drilling into one specific agent/listing.
+function showOverviewReport() {
+  ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
+  document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+  document.getElementById('step-overview').style.display = 'block';
+  loadOverviewReport();
+}
+
+function hideOverviewReport() {
+  setStep(1);
 }
 
 async function init() {
@@ -677,14 +725,33 @@ async function showTourReport(tour) {
       document.getElementById('reportEmptyState').style.display = 'block';
       return;
     }
-    renderViewsChart(data.series);
-    renderDeviceChart(data.device_breakdown);
+    renderViewsChart(data.series, 'viewsChart', '_viewsChart');
+    renderDeviceChart(data.device_breakdown, 'deviceChart', '_deviceChart');
   } catch (e) {
     toast('Could not load the tour report: ' + e.message);
   }
 }
 
-function renderViewsChart(series) {
+async function loadOverviewReport() {
+  document.getElementById('overviewEmptyState').style.display = 'none';
+  document.getElementById('overviewCharts').style.display = 'block';
+  document.getElementById('overviewTotalViews').textContent = '—';
+  try {
+    const data = await GET('/camerons-stage/analytics/overview');
+    document.getElementById('overviewTotalViews').textContent = data.total_views;
+    if (!data.total_views) {
+      document.getElementById('overviewCharts').style.display = 'none';
+      document.getElementById('overviewEmptyState').style.display = 'block';
+      return;
+    }
+    renderViewsChart(data.series, 'overviewViewsChart', '_overviewViewsChart');
+    renderDeviceChart(data.device_breakdown, 'overviewDeviceChart', '_overviewDeviceChart');
+  } catch (e) {
+    toast('Could not load the overview report: ' + e.message);
+  }
+}
+
+function renderViewsChart(series, canvasId, storeKey) {
   const days = [...new Set(series.map(r => r.day))].sort();
   const hosts = [...new Set(series.map(r => r.referrer_host))];
   const datasets = hosts.map((host, i) => ({
@@ -695,8 +762,8 @@ function renderViewsChart(series) {
     fill: true,
     tension: 0.3,
   }));
-  if (window._viewsChart) window._viewsChart.destroy();
-  window._viewsChart = new Chart(document.getElementById('viewsChart'), {
+  if (window[storeKey]) window[storeKey].destroy();
+  window[storeKey] = new Chart(document.getElementById(canvasId), {
     type: 'line',
     data: { labels: days, datasets },
     options: {
@@ -707,9 +774,9 @@ function renderViewsChart(series) {
   });
 }
 
-function renderDeviceChart(breakdown) {
-  if (window._deviceChart) window._deviceChart.destroy();
-  window._deviceChart = new Chart(document.getElementById('deviceChart'), {
+function renderDeviceChart(breakdown, canvasId, storeKey) {
+  if (window[storeKey]) window[storeKey].destroy();
+  window[storeKey] = new Chart(document.getElementById(canvasId), {
     type: 'pie',
     data: {
       labels: breakdown.map(d => d.device_type),
