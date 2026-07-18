@@ -362,9 +362,9 @@ header {
       </div>
 
       <div class="panel-body" id="existingTab">
-        <div class="panel-sub" style="margin-bottom:0.75rem">No-lyrics songs, free to reuse on any listing — no need to generate something new if one of these works.</div>
+        <div class="panel-sub" style="margin-bottom:0.75rem">Instrumental and area-themed songs, free to reuse on any listing — no need to generate something new if one of these works.</div>
         <label style="font-size:0.8rem;color:var(--slate);display:flex;align-items:center;gap:6px;margin-bottom:1rem;">
-          <input type="checkbox" id="showAllRecordings" onchange="loadRecordings()"> Also show songs with lyrics (from other listings)
+          <input type="checkbox" id="showAllRecordings" onchange="loadRecordings()"> Also show songs written for a specific property (from other listings)
         </label>
         <div id="recordingsList"><div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div></div>
       </div>
@@ -866,7 +866,7 @@ async function loadRecordings() {
   el.innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div>`;
   const showAll = document.getElementById('showAllRecordings').checked;
   try {
-    const { recordings } = await GET('/camerons-stage/recordings' + (showAll ? '' : '?no_lyrics=1'));
+    const { recordings } = await GET('/camerons-stage/recordings' + (showAll ? '' : '?reusable_only=1'));
     if (!recordings.length) { el.innerHTML = `<div class="state-msg">${showAll ? 'No recordings generated yet — create the first one.' : 'No no-lyrics recordings yet — check "Also show songs with lyrics," or create a new one.'}</div>`; return; }
     window._recordings = recordings;
     el.innerHTML = recordings.map((r, i) => `
