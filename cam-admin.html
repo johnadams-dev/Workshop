@@ -515,12 +515,23 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 /* ═══════════════════════════════════════════════════════════════════
    AUTH
 ═══════════════════════════════════════════════════════════════════ */
-let userEmail = "", proxyKey = "";
+let userEmail = localStorage.getItem('ac_user_email') || "";
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || "";
+
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display = "grid";
+  window.addEventListener("load", () => {
+    document.getElementById("topbar-user").textContent = userEmail;
+    Promise.all([loadTools(), loadApiDocs(), loadKnowledge(), loadLogs()]);
+  });
+}
 
 async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
   try {
     const r = await fetch(`${PROXY}/config/init`, {
@@ -531,6 +542,7 @@ async function handleGoogleSignIn(response) {
     const data = await r.json();
     if (!r.ok) { alert(data.error || "Sign-in failed."); return; }
     proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display = "grid";
     document.getElementById("topbar-user").textContent = userEmail;

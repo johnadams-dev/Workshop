@@ -446,8 +446,8 @@ header {
 const PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
-let userEmail = localStorage.getItem('cs_user_email') || "";
-let proxyKey  = sessionStorage.getItem('cs_proxy_key') || "";
+let userEmail = localStorage.getItem('ac_user_email') || "";
+let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
 
 if (proxyKey && userEmail) {
   document.getElementById('auth-gate').style.display = 'none';
@@ -458,15 +458,14 @@ if (proxyKey && userEmail) {
 window.addEventListener('load', () => {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
-  google.accounts.id.prompt();
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
 });
 
 async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     userEmail = payload.email || "";
-    localStorage.setItem('cs_user_email', userEmail);
-    localStorage.setItem('ac_user_email', userEmail); // shared key used by usage-logging convention
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -477,7 +476,7 @@ async function handleGoogleSignIn(response) {
     const data = await r.json();
     if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
     proxyKey = data.proxyKey || "";
-    sessionStorage.setItem('cs_proxy_key', proxyKey);
+    localStorage.setItem('ac_proxy_key', proxyKey);
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     await init();

@@ -209,9 +209,9 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID  = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
-let userEmail   = localStorage.getItem('dpa_user_email')   || "";
+let userEmail   = localStorage.getItem('ac_user_email')   || "";
 let userDisplay = localStorage.getItem('dpa_user_display') || userEmail;
-let proxyKey    = sessionStorage.getItem('dpa_proxy_key')  || "";
+let proxyKey    = localStorage.getItem('ac_proxy_key')  || "";
 let userRole    = 'unknown';
 let allAgents   = [];
 let currentAgentId = null;
@@ -234,7 +234,7 @@ window.addEventListener("load", () => {
     document.getElementById("g-signin-btn"),
     { theme: "outline", size: "large", width: 280, text: "signin_with" }
   );
-  google.accounts.id.prompt();
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
 });
 
 async function handleGoogleSignIn(response) {
@@ -242,7 +242,7 @@ async function handleGoogleSignIn(response) {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail   = payload.email || "";
     userDisplay = payload.name  || userEmail;
-    localStorage.setItem('dpa_user_email',   userEmail);
+    localStorage.setItem('ac_user_email',    userEmail);
     localStorage.setItem('dpa_user_display', userDisplay);
   } catch { userEmail = ""; }
 
@@ -258,7 +258,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
-    sessionStorage.setItem('dpa_proxy_key', proxyKey);
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display       = "block";

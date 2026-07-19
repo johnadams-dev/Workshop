@@ -792,7 +792,7 @@ async function handleCredential(cred) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Auth failed');
-      sessionStorage.setItem(SESSION_KEY, data.proxyKey);
+      localStorage.setItem(SESSION_KEY, data.proxyKey);
       window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(data.proxyKey), '_blank');
     } catch(e) {
       alert('Could not open Hotsheet: ' + e.message);
@@ -809,8 +809,12 @@ function initGoogleSignIn() {
     callback: handleCredential,
     auto_select: true,   // silently sign in if only one account is available
   });
-  // Silent prompt — auto-selects if signed in, no visible UI for non-managers
-  google.accounts.id.prompt();
+  // Only prompt if we don't already have a cached session — otherwise this
+  // fires on every visit and eventually trips Google's One Tap/FedCM
+  // dismissal cooldown, which is what was causing the repeated sign-in screens.
+  if (!localStorage.getItem('ac_user_email') || !localStorage.getItem(SESSION_KEY)) {
+    google.accounts.id.prompt();
+  }
   // Pre-render a visible Sign-In button as a fallback for when the silent
   // prompt is blocked or skipped (third-party cookies disabled, FedCM, etc.)
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
@@ -819,7 +823,7 @@ function initGoogleSignIn() {
 }
 
 function openHotsheet() {
-  const cached = sessionStorage.getItem(SESSION_KEY);
+  const cached = localStorage.getItem(SESSION_KEY);
   if (cached) { window.open(HOTSHEET_URL + '?key=' + encodeURIComponent(cached), '_blank'); return; }
 
   const arrow = document.getElementById('hotsheetArrow');

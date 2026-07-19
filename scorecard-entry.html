@@ -272,6 +272,16 @@ function initPeriod() {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function initAuth() {
+  const cachedEmail = localStorage.getItem('ac_user_email');
+  if (cachedEmail) {
+    S.email = cachedEmail;
+    S.name  = cachedEmail.split('@')[0];
+    document.getElementById('userName').textContent  = S.name;
+    document.getElementById('userEmail').textContent = S.email;
+    document.getElementById('userBadge').style.display = 'block';
+    onSignedIn();
+    return;
+  }
   if (typeof google === 'undefined') { setTimeout(initAuth, 300); return; }
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
@@ -294,6 +304,7 @@ function onCredential(cr) {
   }
   S.email = p.email;
   S.name  = p.name || p.given_name || p.email.split('@')[0];
+  localStorage.setItem('ac_user_email', S.email);
   document.getElementById('userName').textContent  = S.name;
   document.getElementById('userEmail').textContent = S.email;
   document.getElementById('userBadge').style.display = 'block';

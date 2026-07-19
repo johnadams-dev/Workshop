@@ -487,11 +487,17 @@ tr:hover td { background: rgba(255,255,255,.02); }
 const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
-let proxyKey  = "";
-let userEmail = "";
+let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
+let userEmail = localStorage.getItem('ac_user_email') || "";
 let _pendingConfirmRecipientId = null;
 
 // ── Auth ────────────────────────────────────────────────────────────────────────
+
+if (proxyKey && userEmail && localStorage.getItem("ac_is_manager") === "1") {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display       = "block";
+  window.addEventListener("load", initApp);
+}
 
 window.addEventListener("load", () => {
   google.accounts.id.initialize({
@@ -504,13 +510,14 @@ window.addEventListener("load", () => {
     document.getElementById("g-signin-btn"),
     { theme: "outline", size: "large", width: 280, text: "signin_with" }
   );
-  google.accounts.id.prompt();
+  if (!proxyKey || !userEmail || localStorage.getItem("ac_is_manager") !== "1") google.accounts.id.prompt();
 });
 
 async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -525,6 +532,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     // Check manager role
     if (localStorage.getItem("ac_is_manager") !== "1") {

@@ -491,8 +491,8 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 // ═══════════════════════════════════════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════════════════════════════════════
-let userEmail    = "";
-let proxyKey     = "";
+let userEmail    = localStorage.getItem('ac_user_email') || "";
+let proxyKey     = localStorage.getItem('ac_proxy_key')  || "";
 let agentDmgId   = null;
 let currentPhotoUrl = "";    // PhotoURL from DeltaNet
 let newPhotoBase64  = null;  // base64 of selected (or enhanced) photo to upload
@@ -502,6 +502,15 @@ let enhancedBase64  = null;  // base64 of AI-enhanced result
 // ═══════════════════════════════════════════════════════════════════════════════
 // Google Sign-In
 // ═══════════════════════════════════════════════════════════════════════════════
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display        = "block";
+  window.addEventListener("load", () => {
+    document.getElementById("header-user-email").textContent = userEmail;
+    loadProfile();
+  });
+}
+
 window.addEventListener("load", () => {
   if (window.google?.accounts?.id) initializeGSI();
 });
@@ -525,6 +534,7 @@ async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(idToken.split(".")[1]));
     userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -539,6 +549,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display        = "block";

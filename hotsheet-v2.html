@@ -431,8 +431,8 @@ const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 const PROPERTY_BASE    = "https://adamscameron.com/";
 
-let userEmail = localStorage.getItem('hs_user_email')   || "";
-let proxyKey  = sessionStorage.getItem('hs_proxy_key')  || "";
+let userEmail = localStorage.getItem('ac_user_email')   || "";
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || "";
 
 let STATE = { data: null, offices: [], userRole: "unknown", activeCategory: "all" };
 
@@ -453,14 +453,14 @@ window.addEventListener("load", () => {
     document.getElementById("g-signin-btn"),
     { theme: "outline", size: "large", width: 280, text: "signin_with" }
   );
-  google.accounts.id.prompt();
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
 });
 
 async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split(".")[1]));
     userEmail = payload.email || "";
-    localStorage.setItem('hs_user_email', userEmail);
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -475,7 +475,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
-    sessionStorage.setItem('hs_proxy_key', proxyKey);
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display       = "block";
@@ -977,6 +977,6 @@ async function init() {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hotsheet v2',email:localStorage.getItem('hs_user_email')||''})}).catch(()=>{});</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hotsheet v2',email:localStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

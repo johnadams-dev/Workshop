@@ -362,8 +362,8 @@ const TOOL_NAMES    = {
   'acc-binder':'ACC Binder','camerons-stage':"Cameron's Stage",'workshop':'Workshop',
 };
 
-let userEmail      = localStorage.getItem('dd_user_email')  || '';
-let proxyKey       = sessionStorage.getItem('dd_proxy_key') || '';
+let userEmail      = localStorage.getItem('ac_user_email')  || '';
+let proxyKey       = localStorage.getItem('ac_proxy_key') || '';
 let userRole       = 'unknown';
 let selectedType   = null;
 let allItems       = [];
@@ -396,7 +396,7 @@ async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     userEmail = payload.email || '';
-    localStorage.setItem('dd_user_email', userEmail);
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ''; }
   try {
     const r = await fetch(`${PROXY}/config/init`, {
@@ -407,7 +407,7 @@ async function handleGoogleSignIn(response) {
     const data = await r.json();
     if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
     proxyKey = data.proxyKey || '';
-    sessionStorage.setItem('dd_proxy_key', proxyKey);
+    localStorage.setItem('ac_proxy_key', proxyKey);
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     await init();

@@ -188,9 +188,15 @@ const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
 let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = sessionStorage.getItem('lb_proxy_key') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key') || '';
 let offices = [];
 let leaderboard = null; // { month, monthLabel, agents: [...] }
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', load);
+}
 
 function toast(msg, type) {
   const a = document.getElementById('toasts');
@@ -350,7 +356,7 @@ async function handleCredential(response) {
     const data = await r.json();
     if (!r.ok) { toast(data.error || 'Sign-in failed.', 'err'); return; }
     proxyKey = data.proxyKey || '';
-    sessionStorage.setItem('lb_proxy_key', proxyKey);
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -362,6 +368,7 @@ async function handleCredential(response) {
 
 window.onload = () => {
   google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  if (proxyKey && userEmail) return;
   google.accounts.id.prompt(n => {
     if (n.isNotDisplayed() || n.isSkippedMoment()) {
       google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large' });

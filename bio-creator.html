@@ -685,8 +685,8 @@ const DRIVE_CLIENT_ID  = "113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.goo
 // ═══════════════════════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════════════════════
-let userEmail        = "";
-let proxyKey         = "";
+let userEmail        = localStorage.getItem('ac_user_email') || "";
+let proxyKey         = localStorage.getItem('ac_proxy_key') || "";
 let agentDmgId       = null;
 let profileData      = {};   // combined { pathfinder, deltanet }
 let currentStep      = 1;
@@ -696,6 +696,15 @@ let driveAccessToken = null;
 // ═══════════════════════════════════════════════════════════════
 // Google Sign-In
 // ═══════════════════════════════════════════════════════════════
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display        = "block";
+  window.addEventListener("load", () => {
+    document.getElementById("header-user-email").textContent = userEmail;
+    loadProfile();
+  });
+}
+
 window.addEventListener("load", () => {
   google.accounts.id.initialize({
     client_id:         GOOGLE_CLIENT_ID,
@@ -707,7 +716,7 @@ window.addEventListener("load", () => {
     document.getElementById("g-signin-btn"),
     { theme: "outline", size: "large", width: 280, text: "signin_with" }
   );
-  google.accounts.id.prompt();
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
 
   // Drive token client (same pattern as contract calculator calendar)
   if (google.accounts.oauth2) {
@@ -734,6 +743,7 @@ async function handleGoogleSignIn(response) {
   try {
     const payload = JSON.parse(atob(idToken.split(".")[1]));
     userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
   } catch { userEmail = ""; }
 
   try {
@@ -749,6 +759,7 @@ async function handleGoogleSignIn(response) {
       return;
     }
     proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
 
     // Show app, hide gate
     document.getElementById("auth-gate").style.display = "none";
