@@ -196,6 +196,17 @@ header {
 .genre-note { font-size: 0.78rem; color: var(--slate); margin: -0.75rem 0 1.25rem; min-height: 1.2em; }
 .genre-note .warn { color: #9a6b10; }
 
+/* ── ADVANCED: custom guidelines ── */
+.advanced-toggle { background: none; border: none; padding: 0; margin: -0.5rem 0 1rem; font-size: 0.8rem; color: var(--slate); cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
+.advanced-toggle:hover { color: var(--ink); text-decoration-color: var(--gold); }
+.advanced-panel { display: none; margin: -0.5rem 0 1.25rem; }
+.advanced-panel textarea {
+  width: 100%; border: 1px solid var(--border-mid); background: var(--cream); border-radius: 8px;
+  padding: 10px 12px; font-family: inherit; font-size: 0.85rem; color: var(--ink); resize: vertical; min-height: 64px;
+}
+.advanced-panel textarea:focus { outline: none; border-color: var(--gold); }
+.advanced-hint { font-size: 0.74rem; color: var(--slate); margin-top: 4px; }
+
 .state-msg { padding: 3rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
 .state-msg .icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
 
@@ -389,6 +400,11 @@ header {
       <div class="panel-body" id="createNewTab" style="display:none">
         <div class="genre-grid" id="genreGrid"></div>
         <div class="genre-note" id="genreNote"></div>
+        <button type="button" class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">+ Advanced: add custom guidelines</button>
+        <div class="advanced-panel" id="advancedPanel">
+          <textarea id="customGuidelines" maxlength="300" placeholder="e.g. mention the pool and the golf course view, keep the mood upbeat and celebratory" oninput="renderGenreNote()"></textarea>
+          <div class="advanced-hint">Blended into the song prompt. Generating with custom guidelines always uses fresh AI generation (no free library match), even for genres normally served instantly.</div>
+        </div>
         <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
         <div id="generateResult" style="margin-top:1rem;display:none;">
           <audio controls style="width:100%" id="audioPreview"></audio>
@@ -612,9 +628,10 @@ function renderGenreNote() {
   const g = GENRES.find(x => x.id === STATE.genre);
   const note = document.getElementById('genreNote');
   if (!g) { note.textContent = ''; return; }
+  const hasGuidelines = !!document.getElementById('customGuidelines')?.value.trim();
   const bits = [];
   if (g.hasVocals) bits.push(`🎤 Custom song about this property!`);
-  bits.push(g.cached
+  bits.push((g.cached && !hasGuidelines)
     ? `Served instantly from our library — no fees.`
     : `<span class="warn">ACC pays AI fees</span> for this one — generated fresh for this listing.`);
   note.innerHTML = bits.join(' ');
@@ -623,6 +640,15 @@ function renderGenreNote() {
 function selectGenre(id) {
   STATE.genre = id;
   renderGenreGrid();
+}
+
+function toggleAdvanced() {
+  const panel = document.getElementById('advancedPanel');
+  const open = panel.style.display === 'block';
+  panel.style.display = open ? 'none' : 'block';
+  document.getElementById('advancedToggle').textContent = open
+    ? '+ Advanced: add custom guidelines'
+    : '− Advanced: add custom guidelines';
 }
 
 function statusChip(status) {
@@ -665,6 +691,9 @@ function resetTourState() {
   STATE.photos = [];
   STATE.music = { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000, genre: null, lyrics: null };
   window._recordingsLoaded = false;
+  document.getElementById('customGuidelines').value = '';
+  document.getElementById('advancedPanel').style.display = 'none';
+  document.getElementById('advancedToggle').textContent = '+ Advanced: add custom guidelines';
 }
 
 async function selectListing(i) {
@@ -875,7 +904,8 @@ async function doGenerate() {
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div> Generating (about 30-60s)…';
   try {
-    const data = await POST('/camerons-stage/generate', { address: STATE.address, city: STATE.city, genre: STATE.genre });
+    const customGuidelines = document.getElementById('customGuidelines').value.trim();
+    const data = await POST('/camerons-stage/generate', { address: STATE.address, city: STATE.city, genre: STATE.genre, custom_guidelines: customGuidelines });
     STATE.music = data;
     document.getElementById('audioPreview').src = data.audio_url;
     document.getElementById('generateResult').style.display = 'block';
