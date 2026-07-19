@@ -301,7 +301,10 @@ tr:hover td { background: rgba(255,255,255,.02); }
 <div id="app" style="display:none">
   <div class="topbar">
     <span class="topbar-title">Review <span>Engine</span></span>
-    <a href="index.html" class="topbar-back">← Workshop</a>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="./feedback.html?tool=review-engine" class="topbar-back">Feedback</a>
+      <a href="index.html" class="topbar-back">← Workshop</a>
+    </div>
   </div>
 
   <div class="tab-bar">
@@ -326,12 +329,13 @@ tr:hover td { background: rgba(255,255,255,.02); }
             <tr>
               <th>Month</th>
               <th>Recipients</th>
+              <th>Sent</th>
               <th>Clicked</th>
               <th>Reviewed</th>
               <th>Review Rate</th>
             </tr>
           </thead>
-          <tbody id="funnel-body"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+          <tbody id="funnel-body"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -627,7 +631,7 @@ async function loadFunnel() {
   try {
     const rows = await GET("/review/funnel");
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="loading">No data yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="loading">No data yet.</td></tr>`;
       return;
     }
     tbody.innerHTML = rows.map(r => {
@@ -637,13 +641,14 @@ async function loadFunnel() {
       return `<tr>
         <td>${fmtMonth(r.month)}</td>
         <td>${r.recipients}</td>
+        <td>${r.sent}</td>
         <td>${r.clicked}</td>
         <td>${r.reviewed}</td>
         <td class="${rateCls}">${rateStr}</td>
       </tr>`;
     }).join("");
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
   }
 }
 
