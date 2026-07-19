@@ -42,6 +42,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .context-banner{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .tool-pill{background:#F3E8FF;color:#6D28D9;border:1px solid #DDD6FE;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 
+/* ── Leaderboard ── */
+.leaderboard-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:20px}
+.leaderboard-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.leaderboard-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+.leaderboard-row{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+.leaderboard-row:last-child{border-bottom:none}
+.leaderboard-rank{width:22px;font-size:13px;font-weight:800;color:var(--gold);text-align:center;flex-shrink:0}
+.leaderboard-name{flex:1;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.leaderboard-count{font-size:12px;font-weight:700;color:var(--navy);background:#F3E8FF;padding:2px 10px;border-radius:20px;flex-shrink:0}
+
 /* ── Tabs ── */
 .tabs{display:flex;gap:2px;margin-bottom:24px;border-bottom:2px solid var(--border)}
 .tab{padding:10px 22px;font-size:14px;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s}
@@ -197,6 +207,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       Reporting about: <span id="context-tool-name" class="tool-pill"></span>
     </div>
 
+    <div id="leaderboard-card" class="leaderboard-card" style="display:none">
+      <div class="leaderboard-title">🏆 Top Contributors</div>
+      <div class="leaderboard-sub">Most bugs, suggestions, and questions submitted</div>
+      <div id="leaderboard-list"></div>
+    </div>
+
     <div class="tabs">
       <button class="tab active" id="tab-btn-report" onclick="showTab('report')">Report</button>
       <button class="tab" id="tab-btn-browse" onclick="showTab('browse')">Browse All</button>
@@ -214,6 +230,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
               <option value="market-update">Comprehensive Market Update</option>
               <option value="mls-magic">MLS Magic</option>
               <option value="camerons-lens">Cameron's Lens</option>
+              <option value="camerons-stage">Cameron's Stage</option>
               <option value="hotsheet">Hotsheet</option>
             </optgroup>
             <optgroup label="Agent Presence">
@@ -239,7 +256,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             </optgroup>
             <optgroup label="Coming Soon">
               <option value="acc-binder">ACC Binder</option>
-              <option value="camerons-stage">Cameron's Stage</option>
             </optgroup>
             <option value="workshop">None / Not tool-specific</option>
           </select>
@@ -296,6 +312,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <option value="market-update">Comprehensive Market Update</option>
             <option value="mls-magic">MLS Magic</option>
             <option value="camerons-lens">Cameron's Lens</option>
+            <option value="camerons-stage">Cameron's Stage</option>
             <option value="hotsheet">Hotsheet</option>
           </optgroup>
           <optgroup label="Agent Presence">
@@ -321,7 +338,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           </optgroup>
           <optgroup label="Coming Soon">
             <option value="acc-binder">ACC Binder</option>
-            <option value="camerons-stage">Cameron's Stage</option>
           </optgroup>
           <option value="workshop">Workshop</option>
         </select>
@@ -437,6 +453,21 @@ async function init() {
   try { const me = await GET('/lockbox/me'); userRole = me?.role || 'unknown'; } catch {}
 
   loadBrowse();
+  loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  try {
+    const rows = await GET('/feedback/leaderboard');
+    if (!rows.length) return;
+    document.getElementById('leaderboard-card').style.display = 'block';
+    document.getElementById('leaderboard-list').innerHTML = rows.map((r, i) => `
+      <div class="leaderboard-row">
+        <span class="leaderboard-rank">${i + 1}</span>
+        <span class="leaderboard-name">${esc(r.name || r.email)}</span>
+        <span class="leaderboard-count">${r.count}</span>
+      </div>`).join('');
+  } catch (e) { /* non-critical — leave the card hidden */ }
 }
 
 // ── Report tab ────────────────────────────────────────────────────────────────
