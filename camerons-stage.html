@@ -324,6 +324,14 @@ header {
           <div class="report-chart-title">Device type</div>
           <canvas id="overviewDeviceChart" height="220"></canvas>
         </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Views by genre</div>
+          <canvas id="overviewGenreChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Views by song type</div>
+          <canvas id="overviewReusableChart" height="220"></canvas>
+        </div>
       </div>
     </div>
     <button class="btn btn-ghost" onclick="hideOverviewReport()">← Back</button>
@@ -746,6 +754,8 @@ async function loadOverviewReport() {
     }
     renderViewsChart(data.series, 'overviewViewsChart', '_overviewViewsChart');
     renderDeviceChart(data.device_breakdown, 'overviewDeviceChart', '_overviewDeviceChart');
+    renderPieChart(data.genre_breakdown, d => d.genre, 'overviewGenreChart', '_overviewGenreChart');
+    renderPieChart(data.reusable_breakdown, d => d.reusable ? 'Stock' : 'Custom', 'overviewReusableChart', '_overviewReusableChart');
   } catch (e) {
     toast('Could not load the overview report: ' + e.message);
   }
@@ -775,11 +785,15 @@ function renderViewsChart(series, canvasId, storeKey) {
 }
 
 function renderDeviceChart(breakdown, canvasId, storeKey) {
+  renderPieChart(breakdown, d => d.device_type, canvasId, storeKey);
+}
+
+function renderPieChart(breakdown, labelFn, canvasId, storeKey) {
   if (window[storeKey]) window[storeKey].destroy();
   window[storeKey] = new Chart(document.getElementById(canvasId), {
     type: 'pie',
     data: {
-      labels: breakdown.map(d => d.device_type),
+      labels: breakdown.map(labelFn),
       datasets: [{ data: breakdown.map(d => d.count), backgroundColor: REPORT_COLORS }],
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
