@@ -245,9 +245,6 @@ header {
         <div class="panel-sub">Pick which agent's listing you're building a tour for.</div>
       </div>
       <div class="panel-body" id="agentPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
-      <div style="padding:0 1.5rem 1.5rem;">
-        <button class="btn btn-ghost btn-block" onclick="showOverviewReport()">📊 View Overview Report — All Tours</button>
-      </div>
     </div>
     <div class="panel" id="listingPickerPanel" style="display:none">
       <div class="panel-head">
@@ -263,6 +260,9 @@ header {
           <button onclick="pickByMls()">Look Up</button>
         </div>
       </div>
+    </div>
+    <div style="padding:0 0 1.5rem;">
+      <button class="btn btn-ghost btn-block" onclick="showOverviewReport()">📊 View Overview Report — All Tours</button>
     </div>
   </div>
 
@@ -300,7 +300,7 @@ header {
     </div>
   </div>
 
-  <!-- Overview report (staff only) — company-wide, reached from the agent picker -->
+  <!-- Overview report (all agents + staff) — company-wide, reached from the listing/agent picker step -->
   <div id="step-overview" style="display:none">
     <div class="panel">
       <div class="panel-head">
@@ -529,8 +529,8 @@ function setStep(n) {
   }
 }
 
-// Staff-only: an aggregate report across every tour, reachable from the
-// agent picker instead of drilling into one specific agent/listing.
+// Available to all agents + staff: an aggregate report across every tour,
+// reachable from step 1 instead of drilling into one specific listing.
 function showOverviewReport() {
   ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
   document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
