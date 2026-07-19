@@ -83,6 +83,25 @@
       background: var(--cream-dark); color: var(--ink-soft); font-size: .8rem; font-weight: 500;
     }
     .time-str { color: var(--muted); font-size: .8rem; }
+    .clickable-name { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color .15s, color .15s; }
+    .clickable-name:hover { text-decoration-color: var(--gold); color: var(--gold); }
+
+    /* drill-down modal */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(26,26,46,.5);
+      align-items: center; justify-content: center; z-index: 100; padding: 1rem;
+    }
+    .modal-card {
+      background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow);
+      max-width: 480px; width: 100%; max-height: 80vh; overflow-y: auto;
+    }
+    .modal-head {
+      padding: .85rem 1.25rem; border-bottom: 1px solid var(--cream-dark);
+      font-weight: 500; font-size: .95rem; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; background: var(--card-bg);
+    }
+    .modal-close { background: none; border: none; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--muted); }
+    .modal-close:hover { color: var(--ink); }
 
     /* auth states */
     #signin-screen {
@@ -156,6 +175,19 @@
       <div class="feed-head-row"><span>Tool</span><span>User</span><span>When</span></div>
       <div id="feed-body"></div>
     </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="drilldown-backdrop">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span id="drilldown-title"></span>
+      <button class="modal-close" id="drilldown-close" aria-label="Close">&times;</button>
+    </div>
+    <table>
+      <thead><tr><th id="drilldown-col1"></th><th>Visits</th><th>Last visit</th></tr></thead>
+      <tbody id="drilldown-tbody"></tbody>
+    </table>
   </div>
 </div>
 
@@ -257,7 +289,11 @@ function shortEmail(e) {
   return e.replace('@adamscameron.com', '');
 }
 
+let _crossRows = [];
+
 function renderStats(data) {
+  _crossRows = data.cross || [];
+
   const period = data.period.days === 'all' ? 'all time' : `last ${data.period.days} days`;
   const total = data.by_tool.reduce((s, r) => s + r.count, 0);
   document.getElementById('subtitle').textContent =
@@ -268,7 +304,7 @@ function renderStats(data) {
   document.getElementById('tool-total').textContent = data.by_tool.length + ' tools';
   document.getElementById('tool-tbody').innerHTML = data.by_tool.map(r => `
     <tr>
-      <td>${esc(r.tool)}</td>
+      <td><span class="clickable-name" data-tool="${esc(r.tool)}">${esc(r.tool)}</span></td>
       <td class="count-cell">
         <div class="bar-wrap">
           <div class="bar" style="width:${Math.round(r.count / maxTool * 80)}px"></div>
@@ -283,7 +319,7 @@ function renderStats(data) {
   document.getElementById('user-total').textContent = data.by_user.length + ' users';
   document.getElementById('user-tbody').innerHTML = data.by_user.map(r => `
     <tr>
-      <td class="email-cell" title="${esc(r.agent_email)}">${esc(shortEmail(r.agent_email))}</td>
+      <td class="email-cell" title="${esc(r.agent_email)}"><span class="clickable-name" data-user="${esc(r.agent_email)}">${esc(shortEmail(r.agent_email))}</span></td>
       <td class="count-cell">
         <div class="bar-wrap">
           <div class="bar" style="width:${Math.round(r.count / maxUser * 80)}px"></div>
@@ -304,6 +340,51 @@ function renderStats(data) {
 
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Drill-down modal ──────────────────────────────────────────────────────────
+document.getElementById('tool-tbody').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-tool]');
+  if (el) openDrilldown('tool', el.dataset.tool);
+});
+document.getElementById('user-tbody').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-user]');
+  if (el) openDrilldown('user', el.dataset.user);
+});
+document.getElementById('drilldown-close').addEventListener('click', closeDrilldown);
+document.getElementById('drilldown-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'drilldown-backdrop') closeDrilldown();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeDrilldown();
+});
+
+function openDrilldown(type, key) {
+  const rows = _crossRows
+    .filter(r => type === 'tool' ? r.tool === key : r.agent_email === key)
+    .slice()
+    .sort((a, b) => b.count - a.count);
+  const max = Math.max(...rows.map(r => r.count), 1);
+
+  document.getElementById('drilldown-title').textContent = type === 'tool' ? key : shortEmail(key);
+  document.getElementById('drilldown-col1').textContent = type === 'tool' ? 'User' : 'Tool';
+  document.getElementById('drilldown-tbody').innerHTML = rows.map(r => `
+    <tr>
+      <td${type === 'tool' ? ` class="email-cell" title="${esc(r.agent_email)}"` : ''}>${esc(type === 'tool' ? shortEmail(r.agent_email) : r.tool)}</td>
+      <td class="count-cell">
+        <div class="bar-wrap">
+          <div class="bar" style="width:${Math.round(r.count / max * 80)}px"></div>
+          ${r.count.toLocaleString()}
+        </div>
+      </td>
+      <td class="muted-val">${fmtDate(r.last_visit)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="muted-val" style="padding:1rem 1.25rem">No data</td></tr>';
+
+  document.getElementById('drilldown-backdrop').style.display = 'flex';
+}
+
+function closeDrilldown() {
+  document.getElementById('drilldown-backdrop').style.display = 'none';
 }
 </script>
 </body>
