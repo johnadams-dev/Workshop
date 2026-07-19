@@ -332,6 +332,14 @@ header {
           <div class="report-chart-title">Views by song type</div>
           <canvas id="overviewReusableChart" height="220"></canvas>
         </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Branded vs. unbranded views</div>
+          <canvas id="overviewBrandedChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Top 10 listing agents by views</div>
+          <canvas id="overviewTopAgentsChart" height="220"></canvas>
+        </div>
       </div>
     </div>
     <button class="btn btn-ghost" onclick="hideOverviewReport()">← Back</button>
@@ -756,6 +764,8 @@ async function loadOverviewReport() {
     renderDeviceChart(data.device_breakdown, 'overviewDeviceChart', '_overviewDeviceChart');
     renderPieChart(data.genre_breakdown, d => d.genre, 'overviewGenreChart', '_overviewGenreChart');
     renderPieChart(data.reusable_breakdown, d => d.reusable ? 'Stock' : 'Custom', 'overviewReusableChart', '_overviewReusableChart');
+    renderPieChart(data.branded_breakdown, d => d.branded ? 'Branded' : 'Unbranded', 'overviewBrandedChart', '_overviewBrandedChart');
+    renderBarChart(data.top_agents, r => r.name || r.email, 'overviewTopAgentsChart', '_overviewTopAgentsChart');
   } catch (e) {
     toast('Could not load the overview report: ' + e.message);
   }
@@ -797,6 +807,22 @@ function renderPieChart(breakdown, labelFn, canvasId, storeKey) {
       datasets: [{ data: breakdown.map(d => d.count), backgroundColor: REPORT_COLORS }],
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+function renderBarChart(rows, labelFn, canvasId, storeKey) {
+  if (window[storeKey]) window[storeKey].destroy();
+  window[storeKey] = new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: {
+      labels: rows.map(labelFn),
+      datasets: [{ data: rows.map(r => r.count), backgroundColor: REPORT_COLORS[0] }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      plugins: { legend: { display: false } },
+    },
   });
 }
 
