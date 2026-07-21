@@ -2288,26 +2288,28 @@ function fmtDate(v) {
 }
 
 const STATUS_CHIP = {
-  coming_soon:    ['chip-neutral', 'Coming Soon'],
-  active_listing: ['chip-amber',   'Active'],
-  under_contract: ['chip-blue',    'Under Contract'],
-  closed:         ['chip-green',   'Closed'],
-  expired:        ['chip-neutral', 'Expired'],
-  withdrawn:      ['chip-neutral', 'Withdrawn'],
-  cancelled:      ['chip-neutral', 'Cancelled'],
+  coming_soon:             ['chip-neutral', 'Coming Soon'],
+  active_listing:          ['chip-amber',   'Active'],
+  under_contract:          ['chip-blue',    'Under Contract'],
+  closed:                  ['chip-green',   'Closed'],
+  expired:                 ['chip-neutral', 'Expired'],
+  withdrawn:               ['chip-neutral', 'Withdrawn'],
+  cancelled:               ['chip-neutral', 'Cancelled'],
+  temporarily_off_market:  ['chip-neutral', 'TOM'],
 };
 function statusChip(status) {
   return STATUS_CHIP[status] || ['chip-neutral', status || '—'];
 }
 
 const STATUS_TO_DATA_STATUS = {
-  coming_soon:    'coming_soon',
-  active_listing: 'active',
-  under_contract: 'under_contract',
-  closed:         'closed',
-  expired:        'expired',
-  withdrawn:      'withdrawn',
-  cancelled:      'withdrawn',
+  coming_soon:            'coming_soon',
+  active_listing:         'active',
+  under_contract:         'under_contract',
+  closed:                 'closed',
+  expired:                'expired',
+  withdrawn:              'withdrawn',
+  cancelled:              'withdrawn',
+  temporarily_off_market: 'temporarily_off_market',
 };
 function dataStatus(status) {
   return STATUS_TO_DATA_STATUS[status] || status;
@@ -3346,6 +3348,7 @@ const LISTING_ACTIONS = {
     { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Price change, extension, or other update.' },
     { key: 'under_contract',         icon: '🤝', title: 'Under Contract',         desc: 'A buyer has been found for this listing.' },
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed (recorded directly from Active).' },
+    { key: 'temporarily_off_market', icon: '⏸',  title: 'Temporarily Off Market', desc: 'Listing is paused — pull it off market without withdrawing.' },
     { key: 'expired',                icon: '⏳', title: 'Expired',                desc: "Listing's term ended without a sale." },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Seller is pulling the listing early.' },
     { key: 'manage_referrals',       icon: '↪',  title: 'Referrals',              desc: 'Add or update referral fees for this transaction.' },
@@ -3360,6 +3363,11 @@ const LISTING_ACTIONS = {
   ],
   withdrawn: [
     { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
+    { key: 'manage_referrals', icon: '↪', title: 'Referrals',        desc: 'Add or update referral fees for this transaction.' },
+  ],
+  temporarily_off_market: [
+    { key: 'return_to_market', icon: '↩', title: 'Return to Market', desc: 'Listing is back on — restore it to Active status.' },
+    { key: 'withdrawn',        icon: '🚫', title: 'Withdrawn',        desc: 'Convert to full withdrawal.' },
     { key: 'manage_referrals', icon: '↪', title: 'Referrals',        desc: 'Add or update referral fees for this transaction.' },
   ],
   closed: [
@@ -3413,6 +3421,9 @@ const ACTION_CHECKLIST = {
     'Recover sign',
     'Withdrawal paperwork uploaded to Form Simplicity',
   ],
+  temporarily_off_market: [
+    'Update MLS status to Temporarily Off Market',
+  ],
   return_to_market: [
     'Update MLS status to Active',
     'Confirm lockbox and sign are in place',
@@ -3430,14 +3441,15 @@ const ACTION_CHECKLIST = {
 };
 
 const ACTION_TITLES = {
-  change:         'Change',
-  expired:        'Expired',
-  withdrawn:      'Withdrawn',
-  fall_through:     'Fall Through',
-  return_to_market: 'Return to Market',
-  closing:          'Closing',
-  under_contract: 'Under Contract',
-  caravan:        'Add to Caravan',
+  change:                 'Change',
+  expired:                'Expired',
+  withdrawn:              'Withdrawn',
+  fall_through:           'Fall Through',
+  return_to_market:       'Return to Market',
+  closing:                'Closing',
+  under_contract:         'Under Contract',
+  caravan:                'Add to Caravan',
+  temporarily_off_market: 'Temporarily Off Market',
 };
 
 let amState = { id: null, addr: null, kind: null, status: null, actionKey: null };
@@ -3695,7 +3707,7 @@ async function amChooseAction(key) {
           <input type="text" id="am-property-address" value="${escapeHtml(amState.addr || '')}" placeholder="Property address">
         </div>
       </div>`;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market' || key === 'temporarily_off_market') {
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3738,6 +3750,19 @@ async function amChooseAction(key) {
           <input type="text" id="am-mortgage-company" list="dl-mortgage-companies" placeholder="Optional">
         </div>
       </div>
+      <div style="border-top:1px solid var(--ink-border); padding-top:14px; margin-bottom:14px;">
+        <div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">Commission Adjustment <span style="font-size:9px; text-transform:none; letter-spacing:0;">(leave blank to keep current)</span></div>
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Commission Rate <span id="am-commission-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
+            <input type="text" id="am-commission-rate" placeholder="e.g. 6">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Co-Broke Commission <span id="am-coop-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
+            <input type="text" id="am-cooperating-commission" placeholder="e.g. 3">
+          </div>
+        </div>
+      </div>
       `;
   } else if (key === 'under_contract') {
     fieldsHtml = `
@@ -3773,6 +3798,17 @@ async function amChooseAction(key) {
     populateCustomers('am');
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
+    GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
+      const isFixed = txn.commission_type === 'fixed_fee';
+      const unit = isFixed ? '($)' : '(%)';
+      const rateEl = document.getElementById('am-commission-rate');
+      const coopEl = document.getElementById('am-cooperating-commission');
+      if (!rateEl) return;
+      document.getElementById('am-commission-unit').textContent = unit;
+      document.getElementById('am-coop-unit').textContent = unit;
+      rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
+      coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+    }).catch(() => {});
   }
   if (key === 'change') {
     await amLoadManageCustomers();
@@ -4210,7 +4246,7 @@ async function amSubmit() {
     fields.notes = document.getElementById('am-notes').value || null;
     const correctedAddr = document.getElementById('am-property-address').value.trim();
     if (correctedAddr && correctedAddr !== amState.addr) fields.propertyAddress = correctedAddr;
-  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market') {
+  } else if (key === 'expired' || key === 'withdrawn' || key === 'fall_through' || key === 'return_to_market' || key === 'temporarily_off_market') {
     const effectiveDate = document.getElementById('am-effective-date').value;
     if (effectiveDate) fields.effectiveDate = effectiveDate;
     fields.notes = document.getElementById('am-notes').value || null;
@@ -4231,6 +4267,10 @@ async function amSubmit() {
     fields.buyerGiftAddress  = document.getElementById('am-gift-buyer-addr')?.value || null;
     fields.titleCompany    = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
+    const commRate = amParseMoney(document.getElementById('am-commission-rate').value);
+    const commCoop = amParseMoney(document.getElementById('am-cooperating-commission').value);
+    if (commRate != null) fields.commissionRate = commRate;
+    if (commCoop != null) fields.cooperatingCommission = commCoop;
   } else if (key === 'under_contract') {
     const contractDate = document.getElementById('am-contract-date').value;
     if (contractDate) fields.contractDate = contractDate;
