@@ -2335,19 +2335,13 @@ async function loadOffices() {
 async function init() {
   document.getElementById('admin-chip').textContent = userDisplay || userEmail;
 
-  await loadOffices();
-
-  try {
-    const me = await GET('/lockbox/me');
-    STATE.userRole = (me || {}).role || 'unknown';
-  } catch (e) {
-    console.error('Failed to load role:', e);
-  }
-
-  try {
-    const sm = await GET('/staff/me');
-    STATE.isAdmin = sm?.role === 'admin';
-  } catch (e) { STATE.isAdmin = false; }
+  const [, me, sm] = await Promise.all([
+    loadOffices(),
+    GET('/lockbox/me').catch(e => { console.error('Failed to load role:', e); return null; }),
+    GET('/staff/me').catch(e => null),
+  ]);
+  STATE.userRole = (me || {}).role || 'unknown';
+  STATE.isAdmin  = sm?.role === 'admin';
 
   const moreItems = [];
   if (['manager', 'staff', 'agent'].includes(STATE.userRole)) {
@@ -2440,16 +2434,15 @@ async function renderAll() {
   const officeId = document.getElementById('officeSelect').value;
   const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
 
-  let summary = {}, listings = [], contracts = [], today = [], untracked = [], statusMismatches = [],
+  let summary = {}, listings = [], contracts = [], today = [], untracked = [],
       noticesUpcoming = [], noticesBuyer = [];
   try {
-    [summary, listings, contracts, today, untracked, statusMismatches, noticesUpcoming, noticesBuyer] = await Promise.all([
+    [summary, listings, contracts, today, untracked, noticesUpcoming, noticesBuyer] = await Promise.all([
       GET(`/daily-desk/summary${qs}`),
       GET(`/daily-desk/listings${qs}`),
       GET(`/daily-desk/contracts${qs}`),
       GET(`/daily-desk/today${qs}`),
       GET(`/daily-desk/untracked${qs}`),
-      GET(`/daily-desk/status-mismatches${qs}`),
       GET('/notices/upcoming'),
       GET('/notices/buyer-needs'),
     ]);
@@ -2458,13 +2451,12 @@ async function renderAll() {
     return;
   }
 
-  STATE.listings         = listings         || [];
-  STATE.contracts        = contracts        || [];
-  STATE.today            = today            || [];
-  STATE.untracked        = untracked        || [];
-  STATE.statusMismatches = statusMismatches || [];
-  STATE.noticesUpcoming  = noticesUpcoming  || [];
-  STATE.noticesBuyer     = noticesBuyer     || [];
+  STATE.listings        = listings        || [];
+  STATE.contracts       = contracts       || [];
+  STATE.today           = today           || [];
+  STATE.untracked       = untracked       || [];
+  STATE.noticesUpcoming = noticesUpcoming || [];
+  STATE.noticesBuyer    = noticesBuyer    || [];
 
   const noticesTotal = STATE.noticesUpcoming.length + STATE.noticesBuyer.length;
   document.getElementById('office-meta').innerHTML =
@@ -2473,14 +2465,13 @@ async function renderAll() {
   document.getElementById('listings-count').textContent  = STATE.listings.filter(l => l.status === 'active_listing' || l.status === 'coming_soon').length;
   document.getElementById('contracts-count').textContent = STATE.contracts.filter(c => c.status === 'under_contract').length;
   document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
-  document.getElementById('statusmismatch-count').textContent = STATE.statusMismatches.length;
+  document.getElementById('statusmismatch-count').textContent = '…';
   document.getElementById('notices-count').textContent   = noticesTotal || '—';
 
   renderTodayTable(getSortedToday());
   renderListingsTable(tableSort(STATE.listings, lstSort.col, lstSort.dir));
   renderContractsTable(tableSort(STATE.contracts, ctrSort.col, ctrSort.dir));
   renderUntrackedTable(tableSort(STATE.untracked, utkSort.col, utkSort.dir));
-  renderMismatchTable(tableSort(STATE.statusMismatches, mmSort.col, mmSort.dir));
   updateSortHeaders();
   renderNoticesUpcoming(STATE.noticesUpcoming);
   renderNoticesBuyer(STATE.noticesBuyer);
@@ -2488,6 +2479,17 @@ async function renderAll() {
   filterToday();
   filterListings();
   filterContracts();
+
+  GET(`/daily-desk/status-mismatches${qs}`)
+    .then(statusMismatches => {
+      STATE.statusMismatches = statusMismatches || [];
+      document.getElementById('statusmismatch-count').textContent = STATE.statusMismatches.length;
+      renderMismatchTable(tableSort(STATE.statusMismatches, mmSort.col, mmSort.dir));
+    })
+    .catch(e => {
+      console.error('status-mismatches failed:', e);
+      document.getElementById('statusmismatch-count').textContent = '!';
+    });
 }
 
 function getSortedToday() {
