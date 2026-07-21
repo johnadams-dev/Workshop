@@ -967,11 +967,12 @@ tbody tr.clickable { cursor: pointer; }
         <input id="lst-q" type="text" placeholder="Search address, agent, MLS #…" oninput="filterListings()">
         <select id="lst-status" onchange="filterListings()">
           <option value="">All Statuses</option>
-          <option value="on_market">On Market</option>
+          <option value="on_market" selected>On Market</option>
           <option value="off_market">Off Market</option>
           <option value="coming_soon">Coming Soon</option>
           <option value="active">Active</option>
           <option value="under_contract">Under Contract</option>
+          <option value="temporarily_off_market">Temporarily Off Market</option>
           <option value="closed">Closed</option>
           <option value="expired">Expired</option>
           <option value="withdrawn">Withdrawn</option>
@@ -1011,7 +1012,7 @@ tbody tr.clickable { cursor: pointer; }
         <input id="ctr-q" type="text" placeholder="Search address, agent…" oninput="filterContracts()">
         <select id="ctr-status" onchange="filterContracts()">
           <option value="">All Statuses</option>
-          <option value="under_contract">Under Contract</option>
+          <option value="under_contract" selected>Under Contract</option>
           <option value="closed">Closed</option>
         </select>
       </div>
@@ -2469,8 +2470,8 @@ async function renderAll() {
   document.getElementById('office-meta').innerHTML =
     `${summary.active_listings ?? 0} active &middot; ${summary.under_contract ?? 0} under contract &middot; <b>${summary.untracked ?? 0} not yet tracked</b>`;
   document.getElementById('today-count').textContent     = STATE.today.length;
-  document.getElementById('listings-count').textContent  = STATE.listings.length;
-  document.getElementById('contracts-count').textContent = STATE.contracts.length;
+  document.getElementById('listings-count').textContent  = STATE.listings.filter(l => l.status === 'active_listing' || l.status === 'coming_soon').length;
+  document.getElementById('contracts-count').textContent = STATE.contracts.filter(c => c.status === 'under_contract').length;
   document.getElementById('untracked-count').textContent = summary.untracked ?? 0;
   document.getElementById('statusmismatch-count').textContent = STATE.statusMismatches.length;
   document.getElementById('notices-count').textContent   = noticesTotal || '—';
@@ -4847,7 +4848,7 @@ function updateSortHeaders() {
 
 const STATUS_GROUPS = {
   on_market:  ['coming_soon', 'active', 'under_contract'],
-  off_market: ['closed', 'expired', 'withdrawn'],
+  off_market: ['closed', 'expired', 'withdrawn', 'temporarily_off_market'],
 };
 
 function filterListings() {
