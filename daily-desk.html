@@ -1657,6 +1657,19 @@ tbody tr.clickable { cursor: pointer; }
           </div>
           <div id="nl-customer-rows"></div>
         </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--ink-border);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="nl-also-buyer" onchange="nlToggleBuyerSection()">
+            We also represent the buyer (in-house sale)
+          </label>
+          <div id="nl-buyer-section" style="display:none;margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span class="field-label" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Buyer(s)</span>
+              <button type="button" onclick="addCustomerRow('nl-buyer')" style="padding:5px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:12px;">+ Add another buyer</button>
+            </div>
+            <div id="nl-buyer-customer-rows"></div>
+          </div>
+        </div>
         <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
           <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
             <input type="checkbox" id="nl-has-referral" onchange="toggleReferralSection('nl')">
@@ -2715,6 +2728,13 @@ function collectCoAgent(areaId, selId, splitPrimaryId, splitCoId) {
 }
 
 function nlToggleCoAgent()    { toggleCoAgent('nl-coagent-btn',     'nl-coagent-area',     'nl-coagent-sel',     'nl-split-primary',     'nl-split-co'); }
+function nlToggleBuyerSection() {
+  const checked = document.getElementById('nl-also-buyer').checked;
+  document.getElementById('nl-buyer-section').style.display = checked ? 'block' : 'none';
+  if (checked && !document.querySelector('#nl-buyer-customer-rows .customer-row')) {
+    addCustomerRow('nl-buyer');
+  }
+}
 function ncAccToggleCoAgent() { toggleCoAgent('nc-acc-coagent-btn', 'nc-acc-coagent-area', 'nc-acc-coagent-sel', 'nc-acc-split-primary', 'nc-acc-split-co'); }
 function ncExtToggleCoAgent() { toggleCoAgent('nc-ext-coagent-btn', 'nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co'); }
 
@@ -2804,6 +2824,9 @@ async function nlReset() {
   document.getElementById('nl-has-referral').checked = false;
   document.getElementById('nl-referral-section').style.display = 'none';
   document.getElementById('nl-referral-rows').innerHTML = '';
+  document.getElementById('nl-also-buyer').checked = false;
+  document.getElementById('nl-buyer-section').style.display = 'none';
+  document.getElementById('nl-buyer-customer-rows').innerHTML = '';
   populateCustomers('nl');
   nlFsTransactions = [];
   await nlLoadAgents();
@@ -2947,6 +2970,8 @@ async function nlSaveListing() {
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
     sellers: collectCustomers('nl'),
+    represents_buyer_at_listing: document.getElementById('nl-also-buyer').checked || false,
+    buyers: document.getElementById('nl-also-buyer').checked ? collectCustomers('nl-buyer') : [],
   };
 
   try {
