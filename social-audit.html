@@ -493,10 +493,14 @@ async function loadAuditList() {
     if (!rows.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">No audits yet — run the first one above.</div>'; return; }
     el.innerHTML = rows.map(row => {
       const failed = row.status === 'failed';
+      const errNote = failed && row.error_message
+        ? `<div style="font-size:11px;color:#991b1b;margin-top:3px">${esc(row.error_message.slice(0, 120))}</div>`
+        : '';
       return `<div class="audit-list-row${failed ? ' no-click' : ''}" ${failed ? '' : `onclick="loadReport(${row.id})"`}>
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="audit-list-name">${esc(row.agent_name)}</div>
           <div class="audit-list-ctx">${esc(row.context||'')} &middot; ${fmtDate(row.run_at)}</div>
+          ${errNote}
         </div>
         <div class="audit-list-score">${row.status === 'complete' ? row.overall_score : '—'}</div>
         <div class="audit-list-status status-${row.status}">${row.status}</div>
