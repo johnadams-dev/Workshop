@@ -299,6 +299,10 @@ header {
           <canvas id="viewsChart" height="220"></canvas>
         </div>
         <div class="report-chart-wrap">
+          <div class="report-chart-title">Branded vs. unbranded</div>
+          <canvas id="brandedChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
           <div class="report-chart-title">Device type</div>
           <canvas id="deviceChart" height="220"></canvas>
         </div>
@@ -448,7 +452,10 @@ header {
           </div>
         </div>
 
-        <button class="btn btn-ghost btn-block" style="margin-top:1.25rem" onclick="location.reload()">Start Another Tour</button>
+        <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
+          <button class="btn btn-ghost" onclick="setStep(4)">← Back to Music</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="location.reload()">Start Another Tour</button>
+        </div>
       </div>
     </div>
   </div>
@@ -771,6 +778,7 @@ async function showTourReport(tour) {
       return;
     }
     renderViewsChart(data.series, 'viewsChart', '_viewsChart');
+    renderPieChart(data.branded_breakdown, d => d.branded ? 'Branded' : 'Unbranded', 'brandedChart', '_brandedChart');
     renderDeviceChart(data.device_breakdown, 'deviceChart', '_deviceChart');
   } catch (e) {
     toast('Could not load the tour report: ' + e.message);
