@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Agent Roster · Adams Cameron &amp; Co.</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f2942">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Roster">
+<link rel="apple-touch-icon" href="images/roster-apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="images/roster-favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="images/roster-favicon-16x16.png">
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --navy:#0f2942; --navy-2:#1a3d5c; --gold:#c8a96e;
+  --bg:#f5f4f2; --surface:#fff; --border:#e2e8f0;
+  --text:#1e293b; --muted:#64748b; --dim:#94a3b8;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+
+/* ── Sign-in gate ───────────────────────────────────────────────────────── */
+#auth-gate{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:999}
+.gate-card{background:var(--navy-2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:40px 32px;text-align:center;width:320px;max-width:88vw;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.gate-card img{width:56px;height:56px;border-radius:14px;margin-bottom:16px}
+.gate-card h1{font-size:19px;font-weight:700;color:#fff;margin:0 0 6px}
+.gate-card p{font-size:13px;color:#8ab4cc;margin:0 0 22px;line-height:1.5}
+#g-signin-btn{display:flex;justify-content:center}
+.gate-foot{font-size:11px;color:rgba(255,255,255,.4);margin-top:16px}
+.gate-back{display:inline-block;margin-top:14px;font-size:12px;color:rgba(255,255,255,.5);text-decoration:none}
+
+/* ── App shell ──────────────────────────────────────────────────────────── */
+#app{display:none;min-height:100vh}
+.topbar{position:sticky;top:0;z-index:50;background:var(--navy);padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.topbar-title{color:#fff;font-weight:700;font-size:16px;flex:1}
+.topbar-title small{display:block;color:var(--gold);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.tools-link{color:rgba(255,255,255,.55);text-decoration:none;font-size:12px;white-space:nowrap}
+
+.search-wrap{padding:12px 16px 0}
+.search-box{position:relative}
+.search-box input{width:100%;padding:11px 14px 11px 36px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface)}
+.search-box .icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:14px}
+
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+.section{padding:8px 16px 4px}
+.section-title{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;display:flex;align-items:center;justify-content:space-between}
+.section-title .count{color:var(--dim);font-weight:600}
+
+.group-label{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;padding:0 2px}
+
+.row-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:8px;display:flex;align-items:center;gap:11px}
+.avatar{width:42px;height:42px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.row-body{flex:1;min-width:0}
+.row-name{font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.row-badges{margin-top:3px;display:flex;gap:5px;flex-wrap:wrap}
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#eef2f6;color:var(--muted)}
+.badge-role-admin{background:#fef2f2;color:#dc2626}
+.badge-role-manager{background:#eff6ff;color:#2563eb}
+.badge-role-coordinator{background:#f0fdf4;color:#16a34a}
+.row-actions{display:flex;gap:6px;flex-shrink:0}
+.row-actions a{width:34px;height:34px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px}
+
+.partner-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.partner-name{font-size:14px;font-weight:700;color:var(--navy)}
+.partner-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.partner-meta a{color:#0369a1;text-decoration:none}
+
+.empty{padding:24px 12px;text-align:center;color:var(--dim);font-size:13px}
+.spin{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
+<div id="auth-gate">
+  <div class="gate-card">
+    <img src="images/roster-apple-touch-icon.png" alt="">
+    <h1>Agent Roster</h1>
+    <p>Sign in with your Adams Cameron Google account to look up agents, office management, and preferred partners.</p>
+    <div id="g-signin-btn"></div>
+    <div class="gate-foot">Access restricted to @adamscameron.com accounts.</div>
+    <a href="./index.html" class="gate-back">← Tools</a>
+  </div>
+</div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-title"><small>Adams Cameron &amp; Co.</small>Agent Roster</div>
+    <a href="./index.html" class="tools-link">← Tools</a>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="search" id="search" placeholder="Search name, office, phone…" oninput="renderAll()">
+    </div>
+  </div>
+
+  <div class="chips" id="office-chips"></div>
+
+  <div class="section">
+    <div class="section-title">Agents <span class="count" id="agents-count"></span></div>
+    <div id="agents-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Management Team <span class="count" id="management-count"></span></div>
+    <div id="management-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Featured Partners <span class="count" id="partners-count"></span></div>
+    <div id="partners-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  </div>
+
+  <div style="height:24px"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+const PARTNER_CATEGORIES = [
+  { value: 'title',               label: 'Title' },
+  { value: 'mortgage',            label: 'Mortgage' },
+  { value: 'association',         label: 'Realtor Associations' },
+  { value: 'property_management', label: 'Property Management' },
+];
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH STATE — shared ac_proxy_key / ac_user_email keys, per repo convention
+═══════════════════════════════════════════════════════════════════ */
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+
+let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null };
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display       = 'block';
+  window.addEventListener('load', init);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleSignIn,
+    auto_select: true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('g-signin-btn'),
+    { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || '';
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ''; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_proxy_key', proxyKey);
+
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display       = 'block';
+    await init();
+  } catch (e) {
+    alert('Authentication error: ' + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════════════════════════════ */
+async function api(path) {
+  const r = await fetch(PROXY + path, { headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+function esc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function initials(first, last) { return ((first||'?')[0] + (last||'?')[0]).toUpperCase(); }
+function fmtPhone(e) {
+  if (!e) return '';
+  const d = e.replace(/\D/g,'');
+  if (d.length === 11 && d[0] === '1') return `(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  return e;
+}
+// Reused verbatim from agent-master-form.html / daily-desk.html.
+const agentPhoto = a => a.photo_url || (a.dmg_id ? `https://www.adamscameron.com/Homes/Images/Agent/${a.dmg_id}/Photo.jpg` : null);
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOAD + RENDER
+═══════════════════════════════════════════════════════════════════ */
+async function init() {
+  try {
+    const [agents, staff, partners, offices] = await Promise.all([
+      api('/roster/agents'),
+      api('/roster/staff'),
+      api('/roster/partners'),
+      api('/offices'),
+    ]);
+    STATE.agents = agents;
+    STATE.staff = staff;
+    STATE.partners = partners;
+    STATE.offices = offices;
+    renderOfficeChips();
+    renderAll();
+  } catch (e) {
+    document.getElementById('agents-list').innerHTML = `<div class="empty">Failed to load roster: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderOfficeChips() {
+  const used = new Set(STATE.agents.map(a => a.office_name).filter(Boolean));
+  const names = STATE.offices.map(o => o.name).filter(n => used.has(n)).sort();
+  const el = document.getElementById('office-chips');
+  el.innerHTML = [
+    `<div class="chip active" data-office="" onclick="setOfficeFilter(null, this)">All Offices</div>`,
+    ...names.map(n => `<div class="chip" data-office="${esc(n)}" onclick="setOfficeFilter('${esc(n).replace(/'/g,"\\'")}', this)">${esc(n)}</div>`),
+  ].join('');
+}
+function setOfficeFilter(name, el) {
+  STATE.activeOffice = name;
+  document.querySelectorAll('#office-chips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderAll();
+}
+
+function renderAll() {
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  renderAgents(q);
+  renderManagement(q);
+  renderPartners(q);
+}
+
+function matchesSearch(haystackParts, q) {
+  if (!q) return true;
+  return haystackParts.filter(Boolean).join(' ').toLowerCase().includes(q);
+}
+
+function renderAgents(q) {
+  const rows = STATE.agents.filter(a =>
+    (!STATE.activeOffice || a.office_name === STATE.activeOffice) &&
+    matchesSearch([a.first_name, a.last_name, a.office_name, a.cell_e164, a.designations, a.languages], q)
+  );
+  document.getElementById('agents-count').textContent = rows.length ? `(${rows.length})` : '';
+  document.getElementById('agents-list').innerHTML = rows.length
+    ? rows.map(agentRow).join('')
+    : `<div class="empty">No agents match.</div>`;
+}
+
+function agentRow(a) {
+  const photo = agentPhoto(a);
+  const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
+  const sub = [a.office_name, a.designations].filter(Boolean).join(' · ');
+  return `
+    <div class="row-card">
+      <div class="avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.parentElement.textContent='${initials(a.first_name,a.last_name)}'">` : initials(a.first_name, a.last_name)}</div>
+      <div class="row-body">
+        <div class="row-name">${esc(name)}</div>
+        ${sub ? `<div class="row-sub">${esc(sub)}</div>` : ''}
+      </div>
+      <div class="row-actions">
+        ${a.cell_e164 ? `<a href="tel:${esc(a.cell_e164)}" title="Call">📞</a>` : ''}
+        ${a.email ? `<a href="mailto:${esc(a.email)}" title="Email">✉️</a>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderManagement(q) {
+  // Fan each staff member out into every office they're assigned to (staff_offices
+  // is many-to-many); staff with no office assignment land in "Company-Wide".
+  const groups = new Map();
+  for (const s of STATE.staff) {
+    if (!matchesSearch([s.first_name, s.last_name, s.title, s.role, ...(s.offices||[]).map(o=>o.name)], q)) continue;
+    const officeNames = (s.offices && s.offices.length) ? s.offices.map(o => o.name) : ['Company-Wide'];
+    for (const name of officeNames) {
+      if (STATE.activeOffice && name !== STATE.activeOffice && name !== 'Company-Wide') continue;
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name).push(s);
+    }
+  }
+  const names = [...groups.keys()].sort((a, b) => a === 'Company-Wide' ? -1 : b === 'Company-Wide' ? 1 : a.localeCompare(b));
+  const total = [...groups.values()].reduce((n, arr) => n + arr.length, 0);
+  document.getElementById('management-count').textContent = total ? `(${total})` : '';
+
+  if (!names.length) {
+    document.getElementById('management-list').innerHTML = `<div class="empty">No management team members match.</div>`;
+    return;
+  }
+  document.getElementById('management-list').innerHTML = names.map(name => `
+    <div class="group-label">${esc(name)}</div>
+    ${groups.get(name).map(staffRow).join('')}
+  `).join('');
+}
+
+function staffRow(s) {
+  const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email;
+  const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
+  return `
+    <div class="row-card">
+      <div class="avatar">${s.photo_url ? `<img src="${esc(s.photo_url)}" alt="" onerror="this.parentElement.textContent='${initials(s.first_name,s.last_name)}'">` : initials(s.first_name, s.last_name)}</div>
+      <div class="row-body">
+        <div class="row-name">${esc(name)}</div>
+        ${s.title ? `<div class="row-sub">${esc(s.title)}</div>` : ''}
+        ${roleLabel ? `<div class="row-badges"><span class="badge badge-role-${s.role}">${esc(roleLabel)}</span></div>` : ''}
+      </div>
+      <div class="row-actions">
+        ${s.cell_e164 ? `<a href="tel:${esc(s.cell_e164)}" title="Call">📞</a>` : ''}
+        ${s.email ? `<a href="mailto:${esc(s.email)}" title="Email">✉️</a>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderPartners(q) {
+  const groups = PARTNER_CATEGORIES.map(cat => ({
+    ...cat,
+    rows: STATE.partners.filter(p => p.category === cat.value && matchesSearch([p.name, p.contact_name, p.notes], q)),
+  })).filter(g => g.rows.length);
+
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  document.getElementById('partners-count').textContent = total ? `(${total})` : '';
+
+  document.getElementById('partners-list').innerHTML = groups.length
+    ? groups.map(g => `
+        <div class="group-label">${esc(g.label)}</div>
+        ${g.rows.map(partnerCard).join('')}
+      `).join('')
+    : `<div class="empty">No partners match.</div>`;
+}
+
+function partnerCard(p) {
+  const meta = [];
+  if (p.contact_name) meta.push(esc(p.contact_name));
+  if (p.phone) meta.push(`<a href="tel:${esc(p.phone)}">${esc(fmtPhone(p.phone))}</a>`);
+  if (p.email) meta.push(`<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`);
+  if (p.website) meta.push(`<a href="${esc(p.website)}" target="_blank" rel="noopener">${esc(p.website.replace(/^https?:\/\//,''))}</a>`);
+  return `
+    <div class="partner-card">
+      <div class="partner-name">${esc(p.name)}</div>
+      ${meta.length ? `<div class="partner-meta">${meta.join(' · ')}</div>` : ''}
+      ${p.notes ? `<div class="partner-meta">${esc(p.notes)}</div>` : ''}
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PWA — register the service worker (network-only for API calls)
+═══════════════════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('roster-sw.js').catch(() => {}));
+}
+</script>
+
+<!-- Visit logging (Tool Usage report) — independent of the auth flow above -->
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Roster',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>

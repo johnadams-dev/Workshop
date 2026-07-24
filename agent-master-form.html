@@ -208,12 +208,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="tab-btn active" id="tab-agents" onclick="switchMode('agents')">Agents</button>
     <button class="tab-btn" id="tab-staff" onclick="switchMode('staff')">Staff</button>
     <button class="tab-btn" id="tab-roster" onclick="switchMode('roster')">Roster</button>
+    <button class="tab-btn" id="tab-partners" onclick="switchMode('partners')">Partners</button>
   </div>
   <div class="topbar-right">
     <a href="./index.html" style="font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em">← Tools</a>
     <span id="issue-summary" style="font-size:11px;color:#8ab4cc"></span>
     <button class="btn btn-secondary btn-sm" id="add-agent-btn" onclick="openNewAgent()" style="display:none">+ Add Agent</button>
     <button class="btn btn-secondary btn-sm" id="add-staff-btn" onclick="openNewStaff()" style="display:none">+ Add Staff</button>
+    <button class="btn btn-secondary btn-sm" id="add-partner-btn" onclick="openNewPartner()" style="display:none">+ Add Partner</button>
     <button class="btn btn-secondary btn-sm" id="sync-pp-btn" onclick="syncProfitPowerIds()" style="display:none">Sync PP IDs</button>
     <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportCsv()">Export</button>
   </div>
@@ -299,6 +301,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           </tbody>
         </table>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Partners Panel (Title / Mortgage / Realtor Associations / Property Management) -->
+<div id="partners-panel" style="display:none;height:calc(100vh - 50px);overflow:auto;padding:24px 28px;background:var(--bg);box-sizing:border-box">
+  <div style="max-width:900px;margin:0 auto" id="partners-groups">
+    <div style="padding:24px;text-align:center;color:var(--muted)">
+      <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
     </div>
   </div>
 </div>
@@ -501,6 +512,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewStaff()">Cancel</button>
       <button class="btn btn-primary" id="ns-create-btn" onclick="createStaff()">Add Staff</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="partner-modal">
+  <div class="modal">
+    <div class="modal-head"><span id="partner-modal-title">Add Partner</span> <button onclick="closePartnerModal()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Name</label><input type="text" id="pt-name" placeholder="Company name"></div>
+      <div class="fg">
+        <div class="field">
+          <label>Category</label>
+          <select id="pt-category">
+            <option value="title">Title</option>
+            <option value="mortgage">Mortgage</option>
+            <option value="association">Realtor Associations</option>
+            <option value="property_management">Property Management</option>
+          </select>
+        </div>
+        <div class="field"><label>Contact Name</label><input type="text" id="pt-contact-name"></div>
+      </div>
+      <div class="fg">
+        <div class="field"><label>Phone</label><input type="tel" id="pt-phone" placeholder="(386) 555-0100"></div>
+        <div class="field"><label>Email</label><input type="email" id="pt-email"></div>
+      </div>
+      <div class="field"><label>Website</label><input type="text" id="pt-website" placeholder="https://example.com"></div>
+      <div class="field"><label>Notes</label><textarea id="pt-notes" rows="2" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box"></textarea></div>
+      <div class="fg">
+        <div class="field"><label>Sort Order</label><input type="number" id="pt-sort-order" value="0"></div>
+        <div class="field" style="display:flex;align-items:flex-end;padding-bottom:6px">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="pt-featured" checked> Featured</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closePartnerModal()">Cancel</button>
+      <button class="btn btn-primary" id="pt-save-btn" onclick="savePartner()">Add Partner</button>
     </div>
   </div>
 </div>
@@ -1800,22 +1848,31 @@ let staffMode = false, allStaff = [], currentStaffId = null, staffDirtyFlag = fa
 async function switchMode(mode) {
   staffMode = (mode === 'staff');
   const rosterMode = (mode === 'roster');
+  const partnersMode = (mode === 'partners');
+  const otherPanel = rosterMode || partnersMode;
   document.getElementById('tab-agents').classList.toggle('active', mode === 'agents');
   document.getElementById('tab-staff').classList.toggle('active', mode === 'staff');
   document.getElementById('tab-roster').classList.toggle('active', mode === 'roster');
-  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : staffMode ? 'Staff Records' : 'Agent Records';
-  document.getElementById('add-agent-btn').style.display = !staffMode && !rosterMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('tab-partners').classList.toggle('active', mode === 'partners');
+  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : staffMode ? 'Staff Records' : 'Agent Records';
+  document.getElementById('add-agent-btn').style.display = !staffMode && !otherPanel && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
-  document.getElementById('sync-pp-btn').style.display = !staffMode && !rosterMode && (USER_ROLE === 'admin' || USER_ROLE === 'manager') ? '' : 'none';
-  document.getElementById('export-btn').style.display   = (staffMode || rosterMode) ? 'none' : '';
-  document.getElementById('issue-summary').style.display = (staffMode || rosterMode) ? 'none' : '';
-  document.getElementById('filter-row').style.display    = (staffMode || rosterMode) ? 'none' : '';
+  document.getElementById('add-partner-btn').style.display = partnersMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('sync-pp-btn').style.display = !staffMode && !otherPanel && (USER_ROLE === 'admin' || USER_ROLE === 'manager') ? '' : 'none';
+  document.getElementById('export-btn').style.display   = (staffMode || otherPanel) ? 'none' : '';
+  document.getElementById('issue-summary').style.display = (staffMode || otherPanel) ? 'none' : '';
+  document.getElementById('filter-row').style.display    = (staffMode || otherPanel) ? 'none' : '';
 
-  document.querySelector('.layout').style.display      = rosterMode ? 'none' : '';
+  document.querySelector('.layout').style.display      = otherPanel ? 'none' : '';
   document.getElementById('roster-panel').style.display = rosterMode ? 'block' : 'none';
+  document.getElementById('partners-panel').style.display = partnersMode ? 'block' : 'none';
 
   if (rosterMode) {
     loadRosterReport();
+    return;
+  }
+  if (partnersMode) {
+    loadPartners();
     return;
   }
 
@@ -1833,6 +1890,154 @@ async function switchMode(mode) {
   } else {
     filterList();
   }
+}
+
+// ── Partners tab ──────────────────────────────────────────────────────────────
+const PARTNER_CATEGORIES = [
+  { value: 'title',                label: 'Title' },
+  { value: 'mortgage',             label: 'Mortgage' },
+  { value: 'association',          label: 'Realtor Associations' },
+  { value: 'property_management',  label: 'Property Management' },
+];
+let allPartners = [], _partnersLoaded = false, editingPartnerId = null;
+
+async function loadPartners() {
+  if (_partnersLoaded) { renderPartners(); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/roster/partners?include_inactive=1`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allPartners = await r.json();
+    _partnersLoaded = true;
+    renderPartners();
+  } catch (e) {
+    document.getElementById('partners-groups').innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted)">Failed to load partners: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderPartners() {
+  const el = document.getElementById('partners-groups');
+  const groups = PARTNER_CATEGORIES.map(cat => {
+    const rows = allPartners.filter(p => p.category === cat.value);
+    if (!rows.length) return '';
+    return `
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head">${esc(cat.label)} (${rows.length})</div>
+        <div class="card-body" style="padding:0">
+          ${rows.map(p => `
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--navy)">
+                  ${esc(p.name)}
+                  ${!p.active ? '<span class="badge badge-inactive" style="margin-left:6px">Inactive</span>' : ''}
+                  ${p.featured ? '<span class="badge badge-active" style="margin-left:6px">Featured</span>' : ''}
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px">
+                  ${[p.contact_name, p.phone ? fmtPhone(p.phone) : '', p.email, p.website].filter(Boolean).map(esc).join(' · ')}
+                </div>
+                ${p.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(p.notes)}</div>` : ''}
+              </div>
+              ${USER_ROLE === 'admin' ? `
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn btn-secondary btn-sm" onclick="openEditPartner(${p.id})">Edit</button>
+                ${p.active
+                  ? `<button class="btn btn-danger btn-sm" onclick="deactivatePartner(${p.id})">Deactivate</button>`
+                  : `<button class="btn btn-secondary btn-sm" onclick="reactivatePartner(${p.id})">Reactivate</button>`}
+              </div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }).join('');
+  el.innerHTML = groups || `<div style="padding:24px;text-align:center;color:var(--muted)">No partners yet.</div>`;
+}
+
+function openNewPartner() {
+  editingPartnerId = null;
+  document.getElementById('partner-modal-title').textContent = 'Add Partner';
+  document.getElementById('pt-save-btn').textContent = 'Add Partner';
+  ['pt-name','pt-contact-name','pt-phone','pt-email','pt-website','pt-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('pt-category').value = 'title';
+  document.getElementById('pt-sort-order').value = 0;
+  document.getElementById('pt-featured').checked = true;
+  document.getElementById('partner-modal').classList.add('open');
+}
+
+function openEditPartner(id) {
+  const p = allPartners.find(x => x.id === id);
+  if (!p) return;
+  editingPartnerId = id;
+  document.getElementById('partner-modal-title').textContent = 'Edit Partner';
+  document.getElementById('pt-save-btn').textContent = 'Save Changes';
+  document.getElementById('pt-name').value = p.name || '';
+  document.getElementById('pt-category').value = p.category || 'title';
+  document.getElementById('pt-contact-name').value = p.contact_name || '';
+  document.getElementById('pt-phone').value = p.phone || '';
+  document.getElementById('pt-email').value = p.email || '';
+  document.getElementById('pt-website').value = p.website || '';
+  document.getElementById('pt-notes').value = p.notes || '';
+  document.getElementById('pt-sort-order').value = p.sort_order || 0;
+  document.getElementById('pt-featured').checked = !!p.featured;
+  document.getElementById('partner-modal').classList.add('open');
+}
+
+function closePartnerModal() { document.getElementById('partner-modal').classList.remove('open'); }
+
+async function savePartner() {
+  const name = document.getElementById('pt-name').value.trim();
+  if (!name) { alert('Name is required.'); return; }
+  const body = {
+    name,
+    category:     document.getElementById('pt-category').value,
+    contact_name: document.getElementById('pt-contact-name').value.trim() || null,
+    phone:        document.getElementById('pt-phone').value.trim() || null,
+    email:        document.getElementById('pt-email').value.trim() || null,
+    website:      document.getElementById('pt-website').value.trim() || null,
+    notes:        document.getElementById('pt-notes').value.trim() || null,
+    sort_order:   parseInt(document.getElementById('pt-sort-order').value, 10) || 0,
+    featured:     document.getElementById('pt-featured').checked,
+  };
+  const btn = document.getElementById('pt-save-btn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(
+      editingPartnerId ? `${PROXY_URL}/roster/partners/${editingPartnerId}` : `${PROXY_URL}/roster/partners`,
+      { method: editingPartnerId ? 'PUT' : 'POST', headers: H(), body: JSON.stringify(body) }
+    );
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
+    const saved = await r.json();
+    const idx = allPartners.findIndex(x => x.id === saved.id);
+    if (idx >= 0) allPartners[idx] = saved; else allPartners.push(saved);
+    closePartnerModal();
+    renderPartners();
+    toast(editingPartnerId ? 'Partner updated' : 'Partner added', 'ok');
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deactivatePartner(id) {
+  if (!confirm('Deactivate this partner? It will stop showing on the Agent Roster.')) return;
+  try {
+    const r = await fetch(`${PROXY_URL}/roster/partners/${id}`, { method: 'PUT', headers: H(), body: JSON.stringify({ active: false }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const idx = allPartners.findIndex(x => x.id === id);
+    if (idx >= 0) allPartners[idx].active = false;
+    renderPartners();
+    toast('Partner deactivated', 'ok');
+  } catch (e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function reactivatePartner(id) {
+  try {
+    const r = await fetch(`${PROXY_URL}/roster/partners/${id}`, { method: 'PUT', headers: H(), body: JSON.stringify({ active: true }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const idx = allPartners.findIndex(x => x.id === id);
+    if (idx >= 0) allPartners[idx].active = true;
+    renderPartners();
+    toast('Partner reactivated', 'ok');
+  } catch (e) { toast('Error: ' + e.message, 'err'); }
 }
 
 async function loadStaff() {
