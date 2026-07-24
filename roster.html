@@ -58,6 +58,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .group-label{font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px;padding:0 2px}
 
 .row-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:8px;display:flex;align-items:center;gap:11px}
+.row-card.clickable{cursor:pointer}
 .avatar{width:42px;height:42px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;overflow:hidden}
 .avatar img{width:100%;height:100%;object-fit:cover}
 .row-body{flex:1;min-width:0}
@@ -71,7 +72,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .row-actions{display:flex;gap:6px;flex-shrink:0}
 .row-actions a{width:34px;height:34px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px}
 
-.partner-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.partner-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:11px;align-items:flex-start}
+.partner-card .avatar{width:36px;height:36px;font-size:13px}
 .partner-name{font-size:14px;font-weight:700;color:var(--navy)}
 .partner-meta{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
 .partner-meta a{color:#0369a1;text-decoration:none}
@@ -79,6 +81,28 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .empty{padding:24px 12px;text-align:center;color:var(--dim);font-size:13px}
 .spin{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Office info panel (shown when a specific office chip is selected) ──── */
+.office-info{margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:none}
+.office-info.show{display:block}
+.office-info .name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.office-info .line{font-size:12px;color:var(--muted);margin-top:2px}
+.office-info .line a{color:#0369a1;text-decoration:none}
+
+/* ── Agent detail modal ───────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,41,66,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-overlay.open{display:flex}
+.detail-card{background:var(--surface);border-radius:14px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+.detail-head{background:var(--navy);padding:24px 20px 20px;text-align:center;position:relative}
+.detail-head .avatar{width:72px;height:72px;font-size:24px;margin:0 auto 10px;border:3px solid rgba(255,255,255,.15)}
+.detail-head .name{color:#fff;font-weight:700;font-size:17px}
+.detail-head .office{color:var(--gold);font-size:12px;margin-top:3px;font-weight:600}
+.detail-close{position:absolute;top:10px;right:10px;width:28px;height:28px;background:rgba(255,255,255,.12);border:none;border-radius:50%;color:#fff;font-size:15px;cursor:pointer}
+.detail-body{padding:8px 20px 16px}
+.detail-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);text-decoration:none;color:var(--text)}
+.detail-row:last-child{border-bottom:none}
+.detail-row .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
+.detail-row .label{font-size:13px;word-break:break-word}
 </style>
 </head>
 <body>
@@ -110,6 +134,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   </div>
 
   <div class="chips" id="office-chips"></div>
+  <div class="office-info" id="office-info"></div>
 
   <div class="section">
     <div class="section-title">Agents <span class="count" id="agents-count"></span></div>
@@ -127,6 +152,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   </div>
 
   <div style="height:24px"></div>
+</div>
+
+<!-- Agent detail card -->
+<div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeDetailModal()">
+  <div class="detail-card" id="detail-modal-content"></div>
 </div>
 
 <script>
@@ -255,7 +285,24 @@ function setOfficeFilter(name, el) {
   STATE.activeOffice = name;
   document.querySelectorAll('#office-chips .chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
+  renderOfficeInfo(name);
   renderAll();
+}
+
+function renderOfficeInfo(name) {
+  const panel = document.getElementById('office-info');
+  const office = name ? STATE.offices.find(o => o.name === name) : null;
+  if (!office || (!office.address && !office.phone)) {
+    panel.classList.remove('show');
+    panel.innerHTML = '';
+    return;
+  }
+  panel.innerHTML = `
+    <div class="name">${esc(office.name)}</div>
+    ${office.address ? `<div class="line">${esc(office.address)}</div>` : ''}
+    ${office.phone ? `<div class="line"><a href="tel:${esc(office.phone)}">${esc(fmtPhone(office.phone))}</a></div>` : ''}
+  `;
+  panel.classList.add('show');
 }
 
 function renderAll() {
@@ -286,33 +333,62 @@ function agentRow(a) {
   const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
   const sub = [a.office_name, a.designations].filter(Boolean).join(' · ');
   return `
-    <div class="row-card">
+    <div class="row-card clickable" onclick="openAgentCard(${a.id})">
       <div class="avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.parentElement.textContent='${initials(a.first_name,a.last_name)}'">` : initials(a.first_name, a.last_name)}</div>
       <div class="row-body">
         <div class="row-name">${esc(name)}</div>
         ${sub ? `<div class="row-sub">${esc(sub)}</div>` : ''}
       </div>
       <div class="row-actions">
-        ${a.cell_e164 ? `<a href="tel:${esc(a.cell_e164)}" title="Call">📞</a>` : ''}
-        ${a.email ? `<a href="mailto:${esc(a.email)}" title="Email">✉️</a>` : ''}
+        ${a.cell_e164 ? `<a href="tel:${esc(a.cell_e164)}" title="Call" onclick="event.stopPropagation()">📞</a>` : ''}
+        ${a.email ? `<a href="mailto:${esc(a.email)}" title="Email" onclick="event.stopPropagation()">✉️</a>` : ''}
       </div>
     </div>`;
 }
 
+function openAgentCard(id) {
+  const a = STATE.agents.find(x => x.id === id);
+  if (!a) return;
+  const photo = agentPhoto(a);
+  const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
+  const websiteHref = a.website ? (/^https?:\/\//i.test(a.website) ? a.website : 'https://' + a.website) : null;
+
+  const rows = [];
+  if (a.cell_e164) rows.push(`<a class="detail-row" href="tel:${esc(a.cell_e164)}"><span class="icon">📞</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Call</span></a>`);
+  if (a.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(a.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Text</span></a>`);
+  if (a.email) rows.push(`<a class="detail-row" href="mailto:${esc(a.email)}"><span class="icon">✉️</span><span class="label">${esc(a.email)}</span></a>`);
+  if (a.languages) rows.push(`<div class="detail-row"><span class="icon">🗣️</span><span class="label">${esc(a.languages)}</span></div>`);
+  if (websiteHref) rows.push(`<a class="detail-row" href="${esc(websiteHref)}" target="_blank" rel="noopener"><span class="icon">🌐</span><span class="label">${esc(a.website)}</span></a>`);
+
+  document.getElementById('detail-modal-content').innerHTML = `
+    <div class="detail-head">
+      <button class="detail-close" onclick="closeDetailModal()">✕</button>
+      <div class="avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.parentElement.textContent='${initials(a.first_name,a.last_name)}'">` : initials(a.first_name, a.last_name)}</div>
+      <div class="name">${esc(name)}</div>
+      ${a.office_name ? `<div class="office">${esc(a.office_name)}</div>` : ''}
+    </div>
+    <div class="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
+  `;
+  document.getElementById('detail-modal').classList.add('open');
+}
+function closeDetailModal() { document.getElementById('detail-modal').classList.remove('open'); }
+
 function renderManagement(q) {
-  // Fan each staff member out into every office they're assigned to (staff_offices
-  // is many-to-many); staff with no office assignment land in "Company-Wide".
+  // Fan each staff member out into every office they're assigned to
+  // (staff_offices is many-to-many). Staff with no office assignment are
+  // dropped from this office-grouped view entirely — no "Company-Wide" catch-all.
   const groups = new Map();
   for (const s of STATE.staff) {
-    if (!matchesSearch([s.first_name, s.last_name, s.title, s.role, ...(s.offices||[]).map(o=>o.name)], q)) continue;
-    const officeNames = (s.offices && s.offices.length) ? s.offices.map(o => o.name) : ['Company-Wide'];
-    for (const name of officeNames) {
-      if (STATE.activeOffice && name !== STATE.activeOffice && name !== 'Company-Wide') continue;
+    if (!s.offices || !s.offices.length) continue;
+    if (!matchesSearch([s.first_name, s.last_name, s.title, s.role, ...s.offices.map(o=>o.name)], q)) continue;
+    for (const office of s.offices) {
+      const name = office.name;
+      if (STATE.activeOffice && name !== STATE.activeOffice) continue;
       if (!groups.has(name)) groups.set(name, []);
       groups.get(name).push(s);
     }
   }
-  const names = [...groups.keys()].sort((a, b) => a === 'Company-Wide' ? -1 : b === 'Company-Wide' ? 1 : a.localeCompare(b));
+  const names = [...groups.keys()].sort((a, b) => a.localeCompare(b));
   const total = [...groups.values()].reduce((n, arr) => n + arr.length, 0);
   document.getElementById('management-count').textContent = total ? `(${total})` : '';
 
@@ -367,11 +443,15 @@ function partnerCard(p) {
   if (p.phone) meta.push(`<a href="tel:${esc(p.phone)}">${esc(fmtPhone(p.phone))}</a>`);
   if (p.email) meta.push(`<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`);
   if (p.website) meta.push(`<a href="${esc(p.website)}" target="_blank" rel="noopener">${esc(p.website.replace(/^https?:\/\//,''))}</a>`);
+  const initial = ((p.contact_name || p.name || '?')[0] || '?').toUpperCase();
   return `
     <div class="partner-card">
-      <div class="partner-name">${esc(p.name)}</div>
-      ${meta.length ? `<div class="partner-meta">${meta.join(' · ')}</div>` : ''}
-      ${p.notes ? `<div class="partner-meta">${esc(p.notes)}</div>` : ''}
+      <div class="avatar">${p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" onerror="this.parentElement.textContent='${initial}'">` : initial}</div>
+      <div>
+        <div class="partner-name">${esc(p.name)}</div>
+        ${meta.length ? `<div class="partner-meta">${meta.join(' · ')}</div>` : ''}
+        ${p.notes ? `<div class="partner-meta">${esc(p.notes)}</div>` : ''}
+      </div>
     </div>`;
 }
 

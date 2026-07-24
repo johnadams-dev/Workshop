@@ -209,6 +209,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="tab-btn" id="tab-staff" onclick="switchMode('staff')">Staff</button>
     <button class="tab-btn" id="tab-roster" onclick="switchMode('roster')">Roster</button>
     <button class="tab-btn" id="tab-partners" onclick="switchMode('partners')">Partners</button>
+    <button class="tab-btn" id="tab-offices" onclick="switchMode('offices')">Offices</button>
   </div>
   <div class="topbar-right">
     <a href="./index.html" style="font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em">← Tools</a>
@@ -310,6 +311,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div style="max-width:900px;margin:0 auto" id="partners-groups">
     <div style="padding:24px;text-align:center;color:var(--muted)">
       <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
+    </div>
+  </div>
+</div>
+
+<!-- Offices Panel — phone/address only; name/aliases/deltanet_office_id are
+     used as join keys elsewhere and aren't editable here. -->
+<div id="offices-panel" style="display:none;height:calc(100vh - 50px);overflow:auto;padding:24px 28px;background:var(--bg);box-sizing:border-box">
+  <div style="max-width:700px;margin:0 auto">
+    <div class="card">
+      <div class="card-head">Offices</div>
+      <div class="card-body" style="padding:0" id="offices-list">
+        <div style="padding:24px;text-align:center;color:var(--muted)">
+          <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -538,6 +554,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div class="field"><label>Email</label><input type="email" id="pt-email"></div>
       </div>
       <div class="field"><label>Website</label><input type="text" id="pt-website" placeholder="https://example.com"></div>
+      <div class="field"><label>Photo URL</label><input type="text" id="pt-photo-url" placeholder="https://…/headshot.jpg"></div>
       <div class="field"><label>Notes</label><textarea id="pt-notes" rows="2" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box"></textarea></div>
       <div class="fg">
         <div class="field"><label>Sort Order</label><input type="number" id="pt-sort-order" value="0"></div>
@@ -1849,12 +1866,14 @@ async function switchMode(mode) {
   staffMode = (mode === 'staff');
   const rosterMode = (mode === 'roster');
   const partnersMode = (mode === 'partners');
-  const otherPanel = rosterMode || partnersMode;
+  const officesMode = (mode === 'offices');
+  const otherPanel = rosterMode || partnersMode || officesMode;
   document.getElementById('tab-agents').classList.toggle('active', mode === 'agents');
   document.getElementById('tab-staff').classList.toggle('active', mode === 'staff');
   document.getElementById('tab-roster').classList.toggle('active', mode === 'roster');
   document.getElementById('tab-partners').classList.toggle('active', mode === 'partners');
-  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : staffMode ? 'Staff Records' : 'Agent Records';
+  document.getElementById('tab-offices').classList.toggle('active', mode === 'offices');
+  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : officesMode ? 'Offices' : staffMode ? 'Staff Records' : 'Agent Records';
   document.getElementById('add-agent-btn').style.display = !staffMode && !otherPanel && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-partner-btn').style.display = partnersMode && USER_ROLE === 'admin' ? '' : 'none';
@@ -1866,6 +1885,7 @@ async function switchMode(mode) {
   document.querySelector('.layout').style.display      = otherPanel ? 'none' : '';
   document.getElementById('roster-panel').style.display = rosterMode ? 'block' : 'none';
   document.getElementById('partners-panel').style.display = partnersMode ? 'block' : 'none';
+  document.getElementById('offices-panel').style.display = officesMode ? 'block' : 'none';
 
   if (rosterMode) {
     loadRosterReport();
@@ -1873,6 +1893,10 @@ async function switchMode(mode) {
   }
   if (partnersMode) {
     loadPartners();
+    return;
+  }
+  if (officesMode) {
+    loadOffices();
     return;
   }
 
@@ -1925,16 +1949,19 @@ function renderPartners() {
         <div class="card-body" style="padding:0">
           ${rows.map(p => `
             <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-              <div>
-                <div style="font-weight:700;font-size:13px;color:var(--navy)">
-                  ${esc(p.name)}
-                  ${!p.active ? '<span class="badge badge-inactive" style="margin-left:6px">Inactive</span>' : ''}
-                  ${p.featured ? '<span class="badge badge-active" style="margin-left:6px">Featured</span>' : ''}
+              <div style="display:flex;gap:10px;align-items:flex-start;min-width:0">
+                <div style="width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden">${p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.textContent='${esc((p.contact_name||p.name||'?')[0]).toUpperCase()}'">` : esc((p.contact_name||p.name||'?')[0]).toUpperCase()}</div>
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:var(--navy)">
+                    ${esc(p.name)}
+                    ${!p.active ? '<span class="badge badge-inactive" style="margin-left:6px">Inactive</span>' : ''}
+                    ${p.featured ? '<span class="badge badge-active" style="margin-left:6px">Featured</span>' : ''}
+                  </div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:3px">
+                    ${[p.contact_name, p.phone ? fmtPhone(p.phone) : '', p.email, p.website].filter(Boolean).map(esc).join(' · ')}
+                  </div>
+                  ${p.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(p.notes)}</div>` : ''}
                 </div>
-                <div style="font-size:12px;color:var(--muted);margin-top:3px">
-                  ${[p.contact_name, p.phone ? fmtPhone(p.phone) : '', p.email, p.website].filter(Boolean).map(esc).join(' · ')}
-                </div>
-                ${p.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(p.notes)}</div>` : ''}
               </div>
               ${USER_ROLE === 'admin' ? `
               <div style="display:flex;gap:6px;flex-shrink:0">
@@ -1955,7 +1982,7 @@ function openNewPartner() {
   editingPartnerId = null;
   document.getElementById('partner-modal-title').textContent = 'Add Partner';
   document.getElementById('pt-save-btn').textContent = 'Add Partner';
-  ['pt-name','pt-contact-name','pt-phone','pt-email','pt-website','pt-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  ['pt-name','pt-contact-name','pt-phone','pt-email','pt-website','pt-photo-url','pt-notes'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('pt-category').value = 'title';
   document.getElementById('pt-sort-order').value = 0;
   document.getElementById('pt-featured').checked = true;
@@ -1974,6 +2001,7 @@ function openEditPartner(id) {
   document.getElementById('pt-phone').value = p.phone || '';
   document.getElementById('pt-email').value = p.email || '';
   document.getElementById('pt-website').value = p.website || '';
+  document.getElementById('pt-photo-url').value = p.photo_url || '';
   document.getElementById('pt-notes').value = p.notes || '';
   document.getElementById('pt-sort-order').value = p.sort_order || 0;
   document.getElementById('pt-featured').checked = !!p.featured;
@@ -1992,6 +2020,7 @@ async function savePartner() {
     phone:        document.getElementById('pt-phone').value.trim() || null,
     email:        document.getElementById('pt-email').value.trim() || null,
     website:      document.getElementById('pt-website').value.trim() || null,
+    photo_url:    document.getElementById('pt-photo-url').value.trim() || null,
     notes:        document.getElementById('pt-notes').value.trim() || null,
     sort_order:   parseInt(document.getElementById('pt-sort-order').value, 10) || 0,
     featured:     document.getElementById('pt-featured').checked,
@@ -2038,6 +2067,58 @@ async function reactivatePartner(id) {
     renderPartners();
     toast('Partner reactivated', 'ok');
   } catch (e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── Offices tab — phone/address only (see PUT /roster/offices/:id) ──────────
+let allOffices = [], _officesLoaded = false;
+
+async function loadOffices() {
+  if (_officesLoaded) { renderOfficesList(); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/offices`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allOffices = (await r.json()).sort((a, b) => a.name.localeCompare(b.name));
+    _officesLoaded = true;
+    renderOfficesList();
+  } catch (e) {
+    document.getElementById('offices-list').innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted)">Failed to load offices: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderOfficesList() {
+  const el = document.getElementById('offices-list');
+  const isAdmin = USER_ROLE === 'admin';
+  el.innerHTML = allOffices.map(o => `
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;font-size:13px;color:var(--navy);margin-bottom:8px">${esc(o.name)}</div>
+      ${isAdmin ? `
+        <div class="fg" style="margin-bottom:8px">
+          <div class="field"><label>Phone</label><input type="tel" id="of-phone-${o.id}" value="${esc(o.phone || '')}" placeholder="(386) 555-0100"></div>
+          <div class="field"><label>Address</label><input type="text" id="of-address-${o.id}" value="${esc(o.address || '')}" placeholder="Street, City, FL Zip"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveOffice(${o.id})">Save</button>
+      ` : `
+        <div style="font-size:12px;color:var(--muted)">${[o.phone ? fmtPhone(o.phone) : '', o.address].filter(Boolean).join(' · ') || 'No phone/address on file'}</div>
+      `}
+    </div>
+  `).join('') || `<div style="padding:24px;text-align:center;color:var(--muted)">No offices found.</div>`;
+}
+
+async function saveOffice(id) {
+  const phone   = document.getElementById(`of-phone-${id}`).value.trim();
+  const address = document.getElementById(`of-address-${id}`).value.trim();
+  try {
+    const r = await fetch(`${PROXY_URL}/roster/offices/${id}`, {
+      method: 'PUT', headers: H(), body: JSON.stringify({ phone: phone || null, address: address || null }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
+    const updated = await r.json();
+    const idx = allOffices.findIndex(x => x.id === id);
+    if (idx >= 0) allOffices[idx] = updated;
+    toast('Office updated', 'ok');
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 async function loadStaff() {
