@@ -547,7 +547,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
     <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem">
       Subject: <strong id="preview-subject" style="color:var(--text)"></strong>
     </div>
-    <iframe id="preview-frame" sandbox=""
+    <iframe id="preview-frame" sandbox="" src="about:blank"
             style="flex:1;min-height:420px;width:100%;border:1px solid var(--ink-border);border-radius:6px;background:#fff"></iframe>
     <div class="modal-btn-row">
       <span id="preview-test-status" style="font-size:.82rem;color:var(--text-muted);margin-right:auto"></span>
@@ -894,6 +894,19 @@ async function toggleTemplateActive(tid, active) {
 // Draft-only: pulls straight from the editor's current field values (even if
 // unsaved), so you can preview edits before deciding to Save.
 let _previewDraft = null;
+let _previewBlobUrl = null;
+
+// Blob URL rather than iframe.srcdoc — Chromium doesn't reliably repaint a
+// sandboxed iframe's srcdoc when it's (re-)assigned via JS after page load;
+// navigating the iframe's src to an object URL doesn't have that issue.
+function setPreviewFrame(html) {
+  const frame = document.getElementById("preview-frame");
+  if (_previewBlobUrl) { URL.revokeObjectURL(_previewBlobUrl); _previewBlobUrl = null; }
+  if (!html) { frame.src = "about:blank"; return; }
+  const blob = new Blob([html], { type: "text/html" });
+  _previewBlobUrl = URL.createObjectURL(blob);
+  frame.src = _previewBlobUrl;
+}
 
 async function previewTemplate(tid) {
   _previewDraft = {
@@ -902,23 +915,23 @@ async function previewTemplate(tid) {
     from_name_mode: document.getElementById(`from-${tid}`).value,
   };
   document.getElementById("preview-subject").textContent = "Loading…";
-  document.getElementById("preview-frame").srcdoc = "";
+  setPreviewFrame("");
   document.getElementById("preview-test-status").textContent = "";
   document.getElementById("preview-modal").classList.add("open");
   try {
     const r = await POST("/review/preview", _previewDraft);
     document.getElementById("preview-subject").textContent = r.subject || "(no subject)";
-    document.getElementById("preview-frame").srcdoc = r.html;
+    setPreviewFrame(r.html);
   } catch (e) {
     document.getElementById("preview-subject").textContent = "Preview failed";
-    document.getElementById("preview-frame").srcdoc =
-      `<p style="font-family:sans-serif;color:#c00;padding:1rem">${esc(e.message)}</p>`;
+    setPreviewFrame(`<p style="font-family:sans-serif;color:#c00;padding:1rem">${esc(e.message)}</p>`);
   }
 }
 
 function closePreviewModal() {
   document.getElementById("preview-modal").classList.remove("open");
   _previewDraft = null;
+  setPreviewFrame("");
 }
 
 async function sendPreviewTest() {
