@@ -537,6 +537,26 @@ tr:hover td { background: rgba(255,255,255,.02); }
   </div>
 </div>
 
+<!-- Preview modal -->
+<div id="preview-modal" class="modal-overlay">
+  <div class="modal-box" style="width:min(680px, 92vw);max-height:88vh;display:flex;flex-direction:column">
+    <h3>Email Preview</h3>
+    <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 .75rem">
+      Rendered with sample data (<code>Jane Smith</code>, <code>Alex Agent</code>) — nothing is sent.
+    </p>
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem">
+      Subject: <strong id="preview-subject" style="color:var(--text)"></strong>
+    </div>
+    <iframe id="preview-frame" sandbox=""
+            style="flex:1;min-height:420px;width:100%;border:1px solid var(--ink-border);border-radius:6px;background:#fff"></iframe>
+    <div class="modal-btn-row">
+      <span id="preview-test-status" style="font-size:.82rem;color:var(--text-muted);margin-right:auto"></span>
+      <button class="btn btn-ghost btn-sm" onclick="closePreviewModal()">Close</button>
+      <button class="btn btn-amber btn-sm" id="preview-send-test-btn" onclick="sendPreviewTest()">Send Test to Me</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
@@ -837,6 +857,7 @@ function renderTemplateEditor(t) {
     <textarea class="tpl-textarea" id="body-${tid}" oninput="markDirty('${tid}')">${esc(t.body || '')}</textarea>
     <div style="display:flex;gap:.5rem;align-items:center">
       <button class="btn btn-amber btn-sm" id="save-${tid}" onclick="saveTemplate('${tid}')" disabled>Save</button>
+      <button class="btn btn-ghost btn-sm" onclick="previewTemplate('${tid}')">Preview</button>
       <button class="btn btn-ghost btn-sm" onclick="toggleTemplateActive('${tid}', ${!t.is_active})">${t.is_active ? 'Deactivate' : 'Activate'}</button>
     </div>
   </div>`;
@@ -866,6 +887,53 @@ async function toggleTemplateActive(tid, active) {
     loadCampaigns();
   } catch (e) {
     alert("Update failed: " + e.message);
+  }
+}
+
+// ── Preview modal ─────────────────────────────────────────────────────────────
+// Draft-only: pulls straight from the editor's current field values (even if
+// unsaved), so you can preview edits before deciding to Save.
+let _previewDraft = null;
+
+async function previewTemplate(tid) {
+  _previewDraft = {
+    subject:        document.getElementById(`subj-${tid}`).value,
+    body:           document.getElementById(`body-${tid}`).value,
+    from_name_mode: document.getElementById(`from-${tid}`).value,
+  };
+  document.getElementById("preview-subject").textContent = "Loading…";
+  document.getElementById("preview-frame").srcdoc = "";
+  document.getElementById("preview-test-status").textContent = "";
+  document.getElementById("preview-modal").classList.add("open");
+  try {
+    const r = await POST("/review/preview", _previewDraft);
+    document.getElementById("preview-subject").textContent = r.subject || "(no subject)";
+    document.getElementById("preview-frame").srcdoc = r.html;
+  } catch (e) {
+    document.getElementById("preview-subject").textContent = "Preview failed";
+    document.getElementById("preview-frame").srcdoc =
+      `<p style="font-family:sans-serif;color:#c00;padding:1rem">${esc(e.message)}</p>`;
+  }
+}
+
+function closePreviewModal() {
+  document.getElementById("preview-modal").classList.remove("open");
+  _previewDraft = null;
+}
+
+async function sendPreviewTest() {
+  if (!_previewDraft) return;
+  const btn    = document.getElementById("preview-send-test-btn");
+  const status = document.getElementById("preview-test-status");
+  btn.disabled = true;
+  status.textContent = "Sending…";
+  try {
+    const r = await POST("/review/preview/send-test", _previewDraft);
+    status.textContent = `Sent to ${r.sentTo}`;
+  } catch (e) {
+    status.textContent = "Failed: " + e.message;
+  } finally {
+    btn.disabled = false;
   }
 }
 
