@@ -485,11 +485,14 @@ async function checkAuditCooldown(agentId) {
 
 // ── Load audit list ───────────────────────────────────────────────────────────
 async function loadAuditList() {
+  const el = document.getElementById('audit-list');
   try {
     const r = await fetch(`${PROXY}/api/audits`, { headers: H() });
-    if (!r.ok) return;
+    if (!r.ok) {
+      el.innerHTML = `<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">Couldn't load recent audits (HTTP ${r.status}).</div>`;
+      return;
+    }
     const rows = await r.json();
-    const el = document.getElementById('audit-list');
     if (!rows.length) { el.innerHTML = '<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">No audits yet — run the first one above.</div>'; return; }
     el.innerHTML = rows.map(row => {
       const failed = row.status === 'failed';
@@ -506,7 +509,10 @@ async function loadAuditList() {
         <div class="audit-list-status status-${row.status}">${row.status}</div>
       </div>`;
     }).join('');
-  } catch(e) { console.warn('loadAuditList:', e.message); }
+  } catch(e) {
+    console.warn('loadAuditList:', e.message);
+    el.innerHTML = `<div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px">Couldn't load recent audits.</div>`;
+  }
 }
 
 // ── Error messaging ───────────────────────────────────────────────────────────
