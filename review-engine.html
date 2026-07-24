@@ -458,6 +458,56 @@ tr:hover td { background: rgba(255,255,255,.02); }
                  placeholder="https://g.page/r/YOUR_PLACE_ID/review">
         </div>
 
+        <!-- Email branding (header/footer) -->
+        <div>
+          <h3 style="font-size:1rem;margin:0 0 .35rem">Email Branding</h3>
+          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+            Shown in the header/footer of every outbound review-request email.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:.9rem">
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">Header Tagline</label>
+              <input id="setting-email-tagline" type="text" class="edit-input" style="width:100%"
+                     placeholder="Bringing Families Home Since 1963">
+            </div>
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">Footer Mailing Address</label>
+              <input id="setting-email-address" type="text" class="edit-input" style="width:100%"
+                     placeholder="759 W. Granada Blvd, Ormond Beach, FL 32174">
+            </div>
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">Phone Number</label>
+              <input id="setting-email-phone" type="text" class="edit-input" style="width:100%"
+                     placeholder="386-253-8044">
+            </div>
+          </div>
+        </div>
+
+        <!-- From-name options -->
+        <div>
+          <h3 style="font-size:1rem;margin:0 0 .35rem">From-Name Options</h3>
+          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+            Choices available on each template's "From" dropdown (Campaigns tab). <code>{{agent_name}}</code>
+            in Display Name is replaced with the transaction's agent. Every email actually sends from
+            <code>johnadams@adamscameron.com</code> no matter what's shown here — set Reply-To to "Agent" so a
+            customer's reply genuinely reaches that agent instead of landing wherever this dropdown implies.
+          </p>
+          <table style="width:100%;border-collapse:collapse" id="from-name-table">
+            <thead>
+              <tr style="text-align:left;border-bottom:1px solid var(--border)">
+                <th style="padding:.4rem .5rem;font-size:.85rem;color:var(--muted);width:22%">Dropdown Label</th>
+                <th style="padding:.4rem .5rem;font-size:.85rem;color:var(--muted)">Display Name</th>
+                <th style="padding:.4rem .5rem;font-size:.85rem;color:var(--muted);width:16%">Reply-To</th>
+                <th style="padding:.4rem .5rem;width:2rem"></th>
+              </tr>
+            </thead>
+            <tbody id="from-name-body">
+              <tr><td colspan="4" class="loading">Loading…</td></tr>
+            </tbody>
+          </table>
+          <button class="btn btn-ghost btn-sm" style="margin-top:.5rem" onclick="addFromNameOption()">+ Add Option</button>
+        </div>
+
         <div>
           <button class="btn btn-amber" onclick="saveSettings()">Save All Settings</button>
           <span id="settings-status" style="margin-left:1rem;font-size:.9rem;color:var(--muted)"></span>
@@ -708,7 +758,10 @@ async function loadVariants() {
       const rate = parseFloat(r.review_rate_pct) || 0;
       const rateStr = rate > 0 ? `${rate.toFixed(1)}%` : "—";
       return `<tr>
-        <td style="font-family:var(--mono);font-size:0.75rem;color:var(--text-muted)">${esc(r.step_id.slice(0,8))}…</td>
+        <td>
+          Step ${r.step_order} <span style="color:var(--text-muted);font-size:.8rem">(Day ${r.send_offset_days}${r.channel ? ', ' + r.channel.toUpperCase() : ''})</span>
+          <div style="font-family:var(--mono);font-size:0.68rem;color:var(--text-muted)">${esc(r.step_id.slice(0,8))}…</div>
+        </td>
         <td>${esc(r.variant_name)}</td>
         <td>${r.sent_count}</td>
         <td>${r.clicked_count}</td>
@@ -726,6 +779,10 @@ async function loadVariants() {
 async function loadCampaigns() {
   const container = document.getElementById("campaigns-body");
   try {
+    // Template editors need FROM_NAME_OPTIONS for their "From" dropdown —
+    // load it once (via the same cache the Settings tab uses) regardless of
+    // which tab the user opens first.
+    if (!_loaded.settings) { await loadSettings(); _loaded.settings = true; }
     const campaigns = await GET("/review/campaigns");
     if (!campaigns.length) {
       container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet. Click "Seed Initial Data" to create the default campaign.</p>`;
@@ -771,8 +828,7 @@ function renderTemplateEditor(t) {
       <span style="font-size:.75rem;color:var(--text-muted)">Variant: <strong>${esc(t.variant_name)}</strong></span>
       ${activeBadge}
       <select class="from-select" id="from-${tid}" onchange="markDirty('${tid}')">
-        <option value="brokerage" ${t.from_name_mode === 'brokerage' ? 'selected' : ''}>From: Adams Cameron & Co.</option>
-        <option value="agent"     ${t.from_name_mode === 'agent'     ? 'selected' : ''}>From: Agent Name</option>
+        ${FROM_NAME_OPTIONS.map(o => `<option value="${esc(o.key)}" ${t.from_name_mode === o.key ? 'selected' : ''}>From: ${esc(o.label)}</option>`).join("")}
       </select>
     </div>
     <label class="field-label">Subject</label>
@@ -827,31 +883,90 @@ async function seedCampaign() {
 
 // ── Settings tab ────────────────────────────────────────────────────────────────
 
+// Populated by loadSettings(); read by renderTemplateEditor() (Campaigns tab)
+// to build each template's "From" dropdown from the same configured list.
+let FROM_NAME_OPTIONS = [];
+
 async function loadSettings() {
   try {
     const data = await GET("/review/settings");
-    document.getElementById("setting-facebook").value       = data.facebook        || "";
-    document.getElementById("setting-zillow").value         = data.zillow          || "";
+    document.getElementById("setting-facebook").value        = data.facebook        || "";
+    document.getElementById("setting-zillow").value          = data.zillow          || "";
     document.getElementById("setting-google-fallback").value = data.google_fallback || "";
+    document.getElementById("setting-email-tagline").value   = data.email_tagline   || "";
+    document.getElementById("setting-email-address").value   = data.email_address   || "";
+    document.getElementById("setting-email-phone").value     = data.email_phone     || "";
 
     const tbody = document.getElementById("office-google-body");
     if (!data.offices || !data.offices.length) {
       tbody.innerHTML = `<tr><td colspan="2" style="color:var(--muted);padding:.5rem">No offices found.</td></tr>`;
-      return;
+    } else {
+      tbody.innerHTML = data.offices.map(o => `
+        <tr>
+          <td style="padding:.4rem .5rem;font-size:.9rem">${esc(o.name)}</td>
+          <td style="padding:.4rem .5rem">
+            <input type="url" class="edit-input" style="width:100%"
+                   data-office-id="${o.id}"
+                   value="${esc(o.google_review_url || '')}"
+                   placeholder="https://g.page/r/…/review">
+          </td>
+        </tr>`).join("");
     }
-    tbody.innerHTML = data.offices.map(o => `
-      <tr>
-        <td style="padding:.4rem .5rem;font-size:.9rem">${esc(o.name)}</td>
-        <td style="padding:.4rem .5rem">
-          <input type="url" class="edit-input" style="width:100%"
-                 data-office-id="${o.id}"
-                 value="${esc(o.google_review_url || '')}"
-                 placeholder="https://g.page/r/…/review">
-        </td>
-      </tr>`).join("");
+
+    FROM_NAME_OPTIONS = data.from_name_options || [];
+    renderFromNameOptions();
   } catch (e) {
     document.getElementById("settings-status").textContent = "Failed to load: " + e.message;
   }
+}
+
+function renderFromNameOptions() {
+  const tbody = document.getElementById("from-name-body");
+  if (!FROM_NAME_OPTIONS.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);padding:.5rem">No options configured.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = FROM_NAME_OPTIONS.map((o, i) => `
+    <tr data-from-row="${i}">
+      <td style="padding:.4rem .5rem">
+        <input type="text" class="edit-input from-key" style="width:100%" value="${esc(o.key || '')}" placeholder="key">
+        <input type="text" class="edit-input from-label" style="width:100%;margin-top:.3rem" value="${esc(o.label || '')}" placeholder="Dropdown label">
+      </td>
+      <td style="padding:.4rem .5rem">
+        <input type="text" class="edit-input from-display" style="width:100%" value="${esc(o.display_name || '')}" placeholder="{{agent_name}} at Adams Cameron & Co.">
+      </td>
+      <td style="padding:.4rem .5rem">
+        <select class="edit-input from-replyto" style="width:100%">
+          <option value="default" ${o.reply_to !== 'agent' ? 'selected' : ''}>Default (johnadams@)</option>
+          <option value="agent"   ${o.reply_to === 'agent' ? 'selected' : ''}>Agent</option>
+        </select>
+      </td>
+      <td style="padding:.4rem .5rem">
+        <button class="btn btn-ghost btn-sm" title="Remove" onclick="removeFromNameOption(${i})">✕</button>
+      </td>
+    </tr>`).join("");
+}
+
+function addFromNameOption() {
+  FROM_NAME_OPTIONS.push({ key: "", label: "", display_name: "", reply_to: "default" });
+  renderFromNameOptions();
+}
+
+function removeFromNameOption(i) {
+  FROM_NAME_OPTIONS.splice(i, 1);
+  renderFromNameOptions();
+}
+
+// Reads the from-name table's current DOM state back into FROM_NAME_OPTIONS
+// (kept in sync on every save rather than on every keystroke).
+function collectFromNameOptions() {
+  const rows = [...document.querySelectorAll("#from-name-body tr[data-from-row]")];
+  return rows.map(row => ({
+    key:          row.querySelector(".from-key").value.trim(),
+    label:        row.querySelector(".from-label").value.trim(),
+    display_name: row.querySelector(".from-display").value.trim(),
+    reply_to:     row.querySelector(".from-replyto").value,
+  })).filter(o => o.key && o.label && o.display_name);
 }
 
 async function saveSettings() {
@@ -864,13 +979,25 @@ async function saveSettings() {
     officeGoogleUrls[inp.dataset.officeId] = inp.value.trim() || null;
   });
 
+  const fromNameOptions = collectFromNameOptions();
+  if (!fromNameOptions.length) {
+    status.style.color = "var(--danger, #c0392b)";
+    status.textContent = "Error: at least one From-Name option needs a key, label, and display name.";
+    return;
+  }
+
   try {
     await PUT("/review/settings", {
-      google_fallback: document.getElementById("setting-google-fallback").value.trim() || null,
-      facebook:        document.getElementById("setting-facebook").value.trim()        || null,
-      zillow:          document.getElementById("setting-zillow").value.trim()          || null,
+      google_fallback:   document.getElementById("setting-google-fallback").value.trim() || null,
+      facebook:          document.getElementById("setting-facebook").value.trim()        || null,
+      zillow:            document.getElementById("setting-zillow").value.trim()          || null,
+      email_tagline:     document.getElementById("setting-email-tagline").value.trim()   || null,
+      email_address:     document.getElementById("setting-email-address").value.trim()   || null,
+      email_phone:       document.getElementById("setting-email-phone").value.trim()      || null,
+      from_name_options: fromNameOptions,
       officeGoogleUrls,
     });
+    FROM_NAME_OPTIONS = fromNameOptions;
     status.style.color = "var(--green, #2d7a3a)";
     status.textContent = "Saved.";
     setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
