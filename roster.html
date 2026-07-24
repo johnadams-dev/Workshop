@@ -41,6 +41,12 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .topbar-title small{display:block;color:var(--gold);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
 .tools-link{color:rgba(255,255,255,.55);text-decoration:none;font-size:12px;white-space:nowrap}
 
+/* ── Top-level section tabs: Agents / Offices / Title / Mortgage / Associations / Property Management ── */
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:10px 12px;background:var(--navy-2);-webkit-overflow-scrolling:touch;position:sticky;top:49px;z-index:49}
+.tabs::-webkit-scrollbar{display:none}
+.tab-btn{flex-shrink:0;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;color:rgba(255,255,255,.6);cursor:pointer;white-space:nowrap}
+.tab-btn.active{background:rgba(255,255,255,.16);color:#fff}
+
 .search-wrap{padding:12px 16px 0}
 .search-box{position:relative}
 .search-box input{width:100%;padding:11px 14px 11px 36px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface)}
@@ -82,9 +88,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .spin{width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── Office info panel (shown when a specific office chip is selected) ──── */
-.office-info{margin:0 16px 4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:none}
-.office-info.show{display:block}
+/* ── Office info card (Offices tab, shown for the selected office) ───────── */
+.office-info{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px}
 .office-info .name{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px}
 .office-info .line{font-size:12px;color:var(--muted);margin-top:2px}
 .office-info .line a{color:#0369a1;text-decoration:none}
@@ -126,29 +131,36 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
     <a href="./index.html" class="tools-link">← Tools</a>
   </div>
 
+  <div class="tabs" id="main-tabs"></div>
+
   <div class="search-wrap">
     <div class="search-box">
       <span class="icon">🔍</span>
-      <input type="search" id="search" placeholder="Search name, office, phone…" oninput="renderAll()">
+      <input type="search" id="search" placeholder="Search…" oninput="renderCurrentTab()">
     </div>
   </div>
 
-  <div class="chips" id="office-chips"></div>
-  <div class="office-info" id="office-info"></div>
-
-  <div class="section">
-    <div class="section-title">Agents <span class="count" id="agents-count"></span></div>
-    <div id="agents-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  <!-- Agents tab -->
+  <div id="panel-agents" class="tab-panel">
+    <div class="chips" id="office-chips"></div>
+    <div class="section">
+      <div class="section-title">Agents <span class="count" id="agents-count"></span></div>
+      <div id="agents-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Management Team <span class="count" id="management-count"></span></div>
-    <div id="management-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  <!-- Offices tab -->
+  <div id="panel-offices" class="tab-panel" style="display:none">
+    <div class="chips" id="offices-pick-chips"></div>
+    <div class="section" id="office-detail"></div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Featured Partners <span class="count" id="partners-count"></span></div>
-    <div id="partners-list"><div class="empty"><div class="spin"></div>Loading…</div></div>
+  <!-- Partner category tab (shared by Title / Mortgage / Associations / Property Management) -->
+  <div id="panel-partners" class="tab-panel" style="display:none">
+    <div class="section">
+      <div class="section-title"><span id="partners-tab-label"></span> <span class="count" id="partners-count"></span></div>
+      <div id="partners-list"></div>
+    </div>
   </div>
 
   <div style="height:24px"></div>
@@ -166,12 +178,18 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
 const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
 
-const PARTNER_CATEGORIES = [
-  { value: 'title',               label: 'Title' },
-  { value: 'mortgage',            label: 'Mortgage' },
-  { value: 'association',         label: 'Realtor Associations' },
-  { value: 'property_management', label: 'Property Management' },
+// Top-level tabs, in display order. The last four ids double as partner
+// `category` values — renderCurrentTab() routes any id not 'agents'/'offices'
+// straight to the shared partners panel filtered to that category.
+const TABS = [
+  { id: 'agents',              label: 'Agents' },
+  { id: 'offices',              label: 'Offices' },
+  { id: 'title',                label: 'Title' },
+  { id: 'mortgage',             label: 'Mortgage' },
+  { id: 'association',         label: 'Associations' },
+  { id: 'property_management', label: 'Property Management' },
 ];
+const PARTNER_TAB_IDS = new Set(['title', 'mortgage', 'association', 'property_management']);
 
 /* ═══════════════════════════════════════════════════════════════════
    AUTH STATE — shared ac_proxy_key / ac_user_email keys, per repo convention
@@ -179,7 +197,7 @@ const PARTNER_CATEGORIES = [
 let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
 
-let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null };
+let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null };
 
 if (proxyKey && userEmail) {
   document.getElementById('auth-gate').style.display = 'none';
@@ -266,12 +284,50 @@ async function init() {
     STATE.partners = partners;
     STATE.offices = offices;
     renderOfficeChips();
-    renderAll();
+    renderMainTabs();
+    switchTab('agents');
   } catch (e) {
     document.getElementById('agents-list').innerHTML = `<div class="empty">Failed to load roster: ${esc(e.message)}</div>`;
   }
 }
 
+/* ── Top-level tabs ──────────────────────────────────────────────────────── */
+function renderMainTabs() {
+  document.getElementById('main-tabs').innerHTML = TABS.map(t =>
+    `<div class="tab-btn ${STATE.activeTab === t.id ? 'active' : ''}" onclick="switchTab('${t.id}')">${esc(t.label)}</div>`
+  ).join('');
+}
+
+function switchTab(tabId) {
+  STATE.activeTab = tabId;
+  renderMainTabs();
+  document.getElementById('panel-agents').style.display   = tabId === 'agents'  ? '' : 'none';
+  document.getElementById('panel-offices').style.display   = tabId === 'offices' ? '' : 'none';
+  document.getElementById('panel-partners').style.display  = PARTNER_TAB_IDS.has(tabId) ? '' : 'none';
+
+  const search = document.getElementById('search');
+  search.value = '';
+  const tab = TABS.find(t => t.id === tabId);
+  search.placeholder = tabId === 'agents' ? 'Search name, office, phone…'
+    : tabId === 'offices' ? 'Search offices…'
+    : `Search ${tab.label.toLowerCase()}…`;
+
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  if (STATE.activeTab === 'agents') renderAgents(q);
+  else if (STATE.activeTab === 'offices') renderOfficesTab(q);
+  else renderPartnersTab(STATE.activeTab, q);
+}
+
+function matchesSearch(haystackParts, q) {
+  if (!q) return true;
+  return haystackParts.filter(Boolean).join(' ').toLowerCase().includes(q);
+}
+
+/* ── Agents tab ──────────────────────────────────────────────────────────── */
 function renderOfficeChips() {
   const used = new Set(STATE.agents.map(a => a.office_name).filter(Boolean));
   const names = STATE.offices.map(o => o.name).filter(n => used.has(n)).sort();
@@ -285,36 +341,7 @@ function setOfficeFilter(name, el) {
   STATE.activeOffice = name;
   document.querySelectorAll('#office-chips .chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
-  renderOfficeInfo(name);
-  renderAll();
-}
-
-function renderOfficeInfo(name) {
-  const panel = document.getElementById('office-info');
-  const office = name ? STATE.offices.find(o => o.name === name) : null;
-  if (!office || (!office.address && !office.phone)) {
-    panel.classList.remove('show');
-    panel.innerHTML = '';
-    return;
-  }
-  panel.innerHTML = `
-    <div class="name">${esc(office.name)}</div>
-    ${office.address ? `<div class="line">${esc(office.address)}</div>` : ''}
-    ${office.phone ? `<div class="line"><a href="tel:${esc(office.phone)}">${esc(fmtPhone(office.phone))}</a></div>` : ''}
-  `;
-  panel.classList.add('show');
-}
-
-function renderAll() {
-  const q = (document.getElementById('search').value || '').trim().toLowerCase();
-  renderAgents(q);
-  renderManagement(q);
-  renderPartners(q);
-}
-
-function matchesSearch(haystackParts, q) {
-  if (!q) return true;
-  return haystackParts.filter(Boolean).join(' ').toLowerCase().includes(q);
+  renderCurrentTab();
 }
 
 function renderAgents(q) {
@@ -331,7 +358,10 @@ function renderAgents(q) {
 function agentRow(a) {
   const photo = agentPhoto(a);
   const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
-  const sub = [a.office_name, a.designations].filter(Boolean).join(' · ');
+  // Phone shown right next to office, per the ask — quick access without
+  // opening the detail card, since web users want to glance-and-dial.
+  const sub = [a.office_name, a.cell_e164 ? fmtPhone(a.cell_e164) : null].filter(Boolean).join(' · ');
+  const websiteHref = a.website ? (/^https?:\/\//i.test(a.website) ? a.website : 'https://' + a.website) : null;
   return `
     <div class="row-card clickable" onclick="openAgentCard(${a.id})">
       <div class="avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.parentElement.textContent='${initials(a.first_name,a.last_name)}'">` : initials(a.first_name, a.last_name)}</div>
@@ -342,6 +372,7 @@ function agentRow(a) {
       <div class="row-actions">
         ${a.cell_e164 ? `<a href="tel:${esc(a.cell_e164)}" title="Call" onclick="event.stopPropagation()">📞</a>` : ''}
         ${a.email ? `<a href="mailto:${esc(a.email)}" title="Email" onclick="event.stopPropagation()">✉️</a>` : ''}
+        ${websiteHref ? `<a href="${esc(websiteHref)}" target="_blank" rel="noopener" title="Website" onclick="event.stopPropagation()">🌐</a>` : ''}
       </div>
     </div>`;
 }
@@ -373,33 +404,47 @@ function openAgentCard(id) {
 }
 function closeDetailModal() { document.getElementById('detail-modal').classList.remove('open'); }
 
-function renderManagement(q) {
-  // Fan each staff member out into every office they're assigned to
-  // (staff_offices is many-to-many). Staff with no office assignment are
-  // dropped from this office-grouped view entirely — no "Company-Wide" catch-all.
-  const groups = new Map();
-  for (const s of STATE.staff) {
-    if (!s.offices || !s.offices.length) continue;
-    if (!matchesSearch([s.first_name, s.last_name, s.title, s.role, ...s.offices.map(o=>o.name)], q)) continue;
-    for (const office of s.offices) {
-      const name = office.name;
-      if (STATE.activeOffice && name !== STATE.activeOffice) continue;
-      if (!groups.has(name)) groups.set(name, []);
-      groups.get(name).push(s);
-    }
-  }
-  const names = [...groups.keys()].sort((a, b) => a.localeCompare(b));
-  const total = [...groups.values()].reduce((n, arr) => n + arr.length, 0);
-  document.getElementById('management-count').textContent = total ? `(${total})` : '';
+/* ── Offices tab — pick an office, see its address/phone + management team ── */
+function renderOfficesTab(q) {
+  const offices = [...STATE.offices].sort((a, b) => a.name.localeCompare(b.name))
+    .filter(o => matchesSearch([o.name, o.address, o.phone], q));
 
-  if (!names.length) {
-    document.getElementById('management-list').innerHTML = `<div class="empty">No management team members match.</div>`;
+  document.getElementById('offices-pick-chips').innerHTML = offices.length
+    ? offices.map(o => `<div class="chip ${STATE.selectedOfficeName === o.name ? 'active' : ''}" onclick="selectOffice('${esc(o.name).replace(/'/g,"\\'")}')">${esc(o.name)}</div>`).join('')
+    : `<div class="empty">No offices match.</div>`;
+
+  // Selected office dropped out of the filtered set (e.g. search narrowed it away) — clear it.
+  if (STATE.selectedOfficeName && !offices.some(o => o.name === STATE.selectedOfficeName)) {
+    STATE.selectedOfficeName = null;
+  }
+  renderOfficeDetail();
+}
+
+function selectOffice(name) {
+  STATE.selectedOfficeName = name;
+  renderOfficesTab((document.getElementById('search').value || '').trim().toLowerCase());
+}
+
+function renderOfficeDetail() {
+  const el = document.getElementById('office-detail');
+  const office = STATE.offices.find(o => o.name === STATE.selectedOfficeName);
+  if (!office) {
+    el.innerHTML = `<div class="empty">Select an office above to see its address, phone, and management team.</div>`;
     return;
   }
-  document.getElementById('management-list').innerHTML = names.map(name => `
-    <div class="group-label">${esc(name)}</div>
-    ${groups.get(name).map(staffRow).join('')}
-  `).join('');
+
+  const staff = STATE.staff.filter(s => (s.offices || []).some(o => o.name === office.name));
+
+  el.innerHTML = `
+    <div class="office-info">
+      <div class="name">${esc(office.name)}</div>
+      ${office.address ? `<div class="line">${esc(office.address)}</div>` : ''}
+      ${office.phone ? `<div class="line"><a href="tel:${esc(office.phone)}">${esc(fmtPhone(office.phone))}</a></div>` : ''}
+      ${(!office.address && !office.phone) ? `<div class="line">No phone/address on file yet.</div>` : ''}
+    </div>
+    <div class="section-title">Management Team <span class="count">${staff.length ? `(${staff.length})` : ''}</span></div>
+    ${staff.length ? staff.map(staffRow).join('') : `<div class="empty">No staff assigned to this office.</div>`}
+  `;
 }
 
 function staffRow(s) {
@@ -420,21 +465,16 @@ function staffRow(s) {
     </div>`;
 }
 
-function renderPartners(q) {
-  const groups = PARTNER_CATEGORIES.map(cat => ({
-    ...cat,
-    rows: STATE.partners.filter(p => p.category === cat.value && matchesSearch([p.name, p.contact_name, p.notes], q)),
-  })).filter(g => g.rows.length);
+/* ── Partner category tabs (Title / Mortgage / Associations / Property Management) ── */
+function renderPartnersTab(category, q) {
+  const tab = TABS.find(t => t.id === category);
+  const rows = STATE.partners.filter(p => p.category === category && matchesSearch([p.name, p.contact_name, p.notes], q));
 
-  const total = groups.reduce((n, g) => n + g.rows.length, 0);
-  document.getElementById('partners-count').textContent = total ? `(${total})` : '';
-
-  document.getElementById('partners-list').innerHTML = groups.length
-    ? groups.map(g => `
-        <div class="group-label">${esc(g.label)}</div>
-        ${g.rows.map(partnerCard).join('')}
-      `).join('')
-    : `<div class="empty">No partners match.</div>`;
+  document.getElementById('partners-tab-label').textContent = tab.label;
+  document.getElementById('partners-count').textContent = rows.length ? `(${rows.length})` : '';
+  document.getElementById('partners-list').innerHTML = rows.length
+    ? rows.map(partnerCard).join('')
+    : `<div class="empty">No ${esc(tab.label.toLowerCase())} partners match.</div>`;
 }
 
 function partnerCard(p) {
