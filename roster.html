@@ -388,6 +388,7 @@ function openAgentCard(id) {
   if (a.cell_e164) rows.push(`<a class="detail-row" href="tel:${esc(a.cell_e164)}"><span class="icon">📞</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Call</span></a>`);
   if (a.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(a.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Text</span></a>`);
   if (a.email) rows.push(`<a class="detail-row" href="mailto:${esc(a.email)}"><span class="icon">✉️</span><span class="label">${esc(a.email)}</span></a>`);
+  if (a.designations) rows.push(`<div class="detail-row"><span class="icon">🏅</span><span class="label">${esc(a.designations)}</span></div>`);
   if (a.languages) rows.push(`<div class="detail-row"><span class="icon">🗣️</span><span class="label">${esc(a.languages)}</span></div>`);
   if (websiteHref) rows.push(`<a class="detail-row" href="${esc(websiteHref)}" target="_blank" rel="noopener"><span class="icon">🌐</span><span class="label">${esc(a.website)}</span></a>`);
 
@@ -433,7 +434,8 @@ function renderOfficeDetail() {
     return;
   }
 
-  const staff = STATE.staff.filter(s => (s.offices || []).some(o => o.name === office.name));
+  const staff  = STATE.staff.filter(s => (s.offices || []).some(o => o.name === office.name));
+  const agents = STATE.agents.filter(a => a.office_name === office.name);
 
   el.innerHTML = `
     <div class="office-info">
@@ -444,14 +446,17 @@ function renderOfficeDetail() {
     </div>
     <div class="section-title">Management Team <span class="count">${staff.length ? `(${staff.length})` : ''}</span></div>
     ${staff.length ? staff.map(staffRow).join('') : `<div class="empty">No staff assigned to this office.</div>`}
+    <div class="section-title" style="margin-top:16px">Agents <span class="count">${agents.length ? `(${agents.length})` : ''}</span></div>
+    ${agents.length ? agents.map(agentRow).join('') : `<div class="empty">No agents assigned to this office.</div>`}
   `;
 }
 
 function staffRow(s) {
   const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email;
   const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
+  const websiteHref = s.website ? (/^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website) : null;
   return `
-    <div class="row-card">
+    <div class="row-card clickable" onclick="openStaffCard(${s.id})">
       <div class="avatar">${s.photo_url ? `<img src="${esc(s.photo_url)}" alt="" onerror="this.parentElement.textContent='${initials(s.first_name,s.last_name)}'">` : initials(s.first_name, s.last_name)}</div>
       <div class="row-body">
         <div class="row-name">${esc(name)}</div>
@@ -459,10 +464,38 @@ function staffRow(s) {
         ${roleLabel ? `<div class="row-badges"><span class="badge badge-role-${s.role}">${esc(roleLabel)}</span></div>` : ''}
       </div>
       <div class="row-actions">
-        ${s.cell_e164 ? `<a href="tel:${esc(s.cell_e164)}" title="Call">📞</a>` : ''}
-        ${s.email ? `<a href="mailto:${esc(s.email)}" title="Email">✉️</a>` : ''}
+        ${s.cell_e164 ? `<a href="tel:${esc(s.cell_e164)}" title="Call" onclick="event.stopPropagation()">📞</a>` : ''}
+        ${s.email ? `<a href="mailto:${esc(s.email)}" title="Email" onclick="event.stopPropagation()">✉️</a>` : ''}
+        ${websiteHref ? `<a href="${esc(websiteHref)}" target="_blank" rel="noopener" title="Website" onclick="event.stopPropagation()">🌐</a>` : ''}
       </div>
     </div>`;
+}
+
+function openStaffCard(id) {
+  const s = STATE.staff.find(x => x.id === id);
+  if (!s) return;
+  const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email;
+  const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
+  const officeNames = (s.offices || []).map(o => o.name).join(', ');
+  const websiteHref = s.website ? (/^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website) : null;
+
+  const rows = [];
+  if (s.cell_e164) rows.push(`<a class="detail-row" href="tel:${esc(s.cell_e164)}"><span class="icon">📞</span><span class="label">${esc(fmtPhone(s.cell_e164))} · Call</span></a>`);
+  if (s.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(s.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(s.cell_e164))} · Text</span></a>`);
+  if (s.email) rows.push(`<a class="detail-row" href="mailto:${esc(s.email)}"><span class="icon">✉️</span><span class="label">${esc(s.email)}</span></a>`);
+  if (websiteHref) rows.push(`<a class="detail-row" href="${esc(websiteHref)}" target="_blank" rel="noopener"><span class="icon">🌐</span><span class="label">${esc(s.website)}</span></a>`);
+
+  document.getElementById('detail-modal-content').innerHTML = `
+    <div class="detail-head">
+      <button class="detail-close" onclick="closeDetailModal()">✕</button>
+      <div class="avatar">${s.photo_url ? `<img src="${esc(s.photo_url)}" alt="" onerror="this.parentElement.textContent='${initials(s.first_name,s.last_name)}'">` : initials(s.first_name, s.last_name)}</div>
+      <div class="name">${esc(name)}</div>
+      ${(s.title || roleLabel) ? `<div class="office">${esc([s.title, roleLabel].filter(Boolean).join(' · '))}</div>` : ''}
+      ${officeNames ? `<div class="office" style="opacity:.8">${esc(officeNames)}</div>` : ''}
+    </div>
+    <div class="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
+  `;
+  document.getElementById('detail-modal').classList.add('open');
 }
 
 /* ── Partner category tabs (Title / Mortgage / Associations / Property Management) ── */
