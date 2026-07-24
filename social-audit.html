@@ -331,6 +331,21 @@ const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
 let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+if (!USER_EMAIL) {
+  // Also recognize a session from the separate Pathfinder-family pages
+  // (checkin.html, agent-dashboard.html, coach-dashboard.html, etc.), which
+  // store their own { email, name, picture, exp } blob under
+  // ac_pathfinder_session instead of the shared ac_user_email key — without
+  // this, being signed in there didn't count as signed in here, forcing a
+  // redundant Google sign-in even with an active, unexpired session.
+  try {
+    const s = JSON.parse(localStorage.getItem('ac_pathfinder_session') || 'null');
+    if (s && s.email && s.exp > Date.now()) {
+      USER_EMAIL = s.email;
+      localStorage.setItem('ac_user_email', USER_EMAIL);
+    }
+  } catch(_) {}
+}
 let currentAuditId = null;
 let pollTimer = null;
 let currentAgentId = null;
