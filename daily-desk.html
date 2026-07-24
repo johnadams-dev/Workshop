@@ -1810,7 +1810,10 @@ tbody tr.clickable { cursor: pointer; }
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent Email</span>
               <input type="email" id="nc-ext-list-agent-email" placeholder="agent@brokerage.com">
             </div>
-            <div></div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller Name <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional — record only, since we don't represent them)</span></span>
+              <input type="text" id="nc-ext-seller-name" placeholder="For our records only">
+            </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3998,8 +4001,35 @@ function amUpdateRepFields() {
       <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
         <span class="field-label" style="${labelStyle}">Source of Buyer</span>
         <input type="text" id="am-source-of-buyer" placeholder="e.g. Sign call, referral, website">
+      </div>
+      <div style="border-top:1px solid var(--ink-border); padding-top:14px; margin-bottom:14px;">
+        <div style="${labelStyle} margin-bottom:10px;">Commission Adjustment <span style="font-size:9px; text-transform:none; letter-spacing:0;">(leave blank to keep the listing's commission)</span></div>
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${labelStyle}">Commission Rate <span id="am-uc-commission-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
+            <input type="text" id="am-uc-commission-rate" placeholder="e.g. 6">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${labelStyle}">Co-Broke Commission <span id="am-uc-coop-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
+            <input type="text" id="am-uc-cooperating-commission" placeholder="e.g. 3">
+          </div>
+        </div>
       </div>`;
     amLoadBuyerAgents();
+    // Placeholders show the listing's current commission so it's clear what
+    // "leave blank" keeps — this contract's commission can differ from the
+    // original listing (e.g. negotiated down for this specific buyer).
+    GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
+      const isFixed = txn.commission_type === 'fixed_fee';
+      const unit = isFixed ? '($)' : '(%)';
+      const rateEl = document.getElementById('am-uc-commission-rate');
+      const coopEl = document.getElementById('am-uc-cooperating-commission');
+      if (!rateEl) return;
+      document.getElementById('am-uc-commission-unit').textContent = unit;
+      document.getElementById('am-uc-coop-unit').textContent = unit;
+      rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
+      coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+    }).catch(() => {});
   } else if (repType === 'co_broke') {
     el.innerHTML = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
@@ -4329,6 +4359,10 @@ async function amSubmit() {
         alert("Please select the buyer's agent.");
         return;
       }
+      const ucCommRate = amParseMoney(document.getElementById('am-uc-commission-rate').value);
+      const ucCommCoop = amParseMoney(document.getElementById('am-uc-cooperating-commission').value);
+      if (ucCommRate != null) fields.commissionRate = ucCommRate;
+      if (ucCommCoop != null) fields.cooperatingCommission = ucCommCoop;
     } else if (repType === 'co_broke') {
       fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
       fields.cooperatingAgentName = document.getElementById('am-coop-agent').value || null;
@@ -4424,6 +4458,7 @@ function openNewContractModal() {
   document.getElementById('nc-ext-list-brokerage').value = '';
   document.getElementById('nc-ext-list-agent').value = '';
   document.getElementById('nc-ext-list-agent-email').value = '';
+  document.getElementById('nc-ext-seller-name').value = '';
   document.getElementById('nc-ext-mlsid').value = '';
   document.getElementById('nc-ext-source').value = '';
   document.getElementById('nc-ext-list-price').value = '';
@@ -4691,6 +4726,7 @@ async function ncSaveExternalContract() {
       listing_brokerage:   document.getElementById('nc-ext-list-brokerage').value.trim() || null,
       listing_agent_name:  document.getElementById('nc-ext-list-agent').value.trim() || null,
       listing_agent_email: document.getElementById('nc-ext-list-agent-email').value.trim() || null,
+      seller_name:         document.getElementById('nc-ext-seller-name').value.trim() || null,
       mls_id:              document.getElementById('nc-ext-mlsid').value.trim() || null,
       source_of_buyer:     document.getElementById('nc-ext-source').value.trim() || null,
       list_price:          amParseMoney(document.getElementById('nc-ext-list-price').value),
