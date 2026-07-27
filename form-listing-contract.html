@@ -84,6 +84,10 @@ function fmt(v) { return v || ''; }
 function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 }) : ''; }
 function fmtDate(v) { if (!v) return ''; const d = new Date(String(v).slice(0, 10) + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
 function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
+// "Agent #" on the paper form was the agent's Profit Power ID — only
+// meaningful for our own (ACC) agents. An external co-broke agent has no
+// pp_id at all, so the form showed "Co-Broke" in that slot instead.
+function agentNumber(a) { if (!a) return ''; return a.is_acc_agent ? fmt(a.pp_id) : 'Co-Broke'; }
 
 function row(label, ...vals) {
   const cells = vals.map(([w, v]) => `<td class="val" style="width:${w}">${v || '&nbsp;'}</td>`).join('');
@@ -129,7 +133,7 @@ function scenarioLabel(t) {
   return 'In-House Listing';
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, customers }) {
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, contract_event, customers }) {
   const la    = listing_agent;
   const ba    = buyers_agent || co_buyers_agent;
   const badge = scenarioLabel(t);
@@ -147,9 +151,17 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
     <div class="section-head">Property Information</div>
     <table>
       ${row2('Property Address', fmt(t.property_address), 'City', fmt(t.city))}
+      ${row2('State', fmt(t.state), 'Zip', fmt(t.zip))}
+      ${row2('Property Type', fmt(t.property_type), 'Bed/Bath', (t.bedrooms != null || t.bathrooms != null) ? `${fmt(t.bedrooms)} / ${fmt(t.bathrooms)}` : '')}
       ${row2('MLS Number', fmt(mls_number), 'Office', fmt(t.office_name))}
       ${row2('List Price', fmtMoney(t.current_price), 'List Date', fmtDate(t.list_date))}
       ${row2('Expiration Date', fmtDate(t.expiration_date), '', '')}
+    </table>
+
+    <div class="section-head">Contract</div>
+    <table>
+      ${row2('Contract Price', fmtMoney(contract_event?.contract_price), 'Contract Date', fmtDate(contract_event?.contract_date))}
+      ${row2('Expected Close Date', fmtDate(contract_event?.close_date), 'Actual Close Date', fmtDate(closing_event?.close_date))}
     </table>
 
     <div class="section-head">Commission</div>
@@ -163,15 +175,17 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
 
     <div class="section-head">Listing Agent</div>
     <table>
-      ${row2('Name', agentName(la), 'Email', fmt(la?.email))}
-      ${row2('NRDS ID', fmt(la?.nrds_id), 'Office', fmt(la?.agent_office || t.office_name))}
-      ${co_listing_agent ? row2('Co-Listing Agent', agentName(co_listing_agent), 'Email', fmt(co_listing_agent?.email)) : ''}
+      ${row2('Name', agentName(la), 'Agent #', agentNumber(la))}
+      ${row2('Email', fmt(la?.email), 'Office', fmt(la?.agent_office || t.office_name))}
+      ${row2('NRDS ID', fmt(la?.nrds_id), '', '')}
+      ${co_listing_agent ? row2('Co-Listing Agent', agentName(co_listing_agent), 'Agent #', agentNumber(co_listing_agent)) : ''}
     </table>
 
     <div class="section-head">Buyer's Agent</div>
     <table>
-      ${row2('Name', agentName(ba), 'Email', fmt(ba?.email))}
-      ${row2('NRDS ID', fmt(ba?.nrds_id), 'Office', fmt(ba?.agent_office))}
+      ${row2('Name', agentName(ba), 'Agent #', agentNumber(ba))}
+      ${row2('Email', fmt(ba?.email), 'Office', fmt(ba?.agent_office))}
+      ${row2('NRDS ID', fmt(ba?.nrds_id), '', '')}
     </table>
 
     <div class="section-head">Referral (if applicable)</div>
