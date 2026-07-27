@@ -442,10 +442,12 @@
 
     .open-slots-table { border-top: 1px solid var(--border); }
     .open-slot-row {
-      display: grid; grid-template-columns: 100px 1fr 185px 72px;
+      display: grid; grid-template-columns: 100px 1fr 185px auto;
       align-items: center; padding: 9px 16px; gap: 12px;
       border-bottom: 1px solid var(--border);
     }
+    .slot-actions { display: flex; gap: 6px; align-items: center; }
+    .slot-open-badge { font-size: 11px; font-weight: 600; color: var(--amber); white-space: nowrap; }
     .open-slot-row:last-child { border-bottom: none; }
     .open-slot-row.hdr {
       background: var(--bg); font-size: 11px; font-weight: 700;
@@ -493,10 +495,37 @@
     .cal-day.default-on  { background: var(--navy); color: #fff; }
     .cal-day.override-on { background: var(--green); color: #fff; }
     .cal-day.override-off { background: var(--red); color: #fff; }
+    .cal-day.override-partial { background: var(--amber); color: #fff; }
+    .cal-day.selected { box-shadow: 0 0 0 2px var(--navy), 0 0 0 4px #fff inset; }
 
     .cal-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
     .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
     .cal-legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+
+    .cal-day-panel {
+      margin-top: 14px; border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px; background: var(--bg);
+    }
+    .cal-day-panel-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .cal-day-panel-hdr strong { font-size: 14px; }
+    .cal-day-panel-hdr .close-btn {
+      margin-left: auto; background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 14px; padding: 2px 6px;
+    }
+    .cal-day-panel-hdr .close-btn:hover { color: var(--text); }
+    .cal-day-panel-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .cal-day-panel-shifts { display: flex; flex-direction: column; gap: 4px; }
+    .ovr-shift-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px; background: #fff; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 13px;
+    }
+    .ovr-shift-toggle {
+      border: 1px solid var(--border); border-radius: 5px; padding: 4px 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer; background: var(--bg); color: var(--muted);
+    }
+    .ovr-shift-toggle.on  { background: var(--green); color: #fff; border-color: var(--green); }
+    .ovr-shift-toggle.off { background: var(--red);   color: #fff; border-color: var(--red); }
 
     /* ── Publish / preflight ────────────────────────────────────────────────── */
     .pf-list { display: flex; flex-direction: column; }
@@ -703,10 +732,10 @@
 
           <div id="avail-cal-wrap" style="display:none">
             <div class="cal-grid">
-              <div class="cal-hdr">Mo</div><div class="cal-hdr">Tu</div>
-              <div class="cal-hdr">We</div><div class="cal-hdr">Th</div>
-              <div class="cal-hdr">Fr</div><div class="cal-hdr">Sa</div>
-              <div class="cal-hdr">Su</div>
+              <div class="cal-hdr">Su</div><div class="cal-hdr">Mo</div>
+              <div class="cal-hdr">Tu</div><div class="cal-hdr">We</div>
+              <div class="cal-hdr">Th</div><div class="cal-hdr">Fr</div>
+              <div class="cal-hdr">Sa</div>
             </div>
             <div class="cal-grid" id="avail-cal-grid"></div>
             <div class="cal-legend">
@@ -722,7 +751,12 @@
               <div class="cal-legend-item">
                 <div class="cal-legend-swatch" style="background:var(--red)"></div> Override: blocked
               </div>
+              <div class="cal-legend-item">
+                <div class="cal-legend-swatch" style="background:var(--amber)"></div> Override: custom by shift
+              </div>
             </div>
+            <p style="color:var(--muted);font-size:12px;margin-top:8px">Click a day to set it available/unavailable all day, or customize individual shifts.</p>
+            <div class="cal-day-panel" id="ovr-day-panel" style="display:none"></div>
             <div class="form-actions" style="margin-top:16px">
               <button class="btn-primary" id="avail-save-overrides">Save Overrides</button>
               <button class="btn-secondary" id="avail-reset-overrides">Reset</button>
@@ -986,8 +1020,8 @@ function renderShifts() {
   list.querySelectorAll('.shift-card').forEach(card => bindShiftCard(card));
 }
 
-const DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
-const DAY_LABELS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
 function fmt12(t) {
   if (!t) return '';
@@ -1722,8 +1756,7 @@ function buildSchedCalendar(period) {
   const year  = period.period_year;
   const month = period.period_month;
   const daysInMonth  = new Date(year, month, 0).getDate();
-  const jsFirstDay   = new Date(year, month - 1, 1).getDay();
-  const startOffset  = jsFirstDay === 0 ? 6 : jsFirstDay - 1;
+  const startOffset  = new Date(year, month - 1, 1).getDay(); // 0=Sun, already Sun-first
 
   // Index assignments by date
   const byDate = {};
@@ -1766,10 +1799,10 @@ function buildSchedCalendar(period) {
     </div>
     <div class="card-body">
       <div class="sched-cal-grid">
-        <div class="sched-cal-hdr">Mo</div><div class="sched-cal-hdr">Tu</div>
-        <div class="sched-cal-hdr">We</div><div class="sched-cal-hdr">Th</div>
-        <div class="sched-cal-hdr">Fr</div><div class="sched-cal-hdr">Sa</div>
-        <div class="sched-cal-hdr">Su</div>
+        <div class="sched-cal-hdr">Su</div><div class="sched-cal-hdr">Mo</div>
+        <div class="sched-cal-hdr">Tu</div><div class="sched-cal-hdr">We</div>
+        <div class="sched-cal-hdr">Th</div><div class="sched-cal-hdr">Fr</div>
+        <div class="sched-cal-hdr">Sa</div>
         ${cells}
       </div>
     </div>`;
@@ -1807,12 +1840,19 @@ function buildOpenSlots(period) {
           <option value="">— select agent —</option>
           ${agentOpts}
         </select>
-        <button class="btn-primary slot-assign-btn">Assign</button>
+        <div class="slot-actions">
+          ${a.confirmed_open ? '<span class="slot-open-badge">✓ Confirmed Open</span>' : ''}
+          <button class="btn-primary slot-assign-btn">Assign</button>
+          <button class="btn-secondary slot-open-btn">${a.confirmed_open ? 'Unmark' : 'Mark as Open'}</button>
+        </div>
       </div>`;
   }).join('');
 
   card.innerHTML = `
     <div class="card-head"><span class="card-head-label">Open Slots (${open.length})</span></div>
+    <p style="padding:0 16px;margin-top:8px;font-size:12px;color:var(--muted)">
+      "Mark as Open" confirms the slot is deliberately uncovered — available to any agent, or calls roll to another office — rather than just not yet assigned. Publishing puts it on the shared calendar as OPEN either way.
+    </p>
     <div class="open-slots-table">
       <div class="open-slot-row hdr">
         <span>Date</span><span>Shift</span><span>Agent</span><span></span>
@@ -1821,19 +1861,31 @@ function buildOpenSlots(period) {
     </div>`;
 
   card.querySelectorAll('.open-slot-row[data-id]').forEach(row => {
-    const id  = parseInt(row.dataset.id, 10);
-    const sel = row.querySelector('.slot-sel');
-    const btn = row.querySelector('.slot-assign-btn');
-    btn.addEventListener('click', async () => {
+    const id      = parseInt(row.dataset.id, 10);
+    const sel     = row.querySelector('.slot-sel');
+    const asgnBtn = row.querySelector('.slot-assign-btn');
+    const openBtn = row.querySelector('.slot-open-btn');
+    asgnBtn.addEventListener('click', async () => {
       const agentId = parseInt(sel.value, 10) || null;
       if (!agentId) { sel.focus(); return; }
-      btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+      asgnBtn.disabled = true; asgnBtn.innerHTML = '<span class="spin"></span>';
       try {
         await api('PUT', '/api/floor/assignments/' + id, { agent_id: agentId });
         await loadAndRenderSchedule(period);
       } catch(e) {
         alert('Error: ' + e.message);
-        btn.disabled = false; btn.textContent = 'Assign';
+        asgnBtn.disabled = false; asgnBtn.textContent = 'Assign';
+      }
+    });
+    openBtn.addEventListener('click', async () => {
+      const nowConfirmed = openBtn.textContent.trim() !== 'Unmark';
+      openBtn.disabled = true; openBtn.innerHTML = '<span class="spin"></span>';
+      try {
+        await api('PUT', '/api/floor/assignments/' + id, { agent_id: null, confirmed_open: nowConfirmed });
+        await loadAndRenderSchedule(period);
+      } catch(e) {
+        alert('Error: ' + e.message);
+        openBtn.disabled = false;
       }
     });
   });
@@ -1847,7 +1899,12 @@ let _availAgentId   = null;
 let _availDefaults  = null;
 let _availPeriodId  = null;
 let _savedOverrides = [];
-let _pendingOvr     = {};  // dateStr -> { is_available: bool }
+// dateStr -> { dayWide?: bool, shifts?: { [shiftId]: bool } }
+// dayWide and shifts are mutually exclusive per date — setting one clears
+// the other, so a day is always either "whole-day override", "customized by
+// shift", or (neither present) "using the standing weekly default".
+let _pendingOvr      = {};
+let _selectedOvrDate = null; // date currently expanded in the day panel, or null
 
 async function loadAvailAgents(officeId) {
   const sel = document.getElementById('avail-agent-select');
@@ -2009,27 +2066,46 @@ function populateAvailPeriods() {
 
 document.getElementById('avail-period-select').addEventListener('change', onAvailPeriodChange);
 
+// Rebuilds the { dayWide, shifts } working state from the flat list of saved
+// override rows the API returns (one row per date, or one row per date+shift
+// for shift-specific overrides — shift_id is null for a whole-day row).
+function pendingOvrFromSaved(rows) {
+  const map = {};
+  for (const o of rows) {
+    if (!map[o.override_date]) map[o.override_date] = {};
+    if (o.shift_id == null) {
+      map[o.override_date].dayWide = o.is_available;
+    } else {
+      if (!map[o.override_date].shifts) map[o.override_date].shifts = {};
+      map[o.override_date].shifts[o.shift_id] = o.is_available;
+    }
+  }
+  return map;
+}
+
 async function onAvailPeriodChange() {
   const periodId = parseInt(document.getElementById('avail-period-select').value, 10);
   const calWrap  = document.getElementById('avail-cal-wrap');
   const msg      = document.getElementById('avail-overrides-msg');
   if (!periodId || !_availAgentId) { calWrap.style.display = 'none'; return; }
-  _availPeriodId  = periodId;
-  _pendingOvr     = {};
-  _savedOverrides = [];
+  _availPeriodId    = periodId;
+  _pendingOvr       = {};
+  _savedOverrides   = [];
+  _selectedOvrDate  = null;
   calWrap.style.display = 'none';
   msg.className = 'inline-msg'; msg.textContent = '';
   try {
     _savedOverrides = await api('GET', `/api/floor/availability/overrides/${_availAgentId}/${periodId}`);
-    for (const o of _savedOverrides) {
-      _pendingOvr[o.override_date] = { is_available: o.is_available };
-    }
+    _pendingOvr = pendingOvrFromSaved(_savedOverrides);
     calWrap.style.display = 'block';
     renderAvailCalendar();
+    renderOvrDayPanel();
   } catch(e) {
     msg.className = 'inline-msg err'; msg.textContent = e.message;
   }
 }
+
+const OVR_DAY_FIELDS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // matches Date.getDay()
 
 function renderAvailCalendar() {
   if (!_availDefaults || !_availPeriodId) return;
@@ -2039,51 +2115,135 @@ function renderAvailCalendar() {
   const year = period.period_year;
   const month = period.period_month;  // 1-based
   const daysInMonth = new Date(year, month, 0).getDate();
-  const jsFirstDay  = new Date(year, month - 1, 1).getDay();  // 0=Sun
-  const startOffset = jsFirstDay === 0 ? 6 : jsFirstDay - 1;  // Mon-first
+  const startOffset = new Date(year, month - 1, 1).getDay();  // 0=Sun, already Sun-first
 
-  const dayFields = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   let cells = '';
 
   for (let i = 0; i < startOffset; i++) cells += '<div class="cal-day empty"></div>';
 
   for (let d = 1; d <= daysInMonth; d++) {
-    const jsDay  = new Date(year, month - 1, d).getDay();
-    const dayIdx = jsDay === 0 ? 6 : jsDay - 1;
-    const field  = dayFields[dayIdx];
+    const jsDay   = new Date(year, month - 1, d).getDay();
+    const field   = OVR_DAY_FIELDS[jsDay];
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const defaultOn = !!_availDefaults[field];
-    const override  = _pendingOvr[dateStr];
+    const ovr       = _pendingOvr[dateStr];
 
     let cls;
-    if (override !== undefined) {
-      cls = override.is_available ? 'override-on' : 'override-off';
+    if (ovr && ovr.shifts && Object.keys(ovr.shifts).length) {
+      cls = 'override-partial';
+    } else if (ovr && ovr.dayWide !== undefined) {
+      cls = ovr.dayWide ? 'override-on' : 'override-off';
     } else {
       cls = defaultOn ? 'default-on' : 'default-off';
     }
-    cells += `<div class="cal-day ${cls}" data-date="${dateStr}" data-default="${defaultOn ? '1' : '0'}">${d}</div>`;
+    if (dateStr === _selectedOvrDate) cls += ' selected';
+    cells += `<div class="cal-day ${cls}" data-date="${dateStr}">${d}</div>`;
   }
 
   const grid = document.getElementById('avail-cal-grid');
   grid.innerHTML = cells;
   grid.querySelectorAll('.cal-day:not(.empty)').forEach(cell =>
-    cell.addEventListener('click', () => toggleCalDay(cell))
+    cell.addEventListener('click', () => selectOvrDay(cell.dataset.date))
   );
 }
 
-function toggleCalDay(cell) {
-  const date      = cell.dataset.date;
-  const defaultOn = cell.dataset.default === '1';
-  const override  = _pendingOvr[date];
-
-  if (override !== undefined) {
-    delete _pendingOvr[date];           // remove override → revert to standing default
-  } else if (defaultOn) {
-    _pendingOvr[date] = { is_available: false };  // block a normally-available day
-  } else {
-    _pendingOvr[date] = { is_available: true };   // add an off-by-default day
-  }
+function selectOvrDay(dateStr) {
+  _selectedOvrDate = _selectedOvrDate === dateStr ? null : dateStr; // click again to close
   renderAvailCalendar();
+  renderOvrDayPanel();
+}
+
+function renderOvrDayPanel() {
+  const panel = document.getElementById('ovr-day-panel');
+  if (!_selectedOvrDate) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+
+  const date  = _selectedOvrDate;
+  const dt    = new Date(date + 'T00:00:00');
+  const field = OVR_DAY_FIELDS[dt.getDay()];
+  const label = dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const defaultOn = !!_availDefaults[field];
+  const ovr = _pendingOvr[date] || {};
+
+  const stateLabel = (ovr.shifts && Object.keys(ovr.shifts).length) ? 'Custom by shift'
+    : ovr.dayWide !== undefined ? (ovr.dayWide ? 'Available (override)' : 'Unavailable (override)')
+    : (defaultOn ? 'Available (standing default)' : 'Unavailable (standing default)');
+
+  // Only shifts that actually run on this day of week are shown — an
+  // override for a shift that never operates that day would be a no-op.
+  const relevantShifts = _shifts.filter(s => s.is_active && s[field]);
+
+  const shiftRows = relevantShifts.length
+    ? relevantShifts.map(s => {
+        const shiftOvr = ovr.shifts ? ovr.shifts[s.id] : undefined;
+        const effective = shiftOvr !== undefined ? shiftOvr
+          : ovr.dayWide !== undefined ? ovr.dayWide
+          : defaultOn;
+        return `<div class="ovr-shift-row">
+          <span>${esc(s.name)} <span style="color:var(--muted);font-size:11px">${fmt12(s.start_time)}–${fmt12(s.end_time)}</span></span>
+          <button type="button" class="ovr-shift-toggle ${effective ? 'on' : 'off'}" data-shift="${s.id}">${effective ? 'Available' : 'Unavailable'}</button>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:13px">No shifts run on this day of week.</div>';
+
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="cal-day-panel-hdr">
+      <strong>${esc(label)}</strong>
+      <span style="color:var(--muted);font-size:12px">${stateLabel}</span>
+      <button type="button" class="close-btn" id="ovr-panel-close" title="Close">✕</button>
+    </div>
+    <div class="cal-day-panel-actions">
+      <button type="button" class="btn-secondary" id="ovr-day-avail">Available All Day</button>
+      <button type="button" class="btn-secondary" id="ovr-day-unavail">Unavailable All Day</button>
+      <button type="button" class="btn-secondary" id="ovr-day-clear">Use Standing Default</button>
+    </div>
+    <div class="cal-day-panel-shifts">${shiftRows}</div>
+  `;
+
+  document.getElementById('ovr-panel-close').addEventListener('click', () => {
+    _selectedOvrDate = null;
+    renderAvailCalendar();
+    renderOvrDayPanel();
+  });
+  document.getElementById('ovr-day-avail').addEventListener('click', () => setDayWideOverride(date, true));
+  document.getElementById('ovr-day-unavail').addEventListener('click', () => setDayWideOverride(date, false));
+  document.getElementById('ovr-day-clear').addEventListener('click', () => clearDayOverride(date));
+  panel.querySelectorAll('.ovr-shift-toggle').forEach(btn => {
+    btn.addEventListener('click', () => toggleShiftOverride(date, parseInt(btn.dataset.shift, 10)));
+  });
+}
+
+// Whole-day override — the fast/simple case. Clears any per-shift
+// customization for the date, since a blanket day setting and individual
+// shift exceptions on the same date would contradict each other.
+function setDayWideOverride(date, isAvailable) {
+  _pendingOvr[date] = { dayWide: isAvailable };
+  renderAvailCalendar();
+  renderOvrDayPanel();
+}
+
+function clearDayOverride(date) {
+  delete _pendingOvr[date];
+  renderAvailCalendar();
+  renderOvrDayPanel();
+}
+
+// Per-shift override — clears any whole-day override for the date, since
+// customizing by shift supersedes a blanket setting.
+function toggleShiftOverride(date, shiftId) {
+  if (!_pendingOvr[date]) _pendingOvr[date] = {};
+  delete _pendingOvr[date].dayWide;
+  if (!_pendingOvr[date].shifts) _pendingOvr[date].shifts = {};
+
+  const dt = new Date(date + 'T00:00:00');
+  const field = OVR_DAY_FIELDS[dt.getDay()];
+  const defaultOn = !!_availDefaults[field];
+  const current = _pendingOvr[date].shifts[shiftId];
+  const currentEffective = current !== undefined ? current : defaultOn;
+  _pendingOvr[date].shifts[shiftId] = !currentEffective;
+
+  renderAvailCalendar();
+  renderOvrDayPanel();
 }
 
 document.getElementById('avail-save-defaults').addEventListener('click', async () => {
@@ -2130,20 +2290,26 @@ document.getElementById('avail-save-overrides').addEventListener('click', async 
   msg.className = 'inline-msg'; msg.textContent = '';
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Saving…';
 
-  const overrides = Object.entries(_pendingOvr).map(([date, val]) => ({
-    override_date: date, shift_id: null, is_available: val.is_available, note: null
-  }));
+  const overrides = [];
+  for (const [date, val] of Object.entries(_pendingOvr)) {
+    if (val.dayWide !== undefined) {
+      overrides.push({ override_date: date, shift_id: null, is_available: val.dayWide, note: null });
+    }
+    if (val.shifts) {
+      for (const [shiftId, isAvailable] of Object.entries(val.shifts)) {
+        overrides.push({ override_date: date, shift_id: parseInt(shiftId, 10), is_available: isAvailable, note: null });
+      }
+    }
+  }
 
   try {
     _savedOverrides = await api('PUT',
       `/api/floor/availability/overrides/${_availAgentId}/${_availPeriodId}`,
       { overrides }
     );
-    _pendingOvr = {};
-    for (const o of _savedOverrides) {
-      _pendingOvr[o.override_date] = { is_available: o.is_available };
-    }
+    _pendingOvr = pendingOvrFromSaved(_savedOverrides);
     renderAvailCalendar();
+    renderOvrDayPanel();
     msg.className = 'inline-msg ok'; msg.textContent = 'Saved.';
     setTimeout(() => { msg.textContent = ''; }, 2500);
   } catch(e) {
@@ -2153,11 +2319,9 @@ document.getElementById('avail-save-overrides').addEventListener('click', async 
 });
 
 document.getElementById('avail-reset-overrides').addEventListener('click', () => {
-  _pendingOvr = {};
-  for (const o of _savedOverrides) {
-    _pendingOvr[o.override_date] = { is_available: o.is_available };
-  }
+  _pendingOvr = pendingOvrFromSaved(_savedOverrides);
   renderAvailCalendar();
+  renderOvrDayPanel();
 });
 
 // ── Publish tab ─────────────────────────────────────────────────────────────
@@ -2357,6 +2521,7 @@ async function publishSchedule(periodId, monthName) {
                 <div class="stat-sm-lbl">Emails sent</div>
               </div>
             </div>
+            ${result.open_slots > 0 ? `<p style="font-size:13px;color:var(--muted);margin-top:12px">${result.open_cal_events_created} of ${result.open_slots} open shift${result.open_slots !== 1 ? 's' : ''} posted to the calendar as OPEN.</p>` : ''}
             ${result.errors.length ? `<p style="color:var(--amber);font-size:13px;margin-top:12px">⚠ ${result.errors.length} non-critical error(s) — calendar or email deliveries that failed individually: ${result.errors.map(esc).join('; ')}</p>` : '<p style="color:var(--green);font-size:13px;margin-top:12px">✓ All done. Agents have been notified.</p>'}
           </div>
         </div>`;
