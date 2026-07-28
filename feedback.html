@@ -121,6 +121,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-question{background:#D1FAE5;color:#065F46}
 .badge-open{background:#FEF3C7;color:#92400E}
 .badge-in_progress{background:#DBEAFE;color:#1D4ED8}
+.badge-waiting{background:#FFE4E6;color:#9F1239}
 .badge-resolved{background:#D1FAE5;color:#065F46}
 .badge-tool{background:#F3E8FF;color:#6D28D9}
 
@@ -303,6 +304,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <option value="">All statuses</option>
           <option value="open">Open</option>
           <option value="in_progress">In Progress</option>
+          <option value="waiting">Waiting for Input</option>
           <option value="resolved">Resolved</option>
         </select>
         <select id="f-tool-filter" onchange="renderFeed()">
@@ -544,7 +546,8 @@ function mgrControlsHtml(item) {
       </div>`;
   }
   const progressOpt = `<option value="open"${item.status==='open'?' selected':''}>Open</option>
-    <option value="in_progress"${item.status==='in_progress'?' selected':''}>In Progress</option>`;
+    <option value="in_progress"${item.status==='in_progress'?' selected':''}>In Progress</option>
+    <option value="waiting"${item.status==='waiting'?' selected':''}>Waiting for Input</option>`;
   return `
     <div class="mgr-quick">
       <select class="mgr-select" id="ssel-${item.id}">${progressOpt}</select>
@@ -565,7 +568,7 @@ function renderFeed() {
   const sf = document.getElementById('f-status-filter').value;
   const lf = document.getElementById('f-tool-filter').value;
 
-  const STATUS_ORDER = { in_progress: 0, open: 1, resolved: 2 };
+  const STATUS_ORDER = { in_progress: 0, waiting: 1, open: 2, resolved: 3 };
   const items = allItems
     .filter(i => (!tf || i.type === tf) && (!sf || i.status === sf) && (!lf || i.tool_id === lf))
     .sort((a, b) => (STATUS_ORDER[a.status] ?? 1) - (STATUS_ORDER[b.status] ?? 1));
@@ -581,7 +584,7 @@ function renderFeed() {
     const d = new Date(item.created_at);
     const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const tool = TOOL_NAMES[item.tool_id] || item.tool_id;
-    const opts = ['open','in_progress','resolved']
+    const opts = ['open','in_progress','waiting','resolved']
       .map(s => `<option value="${s}"${s===item.status?' selected':''}>${fmtStatus(s)}</option>`)
       .join('');
     const up   = item.upvotes   || 0;
@@ -883,7 +886,7 @@ function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function fmtType(t) { return {bug:'Bug',suggestion:'Suggestion',question:'Question'}[t] || t; }
-function fmtStatus(s) { return {open:'Open',in_progress:'In Progress',resolved:'Resolved'}[s] || s; }
+function fmtStatus(s) { return {open:'Open',in_progress:'In Progress',waiting:'Waiting for Input',resolved:'Resolved'}[s] || s; }
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Feedback',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
