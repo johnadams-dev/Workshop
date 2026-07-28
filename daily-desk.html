@@ -1643,12 +1643,35 @@ tbody tr.clickable { cursor: pointer; }
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
               <select id="nl-property-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
                 <option value="">—</option>
-                <option value="Residential">Residential</option>
-                <option value="Condo/Townhome">Condo/Townhome</option>
-                <option value="Commercial">Commercial</option>
-                <option value="Land">Land</option>
-                <option value="Multi-Family">Multi-Family</option>
-                <option value="Mobile/Manufactured">Mobile/Manufactured</option>
+                <optgroup label="Residential">
+                  <option value="Single Family">Single Family</option>
+                  <option value="Condominium">Condominium</option>
+                  <option value="Single Family Attached">Single Family Attached</option>
+                  <option value="Condotel">Condotel</option>
+                </optgroup>
+                <optgroup label="Manufactured">
+                  <option value="Manufactured Home w/ Land">Manufactured Home w/ Land</option>
+                  <option value="Manufactured Home no Land">Manufactured Home no Land</option>
+                </optgroup>
+                <optgroup label="Multi-Unit">
+                  <option value="Duplex">Duplex</option>
+                  <option value="Triplex">Triplex</option>
+                  <option value="Fourplex">Fourplex</option>
+                  <option value="5+ Units">5+ Units</option>
+                </optgroup>
+                <optgroup label="Land">
+                  <option value="Single Family Lot">Single Family Lot</option>
+                  <option value="Multi Family Land">Multi Family Land</option>
+                  <option value="Commercial Land">Commercial Land</option>
+                  <option value="Industrial Land">Industrial Land</option>
+                </optgroup>
+                <optgroup label="Commercial">
+                  <option value="Commercial Land & Building">Commercial Land &amp; Building</option>
+                  <option value="Business Opportunity">Business Opportunity</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="Boat Slip">Boat Slip</option>
+                </optgroup>
               </select>
             </div>
           </div>
@@ -5153,10 +5176,7 @@ async function startTracking(deltaListingId) {
   if (row.bathrooms != null)
     document.getElementById('nl-bathrooms').value = row.bathrooms;
   if (row.property_type) {
-    const pt = document.getElementById('nl-property-type');
-    // try to match a dropdown option; store verbatim if no match
-    const matched = [...pt.options].some(o => o.value === row.property_type);
-    pt.value = matched ? row.property_type : '';
+    document.getElementById('nl-property-type').value = mapDeltaNetPropertyType(row.property_type);
   }
 
   // Pre-fill agent
@@ -5695,15 +5715,37 @@ function cvHeaders() {
 const cvQueue = [];
 let cvPendingListing = null;
 
+// Maps a raw DeltaNet property_type string to a dropdown option value.
+// Returns '' when ambiguous so the user is prompted to select manually.
+function mapDeltaNetPropertyType(raw) {
+  if (!raw) return '';
+  const s = raw.toLowerCase().trim();
+  if (s === 'single family' || s === 'residential' || s.includes('single family res')) return 'Single Family';
+  if (s === 'condominium' || s === 'condo' || s === 'condos') return 'Condominium';
+  if (s.includes('condotel')) return 'Condotel';
+  if (s.includes('townhome') || s.includes('townhouse') || (s.includes('attached') && !s.includes('manufactured'))) return 'Single Family Attached';
+  if (s.includes('duplex') || s === '2 family') return 'Duplex';
+  if (s.includes('triplex') || s === '3 family') return 'Triplex';
+  if (s.includes('fourplex') || s === '4 family' || s.includes('quadplex')) return 'Fourplex';
+  if (s.includes('5+') || s.includes('five or more') || s.includes('apartment')) return '5+ Units';
+  if (s.includes('boat slip')) return 'Boat Slip';
+  if (s.includes('business opportunity')) return 'Business Opportunity';
+  if (s.includes('industrial')) return 'Industrial Land';
+  if (s.includes('commercial land')) return 'Commercial Land';
+  if (s.includes('commercial')) return 'Commercial Land & Building';
+  // Ambiguous: manufactured (land or no land?), lot/land (which type?), multi-family
+  return '';
+}
+
 // ── DeltaNet normalize (same logic as camerons-lens.html) ──
 function cvNormalizeListing(l) {
   const truthy = v => v === true || v === 'true' || v === 1 || v === '1';
   const propType =
-    truthy(l.property_type_condo)          ? 'Condo / Townhouse' :
-    truthy(l.property_type_townhouse)      ? 'Condo / Townhouse' :
-    truthy(l.property_category_multi)      ? 'Multi-Family'      :
-    truthy(l.property_category_land)       ? 'Land'              :
-    truthy(l.property_category_commercial) ? 'Commercial'        : 'Residential';
+    truthy(l.property_type_condo)          ? 'Condominium'           :
+    truthy(l.property_type_townhouse)      ? 'Single Family Attached' :
+    truthy(l.property_category_multi)      ? ''                      :
+    truthy(l.property_category_land)       ? ''                      :
+    truthy(l.property_category_commercial) ? ''                      : 'Single Family';
   const street   = [l.address, l.address2, l.unit_number ? '#' + l.unit_number : null].filter(Boolean).join(' ');
   const city     = l.city || '';
   const state    = l.state || 'FL';
