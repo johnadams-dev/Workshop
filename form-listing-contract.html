@@ -88,6 +88,28 @@ function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].fi
 // meaningful for our own (ACC) agents. An external co-broke agent has no
 // pp_id at all, so the form showed "Co-Broke" in that slot instead.
 function agentNumber(a) { if (!a) return ''; return a.is_acc_agent ? fmt(a.pp_id) : 'Co-Broke'; }
+function splitLabel(a) { return a && a.commission_split != null ? ` — ${a.commission_split}%` : ''; }
+
+// Renders every agent on a side (listing or buyer), not just one — a 3+ way
+// split inserts multiple participant rows with the same role (e.g. two
+// co_listing_agent rows). Email/office/NRDS aren't needed on this form; an
+// external (non-ACC) agent has no Agent # in our system, so their brokerage
+// is shown instead — agent_office already resolves to the external brokerage
+// name for those rows (see the /api/forms/transaction/:id query).
+function agentSection(sectionLabel, list) {
+  if (!list.length) {
+    return `<div class="section-head">${sectionLabel}</div><table>${row2('Name', '', 'Agent #', '')}</table>`;
+  }
+  const rows = list.map(a => {
+    const brokerageRow = !a.is_acc_agent && a.agent_office
+      ? row2('Brokerage', fmt(a.agent_office), '', '')
+      : '';
+    return row2('Name', agentName(a) + splitLabel(a), 'Agent #', agentNumber(a)) + brokerageRow;
+  }).join('');
+  return `
+    <div class="section-head">${sectionLabel}</div>
+    <table>${rows}</table>`;
+}
 
 function row(label, ...vals) {
   const cells = vals.map(([w, v]) => `<td class="val" style="width:${w}">${v || '&nbsp;'}</td>`).join('');
@@ -104,9 +126,9 @@ function customerBlock(label, c) {
   return `
     <div class="section-head">${label}</div>
     <table>
-      ${row2('Name', fmt(c?.name), 'Email', fmt(c?.email))}
-      ${row2('Mailing Address', fmt(c?.address), 'City', fmt(c?.city))}
-      ${row2('State', fmt(c?.state), 'Zip', fmt(c?.zip))}
+      ${row2('Name', fmt(c?.name), 'Phone', fmt(c?.phone))}
+      ${row2('Email', fmt(c?.email), 'Mailing Address', fmt(c?.address))}
+      ${row2('City', fmt(c?.city), 'Zip', fmt(c?.zip))}
     </table>`;
 }
 function customerSections(label, list) {
@@ -133,9 +155,7 @@ function scenarioLabel(t) {
   return 'In-House Listing';
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, contract_event, customers }) {
-  const la    = listing_agent;
-  const ba    = buyers_agent || co_buyers_agent;
+function render({ transaction: t, mls_number, listing_agents, buyer_agents, closing_event, contract_event, customers }) {
   const badge = scenarioLabel(t);
   const custs = customers || [];
   const sellers = custs.filter(c => c.role === 'seller');
@@ -151,11 +171,10 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
     <div class="section-head">Property Information</div>
     <table>
       ${row2('Property Address', fmt(t.property_address), 'City', fmt(t.city))}
-      ${row2('State', fmt(t.state), 'Zip', fmt(t.zip))}
-      ${row2('Property Type', fmt(t.property_type), 'Bed/Bath', (t.bedrooms != null || t.bathrooms != null) ? `${fmt(t.bedrooms)} / ${fmt(t.bathrooms)}` : '')}
-      ${row2('MLS Number', fmt(mls_number), 'Office', fmt(t.office_name))}
-      ${row2('List Price', fmtMoney(t.current_price), 'List Date', fmtDate(t.list_date))}
-      ${row2('Expiration Date', fmtDate(t.expiration_date), '', '')}
+      ${row2('Zip', fmt(t.zip), 'Property Type', fmt(t.property_type))}
+      ${row2('Bed/Bath', (t.bedrooms != null || t.bathrooms != null) ? `${fmt(t.bedrooms)} / ${fmt(t.bathrooms)}` : '', 'MLS Number', fmt(mls_number))}
+      ${row2('Office', fmt(t.office_name), 'List Price', fmtMoney(t.current_price))}
+      ${row2('List Date', fmtDate(t.list_date), 'Expiration Date', fmtDate(t.expiration_date))}
     </table>
 
     <div class="section-head">Contract</div>
@@ -173,20 +192,9 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
 
     ${customerSections('Buyer / Tenant', buyers)}
 
-    <div class="section-head">Listing Agent</div>
-    <table>
-      ${row2('Name', agentName(la), 'Agent #', agentNumber(la))}
-      ${row2('Email', fmt(la?.email), 'Office', fmt(la?.agent_office || t.office_name))}
-      ${row2('NRDS ID', fmt(la?.nrds_id), '', '')}
-      ${co_listing_agent ? row2('Co-Listing Agent', agentName(co_listing_agent), 'Agent #', agentNumber(co_listing_agent)) : ''}
-    </table>
+    ${agentSection('Listing Agent', listing_agents || [])}
 
-    <div class="section-head">Buyer's Agent</div>
-    <table>
-      ${row2('Name', agentName(ba), 'Agent #', agentNumber(ba))}
-      ${row2('Email', fmt(ba?.email), 'Office', fmt(ba?.agent_office))}
-      ${row2('NRDS ID', fmt(ba?.nrds_id), '', '')}
-    </table>
+    ${agentSection("Buyer's Agent", buyer_agents || [])}
 
     <div class="section-head">Referral (if applicable)</div>
     <table>

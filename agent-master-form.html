@@ -351,10 +351,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           Create Google Workspace account
         </label>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-          <input type="checkbox" id="na-manufactured-homes">
-          Add to Manufactured Homes group
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="na-foundation-toggle" onchange="toggleFoundationFields()">
           Enroll in Foundation donation
         </label>
@@ -400,27 +396,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="modal-body" id="terminate-result-body"></div>
     <div class="modal-foot">
       <button class="btn btn-primary" onclick="closeTerminateResult()">Done</button>
-    </div>
-  </div>
-</div>
-
-<!-- Temp password display after Google account provisioning -->
-<div class="modal-overlay" id="pw-modal">
-  <div class="modal">
-    <div class="modal-head">Google Account Created <button onclick="onPwModalDone()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--muted);line-height:1.6">Share these credentials with the new agent. They will be prompted to set a new password on first sign-in.</p>
-      <div class="field"><label>Email</label><input type="text" id="pw-email" readonly style="font-family:monospace"></div>
-      <div class="field">
-        <label>Temporary password</label>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="pw-pass" readonly style="font-family:monospace;font-size:15px;font-weight:600;letter-spacing:.04em">
-          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('pw-pass').value);toast('Copied','ok')">Copy</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-primary" onclick="onPwModalDone()">Done</button>
     </div>
   </div>
 </div>
@@ -1297,19 +1272,12 @@ function toggleFoundationFields() {
   document.getElementById('na-foundation-fields').style.display = show ? '' : 'none';
 }
 
-function showTempPassword(email, tempPassword) {
-  document.getElementById('pw-email').value = email;
-  document.getElementById('pw-pass').value  = tempPassword;
-  document.getElementById('pw-modal').classList.add('open');
-}
-
 function showOnboardResult(data) {
   const STEP_LABELS = {
     db:                   'Agent record created in database',
     googleWorkspace:      'Google Workspace account provisioned',
     universalGroups:      'Added to universal email groups',
     officeGroup:          'Added to office email group',
-    manufacturedHomesGroup: 'Added to Manufactured Homes group',
     deltanet:             'DeltaNet account created',
     roster:               'Added to agent roster spreadsheet',
     welcomeEmailInternal: 'Internal welcome notification sent',
@@ -1360,7 +1328,6 @@ async function createAgent() {
   const languages       = document.getElementById('na-languages').value.trim();
   const website         = document.getElementById('na-website').value.trim();
   const provisionGoogle    = document.getElementById('na-provision-google').checked;
-  const manufacturedHomes  = document.getElementById('na-manufactured-homes').checked;
   const foundationToggle   = document.getElementById('na-foundation-toggle').checked;
   const foundationType     = foundationToggle ? document.getElementById('na-foundation-type').value : null;
   const foundationAmount   = foundationToggle ? parseFloat(document.getElementById('na-foundation-amount').value || '0') : null;
@@ -1385,7 +1352,6 @@ async function createAgent() {
         languages: languages || null,
         website: website || null,
         provisionGoogle,
-        manufacturedHomes,
         foundationDonationType:   foundationType,
         foundationDonationAmount: foundationAmount,
       }),
@@ -1397,10 +1363,7 @@ async function createAgent() {
     await load();
     const newAgent = allAgents.find(a => a.email === email);
 
-    if (data.tempPassword) {
-      _pendingRCAfterPW = newAgent ? { eventType: 'hired', agent: newAgent } : null;
-      showTempPassword(email, data.tempPassword);
-    } else if (newAgent) {
+    if (newAgent) {
       openRosterChangeModal('hired', newAgent);
     }
 
@@ -1589,7 +1552,6 @@ function renderRosterTable(records) {
 
 // ── Roster Change Modal ────────────────────────────────────────────────────────
 let _rcPendingAction  = null;
-let _pendingRCAfterPW = null;
 
 function openRosterChangeModal(eventType, agent, pendingAction = null) {
   _rcPendingAction = pendingAction;
@@ -1686,15 +1648,6 @@ async function submitRCModal() {
     toast('Failed to log: ' + e.message, 'err');
     btn.disabled = false;
     btn.textContent = 'Log Change';
-  }
-}
-
-function onPwModalDone() {
-  document.getElementById('pw-modal').classList.remove('open');
-  if (_pendingRCAfterPW) {
-    const { eventType, agent } = _pendingRCAfterPW;
-    _pendingRCAfterPW = null;
-    openRosterChangeModal(eventType, agent);
   }
 }
 
