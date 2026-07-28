@@ -363,9 +363,9 @@
         const soldWithDates = soldListings.filter(l => l.closeDate !== null);
         if (soldWithDates.length > 0) {
             const oldestDate = new Date(Math.min(...soldWithDates.map(l => l.closeDate.getTime())));
-            const now = new Date();
-            const monthsDiff = (now.getFullYear() - oldestDate.getFullYear()) * 12 + (now.getMonth() - oldestDate.getMonth());
-            monthsOfData = Math.max(1, Math.ceil(monthsDiff));
+            const newestDate = new Date(Math.max(...soldWithDates.map(l => l.closeDate.getTime())));
+            const monthsDiff = (newestDate.getFullYear() - oldestDate.getFullYear()) * 12 + (newestDate.getMonth() - oldestDate.getMonth());
+            monthsOfData = Math.max(1, monthsDiff + 1);
         }
         const salesPerMonth = soldListings.length / monthsOfData;
         const monthsSupply  = salesPerMonth > 0 ? activeListings.length / salesPerMonth : Infinity;

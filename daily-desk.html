@@ -637,7 +637,7 @@ tbody tr.clickable { cursor: pointer; }
 .drawer-head-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
 .drawer-addr { font-size: 16px; font-weight: 600; }
 .drawer-sub { font-size: 12px; color: var(--text-muted); font-family: var(--mono); margin-top: 2px; }
-.drawer-body { padding: 20px 22px; flex: 1; overflow-y: auto; }
+.drawer-body { padding: 20px 22px; flex: 1; min-height: 0; overflow-y: auto; }
 .drawer-foot { padding: 12px 22px; border-top: 1px solid var(--ink-border); flex-shrink: 0; background: var(--ink-mid); }
 
 .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 20px; }
@@ -2232,6 +2232,10 @@ tbody tr.clickable { cursor: pointer; }
       <div id="drawer-beds-baths-row" style="display:none">
         <div class="dfield-key">Beds / Baths</div>
         <div class="dfield-val" id="drawer-beds-baths">—</div>
+      </div>
+      <div id="drawer-source-row" style="display:none">
+        <div class="dfield-key" id="drawer-source-label">Source of Seller</div>
+        <div class="dfield-val" id="drawer-source">—</div>
       </div>
     </div>
 
@@ -5493,6 +5497,16 @@ function renderDrawer(t) {
     bedsBathsRow.style.display = '';
   } else {
     bedsBathsRow.style.display = 'none';
+  }
+
+  const sourceRow = document.getElementById('drawer-source-row');
+  const sourceVal = isContractView ? t.source_of_buyer : t.source_of_seller;
+  if (sourceVal) {
+    document.getElementById('drawer-source-label').textContent = isContractView ? 'Source of Buyer' : 'Source of Seller';
+    document.getElementById('drawer-source').textContent = sourceVal;
+    sourceRow.style.display = '';
+  } else {
+    sourceRow.style.display = 'none';
   }
 
   const clEl = document.getElementById('drawer-checklist');
