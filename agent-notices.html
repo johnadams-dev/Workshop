@@ -75,6 +75,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 .agent-note{background:var(--gold-lt);border:1px solid var(--gold);border-radius:7px;padding:10px 13px;font-size:12px;margin-bottom:16px;display:none}
 .agent-note.show{display:block}
+
+.mine-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.mine-row:last-child{border-bottom:none}
+.mine-row-summary{font-size:12px;color:var(--text)}
+.mine-row-date{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.btn-edit-mine{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--blue);color:var(--blue);background:#fff;border-radius:5px;cursor:pointer;flex-shrink:0;font-family:inherit}
+.btn-edit-mine:hover{background:#EFF6FF}
+.cancel-edit-link{font-size:12px;color:var(--muted);cursor:pointer;margin-right:auto;align-self:center;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -178,7 +186,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
     </div>
 
+    <div class="card" id="ul-mine-card" style="display:none">
+      <div class="card-title">Your upcoming listings</div>
+      <div id="ul-mine-list"></div>
+    </div>
+
     <div class="btn-row">
+      <span class="cancel-edit-link" id="ul-cancel-edit" style="display:none" onclick="cancelEditUpcoming()">Cancel edit</span>
       <button class="btn btn-primary" id="ul-submit-btn" onclick="submitUpcoming()">Submit Upcoming Listing</button>
     </div>
   </div>
@@ -234,7 +248,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
     </div>
 
+    <div class="card" id="bn-mine-card" style="display:none">
+      <div class="card-title">Your buyer needs</div>
+      <div id="bn-mine-list"></div>
+    </div>
+
     <div class="btn-row">
+      <span class="cancel-edit-link" id="bn-cancel-edit" style="display:none" onclick="cancelEditBuyer()">Cancel edit</span>
       <button class="btn btn-primary" id="bn-submit-btn" onclick="submitBuyerNeed()">Submit Buyer Need</button>
     </div>
   </div>
@@ -249,6 +269,11 @@ const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleu
 let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
 let isStaff = false;
 let agents  = [];
+
+let myUpcoming = [];
+let myBuyerNeeds = [];
+let editingUpcomingId = null;
+let editingBuyerId = null;
 
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
 
@@ -321,11 +346,12 @@ async function submitUpcoming() {
   const contactValue  = val('ul-contact-value');
   if (!contactValue) { toast('Please enter your contact info', 'err'); return; }
 
+  const isEditing = !!editingUpcomingId;
   const agentId = getSelectedAgentId('ul-upcoming-agent-select');
-  if (isStaff && !agentId) { toast('Please select an agent', 'err'); return; }
+  if (isStaff && !agentId && !isEditing) { toast('Please select an agent', 'err'); return; }
 
   const btn = document.getElementById('ul-submit-btn');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Submitting…';
+  btn.disabled = true; btn.innerHTML = `<span class="spin"></span>${isEditing ? 'Saving…' : 'Submitting…'}`;
 
   try {
     const body = {
@@ -342,24 +368,36 @@ async function submitUpcoming() {
     };
     if (agentId) body.agent_id = agentId;
 
-    const r = await fetch(`${PROXY}/notices/upcoming`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    const url = isEditing ? `${PROXY}/notices/upcoming/${editingUpcomingId}` : `${PROXY}/notices/upcoming`;
+    const r = await fetch(url, { method: isEditing ? 'PATCH' : 'POST', headers:H(), body:JSON.stringify(body) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
 
-    toast('Upcoming listing submitted — it will appear in the hotsheet.', 'ok');
-    // Reset form
-    ['ul-contact-value','ul-address','ul-city','ul-price-range','ul-expected-date','ul-comments'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-    document.getElementById('ul-bedrooms').value='';
-    document.getElementById('ul-bathrooms').value='';
-    document.getElementById('ul-has-agreement').checked=false;
-    document.getElementById('address-note').classList.remove('show');
-    const sel = document.getElementById('ul-upcoming-agent-select');
-    if (sel) sel.value='';
+    toast(isEditing ? 'Upcoming listing updated.' : 'Upcoming listing submitted — it will appear in the hotsheet.', 'ok');
+    resetUpcomingForm();
+    loadMyNotices();
   } catch(e) {
     toast('Failed: '+e.message, 'err');
   } finally {
-    btn.disabled=false; btn.textContent='Submit Upcoming Listing';
+    btn.disabled=false; btn.textContent = editingUpcomingId ? 'Save changes' : 'Submit Upcoming Listing';
   }
+}
+
+function resetUpcomingForm() {
+  ['ul-contact-value','ul-address','ul-city','ul-price-range','ul-expected-date','ul-comments'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('ul-bedrooms').value='';
+  document.getElementById('ul-bathrooms').value='';
+  document.getElementById('ul-has-agreement').checked=false;
+  document.getElementById('address-note').classList.remove('show');
+  const sel = document.getElementById('ul-upcoming-agent-select');
+  if (sel) sel.value='';
+  editingUpcomingId = null;
+  document.getElementById('ul-submit-btn').textContent = 'Submit Upcoming Listing';
+  document.getElementById('ul-cancel-edit').style.display = 'none';
+}
+
+function cancelEditUpcoming() {
+  resetUpcomingForm();
 }
 
 function updateBnContactPlaceholder() {
@@ -374,11 +412,12 @@ async function submitBuyerNeed() {
   const contactValue  = val('bn-contact-value');
   if (!contactValue) { toast('Please enter your contact info', 'err'); return; }
 
+  const isEditing = !!editingBuyerId;
   const agentId = getSelectedAgentId('bn-buyer-agent-select');
-  if (isStaff && !agentId) { toast('Please select an agent', 'err'); return; }
+  if (isStaff && !agentId && !isEditing) { toast('Please select an agent', 'err'); return; }
 
   const btn = document.getElementById('bn-submit-btn');
-  btn.disabled=true; btn.innerHTML='<span class="spin"></span>Submitting…';
+  btn.disabled=true; btn.innerHTML=`<span class="spin"></span>${isEditing ? 'Saving…' : 'Submitting…'}`;
 
   try {
     const body = {
@@ -392,24 +431,128 @@ async function submitBuyerNeed() {
     };
     if (agentId) body.agent_id = agentId;
 
-    const r = await fetch(`${PROXY}/notices/buyer-needs`, { method:'POST', headers:H(), body:JSON.stringify(body) });
+    const url = isEditing ? `${PROXY}/notices/buyer-needs/${editingBuyerId}` : `${PROXY}/notices/buyer-needs`;
+    const r = await fetch(url, { method: isEditing ? 'PATCH' : 'POST', headers:H(), body:JSON.stringify(body) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
 
-    toast('Buyer need submitted — it will appear in the hotsheet.', 'ok');
-    ['bn-contact-value','bn-area','bn-max-price','bn-comments'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
-    document.getElementById('bn-min-bedrooms').value='';
-    document.getElementById('bn-min-bathrooms').value='';
-    document.getElementById('bn-contact-method').value='phone';
-    updateBnContactPlaceholder();
-    const sel = document.getElementById('bn-buyer-agent-select');
-    if (sel) sel.value='';
+    toast(isEditing ? 'Buyer need updated.' : 'Buyer need submitted — it will appear in the hotsheet.', 'ok');
+    resetBuyerForm();
+    loadMyNotices();
   } catch(e) {
     toast('Failed: '+e.message, 'err');
   } finally {
-    btn.disabled=false; btn.textContent='Submit Buyer Need';
+    btn.disabled=false; btn.textContent = editingBuyerId ? 'Save changes' : 'Submit Buyer Need';
   }
 }
+
+function resetBuyerForm() {
+  ['bn-contact-value','bn-area','bn-max-price','bn-comments'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('bn-min-bedrooms').value='';
+  document.getElementById('bn-min-bathrooms').value='';
+  const sel = document.getElementById('bn-buyer-agent-select');
+  if (sel) sel.value='';
+  editingBuyerId = null;
+  document.getElementById('bn-submit-btn').textContent = 'Submit Buyer Need';
+  document.getElementById('bn-cancel-edit').style.display = 'none';
+  document.getElementById('bn-contact-method').value='phone';
+  updateBnContactPlaceholder();
+}
+
+function cancelEditBuyer() {
+  resetBuyerForm();
+}
+
+// ── My notices (agents manage their own) ───────────────────────────────────────
+function fmtDateShort(d) { return d ? String(d).split('T')[0] : ''; }
+
+function mineSummary(type, item) {
+  if (type === 'upcoming') {
+    return [item.address, item.city, item.price_range].filter(Boolean).join(' · ') || 'Upcoming listing';
+  }
+  return [item.area, item.max_price ? `up to ${item.max_price}` : ''].filter(Boolean).join(' · ') || 'Buyer need';
+}
+
+function renderMineList(type) {
+  const items = type === 'upcoming' ? myUpcoming : myBuyerNeeds;
+  const card = document.getElementById(type === 'upcoming' ? 'ul-mine-card' : 'bn-mine-card');
+  const list = document.getElementById(type === 'upcoming' ? 'ul-mine-list' : 'bn-mine-list');
+  if (!items.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
+  card.style.display = 'block';
+  list.innerHTML = items.map(item => `
+    <div class="mine-row">
+      <div>
+        <div class="mine-row-summary">${esc(mineSummary(type, item))}</div>
+        <span class="mine-row-date">Posted ${esc(fmtDateShort(item.created_at))}</span>
+      </div>
+      <button type="button" class="btn-edit-mine" data-type="${type}" data-id="${item.id}">Edit</button>
+    </div>`).join('');
+}
+
+async function loadMyNotices() {
+  if (isStaff) return;
+  try {
+    const [upRes, bnRes] = await Promise.all([
+      fetch(`${PROXY}/notices/upcoming`, { headers: H() }),
+      fetch(`${PROXY}/notices/buyer-needs`, { headers: H() }),
+    ]);
+    const up = upRes.ok ? await upRes.json() : [];
+    const bn = bnRes.ok ? await bnRes.json() : [];
+    myUpcoming = (up || []).filter(r => (r.agent_email || '').toLowerCase() === USER_EMAIL.toLowerCase());
+    myBuyerNeeds = (bn || []).filter(r => (r.agent_email || '').toLowerCase() === USER_EMAIL.toLowerCase());
+    renderMineList('upcoming');
+    renderMineList('buyer');
+  } catch(_) {}
+}
+
+function startEditUpcoming(item) {
+  editingUpcomingId = item.id;
+  document.getElementById('ul-contact-method').value = item.contact_method || 'phone';
+  document.getElementById('ul-contact-value').value = item.contact_value || '';
+  updateContactPlaceholder();
+  document.getElementById('ul-address').value = item.address || '';
+  document.getElementById('ul-city').value = item.city || '';
+  document.getElementById('ul-price-range').value = item.price_range || '';
+  document.getElementById('ul-bedrooms').value = item.bedrooms ?? '';
+  document.getElementById('ul-bathrooms').value = item.bathrooms ?? '';
+  document.getElementById('ul-expected-date').value = fmtDateShort(item.expected_date);
+  document.getElementById('ul-has-agreement').checked = !!item.has_agreement;
+  toggleAddressNote();
+  document.getElementById('ul-comments').value = item.comments || '';
+  document.getElementById('ul-submit-btn').textContent = 'Save changes';
+  document.getElementById('ul-cancel-edit').style.display = 'inline';
+  switchTab('upcoming', document.querySelector('.tab[onclick*="upcoming"]'));
+  document.getElementById('tab-upcoming').scrollIntoView({ behavior: 'smooth' });
+}
+
+function startEditBuyer(item) {
+  editingBuyerId = item.id;
+  document.getElementById('bn-contact-method').value = item.contact_method || 'phone';
+  document.getElementById('bn-contact-value').value = item.contact_value || '';
+  updateBnContactPlaceholder();
+  document.getElementById('bn-area').value = item.area || '';
+  document.getElementById('bn-min-bedrooms').value = item.min_bedrooms ?? '';
+  document.getElementById('bn-min-bathrooms').value = item.min_bathrooms ?? '';
+  document.getElementById('bn-max-price').value = item.max_price ?? '';
+  document.getElementById('bn-comments').value = item.comments || '';
+  document.getElementById('bn-submit-btn').textContent = 'Save changes';
+  document.getElementById('bn-cancel-edit').style.display = 'inline';
+  switchTab('buyer', document.querySelector('.tab[onclick*="buyer"]'));
+  document.getElementById('tab-buyer').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.btn-edit-mine');
+  if (!btn) return;
+  const id = parseInt(btn.dataset.id, 10);
+  if (btn.dataset.type === 'upcoming') {
+    const item = myUpcoming.find(r => r.id === id);
+    if (item) startEditUpcoming(item);
+  } else {
+    const item = myBuyerNeeds.find(r => r.id === id);
+    if (item) startEditBuyer(item);
+  }
+});
 
 // ── Init after sign-in ────────────────────────────────────────────────────────
 async function init() {
@@ -444,6 +587,7 @@ async function init() {
   }
 
   document.getElementById('main').style.display = 'block';
+  loadMyNotices();
 }
 
 // ── Google Sign-In ────────────────────────────────────────────────────────────

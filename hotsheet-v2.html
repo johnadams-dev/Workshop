@@ -314,6 +314,43 @@
   .card-comments { font-size: 12px; color: var(--text-light); line-height: 1.5; }
   .card-footer-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-light); }
 
+  .card-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .card-action-btn {
+    font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+    border-radius: 6px; padding: 4px 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--brand);
+  }
+  .card-action-btn:hover { background: var(--bg); }
+  .card-action-btn.danger { color: var(--red); border-color: #f3c9c9; }
+  .card-action-btn.danger:hover { background: #fef2f2; }
+
+  /* ── Edit modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,41,66,.5); z-index: 800;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-box {
+    background: var(--surface); border-radius: var(--radius); padding: 24px;
+    width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal-box h3 { font-family: 'Playfair Display', serif; color: var(--brand); font-size: 18px; margin-bottom: 16px; }
+  .modal-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .modal-field label { font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .4px; }
+  .modal-field input, .modal-field select, .modal-field textarea {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; font-family: inherit; color: var(--text); outline: none;
+  }
+  .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: var(--gold); }
+  .modal-field textarea { resize: vertical; min-height: 60px; }
+  .modal-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-checkbox { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 14px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+  .modal-btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+  .modal-btn-cancel { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .modal-btn-save { background: var(--brand); color: #fff; }
+  .modal-btn-save:disabled { opacity: .6; cursor: not-allowed; }
+
   .card-two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -384,6 +421,17 @@
     <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
     <div class="foot">Access restricted to @adamscameron.com accounts.</div>
     <a href="./index.html">← Tools</a>
+  </div>
+</div>
+
+<div id="edit-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 id="edit-modal-title">Edit notice</h3>
+    <div id="edit-modal-fields"></div>
+    <div class="modal-actions">
+      <button type="button" class="modal-btn modal-btn-cancel" onclick="closeEditModal()">Cancel</button>
+      <button type="button" class="modal-btn modal-btn-save" id="edit-modal-save" onclick="saveEditModal()">Save changes</button>
+    </div>
   </div>
 </div>
 
@@ -738,7 +786,17 @@ function changeCard(item) {
   </div>`;
 }
 
-function upcomingCard(item) {
+function noticeActions(item, type, isStaffUser) {
+  const isOwner = item.agentEmail && userEmail && item.agentEmail.toLowerCase() === userEmail.toLowerCase();
+  if (!isOwner && !isStaffUser) return "";
+  return `
+      <div class="card-actions">
+        ${isOwner ? `<button type="button" class="card-action-btn" data-action="edit" data-type="${type}" data-id="${item.id}">Edit</button>` : ""}
+        ${isStaffUser ? `<button type="button" class="card-action-btn danger" data-action="remove" data-type="${type}" data-id="${item.id}">Remove</button>` : ""}
+      </div>`;
+}
+
+function upcomingCard(item, isStaffUser) {
   const addr = item.address || "";
   const contactHref = (item.contact || item.agentEmail)
     ? `${item.contactMethod === "phone" ? "tel:" : "mailto:"}${item.contact || item.agentEmail}` : "";
@@ -761,11 +819,12 @@ function upcomingCard(item) {
         ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
       </div>
       <div class="card-date">Submitted ${fmtDate(item.timestamp)}</div>
+      ${noticeActions(item, "upcoming", isStaffUser)}
     </div>
   </div>`;
 }
 
-function buyerCard(item) {
+function buyerCard(item, isStaffUser) {
   const contactHref = (item.contact || item.agentEmail)
     ? `${item.contactMethod === "phone" ? "tel:" : "mailto:"}${item.contact || item.agentEmail}` : "";
   return `
@@ -785,6 +844,7 @@ function buyerCard(item) {
         ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
       </div>
       <div class="card-date">Submitted ${fmtDate(item.timestamp)}</div>
+      ${noticeActions(item, "buyer", isStaffUser)}
     </div>
   </div>`;
 }
@@ -875,6 +935,7 @@ function render() {
   const data = STATE.data;
   if (!data) return;
   const isManager = STATE.userRole === 'manager';
+  const isStaffUser = STATE.userRole === 'manager' || STATE.userRole === 'staff';
 
   const sinceDisp = new Date(data.since).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" });
   const untilDisp = new Date(data.until).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" });
@@ -907,8 +968,8 @@ function render() {
       `<span class="badge badge-triple">⚾ Triple</span> Both sides + CMG or AC Title &nbsp;` +
       `<span class="badge badge-homerun">🏠 Home Run</span> Both sides + CMG + AC Title`),
     section("Changes / Withdrawn / Expired","🔄", "changes",   data.changes.map(changeCard)),
-    section("Upcoming Listings",           "📅", "upcoming",   data.upcoming.map(upcomingCard)),
-    section("Buyer Needs",                 "🔍", "buyers",     data.buyerNeeds.map(buyerCard)),
+    section("Upcoming Listings",           "📅", "upcoming",   data.upcoming.map(u => upcomingCard(u, isStaffUser))),
+    section("Buyer Needs",                 "🔍", "buyers",     data.buyerNeeds.map(b => buyerCard(b, isStaffUser))),
     section("Open Houses",                 "🏠", "openhouses", [...data.openHouses].sort((a, b) => {
       const d = (a.openDate || "").localeCompare(b.openDate || "");
       if (d !== 0) return d;
@@ -974,6 +1035,134 @@ document.getElementById('dateForm').addEventListener("submit", e => {
   e.preventDefault();
   fetchAndRender();
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   NOTICE EDIT / REMOVE (Upcoming Listings & Buyer Needs)
+═══════════════════════════════════════════════════════════════════ */
+let editState = null; // { type: 'upcoming'|'buyer', id }
+
+document.getElementById('main').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const { action, type, id } = btn.dataset;
+  if (action === 'remove') handleRemove(type, id);
+  if (action === 'edit') openEditModal(type, id);
+});
+
+async function handleRemove(type, id) {
+  if (!confirm('Remove this notice? This cannot be undone.')) return;
+  const path = type === 'upcoming' ? `/notices/upcoming/${id}` : `/notices/buyer-needs/${id}`;
+  try {
+    await api(path, { method: 'DELETE' });
+    await fetchAndRender();
+  } catch (e) {
+    alert('Failed to remove: ' + e.message);
+  }
+}
+
+function upcomingEditFields(item) {
+  return `
+    <div class="modal-field"><label>Contact method</label>
+      <select id="em-contact-method">
+        <option value="phone" ${item.contact_method === 'phone' ? 'selected' : ''}>Phone</option>
+        <option value="email" ${item.contact_method === 'email' ? 'selected' : ''}>Email</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Contact value</label><input type="text" id="em-contact-value" value="${escapeHtml(item.contact_value || '')}"></div>
+    <div class="modal-field"><label>Address</label><input type="text" id="em-address" value="${escapeHtml(item.address || '')}"></div>
+    <div class="modal-field"><label>City</label><input type="text" id="em-city" value="${escapeHtml(item.city || '')}"></div>
+    <div class="modal-field-row">
+      <div class="modal-field"><label>Bedrooms</label><input type="number" min="0" step="1" id="em-bedrooms" value="${item.bedrooms ?? ''}"></div>
+      <div class="modal-field"><label>Bathrooms</label><input type="number" min="0" step="0.5" id="em-bathrooms" value="${item.bathrooms ?? ''}"></div>
+    </div>
+    <div class="modal-field"><label>Price range</label><input type="text" id="em-price-range" value="${escapeHtml(item.price_range || '')}"></div>
+    <div class="modal-field"><label>Expected on market</label><input type="date" id="em-expected-date" value="${item.expected_date ? String(item.expected_date).split('T')[0] : ''}"></div>
+    <label class="modal-checkbox"><input type="checkbox" id="em-has-agreement" ${item.has_agreement ? 'checked' : ''}> Listing agreement signed</label>
+    <div class="modal-field"><label>Comments</label><textarea id="em-comments">${escapeHtml(item.comments || '')}</textarea></div>`;
+}
+
+function buyerEditFields(item) {
+  return `
+    <div class="modal-field"><label>Contact method</label>
+      <select id="em-contact-method">
+        <option value="phone" ${item.contact_method === 'phone' ? 'selected' : ''}>Phone</option>
+        <option value="email" ${item.contact_method === 'email' ? 'selected' : ''}>Email</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Contact value</label><input type="text" id="em-contact-value" value="${escapeHtml(item.contact_value || '')}"></div>
+    <div class="modal-field"><label>Area / neighborhood</label><input type="text" id="em-area" value="${escapeHtml(item.area || '')}"></div>
+    <div class="modal-field-row">
+      <div class="modal-field"><label>Min bedrooms</label><input type="number" min="0" step="1" id="em-min-bedrooms" value="${item.min_bedrooms ?? ''}"></div>
+      <div class="modal-field"><label>Min bathrooms</label><input type="number" min="0" step="0.5" id="em-min-bathrooms" value="${item.min_bathrooms ?? ''}"></div>
+    </div>
+    <div class="modal-field"><label>Max price</label><input type="text" id="em-max-price" value="${escapeHtml(item.max_price ?? '')}"></div>
+    <div class="modal-field"><label>Comments</label><textarea id="em-comments">${escapeHtml(item.comments || '')}</textarea></div>`;
+}
+
+function collectUpcomingEdit() {
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+  return {
+    contact_method: document.getElementById('em-contact-method').value,
+    contact_value:  document.getElementById('em-contact-value').value.trim(),
+    address:        document.getElementById('em-address').value.trim() || undefined,
+    city:           document.getElementById('em-city').value.trim() || undefined,
+    bedrooms:       num(document.getElementById('em-bedrooms').value),
+    bathrooms:      num(document.getElementById('em-bathrooms').value),
+    price_range:    document.getElementById('em-price-range').value.trim() || undefined,
+    expected_date:  document.getElementById('em-expected-date').value || undefined,
+    has_agreement:  document.getElementById('em-has-agreement').checked,
+    comments:       document.getElementById('em-comments').value.trim() || undefined,
+  };
+}
+
+function collectBuyerEdit() {
+  const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+  return {
+    contact_method: document.getElementById('em-contact-method').value,
+    contact_value:  document.getElementById('em-contact-value').value.trim(),
+    area:           document.getElementById('em-area').value.trim() || undefined,
+    min_bedrooms:   num(document.getElementById('em-min-bedrooms').value),
+    min_bathrooms:  num(document.getElementById('em-min-bathrooms').value),
+    max_price:      document.getElementById('em-max-price').value.trim() || undefined,
+    comments:       document.getElementById('em-comments').value.trim() || undefined,
+  };
+}
+
+async function openEditModal(type, id) {
+  try {
+    const list = await api(type === 'upcoming' ? '/notices/upcoming' : '/notices/buyer-needs');
+    const item = list.find(r => String(r.id) === String(id));
+    if (!item) { alert('Notice not found — it may have been removed.'); return; }
+    editState = { type, id };
+    document.getElementById('edit-modal-title').textContent = type === 'upcoming' ? 'Edit Upcoming Listing' : 'Edit Buyer Need';
+    document.getElementById('edit-modal-fields').innerHTML = type === 'upcoming' ? upcomingEditFields(item) : buyerEditFields(item);
+    document.getElementById('edit-modal').style.display = 'flex';
+  } catch (e) {
+    alert('Failed to load notice: ' + e.message);
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  editState = null;
+}
+
+async function saveEditModal() {
+  if (!editState) return;
+  const btn = document.getElementById('edit-modal-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const body = editState.type === 'upcoming' ? collectUpcomingEdit() : collectBuyerEdit();
+    const path = editState.type === 'upcoming' ? `/notices/upcoming/${editState.id}` : `/notices/buyer-needs/${editState.id}`;
+    await api(path, { method: 'PATCH', body: JSON.stringify(body) });
+    closeEditModal();
+    await fetchAndRender();
+  } catch (e) {
+    alert('Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    INIT
