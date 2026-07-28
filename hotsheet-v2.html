@@ -548,6 +548,13 @@ function photoEl(item, size = "card") {
   return `<img src="${url}" alt="Property photo" class="photo-img photo-${size}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=\\'photo-placeholder photo-${size}\\'><span>No Photo</span></div>'">`;
 }
 
+function coAgentsHtml(agents) {
+  if (!agents || !agents.length) return '';
+  return agents.map(a =>
+    `<div style="margin-top:3px"><strong>${escapeHtml(a.first)} ${escapeHtml(a.last)}</strong>${a.office ? ` <span class="card-office">${escapeHtml(a.office)}</span>` : ''}</div>`
+  ).join('');
+}
+
 function mlsBadges(mlsIds) {
   return (mlsIds || []).map(id => `<span class="mls-badge">${escapeHtml(id)}</span>`).join(" ");
 }
@@ -603,6 +610,7 @@ function listingCard(item) {
       <div class="card-agent">
         <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+        ${coAgentsHtml(item.coListingAgents)}
       </div>
       ${item.listDate ? `<div class="card-date">Listed ${fmtDate(item.listDate)}</div>` : ""}
     </div>
@@ -642,11 +650,13 @@ function contractCard(item, isManager = false) {
           <div class="col-label">Listing</div>
           <strong>${escapeHtml(listingFirst)} ${escapeHtml(listingLast)}</strong>
           ${listingOffice ? `<div class="card-office">${escapeHtml(listingOffice)}</div>` : ""}
+          ${coAgentsHtml(item.coListingAgents)}
         </div>
         <div>
           <div class="col-label">Selling</div>
           <strong>${escapeHtml(sellingFirst)} ${escapeHtml(sellingLast)}</strong>
           ${sellingOffice ? `<div class="card-office">${escapeHtml(sellingOffice)}</div>` : ""}
+          ${coAgentsHtml(item.coSellingAgents)}
         </div>
       </div>
     </div>
@@ -688,11 +698,13 @@ function closingCard(item, isManager = false) {
           <div class="col-label">Listing</div>
           <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
           ${item.listingOffice ? `<div class="card-office">${escapeHtml(item.listingOffice)}</div>` : ""}
+          ${coAgentsHtml(item.coListingAgents)}
         </div>
         <div>
           <div class="col-label">Selling</div>
           <strong>${escapeHtml(item.sellingAgentFirst)} ${escapeHtml(item.sellingAgentLast)}</strong>
           ${item.sellingOffice ? `<div class="card-office">${escapeHtml(item.sellingOffice)}</div>` : ""}
+          ${coAgentsHtml(item.coSellingAgents)}
         </div>
       </div>
       ${item.mortgageCompany || item.titleCompany ? `
@@ -720,6 +732,7 @@ function changeCard(item) {
       <div class="card-agent">
         <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+        ${coAgentsHtml(item.coListingAgents)}
       </div>
     </div>
   </div>`;
