@@ -254,9 +254,17 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
         <!-- President's Club membership status -->
         <div class="you-card" id="you-pc-card" style="display:none">
           <div class="you-title" id="you-pc-title">Your President's Club Status</div>
-          <div class="you-grid" style="grid-template-columns:1fr">
+          <div class="you-grid">
             <div class="you-metric">
-              <div class="you-metric-value" id="you-pc-status" style="font-size:1.1rem"></div>
+              <div class="you-metric-label">Year-to-Date GCI</div>
+              <div class="you-metric-value" id="you-gci-value">$0</div>
+              <div class="you-metric-rank" id="you-gci-rank">—</div>
+              <div class="you-street" id="you-gci-street"></div>
+              <div class="you-metric-gap" id="you-gci-gap"></div>
+            </div>
+            <div class="you-metric">
+              <div class="you-metric-label">Club Status</div>
+              <div class="you-metric-value" id="you-pc-status" style="font-size:1rem;margin-top:8px"></div>
             </div>
           </div>
         </div>
@@ -468,8 +476,18 @@ function renderPresidentsClub() {
   if (!myEntry) { youCard.style.display = 'none'; return; }
   youCard.style.display = 'block';
 
-  document.getElementById('you-pc-title').textContent = `Your ${year} President's Club Status`;
-  document.getElementById('you-pc-status').textContent = meInTop25
+  const myGciRank = withGci.indexOf(myEntry) + 1; // rank by GCI among agents with GCI > 0
+  const maxGci    = withGci[0]?.gci || 1;
+  const above     = myGciRank > 1 ? withGci[myGciRank - 2] : null;
+
+  document.getElementById('you-pc-title').textContent   = `Your ${year} President's Club Status`;
+  document.getElementById('you-gci-value').textContent  = fmtMoney(myEntry.gci);
+  document.getElementById('you-gci-rank').textContent   = `Rank #${myGciRank} of ${withGci.length} agents with GCI`;
+  document.getElementById('you-gci-street').innerHTML   = houseStreet(myEntry.gci, maxGci);
+  document.getElementById('you-gci-gap').textContent    = myGciRank > 1 && above
+    ? `${fmtMoney(above.gci - myEntry.gci)} behind the spot above you`
+    : (myEntry.gci > 0 ? "You're leading in GCI!" : 'No closed commission yet this year');
+  document.getElementById('you-pc-status').textContent  = meInTop25
     ? '🏅 You are a member of President\'s Club this year.'
     : 'You have not yet reached President\'s Club for this year. Keep closing!';
 }
