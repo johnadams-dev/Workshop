@@ -105,14 +105,14 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
 
 .empty-state{text-align:center;color:var(--muted);font-size:13px;padding:2rem 1rem;background:var(--card-bg);border-radius:14px;box-shadow:var(--shadow)}
 
-/* ── President's Club ranked list ── */
+/* ── President's Club recognition list ── */
 .pc-header,
 .pc-row{
   display:grid;
-  grid-template-columns:52px 1fr 1fr 130px;
+  grid-template-columns:1fr 1fr;
   align-items:center;
   gap:8px;
-  padding:10px 16px;
+  padding:11px 18px;
 }
 .pc-header{
   font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
@@ -126,28 +126,17 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
 .pc-row:hover{background:var(--cream)}
 .pc-row.you-row{background:var(--ink);color:#fff}
 .pc-row.you-row:hover{background:var(--ink-soft)}
-.pc-rank{
-  font-size:.85rem;font-weight:800;color:var(--gold);
-  text-align:center;
-}
-.pc-row.you-row .pc-rank{color:var(--gold-light)}
 .pc-name{font-weight:600;font-size:.9rem}
 .pc-row.you-row .pc-name{color:#fff}
 .pc-office{font-size:.8rem;color:var(--muted)}
 .pc-row.you-row .pc-office{color:rgba(255,255,255,.55)}
-.pc-gci{
-  font-weight:700;font-size:.9rem;
-  background:var(--ink);color:var(--gold-light);
-  border-radius:8px;padding:3px 10px;text-align:right;
-}
-.pc-row.you-row .pc-gci{background:rgba(255,255,255,.12);color:var(--gold-light)}
 .pc-ellipsis{
   text-align:center;padding:10px;
   color:var(--muted);font-size:12px;letter-spacing:.05em;
   border-bottom:1px solid var(--cream-dark);
 }
 @media(max-width:600px){
-  .pc-header,.pc-row{grid-template-columns:44px 1fr 100px}
+  .pc-header,.pc-row{grid-template-columns:1fr}
   .pc-office{display:none}
   .pc-header .ph-office{display:none}
 }
@@ -262,16 +251,12 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
         </div>
         <div id="pc-list"><div class="empty-state">Loading…</div></div>
 
-        <!-- Your GCI position -->
+        <!-- President's Club membership status -->
         <div class="you-card" id="you-pc-card" style="display:none">
-          <div class="you-title">Your GCI — Year to Date</div>
+          <div class="you-title" id="you-pc-title">Your President's Club Status</div>
           <div class="you-grid" style="grid-template-columns:1fr">
             <div class="you-metric">
-              <div class="you-metric-label">Gross Commission Income</div>
-              <div class="you-metric-value" id="you-gci-value">$0</div>
-              <div class="you-metric-rank" id="you-gci-rank">—</div>
-              <div class="you-street" id="you-gci-street"></div>
-              <div class="you-metric-gap" id="you-gci-gap"></div>
+              <div class="you-metric-value" id="you-pc-status" style="font-size:1.1rem"></div>
             </div>
           </div>
         </div>
@@ -453,60 +438,40 @@ function renderPresidentsClub() {
     return;
   }
 
-  const top25 = withGci.slice(0, 25);
-  const maxGci = top25[0].gci;
-  const myEntry = agents.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
-  const myRank  = myEntry ? agents.indexOf(myEntry) + 1 : null;
-  const meInTop25 = myRank !== null && myRank <= 25;
+  // Determine top 25 by GCI, then sort that group alphabetically
+  const top25 = withGci.slice(0, 25)
+    .sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name));
+
+  const myEntry   = agents.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
+  const meInTop25 = myEntry ? withGci.slice(0, 25).some(a => a.agent_id === myEntry.agent_id) : false;
+
+  const year = pcData.year || new Date().getFullYear();
 
   const header = `
     <div class="pc-header">
-      <span>#</span>
       <span>Agent</span>
       <span class="ph-office">Office</span>
-      <span style="text-align:right">YTD GCI</span>
     </div>`;
 
-  const rows = top25.map((a, i) => {
+  const rows = top25.map(a => {
     const isMe = myEntry && a.agent_id === myEntry.agent_id;
     return `
       <div class="pc-row${isMe ? ' you-row' : ''}">
-        <span class="pc-rank">${medal(i)}</span>
         <span class="pc-name">${esc(a.first_name)} ${esc(a.last_name)}${isMe ? ' ★' : ''}</span>
         <span class="pc-office">${esc(a.office_name || '—')}</span>
-        <span class="pc-gci">${fmtMoney(a.gci)}</span>
       </div>`;
   }).join('');
 
-  // If the current user is outside the top 25, show their row with a separator
-  let youExtra = '';
-  if (myEntry && !meInTop25 && myEntry.gci > 0) {
-    youExtra = `
-      <div class="pc-ellipsis">· · ·</div>
-      <div class="pc-row you-row">
-        <span class="pc-rank">#${myRank}</span>
-        <span class="pc-name">${esc(myEntry.first_name)} ${esc(myEntry.last_name)} ★</span>
-        <span class="pc-office">${esc(myEntry.office_name || '—')}</span>
-        <span class="pc-gci">${fmtMoney(myEntry.gci)}</span>
-      </div>`;
-  }
+  listEl.innerHTML = header + `<div>${rows}</div>`;
 
-  listEl.innerHTML = header + `<div>${rows}${youExtra}</div>`;
-
-  // Your GCI card
+  // Membership status card
   if (!myEntry) { youCard.style.display = 'none'; return; }
   youCard.style.display = 'block';
 
-  const rank     = myRank || agents.length;
-  const total    = withGci.length;
-  const above    = rank > 1 ? withGci[rank - 2] : null;
-
-  document.getElementById('you-gci-value').textContent = fmtMoney(myEntry.gci);
-  document.getElementById('you-gci-rank').textContent  = `Rank #${rank} of ${total} agents with GCI`;
-  document.getElementById('you-gci-street').innerHTML  = houseStreet(myEntry.gci, maxGci);
-  document.getElementById('you-gci-gap').textContent   = rank > 1 && above
-    ? `${fmtMoney(above.gci - myEntry.gci)} behind the spot above you`
-    : (myEntry.gci > 0 ? "You're in the lead!" : 'No closed commission earned yet this year');
+  document.getElementById('you-pc-title').textContent = `Your ${year} President's Club Status`;
+  document.getElementById('you-pc-status').textContent = meInTop25
+    ? '🏅 You are a member of President\'s Club this year.'
+    : 'You have not yet reached President\'s Club for this year. Keep closing!';
 }
 
 // ── Main render ───────────────────────────────────────────────────────────────
