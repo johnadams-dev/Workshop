@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACC Binder</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand:      #0f2942;
+    --brand-light:#1a3d60;
+    --gold:       #c8972a;
+    --gold-light: #f59e0b;
+    --green:      #15803d;
+    --red:        #b91c1c;
+    --bg:         #f4f1ec;
+    --surface:    #ffffff;
+    --border:     #e2ddd5;
+    --text:       #1c1917;
+    --text-light: #6b6560;
+    --radius:     12px;
+  }
+
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Sign-in gate ── */
+  #auth-gate { position: fixed; inset: 0; background: var(--brand); display: flex; align-items: center; justify-content: center; z-index: 999; }
+  #auth-gate .box { background: var(--surface); border-radius: var(--radius); padding: 48px 40px; text-align: center; width: 360px; box-shadow: 0 8px 48px rgba(0,0,0,.35); }
+  #auth-gate .icon { width: 52px; height: 52px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 20px; }
+  #auth-gate .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--gold); margin-bottom: 8px; }
+  #auth-gate h1 { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--brand); margin-bottom: 6px; }
+  #auth-gate p { font-size: 13px; color: var(--text-light); margin-bottom: 24px; line-height: 1.5; }
+  #auth-gate .foot { font-size: 11px; color: var(--text-light); margin-top: 16px; }
+  #auth-gate a { display: inline-block; margin-top: 16px; font-size: 12px; color: var(--text-light); text-decoration: none; }
+
+  /* ── Denied (non-staff) ── */
+  #denied-gate { position: fixed; inset: 0; background: var(--brand); display: none; align-items: center; justify-content: center; z-index: 998; }
+  #denied-gate .box { background: var(--surface); border-radius: var(--radius); padding: 48px 40px; text-align: center; width: 380px; }
+  #denied-gate h1 { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--brand); margin-bottom: 10px; }
+  #denied-gate p { font-size: 13px; color: var(--text-light); line-height: 1.6; margin-bottom: 20px; }
+  #denied-gate a { color: var(--brand); font-weight: 600; font-size: 13px; }
+
+  /* ── Header ── */
+  header.site-header { background: var(--brand); border-bottom: 3px solid var(--gold); position: sticky; top: 0; z-index: 100; }
+  .header-inner { max-width: 1100px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-name { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--gold); font-weight: 700; }
+  .brand-sub { font-size: 11px; color: #94a3b8; letter-spacing: .08em; text-transform: uppercase; }
+  .header-link { color: #cbd5e1; text-decoration: none; font-size: 13px; font-weight: 500; }
+  .header-link:hover { color: var(--gold); }
+
+  /* ── Step bar ── */
+  .step-bar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: center; padding: 16px 24px; flex-wrap: wrap; }
+  .step-item { display: flex; align-items: center; }
+  .step-dot { width: 28px; height: 28px; border-radius: 50%; background: #e5e7eb; color: #9ca3af; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .step-dot.on { background: var(--gold); color: var(--brand); }
+  .step-dot.cur { background: var(--brand); color: var(--gold); box-shadow: 0 0 0 3px rgba(200,151,42,.25); }
+  .step-label { font-size: 11px; color: #9ca3af; margin: 0 8px 0 6px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+  .step-label.on { color: var(--brand); font-weight: 600; }
+  .step-line { width: 36px; height: 2px; background: #e5e7eb; }
+  .step-line.on { background: var(--gold); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 32px; box-shadow: 0 1px 4px rgba(0,0,0,.07); border: 1px solid var(--border); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .title { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--brand); margin-bottom: 8px; font-weight: 700; }
+  .sub { color: var(--text-light); font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+
+  .drop { border: 2px dashed var(--gold); border-radius: var(--radius); padding: 48px; text-align: center; cursor: pointer; background: #fffbf0; margin-bottom: 20px; }
+  .drop-icon { font-size: 40px; margin-bottom: 10px; }
+  .drop-title { font-weight: 600; color: var(--brand); margin-bottom: 4px; }
+  .drop-sub { font-size: 13px; color: #9ca3af; }
+  .frow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border); }
+  .frow-name { flex: 1; font-size: 14px; font-weight: 500; }
+  .frow-size { font-size: 12px; color: #9ca3af; }
+  .rm-btn { background: none; border: none; color: #d1d5db; cursor: pointer; font-size: 16px; padding: 2px 6px; }
+
+  .btn { background: var(--brand); color: var(--gold); border: none; border-radius: 8px; padding: 13px 28px; font-weight: 700; font-size: 15px; cursor: pointer; width: 100%; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.auto { width: auto; }
+  .ghost { background: none; border: 1px solid var(--border); color: var(--text-light); border-radius: 8px; padding: 13px 28px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .out-btn { width: 100%; background: none; border: 1px dashed var(--gold); color: var(--brand); border-radius: 8px; padding: 12px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .out-btn.on { background: var(--brand); color: var(--gold); border-style: solid; }
+
+  .spin { width: 40px; height: 40px; border: 4px solid #e5e7eb; border-top-color: var(--gold); border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err-box { margin-top: 16px; padding: 14px 18px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #991b1b; font-size: 13px; text-align: left; }
+
+  .extract-box { background: #f8fafc; border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  .extract-title { font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+  .field-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .field-row label { width: 60px; font-size: 12px; font-weight: 600; color: var(--text-light); flex-shrink: 0; }
+  .edit-input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+  .field-group { margin-bottom: 18px; }
+  .field-label { font-size: 12px; font-weight: 600; color: var(--text-light); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #f1f5f9; border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .chip.on { background: var(--brand); color: var(--gold); border-color: var(--brand); }
+
+  .agent-box { background: #fffbf0; border: 1px solid #fde68a; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .agent-box-title { font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .agent-select { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; font-family: inherit; }
+
+  .sug-box { background: #fefce8; border: 1px solid #fde047; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .txn-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; max-height: 280px; overflow-y: auto; }
+  .txn-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+  .txn-card.on { border-color: var(--brand); background: #eef2ff; }
+  .txn-addr { font-size: 13px; font-weight: 600; color: var(--brand); margin-bottom: 2px; }
+  .txn-meta { font-size: 11px; color: var(--text-light); }
+
+  .txn-bar { display: flex; align-items: center; gap: 10px; background: #f8fafc; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .txn-bar-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-light); background: #e5e7eb; padding: 3px 8px; border-radius: 6px; }
+
+  .review-header { display: flex; gap: 10px; padding: 8px 10px; font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .04em; }
+  .review-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
+  .review-row.skipped { opacity: .55; background: #f8fafc; }
+  .review-row.unidentified { border-color: #c4b5fd; background: #faf5ff; }
+  .review-row.duplicate { border-color: #fca5a5; background: #fef2f2; }
+  .review-row.edited { border-color: var(--gold); }
+  .cat-pill { color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-radius: 6px; padding: 3px 8px; display: inline-block; }
+  .review-name-input { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; margin-bottom: 3px; }
+  .review-file { font-size: 10px; color: #9ca3af; }
+  .page-control { display: flex; align-items: center; gap: 8px; }
+  .page-input { width: 52px; border: 1px solid var(--border); border-radius: 6px; padding: 5px; font-size: 13px; text-align: center; }
+  .conf-pill { font-size: 10px; font-weight: 700; border-radius: 10px; padding: 3px 8px; text-transform: uppercase; }
+  .skip-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--text-light); }
+  .skip-btn.on { background: var(--green); color: #fff; border-color: var(--green); }
+  .split-btn { background: none; border: 1px dashed var(--border); border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: var(--text-light); }
+
+  .dl-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+  .dl-row.done { border-color: var(--green); background: #f0fdf4; }
+  .dl-cat { color: #fff; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 4px 8px; text-transform: uppercase; flex-shrink: 0; }
+  .dl-name { font-size: 13px; font-weight: 600; color: #111827; margin-bottom: 2px; }
+  .dl-file { font-size: 11px; color: var(--text-light); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dl-btn { background: var(--brand); color: var(--gold); border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
+
+  .upload-result { padding: 8px 12px; border-radius: 7px; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .upload-result.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+  .upload-result.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .upload-result.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .upload-result.info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ SIGN-IN GATE ═══════════════ -->
+<div id="auth-gate">
+  <div class="box">
+    <div class="icon">📋</div>
+    <div class="eyebrow">ADAMS CAMERON &amp; CO.</div>
+    <h1>ACC Binder</h1>
+    <p>Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <div class="foot">Access restricted to @adamscameron.com accounts.</div>
+    <a href="./index.html">← Tools</a>
+  </div>
+</div>
+
+<!-- ═══════════════ UNRECOGNIZED-ACCOUNT GATE ═══════════════ -->
+<div id="denied-gate">
+  <div class="box">
+    <h1>Account not recognized</h1>
+    <p>We couldn't match your Adams Cameron account to a staff or agent record, so ACC Binder can't tell which Form Simplicity transactions you should see. Reach out if you think this is a mistake.</p>
+    <a href="./index.html">← Back to Tools</a>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span style="font-size:26px">📋</span>
+        <div>
+          <div class="brand-name">ACC Binder</div>
+          <div class="brand-sub">Intelligent Document Classifier</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <a href="./feedback.html?tool=acc-binder" class="header-link">Feedback</a>
+        <a href="./index.html" class="header-link">← Tools</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="step-bar" id="stepBar"></div>
+
+  <main id="main"></main>
+
+  <footer style="text-align:center; padding:20px 24px; font-size:11px; color:#9ca3af; border-top:1px solid var(--border); background:#fff; margin-top:40px;">
+    ACC Binder · A tool for Florida REALTORS®
+  </footer>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG / AUTH — same pattern as hotsheet-v2.html / daily-desk.html
+═══════════════════════════════════════════════════════════════════ */
+const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+let userEmail = localStorage.getItem('ac_user_email') || "";
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || "";
+
+if (proxyKey && userEmail) {
+  document.getElementById("auth-gate").style.display = "none";
+  window.addEventListener("load", init);
+}
+
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
+      return;
+    }
+    proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById("auth-gate").style.display = "none";
+    await init();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PDF SETUP
+═══════════════════════════════════════════════════════════════════ */
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const { PDFDocument } = PDFLib;
+
+const CATEGORY_COLORS = {
+  Contract: "#1e3a5f", Listing: "#166534", "Buyer Agreement": "#7c3aed", Compensation: "#92400e",
+  Rider: "#0e7490", Disclosure: "#be185d", Addendum: "#d97706", Receipt: "#4b5563",
+  Inspection: "#065f46", Notice: "#b45309", Checklist: "#374151", Financial: "#1d4ed8",
+  Information: "#1e40af", Agreement: "#5b21b6", MLS: "#0369a1", "Contract Addendum": "#059669",
+  Other: "#6b7280", Unidentified: "#7c3aed",
+};
+const catColor = (cat) => CATEGORY_COLORS[cat] || "#6b7280";
+
+const STEPS = ["Upload", "Analyze", "Transaction", "Review", "Finish"];
+
+async function extractFileData(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+  const totalPages = pdf.numPages;
+  let richText = "", labeledText = "";
+  for (let i = 1; i <= totalPages; i++) {
+    const content = await (await pdf.getPage(i)).getTextContent();
+    const fullPage = content.items.map((s) => s.str).join(" ").trim();
+    richText += fullPage + "\n\n";
+    labeledText += `[PAGE ${i} of ${totalPages}] ${fullPage.slice(0, 600)}\n\n`;
+  }
+  return { name: file.name, richText: richText.slice(0, 12000), labeledText: labeledText.slice(0, 30000), totalPages, file };
+}
+
+async function extractPagesAsBase64(arrayBuffer, startPage, endPage) {
+  const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+  const newDoc = await PDFDocument.create();
+  const total  = srcDoc.getPageCount();
+  const safeStart = Math.max(0, startPage);
+  const safeEnd   = Math.min(endPage, total - 1);
+  const pageIndexes = [];
+  for (let i = safeStart; i <= safeEnd; i++) pageIndexes.push(i);
+  const copied = await newDoc.copyPages(srcDoc, pageIndexes);
+  copied.forEach((p) => newDoc.addPage(p));
+  return uint8ToBase64(await newDoc.save());
+}
+
+function uint8ToBase64(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function base64ToArrayBuffer(b64) {
+  const binary = atob(b64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+const sanitize = (str) => (str || "").replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").trim().slice(0, 80);
+const buildFilename = (formName, address) => `${sanitize(formName)} - ${sanitize(address || "No Address")}.pdf`;
+
+function downloadUint8PDF(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+async function buildSplitPDFs(forms, rawFileMap, address) {
+  const result = {};
+  const parsedCache = {};
+  for (const form of forms) {
+    try {
+      const rawB64 = rawFileMap[form.sourceFile];
+      if (!rawB64) { result[form.formId] = null; continue; }
+      if (!parsedCache[form.sourceFile]) parsedCache[form.sourceFile] = base64ToArrayBuffer(rawB64);
+      const arrayBuffer = parsedCache[form.sourceFile];
+      const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      const totalPages = srcDoc.getPageCount();
+      const startPage = form.pageStart ? form.pageStart - 1 : 0;
+      const endPage   = form.pageEnd   ? form.pageEnd   - 1 : totalPages - 1;
+      const isWholeFile = startPage === 0 && endPage === totalPages - 1;
+      const finalBase64 = isWholeFile ? rawB64 : await extractPagesAsBase64(arrayBuffer, startPage, endPage);
+      result[form.formId] = {
+        base64: finalBase64,
+        filename: buildFilename(form.formName, address),
+        pages: `pages ${startPage + 1}–${endPage + 1} of ${totalPages}`,
+        split: !isWholeFile,
+      };
+    } catch (err) {
+      console.error(`Failed to split ${form.formId}:`, err);
+      const rawB64 = rawFileMap[form.sourceFile];
+      result[form.formId] = rawB64
+        ? { base64: rawB64, filename: buildFilename(form.formName, address), pages: "full file (split failed)", split: false }
+        : null;
+    }
+  }
+  return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let STATE = {
+  step: 0,
+  userRole: "unknown",
+  files: [],
+  analysisResult: null,
+  analysisError: null,
+  formOverrides: {},
+  splitTarget: null,
+  splitting: false,
+  splitPDFs: {},
+  txnDetails: { sellerName: "", buyerName: "", propertyAddress: "", propertyType: "Residential", transactionType: "Contract on My Listing" },
+  agents: [],
+  agentsLoaded: false,
+  selectedAgentEmail: "",   // "" = acting as self; only meaningful for staff
+  agentNRDSID: null,
+  fsTransactions: [],
+  fsLoading: false,
+  fsError: null,
+  suggestedTxn: null,
+  selectedTxn: null,
+  downloaded: {},
+  uploadResults: [],
+  uploading: false,
+  uploadDone: false,
+};
+
+function esc(str) {
+  if (str == null) return "";
+  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+async function init() {
+  try {
+    const me = await api('/lockbox/me');
+    STATE.userRole = (me || {}).role || "unknown";
+  } catch (e) {
+    console.error("Failed to load role:", e);
+  }
+  // Staff (manager/staff) and agents can both use the tool — the server scopes
+  // agents to their own Form Simplicity transactions (see resolveFsIdentity in
+  // acc-binder-routes.js); only a genuinely unrecognized account is blocked here.
+  if (STATE.userRole === "unknown") {
+    document.getElementById("denied-gate").style.display = "flex";
+    return;
+  }
+  document.getElementById("app").style.display = "block";
+  render();
+}
+
+function isStaffTier() { return STATE.userRole === "manager" || STATE.userRole === "staff"; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER — step bar + main
+═══════════════════════════════════════════════════════════════════ */
+function render() {
+  const bar = document.getElementById("stepBar");
+  bar.innerHTML = STEPS.map((s, i) => `
+    <div class="step-item">
+      <div class="step-dot ${i <= STATE.step ? 'on' : ''} ${i === STATE.step ? 'cur' : ''}">${i < STATE.step ? '✓' : i + 1}</div>
+      <span class="step-label ${i === STATE.step ? 'on' : ''}">${s}</span>
+      ${i < STEPS.length - 1 ? `<div class="step-line ${i < STATE.step ? 'on' : ''}"></div>` : ''}
+    </div>
+  `).join("");
+
+  const main = document.getElementById("main");
+  if      (STATE.step === 0) main.innerHTML = renderStep0();
+  else if (STATE.step === 1) main.innerHTML = renderStep1();
+  else if (STATE.step === 2) main.innerHTML = renderStep2();
+  else if (STATE.step === 3) main.innerHTML = renderStep3();
+  else if (STATE.step === 4) main.innerHTML = renderStep4();
+
+  if (STATE.step === 2) initStep2();
+}
+
+/* ── STEP 0 — Upload ─────────────────────────────────────────────── */
+function renderStep0() {
+  const fileRows = STATE.files.map((f, i) => `
+    <div class="frow">
+      <span>📄</span>
+      <span class="frow-name">${esc(f.name)}</span>
+      <span class="frow-size">${(f.size / 1024).toFixed(0)} KB</span>
+      <button class="rm-btn" onclick="removeFile(${i})">✕</button>
+    </div>
+  `).join("");
+
+  return `
+    <div class="card">
+      <h2 class="title">Upload Transaction Documents</h2>
+      <p class="sub">Upload one combined PDF or multiple individual PDFs. ACC Binder will identify each form and split them automatically.</p>
+      <div class="drop" ondragover="event.preventDefault()" ondrop="onDrop(event)" onclick="document.getElementById('fi').click()">
+        <div class="drop-icon">📂</div>
+        <div class="drop-title">Drag &amp; drop PDFs here</div>
+        <div class="drop-sub">or click to browse — combined or individual PDFs both work</div>
+        <input id="fi" type="file" accept=".pdf" multiple style="display:none" onchange="onDrop(event)">
+      </div>
+      ${STATE.files.length ? `<div style="margin-bottom:24px">${fileRows}</div>` : ""}
+      <button class="btn" ${STATE.files.length === 0 ? "disabled" : ""} onclick="startAnalysis()">Analyze Documents →</button>
+    </div>
+  `;
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const dropped = Array.from(e.dataTransfer?.files || e.target.files || []).filter((f) => f.type === "application/pdf");
+  const names = new Set(STATE.files.map((f) => f.name));
+  STATE.files = [...STATE.files, ...dropped.filter((f) => !names.has(f.name))];
+  render();
+}
+function removeFile(i) { STATE.files.splice(i, 1); render(); }
+
+/* ── STEP 1 — Analyzing ──────────────────────────────────────────── */
+function renderStep1() {
+  const fileList = STATE.files.map((f) => `<div style="font-size:13px;color:#6b7280;margin-bottom:8px;text-align:left">📄 ${esc(f.name)}</div>`).join("");
+  return `
+    <div class="card" style="text-align:center">
+      <div style="display:flex;justify-content:center;margin-bottom:24px"><div class="spin"></div></div>
+      <h2 class="title">Analyzing Documents...</h2>
+      <p class="sub">Identifying each form and its page range. Usually 15–30 seconds.</p>
+      ${fileList}
+      ${STATE.analysisError ? `<div class="err-box">${esc(STATE.analysisError)}<br><button class="btn auto" style="margin-top:12px;padding:8px 20px" onclick="STATE.step=0;render()">Back</button></div>` : ""}
+    </div>
+  `;
+}
+
+async function startAnalysis() {
+  STATE.step = 1;
+  STATE.analysisError = null;
+  STATE.splitPDFs = {};
+  render();
+  try {
+    const filesData = await Promise.all(STATE.files.map(extractFileData));
+    const rawFileMap = {}, pageCounts = {};
+    for (const fd of filesData) {
+      const bytes = await fd.file.arrayBuffer();
+      rawFileMap[fd.name] = uint8ToBase64(new Uint8Array(bytes));
+      pageCounts[fd.name] = fd.totalPages;
+    }
+    const payloadFiles = filesData.map((f) => ({ name: f.name, richText: f.richText, labeledText: f.labeledText, totalPages: f.totalPages }));
+    const result = await api('/acc-binder/analyze', { method: "POST", body: JSON.stringify({ files: payloadFiles }) });
+    result._rawFileMap = rawFileMap;
+    result._pageCounts = pageCounts;
+
+    // Gap detection — insert UNIDENTIFIED entries for any pages Claude skipped over.
+    if (result.forms) {
+      const augmented = [];
+      const byFile = {};
+      result.forms.forEach((f) => { (byFile[f.sourceFile] ||= []).push(f); });
+      Object.entries(byFile).forEach(([filename, fileForms]) => {
+        const total = pageCounts[filename] || 0;
+        const sorted = [...fileForms].sort((a, b) => (parseInt(a.pageStart) || 1) - (parseInt(b.pageStart) || 1));
+        let cursor = 1;
+        sorted.forEach((form) => {
+          const start = parseInt(form.pageStart) || 1;
+          const end   = parseInt(form.pageEnd)   || start;
+          if (start > cursor) {
+            augmented.push({ formId: `UNIDENTIFIED_${filename}_${cursor}`, formName: "Unidentified Document", category: "Unidentified", sourceFile: filename, pageStart: cursor, pageEnd: start - 1, confidence: "low", unidentified: true, skipped: false });
+          }
+          augmented.push(form);
+          cursor = end + 1;
+        });
+        if (cursor <= total) {
+          augmented.push({ formId: `UNIDENTIFIED_${filename}_${cursor}`, formName: "Unidentified Document", category: "Unidentified", sourceFile: filename, pageStart: cursor, pageEnd: total, confidence: "low", unidentified: true, skipped: false });
+        }
+      });
+      result.forms = augmented;
+    }
+
+    STATE.analysisResult = result;
+    STATE.formOverrides = {};
+    (result.forms || []).forEach((f, idx) => {
+      STATE.formOverrides[idx] = { pageStart: parseInt(f.pageStart) || 1, pageEnd: parseInt(f.pageEnd) || 1, formName: f.formName || "Unidentified Document", skipped: false };
+    });
+
+    if (result.transaction) {
+      const t = result.transaction;
+      STATE.txnDetails = {
+        sellerName: t.sellerName || "",
+        buyerName: t.buyerName || "",
+        propertyAddress: [t.propertyAddress, t.propertyCity, t.propertyState, t.propertyZip].filter(Boolean).join(", "),
+        propertyType: t.propertyType || "Residential",
+        transactionType: t.transactionType || "Contract on My Listing",
+      };
+    }
+    STATE.step = 2;
+  } catch (err) {
+    STATE.analysisError = "Analysis failed: " + err.message;
+  }
+  render();
+}
+
+/* ── STEP 2 — Transaction ────────────────────────────────────────── */
+function renderStep2() {
+  const forms = STATE.analysisResult?.forms || [];
+  return `
+    <div class="two-col">
+      <div class="card">
+        <h2 class="title">Transaction Details</h2>
+        <p class="sub">Verify the extracted information. The property address is used to name each file.</p>
+        <div class="extract-box">
+          <div class="extract-title">Extracted Information</div>
+          <div class="field-row"><label>Seller</label><input class="edit-input" value="${esc(STATE.txnDetails.sellerName)}" oninput="STATE.txnDetails.sellerName=this.value"></div>
+          <div class="field-row"><label>Buyer</label><input class="edit-input" value="${esc(STATE.txnDetails.buyerName)}" oninput="STATE.txnDetails.buyerName=this.value"></div>
+          <div class="field-row"><label>Property</label><input class="edit-input" value="${esc(STATE.txnDetails.propertyAddress)}" oninput="STATE.txnDetails.propertyAddress=this.value"></div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Property Type</div>
+          <div class="chips">${["Residential","Condominium","Commercial","Manufactured Home","Vacant Land"].map((t) => `<button class="chip ${STATE.txnDetails.propertyType === t ? 'on' : ''}" onclick="STATE.txnDetails.propertyType='${t}';render()">${t}</button>`).join("")}</div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Transaction Type</div>
+          <div class="chips">${["Contract on My Listing","Contract for a Buyer","Listing","Rental"].map((t) => `<button class="chip ${STATE.txnDetails.transactionType === t ? 'on' : ''}" onclick="STATE.txnDetails.transactionType='${t}';render()">${t}</button>`).join("")}</div>
+        </div>
+        ${forms.length ? `<div class="extract-box"><div class="extract-title">Example file name</div><div style="font-size:12px;font-family:monospace">${esc(buildFilename(forms[0].formName, STATE.txnDetails.propertyAddress))}</div></div>` : ""}
+      </div>
+      <div class="card">
+        <h2 class="title">Link to Transaction</h2>
+        ${isStaffTier() ? `
+          <div class="agent-box">
+            <div class="agent-box-title">Acting as</div>
+            <select class="agent-select" id="agentSelect" onchange="onAgentChange(this.value)">
+              <option value="">Myself (${esc(userEmail)})</option>
+              ${STATE.agents.map((a) => `<option value="${esc(a.email)}" ${STATE.selectedAgentEmail === a.email ? "selected" : ""}>${esc(a.firstName)} ${esc(a.lastName)} (${esc(a.email)})</option>`).join("")}
+            </select>
+          </div>
+        ` : ""}
+        ${STATE.fsError ? `<div class="err-box">⚠ ${esc(STATE.fsError)}</div>` : ""}
+        ${STATE.suggestedTxn ? `
+          <div class="sug-box">
+            <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Suggested Match</div>
+            <div class="txn-addr">${esc(STATE.suggestedTxn.address)}</div>
+            <div class="txn-meta" style="margin-bottom:10px">${esc(STATE.suggestedTxn.seller)} · ${esc(STATE.suggestedTxn.type)}</div>
+            <button class="btn auto" onclick="selectTxn('${esc(STATE.suggestedTxn.id)}');STATE.step=3;render()">Use This Transaction</button>
+          </div>
+        ` : ""}
+        <div style="font-size:12px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Form Simplicity Transactions</div>
+        <div class="txn-list">
+          ${STATE.fsLoading ? `<div style="font-size:13px;color:#6b7280">Loading transactions…</div>` : ""}
+          ${!STATE.fsLoading ? STATE.fsTransactions.map((t) => `
+            <div class="txn-card ${STATE.selectedTxn === t.id ? 'on' : ''}" onclick="selectTxn('${esc(t.id)}')">
+              <div class="txn-addr">${esc(t.address || "No address")}</div>
+              <div class="txn-meta">${esc(t.seller)}${t.buyer ? " → " + esc(t.buyer) : ""}${t.type ? " · " + esc(t.type) : ""}</div>
+            </div>
+          `).join("") : ""}
+          ${!STATE.fsLoading && STATE.fsTransactions.length === 0 && !STATE.fsError ? `<div style="font-size:13px;color:#9ca3af;padding:12px 0">No open Form Simplicity transactions found in the last 45 days.</div>` : ""}
+        </div>
+        <div style="text-align:center;color:#9ca3af;font-size:12px;margin:12px 0">or</div>
+        <button class="out-btn ${STATE.selectedTxn === 'new' ? 'on' : ''}" onclick="selectTxn('new')">+ Create New Transaction</button>
+        <button class="btn" style="margin-top:16px" ${STATE.selectedTxn === null ? "disabled" : ""} onclick="STATE.step=3;render()">Continue to Review</button>
+      </div>
+    </div>
+  `;
+}
+
+function selectTxn(id) { STATE.selectedTxn = id; render(); }
+
+function onAgentChange(email) {
+  STATE.selectedAgentEmail = email;
+  STATE.fsTransactions = [];
+  STATE.selectedTxn = null;
+  STATE.suggestedTxn = null;
+  render(); // render() re-enters initStep2(), which re-fetches transactions since the list is now empty
+}
+
+async function initStep2() {
+  if (isStaffTier() && !STATE.agentsLoaded) {
+    STATE.agentsLoaded = true;
+    try {
+      STATE.agents = await api('/acc-binder/fs/agents', { method: "POST", body: JSON.stringify({}) });
+      if (STATE.step === 2) render(); // reflect the newly loaded agent list in the picker
+    } catch (e) {
+      console.error("Failed to load agent list:", e.message);
+    }
+  }
+  if (!STATE.fsTransactions.length && !STATE.fsLoading) await loadFsTransactions();
+}
+
+async function loadFsTransactions() {
+  STATE.fsLoading = true;
+  STATE.fsError = null;
+  render();
+  try {
+    const body = STATE.selectedAgentEmail ? { agentEmail: STATE.selectedAgentEmail } : {};
+    const result = await api('/acc-binder/fs/transactions', { method: "POST", body: JSON.stringify(body) });
+    STATE.agentNRDSID = result.agentNRDSID;
+    STATE.fsTransactions = (result.transactions || []).map((t) => ({
+      id: t.transId,
+      address: [t.streetAddress, t.City, t.State, t.Zip].filter(Boolean).join(", "),
+      seller: t.sellerParty1Name || t.sellerLandlordName || "",
+      buyer: t.buyerParty1Name || t.buyerLandlordName || "",
+      type: t.transactionType || "",
+    }));
+    const addr = (STATE.txnDetails.propertyAddress || "").toLowerCase();
+    const seller = (STATE.txnDetails.sellerName || "").toLowerCase();
+    STATE.suggestedTxn = STATE.fsTransactions.find((t) => {
+      const a = t.address.toLowerCase(), s = t.seller.toLowerCase();
+      return (addr && addr.split(" ")[0].length > 3 && a.includes(addr.split(" ")[0]))
+          || (seller && seller.split(" ")[0].length > 3 && s.includes(seller.split(" ")[0]));
+    }) || null;
+  } catch (e) {
+    STATE.fsError = e.message;
+  }
+  STATE.fsLoading = false;
+  render();
+}
+
+/* ── STEP 3 — Review ─────────────────────────────────────────────── */
+function renderStep3() {
+  const forms = STATE.analysisResult?.forms || [];
+  const rows = forms.map((form, i) => {
+    const ov = STATE.formOverrides[i] || {};
+    const pgStart = ov.pageStart ?? (parseInt(form.pageStart) || 1);
+    const pgEnd   = ov.pageEnd   ?? (parseInt(form.pageEnd)   || 1);
+    const fname   = ov.formName  ?? (form.formName || "Unidentified Document");
+    const isSkipped = ov.skipped || false;
+    const isUnidentified = form.unidentified === true;
+    const totalPgs = STATE.analysisResult._pageCounts?.[form.sourceFile] ?? "?";
+    const changed = pgStart !== (parseInt(form.pageStart) || 1) || pgEnd !== (parseInt(form.pageEnd) || 1);
+
+    const isDuplicate = !isSkipped && forms.some((other, j) => {
+      if (j === i) return false;
+      const oov = STATE.formOverrides[j] || {};
+      const oSkip = oov.skipped || false;
+      const oStart = oov.pageStart ?? (parseInt(other.pageStart) || 1);
+      const oEnd   = oov.pageEnd   ?? (parseInt(other.pageEnd)   || 1);
+      return !oSkip && other.sourceFile === form.sourceFile && oStart === pgStart && oEnd === pgEnd;
+    });
+
+    const rowClass = [
+      "review-row",
+      isSkipped ? "skipped" : "",
+      isUnidentified && !isSkipped ? "unidentified" : "",
+      isDuplicate ? "duplicate" : "",
+      changed && !isDuplicate && !isSkipped && !isUnidentified ? "edited" : "",
+    ].filter(Boolean).join(" ");
+
+    const splitControls = (!isSkipped && pgEnd > pgStart)
+      ? (STATE.splitTarget === i
+          ? `<div style="display:flex;align-items:center;gap:4px;font-size:11px;margin-top:4px">
+               <span style="color:#6b7280">Split after page</span>
+               <input type="number" min="${pgStart}" max="${pgEnd - 1}" value="${pgStart}" id="split-input-${i}" class="page-input" style="width:44px">
+               <button class="split-btn" onclick="confirmSplit(${i})">✓</button>
+               <button class="split-btn" onclick="STATE.splitTarget=null;render()">✕</button>
+             </div>`
+          : `<button class="split-btn" style="margin-top:4px" onclick="STATE.splitTarget=${i};render()">✂ Split</button>`)
+      : "";
+
+    return `
+      <div class="${rowClass}">
+        <div style="flex:0 0 100px">
+          <span class="cat-pill" style="background:${isSkipped ? '#9ca3af' : isUnidentified ? '#6b7280' : catColor(form.category)}">${isSkipped ? "skipped" : esc(form.category)}</span>
+        </div>
+        <div style="flex:1;min-width:0;opacity:${isSkipped ? .4 : 1}">
+          <input class="review-name-input" value="${esc(fname)}" ${isSkipped ? "disabled" : ""} oninput="setOverride(${i},{formName:this.value})">
+          <div class="review-file">
+            📄 ${esc(form.sourceFile)}
+            ${isUnidentified && !isSkipped ? `<span style="margin-left:8px;color:#7c3aed;font-weight:700">⚠ Not identified — enter name or skip</span>` : ""}
+            ${isDuplicate ? `<span style="margin-left:8px;color:#dc2626;font-weight:700">⚠ Same pages as another form</span>` : ""}
+            ${changed && !isDuplicate && !isSkipped && !isUnidentified ? `<span style="margin-left:8px;color:#d97706;font-weight:600">✎ edited</span>` : ""}
+          </div>
+        </div>
+        <div style="flex:0 0 210px">
+          <div class="page-control" style="opacity:${isSkipped ? .4 : 1}">
+            <input type="number" min="1" max="${totalPgs}" class="page-input" value="${pgStart}" ${isSkipped ? "disabled" : ""} oninput="setOverride(${i},{pageStart:Math.max(1,parseInt(this.value)||1)})">
+            <span style="color:#9ca3af">–</span>
+            <input type="number" min="1" max="${totalPgs}" class="page-input" value="${pgEnd}" ${isSkipped ? "disabled" : ""} oninput="setOverride(${i},{pageEnd:Math.max(1,parseInt(this.value)||1)})">
+            <span style="font-size:11px;color:#9ca3af">of ${totalPgs}</span>
+          </div>
+          ${splitControls}
+        </div>
+        <div style="flex:0 0 90px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px">
+          ${!isSkipped ? `<span class="conf-pill" style="background:${form.confidence === 'high' ? '#dcfce7' : form.confidence === 'medium' ? '#fef9c3' : '#f3e8ff'};color:${form.confidence === 'high' ? '#166534' : form.confidence === 'medium' ? '#854d0e' : '#6b21a8'}">${isUnidentified ? "unknown" : esc(form.confidence)}</span>` : ""}
+          <button class="skip-btn ${isSkipped ? 'on' : ''}" onclick="setOverride(${i},{skipped:${!isSkipped}})">${isSkipped ? "↩ Include" : "Skip"}</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="card">
+      <h2 class="title">Review &amp; Correct Page Ranges</h2>
+      ${STATE.analysisResult._scannedPDF ? `<div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#713f12"><strong>⚠ Scanned PDF detected</strong> — this document has no text layer, so page boundaries are estimates. Please review and correct every row before splitting.</div>` : ""}
+      <p class="sub">${forms.length} document(s) identified. Verify each form's page range and correct any mistakes before splitting.</p>
+      <div class="txn-bar">
+        <span class="txn-bar-label">${STATE.selectedTxn === "new" ? "New Transaction" : "Existing Transaction"}</span>
+        <span style="font-size:13px;color:var(--brand);font-weight:600">${esc(STATE.txnDetails.propertyAddress || "No address")}</span>
+        <span style="font-size:12px;color:#6b7280;margin-left:auto">${esc(STATE.txnDetails.propertyType)} · ${esc(STATE.txnDetails.transactionType)}</span>
+      </div>
+      <div class="review-header">
+        <div style="flex:0 0 100px">Category</div>
+        <div style="flex:1">Form Name</div>
+        <div style="flex:0 0 210px;text-align:center">Page Range</div>
+        <div style="flex:0 0 90px;text-align:center">Confidence</div>
+      </div>
+      ${rows}
+      <div style="margin-top:12px;padding:10px 14px;background:#f0f4ff;border-radius:8px;font-size:12px;color:#3730a3">
+        💡 <strong>Purple rows</strong> are pages ACC Binder could not identify — type a name or click Skip if not needed. <strong>Red rows</strong> share duplicate page numbers and must be corrected before splitting.
+      </div>
+      <div style="display:flex;gap:12px;margin-top:24px;justify-content:flex-end">
+        <button class="ghost" onclick="STATE.step=2;render()">Back</button>
+        <button class="btn auto" ${STATE.splitting ? "disabled" : ""} onclick="prepareSplitPDFs()">${STATE.splitting ? "Splitting PDFs..." : "Split &amp; Continue →"}</button>
+      </div>
+    </div>
+  `;
+}
+
+function setOverride(i, patch) {
+  const form = STATE.analysisResult.forms[i];
+  const ov = STATE.formOverrides[i] || {};
+  const pgStart = ov.pageStart ?? (parseInt(form.pageStart) || 1);
+  const pgEnd   = ov.pageEnd   ?? (parseInt(form.pageEnd)   || 1);
+  const fname   = ov.formName  ?? (form.formName || "Unidentified Document");
+  STATE.formOverrides[i] = { pageStart: pgStart, pageEnd: pgEnd, formName: fname, skipped: ov.skipped || false, ...patch };
+  render();
+}
+
+function confirmSplit(idx) {
+  const input = document.getElementById(`split-input-${idx}`);
+  const splitPage = parseInt(input?.value);
+  const form = STATE.analysisResult.forms[idx];
+  const ov = STATE.formOverrides[idx] || {};
+  const currentEnd = ov.pageEnd ?? (parseInt(form.pageEnd) || 1);
+  const currentStart = ov.pageStart ?? (parseInt(form.pageStart) || 1);
+  if (!(splitPage >= currentStart && splitPage < currentEnd)) return;
+
+  STATE.formOverrides[idx] = { ...ov, pageStart: currentStart, pageEnd: splitPage, formName: ov.formName ?? form.formName, skipped: false };
+  const newForm = { formId: `UNIDENTIFIED_split_${idx}_${splitPage}_${Date.now()}`, formName: "Unidentified Document", category: "Unidentified", sourceFile: form.sourceFile, pageStart: splitPage + 1, pageEnd: currentEnd, confidence: "low", unidentified: true, skipped: false };
+
+  const forms = STATE.analysisResult.forms;
+  const updated = [...forms.slice(0, idx + 1), newForm, ...forms.slice(idx + 1)];
+  STATE.analysisResult.forms = updated;
+
+  const shifted = {};
+  Object.keys(STATE.formOverrides).forEach((k) => {
+    const ki = parseInt(k);
+    if (ki <= idx) shifted[ki] = STATE.formOverrides[ki];
+    else shifted[ki + 1] = STATE.formOverrides[ki];
+  });
+  shifted[idx + 1] = { pageStart: splitPage + 1, pageEnd: currentEnd, formName: "Unidentified Document", skipped: false };
+  STATE.formOverrides = shifted;
+  STATE.splitTarget = null;
+  render();
+}
+
+async function prepareSplitPDFs() {
+  STATE.splitting = true;
+  render();
+  const overridden = (STATE.analysisResult.forms || [])
+    .map((f, idx) => {
+      const ov = STATE.formOverrides[idx];
+      return ov ? { ...f, pageStart: ov.pageStart, pageEnd: ov.pageEnd, formName: ov.formName, skipped: ov.skipped } : f;
+    })
+    .filter((f) => !f.skipped);
+  STATE.splitPDFs = await buildSplitPDFs(overridden, STATE.analysisResult._rawFileMap || {}, STATE.txnDetails.propertyAddress);
+  STATE.splitting = false;
+  STATE.step = 4;
+  render();
+}
+
+/* ── STEP 4 — Download / Upload ──────────────────────────────────── */
+function renderStep4() {
+  const forms = (STATE.analysisResult?.forms || []).map((f, idx) => ({ f, idx })).filter(({ idx }) => !STATE.formOverrides[idx]?.skipped);
+  const doneCount = Object.keys(STATE.downloaded).length;
+
+  const rows = forms.map(({ f: form }) => {
+    const entry = STATE.splitPDFs[form.formId];
+    const isDone = !!STATE.downloaded[form.formId];
+    return `
+      <div class="dl-row ${isDone ? 'done' : ''}">
+        <div class="dl-cat" style="background:${catColor(form.category)}">${esc(form.category)}</div>
+        <div style="flex:1;min-width:0">
+          <div class="dl-name">${esc(form.formName)}${entry?.split ? `<span style="font-size:10px;margin-left:8px;background:#dbeafe;color:#1e40af;border-radius:4px;padding:2px 6px;font-weight:700">EXTRACTED</span>` : ""}</div>
+          <div class="dl-file">${esc(entry?.filename || buildFilename(form.formName, STATE.txnDetails.propertyAddress))}</div>
+          ${entry?.pages ? `<div style="font-size:10px;color:#9ca3af;margin-top:2px">${esc(entry.pages)}</div>` : ""}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+          ${isDone ? `<span style="font-size:12px;color:#166534;font-weight:600">Saved</span>` : ""}
+          ${entry?.base64 ? `<button class="dl-btn" onclick="handleDownload('${esc(form.formId)}')">${isDone ? "Save Again" : "Download"}</button>` : `<span style="font-size:12px;color:#ef4444">Failed to extract</span>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="card">
+      <h2 class="title">Finish — Download &amp; Upload</h2>
+      <p class="sub">Each form has been extracted as a separate PDF. Download your own copies and/or upload them to Form Simplicity.</p>
+      <div class="txn-bar">
+        <span class="txn-bar-label">${STATE.selectedTxn === "new" ? "New Transaction" : "Existing Transaction"}</span>
+        <span style="font-size:13px;color:var(--brand);font-weight:600">${esc(STATE.txnDetails.propertyAddress || "No address")}</span>
+        <span style="font-size:12px;color:#6b7280;margin-left:auto">${esc(STATE.txnDetails.propertyType)} · ${esc(STATE.txnDetails.transactionType)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:16px 20px;background:#fffbf0;border-radius:10px;border:1px solid #fde68a">
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600;color:var(--brand);margin-bottom:2px">Download all ${forms.length} files at once</div>
+          <div style="font-size:12px;color:#6b7280">Each file is a separate, properly named PDF ready to file.</div>
+        </div>
+        <button class="btn auto" onclick="handleDownloadAll()">Download All</button>
+      </div>
+      <div>${rows}</div>
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;color:#6b7280">${doneCount} of ${forms.length} files downloaded</div>
+
+      <div style="margin-top:32px;padding-top:24px;border-top:2px solid var(--gold)">
+        <h3 style="font-family:'Playfair Display',serif;font-size:18px;color:var(--brand);margin-bottom:8px">Upload to Form Simplicity</h3>
+        <p style="font-size:13px;color:#6b7280;margin-bottom:16px">
+          ${STATE.selectedTxn === "new" ? "A new transaction will be created in Form Simplicity, then all documents uploaded to it." : `Documents will be uploaded to transaction ID: ${esc(STATE.selectedTxn)}`}
+        </p>
+        ${!STATE.uploadDone ? `
+          <button class="btn auto" ${STATE.uploading ? "disabled" : ""} onclick="submitToFormSimplicity()">${STATE.uploading ? "Uploading…" : `Upload ${forms.length} Documents to Form Simplicity`}</button>
+        ` : `<div style="font-size:14px;font-weight:600;color:#166534;margin-bottom:16px">✓ Upload complete</div>`}
+        ${STATE.uploadResults.length ? `<div style="margin-top:16px">${STATE.uploadResults.map((r) => `<div class="upload-result ${r.type}">${esc(r.msg)}</div>`).join("")}</div>` : ""}
+      </div>
+
+      <div style="margin-top:24px;text-align:right">
+        <button class="ghost" onclick="resetSession()">Start New Session</button>
+      </div>
+    </div>
+  `;
+}
+
+function handleDownload(formId) {
+  const entry = STATE.splitPDFs[formId];
+  if (!entry?.base64) return;
+  const bytes = Uint8Array.from(atob(entry.base64), (c) => c.charCodeAt(0));
+  downloadUint8PDF(bytes, entry.filename);
+  STATE.downloaded[formId] = true;
+  render();
+}
+async function handleDownloadAll() {
+  const forms = STATE.analysisResult?.forms || [];
+  for (let i = 0; i < forms.length; i++) {
+    if (STATE.formOverrides[i]?.skipped) continue;
+    await new Promise((r) => setTimeout(r, i * 400));
+    handleDownload(forms[i].formId);
+  }
+}
+
+async function submitToFormSimplicity() {
+  STATE.uploading = true;
+  STATE.uploadDone = false;
+  render();
+  const results = [];
+  try {
+    const agentBody = STATE.selectedAgentEmail ? { agentEmail: STATE.selectedAgentEmail } : {};
+    let transId;
+    if (STATE.selectedTxn === "new") {
+      const created = await api('/acc-binder/fs/create-transaction', {
+        method: "POST",
+        body: JSON.stringify({ ...agentBody, propertyAddress: STATE.txnDetails.propertyAddress, propertyType: STATE.txnDetails.propertyType, transactionType: STATE.txnDetails.transactionType }),
+      });
+      transId = created.transaction?.transId;
+      if (!transId) throw new Error("Transaction created but no transId returned.");
+      results.push({ type: "success", msg: `✓ Created new transaction (ID: ${transId})` });
+    } else {
+      transId = STATE.selectedTxn;
+      results.push({ type: "info", msg: `Using existing transaction (ID: ${transId})` });
+    }
+
+    const formsToUpload = (STATE.analysisResult.forms || [])
+      .map((f, idx) => {
+        const ov = STATE.formOverrides[idx];
+        return ov ? { ...f, pageStart: ov.pageStart, pageEnd: ov.pageEnd, formName: ov.formName, skipped: ov.skipped } : f;
+      })
+      .filter((f) => !f.skipped);
+
+    for (const form of formsToUpload) {
+      try {
+        const entry = STATE.splitPDFs[form.formId];
+        if (!entry?.base64) { results.push({ type: "warning", msg: `⚠ No PDF data for: ${form.formName}` }); continue; }
+        const pageCount = (form.pageEnd || 1) - (form.pageStart || 1) + 1;
+        await api('/acc-binder/fs/upload-file', {
+          method: "POST",
+          body: JSON.stringify({ ...agentBody, transId, formName: form.formName, fileBase64: entry.base64, pageCount }),
+        });
+        results.push({ type: "success", msg: `✓ Uploaded: ${form.formName}` });
+      } catch (err) {
+        results.push({ type: "error", msg: `✗ Failed: ${form.formName} — ${err.message}` });
+      }
+    }
+  } catch (err) {
+    results.push({ type: "error", msg: `Error: ${err.message}` });
+  }
+  STATE.uploadResults = results;
+  STATE.uploading = false;
+  STATE.uploadDone = true;
+  render();
+}
+
+function resetSession() {
+  STATE = {
+    ...STATE,
+    step: 0, files: [], analysisResult: null, analysisError: null, formOverrides: {}, splitTarget: null,
+    splitting: false, splitPDFs: {}, txnDetails: { sellerName: "", buyerName: "", propertyAddress: "", propertyType: "Residential", transactionType: "Contract on My Listing" },
+    selectedAgentEmail: "", agentNRDSID: null, fsTransactions: [], fsLoading: false, fsError: null,
+    suggestedTxn: null, selectedTxn: null, downloaded: {}, uploadResults: [], uploading: false, uploadDone: false,
+  };
+  render();
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'ACC Binder',email:localStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
