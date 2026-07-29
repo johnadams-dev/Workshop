@@ -247,6 +247,10 @@
   }
   .card-change { border-left: 4px solid var(--gold-light); }
   .card-buyer  { border-left: 4px solid #0ea5e9; }
+  .card-dn     { border-left: 4px solid #f97316; opacity: .9; }
+  .card-source     { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .card-commission { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .badge-dn    { background: #fed7aa; color: #9a3412; }
 
   /* Photo */
   .photo-img.photo-card {
@@ -639,7 +643,7 @@ function closingTier(item) {
 }
 
 /* ── Card renderers ── */
-function listingCard(item) {
+function listingCard(item, isManager = false) {
   const addr = item.address || "Address TBD";
   return `
   <div class="card" data-category="listings" data-office="${resolveOffice(item.listingOffice)}">
@@ -660,7 +664,10 @@ function listingCard(item) {
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
         ${coAgentsHtml(item.coListingAgents)}
       </div>
+      ${item.sourceSeller ? `<div class="card-source">Source: ${escapeHtml(item.sourceSeller)}</div>` : ""}
       ${item.listDate ? `<div class="card-date">Listed ${fmtDate(item.listDate)}</div>` : ""}
+      ${item.expirationDate ? `<div class="card-date">Expires ${fmtDate(item.expirationDate)}</div>` : ""}
+      ${isManager && (item.commission || item.cobrokeCommission) ? `<div class="card-commission">Commission: ${item.commission || "—"}% / Co-broke: ${item.cobrokeCommission || "—"}%</div>` : ""}
     </div>
   </div>`;
 }
@@ -707,6 +714,7 @@ function contractCard(item, isManager = false) {
           ${coAgentsHtml(item.coSellingAgents)}
         </div>
       </div>
+      ${item.sourceBuyer ? `<div class="card-source">Source of Buyer: ${escapeHtml(item.sourceBuyer)}</div>` : ""}
     </div>
   </div>`;
 }
@@ -786,6 +794,29 @@ function changeCard(item) {
   </div>`;
 }
 
+function dnOnlyCard(item) {
+  return `
+  <div class="card card-dn" data-category="dnonly" data-office="${resolveOffice(item.listingOffice)}">
+    <div class="card-photo">${photoEl(item, "card")}</div>
+    <div class="card-body">
+      <div class="card-header">
+        ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(item.address || "Address TBD")}</h3>`)}
+        <div class="card-mls">${mlsBadges(item.mlsIds)}</div>
+      </div>
+      <div class="card-price">${fmtPrice(item.listPrice)}</div>
+      <div class="card-meta">
+        ${item.city ? `<span>📍 ${escapeHtml(item.city)}</span>` : ""}
+        ${item.brba ? `<span>🛏 ${escapeHtml(item.brba)}</span>` : ""}
+        ${item.sqft ? `<span>📐 ${Number(item.sqft).toLocaleString()} sqft</span>` : ""}
+      </div>
+      <div class="card-agent">
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
 function noticeActions(item, type, isStaffUser) {
   const isOwner = item.agentEmail && userEmail && item.agentEmail.toLowerCase() === userEmail.toLowerCase();
   if (!isOwner && !isStaffUser) return "";
@@ -800,12 +831,14 @@ function upcomingCard(item, isStaffUser) {
   const addr = item.address || "";
   const contactHref = (item.contact || item.agentEmail)
     ? `${item.contactMethod === "phone" ? "tel:" : "mailto:"}${item.contact || item.agentEmail}` : "";
+  const dnBadge = item.source === "deltanet" ? `<span class="badge badge-dn">Coming Soon</span>` : "";
   return `
-  <div class="card" data-category="upcoming" data-office="${resolveOffice(item.agentOffice)}">
+  <div class="card" data-category="upcoming" data-office="${resolveOffice(item.agentOffice || item.listingOffice || "")}">
     ${item.photoUrl ? `<div class="card-photo">${photoEl(item, "card")}</div>` : ""}
     <div class="card-body">
       <div class="card-header">
         ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(addr || item.city || "Location TBD")}</h3>`)}
+        ${dnBadge ? `<div class="card-mls">${dnBadge}</div>` : ""}
       </div>
       <div class="card-price">${fmtPrice(item.listPrice)}</div>
       <div class="card-meta">
@@ -945,6 +978,7 @@ function render() {
     data.changes.length + data.upcoming.length + data.buyerNeeds.length + data.openHouses.length;
   document.getElementById('headerCount').textContent = `${totalItems} items`;
 
+  const dnOnlyCount = (data.dnOnly || []).length;
   const categories = [
     { id: "all",        label: `All (${totalItems})`,                     base: "All" },
     { id: "listings",   label: `Listings (${data.newListings.length})`,   base: "Listings" },
@@ -954,13 +988,14 @@ function render() {
     { id: "upcoming",   label: `Upcoming (${data.upcoming.length})`,      base: "Upcoming" },
     { id: "buyers",     label: `Buyer Needs (${data.buyerNeeds.length})`, base: "Buyer Needs" },
     { id: "openhouses", label: `Open Houses (${data.openHouses.length})`, base: "Open Houses" },
+    ...(dnOnlyCount ? [{ id: "dnonly", label: `Not in Daily Desk (${dnOnlyCount})`, base: "Not in Daily Desk" }] : []),
   ];
   document.getElementById('filterBar').innerHTML = categories.map(c =>
     `<button class="filter-tab${c.id === STATE.activeCategory ? " active" : ""}" data-filter="${c.id}" data-label="${c.base}">${c.label}</button>`
   ).join("");
 
   const sections = [
-    section("New Listings",                "🏡", "listings",   data.newListings.map(listingCard)),
+    section("New Listings",                "🏡", "listings",   data.newListings.map(l => listingCard(l, isManager))),
     section("New Contracts",               "📋", "contracts",  data.newContracts.map(c => contractCard(c, isManager))),
     section("Closings", "🎉", "closings", data.closings.map(c => closingCard(c, isManager)),
       `<strong>⚾ Baseball Awards:</strong>&nbsp;` +
@@ -975,6 +1010,9 @@ function render() {
       if (d !== 0) return d;
       return (a.openStart || "").localeCompare(b.openStart || "");
     }).map(openHouseCard)),
+    (data.dnOnly && data.dnOnly.length)
+      ? section("Not in Daily Desk",       "⚠", "dnonly",     data.dnOnly.map(dnOnlyCard))
+      : null,
   ].filter(Boolean).join("");
 
   document.getElementById('main').innerHTML = totalItems === 0
