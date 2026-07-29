@@ -12,7 +12,7 @@
 </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>John Adams | Real Estate AI Tools</title>
+  <title>John's Workshop | Real Estate AI Tools</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -74,6 +74,33 @@
       color: var(--muted);
       font-weight: 300;
       letter-spacing: 0.04em;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .auth-status {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.78rem;
+    }
+    .auth-status .auth-user-name {
+      color: var(--cream);
+      font-weight: 500;
+    }
+    .auth-status a {
+      color: var(--gold-light);
+      font-weight: 500;
+      text-decoration: none;
+      letter-spacing: 0.02em;
+    }
+    .auth-status a:hover { text-decoration: underline; }
+    .auth-status .auth-signout {
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 0.7rem;
     }
 
     /* ── QUICK NAV ── */
@@ -394,8 +421,11 @@
 
 <header>
   <div class="header-inner">
-    <div class="logo">John <span>Adams</span></div>
-    <span class="header-note">Real Estate AI Tools</span>
+    <div class="logo">John's <span>Workshop</span></div>
+    <div class="header-right">
+      <span class="header-note">Real Estate AI Tools</span>
+      <span class="auth-status" id="authStatus"></span>
+    </div>
   </div>
 </header>
 
@@ -860,7 +890,13 @@ async function handleCredential(cred) {
   // Close the fallback sign-in modal if it was open
   document.getElementById('signinModal').style.display = 'none';
 
-  // Always check manager status on sign-in
+  const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+  sessionStorage.setItem('ac_user_email', payload.email || '');
+  localStorage.setItem('ac_user_email', payload.email || '');
+  localStorage.setItem('ac_user_name', payload.name || '');
+  renderAuthStatus();
+
+  // Check manager status on sign-in
   try {
     const r = await fetch(PROXY_BASE + '/auth/is-manager', {
       method: 'POST',
@@ -870,10 +906,44 @@ async function handleCredential(cred) {
     const data = await r.json();
     localStorage.setItem('ac_is_manager', data.isManager ? '1' : '0');
     document.querySelectorAll('.manager-card').forEach(el => el.style.display = data.isManager ? '' : 'none');
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    sessionStorage.setItem('ac_user_email', payload.email || '');
-    localStorage.setItem('ac_user_email', payload.email || '');
   } catch (_) {}
+}
+
+// Renders the header's sign-in state from localStorage — built with DOM calls
+// (not innerHTML) since the display name comes from the Google ID token payload.
+function renderAuthStatus() {
+  const el = document.getElementById('authStatus');
+  if (!el) return;
+  el.textContent = '';
+  const email = localStorage.getItem('ac_user_email');
+  if (email) {
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'auth-user-name';
+    nameSpan.textContent = localStorage.getItem('ac_user_name') || email;
+    const signOutLink = document.createElement('a');
+    signOutLink.href = '#';
+    signOutLink.className = 'auth-signout';
+    signOutLink.textContent = 'Sign out';
+    signOutLink.onclick = (e) => { e.preventDefault(); signOut(); };
+    el.append(nameSpan, signOutLink);
+  } else {
+    const link = document.createElement('a');
+    link.href = '#';
+    link.className = 'auth-link';
+    link.textContent = 'Sign in';
+    link.onclick = (e) => { e.preventDefault(); document.getElementById('signinModal').style.display = 'flex'; };
+    el.append(link);
+  }
+}
+
+function signOut() {
+  localStorage.removeItem('ac_user_email');
+  localStorage.removeItem('ac_user_name');
+  localStorage.removeItem('ac_is_manager');
+  sessionStorage.removeItem('ac_user_email');
+  document.querySelectorAll('.manager-card').forEach(el => el.style.display = 'none');
+  if (window.google?.accounts?.id) { google.accounts.id.disableAutoSelect(); }
+  renderAuthStatus();
 }
 
 function initGoogleSignIn() {
@@ -895,8 +965,10 @@ function initGoogleSignIn() {
   });
 }
 
-// Immediately restore manager section from last known role — no network round-trip needed.
-// Google's silent sign-in runs in the background and will update if the role has changed.
+// Immediately restore sign-in state and manager section from last known role — no
+// network round-trip needed. Google's silent sign-in runs in the background and
+// will update both if anything's changed.
+renderAuthStatus();
 if (localStorage.getItem('ac_is_manager') === '1') {
   document.querySelectorAll('.manager-card').forEach(el => el.style.display = '');
 }
