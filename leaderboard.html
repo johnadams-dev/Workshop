@@ -31,7 +31,17 @@ h1,h2,h3{font-family:'Cormorant Garamond',serif}
 
 /* ── App ── */
 #app{display:none}
-header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 24px rgba(0,0,0,.3)}
+
+/* ── BETA ONLY banner ── */
+.beta-banner{
+  background:#dc2626;color:#fff;text-align:center;
+  padding:16px 24px;
+  font-size:1.15rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  position:sticky;top:0;z-index:200;
+  box-shadow:0 2px 12px rgba(220,38,38,.4);
+}
+
+header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:100;box-shadow:0 2px 24px rgba(0,0,0,.3)}
 .header-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px}
 .logo{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;color:var(--cream)}
 .logo span{color:var(--gold)}
@@ -43,19 +53,41 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
 
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2.1rem;font-weight:600;color:var(--ink);text-align:center}
 .page-title span{color:var(--gold)}
-.month-label{text-align:center;color:var(--slate);font-size:.9rem;margin-top:4px;margin-bottom:1.5rem}
+.period-label{text-align:center;color:var(--slate);font-size:.9rem;margin-top:4px;margin-bottom:1.5rem}
+
+/* ── Tabs ── */
+.tab-nav{
+  display:flex;justify-content:center;gap:4px;
+  background:var(--cream-dark);border-radius:14px;padding:5px;
+  margin-bottom:1.5rem;
+}
+.tab-btn{
+  flex:1;max-width:220px;padding:10px 16px;
+  border:none;background:transparent;border-radius:10px;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  color:var(--slate);cursor:pointer;
+  transition:background .15s,color .15s,box-shadow .15s;
+}
+.tab-btn:hover{background:rgba(255,255,255,.7)}
+.tab-btn.active{
+  background:#fff;color:var(--ink);font-weight:700;
+  box-shadow:0 1px 8px rgba(26,26,46,.1);
+}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
 
 /* ── Office filter ── */
 .filter-bar{display:flex;justify-content:center;margin-bottom:2rem}
 .filter-bar select{padding:9px 16px;border-radius:20px;border:1px solid var(--cream-dark);background:#fff;font-size:13px;color:var(--ink);font-family:inherit;cursor:pointer;box-shadow:var(--shadow)}
 
-/* ── Section ── */
+/* ── Board section ── */
 .board-section{margin-bottom:2.75rem}
 .board-head{text-align:center;margin-bottom:.4rem}
 .board-icon{font-size:1.6rem}
 .board-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;color:var(--ink)}
 .board-methodology{max-width:640px;margin:.35rem auto 1.4rem;text-align:center;font-size:12.5px;line-height:1.65;color:var(--slate);background:var(--cream-dark);border-radius:10px;padding:12px 18px}
 
+/* ── Podium ── */
 .podium{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:1.1rem}
 @media(max-width:720px){.podium{grid-template-columns:1fr}}
 
@@ -69,10 +101,56 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
 .rank-name{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:600;color:var(--ink);margin-top:2px}
 .rank-office{font-size:11.5px;color:var(--muted);margin-bottom:8px}
 .rank-value{font-size:1.15rem;font-weight:700;color:var(--gold-light);background:var(--ink);display:inline-block;padding:3px 12px;border-radius:14px;margin-bottom:10px}
-.rank-value.alt{background:var(--ink-soft)}
 .street{display:flex;justify-content:center;gap:2px;flex-wrap:wrap}
 
 .empty-state{text-align:center;color:var(--muted);font-size:13px;padding:2rem 1rem;background:var(--card-bg);border-radius:14px;box-shadow:var(--shadow)}
+
+/* ── President's Club ranked list ── */
+.pc-header,
+.pc-row{
+  display:grid;
+  grid-template-columns:52px 1fr 1fr 130px;
+  align-items:center;
+  gap:8px;
+  padding:10px 16px;
+}
+.pc-header{
+  font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--slate);background:var(--cream-dark);
+  border-radius:12px 12px 0 0;
+  border-bottom:1px solid var(--cream-dark);
+}
+.pc-list{background:var(--card-bg);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.pc-row{border-bottom:1px solid var(--cream-dark);transition:background .1s}
+.pc-row:last-child{border-bottom:none}
+.pc-row:hover{background:var(--cream)}
+.pc-row.you-row{background:var(--ink);color:#fff}
+.pc-row.you-row:hover{background:var(--ink-soft)}
+.pc-rank{
+  font-size:.85rem;font-weight:800;color:var(--gold);
+  text-align:center;
+}
+.pc-row.you-row .pc-rank{color:var(--gold-light)}
+.pc-name{font-weight:600;font-size:.9rem}
+.pc-row.you-row .pc-name{color:#fff}
+.pc-office{font-size:.8rem;color:var(--muted)}
+.pc-row.you-row .pc-office{color:rgba(255,255,255,.55)}
+.pc-gci{
+  font-weight:700;font-size:.9rem;
+  background:var(--ink);color:var(--gold-light);
+  border-radius:8px;padding:3px 10px;text-align:right;
+}
+.pc-row.you-row .pc-gci{background:rgba(255,255,255,.12);color:var(--gold-light)}
+.pc-ellipsis{
+  text-align:center;padding:10px;
+  color:var(--muted);font-size:12px;letter-spacing:.05em;
+  border-bottom:1px solid var(--cream-dark);
+}
+@media(max-width:600px){
+  .pc-header,.pc-row{grid-template-columns:44px 1fr 100px}
+  .pc-office{display:none}
+  .pc-header .ph-office{display:none}
+}
 
 /* ── Your production ── */
 .you-card{background:var(--ink);color:var(--cream);border-radius:16px;padding:24px 22px;box-shadow:var(--shadow-hover);margin-top:1.5rem}
@@ -85,9 +163,6 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
 .you-metric-rank{font-size:12px;color:var(--gold-light);margin-bottom:8px}
 .you-metric-gap{font-size:11.5px;color:rgba(255,255,255,.55);line-height:1.5}
 .you-street{margin-top:8px;display:flex;gap:2px;flex-wrap:wrap}
-
-/* ── Footer note ── */
-.footnote{text-align:center;color:var(--muted);font-size:11.5px;margin-top:2.5rem;line-height:1.6}
 
 .toast-area{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;align-items:center}
 .toast{background:var(--ink);color:#fff;padding:9px 18px;border-radius:20px;font-size:12.5px;box-shadow:var(--shadow-hover)}
@@ -107,6 +182,9 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
 </div>
 
 <div id="app">
+
+  <div class="beta-banner">⚠ BETA ONLY — Rankings are unofficial and data may be incomplete</div>
+
   <header>
     <div class="header-inner">
       <div class="logo">ACC <span>Leaderboard</span></div>
@@ -119,42 +197,88 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
 
   <div class="container">
     <div class="page-title">Production <span>Leaderboard</span></div>
-    <div class="month-label" id="month-label">Loading…</div>
+    <div class="period-label" id="period-label">Loading…</div>
 
-    <div class="filter-bar">
+    <!-- Tab navigation -->
+    <div class="tab-nav" role="tablist">
+      <button class="tab-btn active" onclick="switchTab('sales')" data-tab="sales">🏆 Sales Leader</button>
+      <button class="tab-btn" onclick="switchTab('listings')" data-tab="listings">🏘️ Listing Leader</button>
+      <button class="tab-btn" onclick="switchTab('presidents')" data-tab="presidents">🏅 President's Club</button>
+    </div>
+
+    <!-- Office filter (Sales + Listings only) -->
+    <div class="filter-bar" id="office-filter-bar">
       <select id="office-select" onchange="render()">
         <option value="">All Offices</option>
       </select>
     </div>
 
-    <div class="board-section">
-      <div class="board-head">
-        <span class="board-icon">🏆</span>
-        <div class="board-title">Sales Leader</div>
+    <!-- ── Panel: Sales Leader ── -->
+    <div id="panel-sales" class="tab-panel active">
+      <div class="board-section">
+        <div class="board-head">
+          <span class="board-icon">🏆</span>
+          <div class="board-title">Sales Leader</div>
+        </div>
+        <div class="board-methodology">
+          Total dollar volume of every deal that went under contract this month — your own listing, another
+          Adams Cameron agent's listing where you represented the buyer, or a cooperating brokerage's listing
+          where you represented the buyer. Split a deal with a teammate? You're each credited for your share
+          of the commission split; solo agents get full credit. Deals that later fall through drop off the count.
+        </div>
+        <div id="sales-podium"></div>
       </div>
-      <div class="board-methodology">
-        Total dollar volume of every deal that went under contract this month — your own listing, another
-        Adams Cameron agent's listing where you represented the buyer, or a cooperating brokerage's listing
-        where you represented the buyer. Split a deal with a teammate? You're each credited for your share
-        of the commission split; solo agents get full credit. Deals that later fall through drop off the count.
-      </div>
-      <div id="sales-podium"></div>
     </div>
 
-    <div class="board-section">
-      <div class="board-head">
-        <span class="board-icon">🏘️</span>
-        <div class="board-title">Listing Leader</div>
+    <!-- ── Panel: Listing Leader ── -->
+    <div id="panel-listings" class="tab-panel">
+      <div class="board-section">
+        <div class="board-head">
+          <span class="board-icon">🏘️</span>
+          <div class="board-title">Listing Leader</div>
+        </div>
+        <div class="board-methodology">
+          Number of listings taken this month (by list date) that are still active, under contract, sold, or
+          coming soon — withdrawn and expired listings don't count. Co-listed properties split the count itself
+          by your share (a 50/50 co-listing earns each agent 0.5), so totals can land on numbers like "2.5
+          listings." Ties are broken by combined list price.
+        </div>
+        <div id="listing-podium"></div>
       </div>
-      <div class="board-methodology">
-        Number of listings taken this month (by list date) that are still active, under contract, sold, or
-        coming soon — withdrawn and expired listings don't count. Co-listed properties split the count itself
-        by your share (a 50/50 co-listing earns each agent 0.5), so totals can land on numbers like "2.5
-        listings." Ties are broken by combined list price.
-      </div>
-      <div id="listing-podium"></div>
     </div>
 
+    <!-- ── Panel: President's Club ── -->
+    <div id="panel-presidents" class="tab-panel">
+      <div class="board-section">
+        <div class="board-head">
+          <span class="board-icon">🏅</span>
+          <div class="board-title">President's Club</div>
+        </div>
+        <div class="board-methodology">
+          Top 25 agents by Gross Commission Income (GCI) from closed transactions,
+          January 1 through today. Buyer-side GCI = co-broke commission rate × sale price.
+          Listing-side GCI = (total commission − co-broke) × sale price. Co-listed or co-sold
+          deals split GCI by each agent's commission share.
+        </div>
+        <div id="pc-list"><div class="empty-state">Loading…</div></div>
+
+        <!-- Your GCI position -->
+        <div class="you-card" id="you-pc-card" style="display:none">
+          <div class="you-title">Your GCI — Year to Date</div>
+          <div class="you-grid" style="grid-template-columns:1fr">
+            <div class="you-metric">
+              <div class="you-metric-label">Gross Commission Income</div>
+              <div class="you-metric-value" id="you-gci-value">$0</div>
+              <div class="you-metric-rank" id="you-gci-rank">—</div>
+              <div class="you-street" id="you-gci-street"></div>
+              <div class="you-metric-gap" id="you-gci-gap"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared you-card (Sales + Listings) -->
     <div class="you-card" id="you-card" style="display:none">
       <div class="you-title">Your Production This Month</div>
       <div class="you-grid">
@@ -175,12 +299,8 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:0;z-index:100;
       </div>
     </div>
 
-    <div class="footnote">
-      President's Club (year-to-date, based on gross commission income) is coming in a future update —
-      we don't have GCI data recorded yet.
-    </div>
-  </div>
-</div>
+  </div><!-- /.container -->
+</div><!-- /#app -->
 
 <div class="toast-area" id="toasts"></div>
 
@@ -192,6 +312,8 @@ let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key') || '';
 let offices = [];
 let leaderboard = null; // { month, monthLabel, agents: [...] }
+let pcData = null;      // { year, yearLabel, agents: [...] }
+let activeTab = 'sales';
 
 if (proxyKey && userEmail) {
   document.getElementById('auth-gate').style.display = 'none';
@@ -213,6 +335,16 @@ function fmtMoney(n) { return '$' + Math.round(n || 0).toLocaleString('en-US'); 
 function fmtCount(n) {
   const r = Math.round((n || 0) * 10) / 10;
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+  document.getElementById('office-filter-bar').style.display = tab === 'presidents' ? 'none' : '';
+  document.getElementById('you-card').style.display = 'none';
+  render();
 }
 
 // ── House-street visual ──────────────────────────────────────────────────────
@@ -247,10 +379,6 @@ function scopedAgents() {
     : leaderboard.agents;
 }
 
-function rankBy(agents, cmp) {
-  return [...agents].sort(cmp);
-}
-
 const salesCmp = (a, b) => b.sales_volume - a.sales_volume;
 const listingCmp = (a, b) => (b.listing_count - a.listing_count) || (b.listing_price_sum - a.listing_price_sum);
 
@@ -283,34 +411,116 @@ function renderYouCard(scoped) {
   if (!me) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
-  const salesRanked = rankBy(scoped, salesCmp);
-  const listingRanked = rankBy(scoped, listingCmp);
-  const salesRank = salesRanked.findIndex(a => a.agent_id === me.agent_id) + 1;
+  const salesRanked   = [...scoped].sort(salesCmp);
+  const listingRanked = [...scoped].sort(listingCmp);
+  const salesRank   = salesRanked.findIndex(a => a.agent_id === me.agent_id) + 1;
   const listingRank = listingRanked.findIndex(a => a.agent_id === me.agent_id) + 1;
-  const salesMax = salesRanked[0]?.sales_volume || me.sales_volume || 1;
-  const listingMax = listingRanked[0]?.listing_count || me.listing_count || 1;
+  const salesMax   = salesRanked[0]?.sales_volume   || me.sales_volume   || 1;
+  const listingMax = listingRanked[0]?.listing_count || me.listing_count  || 1;
 
-  document.getElementById('you-sales-value').textContent = fmtMoney(me.sales_volume);
-  document.getElementById('you-sales-rank').textContent = `Rank #${salesRank} of ${salesRanked.length}`;
-  document.getElementById('you-sales-street').innerHTML = houseStreet(me.sales_volume, salesMax);
-  document.getElementById('you-sales-gap').textContent = salesRank > 1
+  document.getElementById('you-sales-value').textContent   = fmtMoney(me.sales_volume);
+  document.getElementById('you-sales-rank').textContent    = `Rank #${salesRank} of ${salesRanked.length}`;
+  document.getElementById('you-sales-street').innerHTML    = houseStreet(me.sales_volume, salesMax);
+  document.getElementById('you-sales-gap').textContent     = salesRank > 1
     ? `${fmtMoney(salesRanked[salesRank - 2].sales_volume - me.sales_volume)} behind the spot above you`
     : (me.sales_volume > 0 ? "You're in the lead!" : 'No sales volume yet this month');
 
   document.getElementById('you-listing-value').textContent = fmtCount(me.listing_count) + ' listings';
-  document.getElementById('you-listing-rank').textContent = `Rank #${listingRank} of ${listingRanked.length}`;
-  document.getElementById('you-listing-street').innerHTML = houseStreet(me.listing_count, listingMax);
-  document.getElementById('you-listing-gap').textContent = listingRank > 1
+  document.getElementById('you-listing-rank').textContent  = `Rank #${listingRank} of ${listingRanked.length}`;
+  document.getElementById('you-listing-street').innerHTML  = houseStreet(me.listing_count, listingMax);
+  document.getElementById('you-listing-gap').textContent   = listingRank > 1
     ? `${fmtCount(listingRanked[listingRank - 2].listing_count - me.listing_count)} listings behind the spot above you`
     : (me.listing_count > 0 ? "You're in the lead!" : 'No listings taken yet this month');
 }
 
+// ── President's Club ──────────────────────────────────────────────────────────
+function renderPresidentsClub() {
+  const listEl  = document.getElementById('pc-list');
+  const youCard = document.getElementById('you-pc-card');
+
+  if (!pcData) {
+    listEl.innerHTML = '<div class="empty-state">Loading President\'s Club data…</div>';
+    youCard.style.display = 'none';
+    return;
+  }
+
+  const agents = pcData.agents; // sorted by gci desc server-side
+  const withGci = agents.filter(a => a.gci > 0);
+
+  if (!withGci.length) {
+    listEl.innerHTML = '<div class="empty-state">No closed transactions with commission data yet this year.</div>';
+    youCard.style.display = 'none';
+    return;
+  }
+
+  const top25 = withGci.slice(0, 25);
+  const maxGci = top25[0].gci;
+  const myEntry = agents.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
+  const myRank  = myEntry ? agents.indexOf(myEntry) + 1 : null;
+  const meInTop25 = myRank !== null && myRank <= 25;
+
+  const header = `
+    <div class="pc-header">
+      <span>#</span>
+      <span>Agent</span>
+      <span class="ph-office">Office</span>
+      <span style="text-align:right">YTD GCI</span>
+    </div>`;
+
+  const rows = top25.map((a, i) => {
+    const isMe = myEntry && a.agent_id === myEntry.agent_id;
+    return `
+      <div class="pc-row${isMe ? ' you-row' : ''}">
+        <span class="pc-rank">${medal(i)}</span>
+        <span class="pc-name">${esc(a.first_name)} ${esc(a.last_name)}${isMe ? ' ★' : ''}</span>
+        <span class="pc-office">${esc(a.office_name || '—')}</span>
+        <span class="pc-gci">${fmtMoney(a.gci)}</span>
+      </div>`;
+  }).join('');
+
+  // If the current user is outside the top 25, show their row with a separator
+  let youExtra = '';
+  if (myEntry && !meInTop25 && myEntry.gci > 0) {
+    youExtra = `
+      <div class="pc-ellipsis">· · ·</div>
+      <div class="pc-row you-row">
+        <span class="pc-rank">#${myRank}</span>
+        <span class="pc-name">${esc(myEntry.first_name)} ${esc(myEntry.last_name)} ★</span>
+        <span class="pc-office">${esc(myEntry.office_name || '—')}</span>
+        <span class="pc-gci">${fmtMoney(myEntry.gci)}</span>
+      </div>`;
+  }
+
+  listEl.innerHTML = header + `<div>${rows}${youExtra}</div>`;
+
+  // Your GCI card
+  if (!myEntry) { youCard.style.display = 'none'; return; }
+  youCard.style.display = 'block';
+
+  const rank     = myRank || agents.length;
+  const total    = withGci.length;
+  const above    = rank > 1 ? withGci[rank - 2] : null;
+
+  document.getElementById('you-gci-value').textContent = fmtMoney(myEntry.gci);
+  document.getElementById('you-gci-rank').textContent  = `Rank #${rank} of ${total} agents with GCI`;
+  document.getElementById('you-gci-street').innerHTML  = houseStreet(myEntry.gci, maxGci);
+  document.getElementById('you-gci-gap').textContent   = rank > 1 && above
+    ? `${fmtMoney(above.gci - myEntry.gci)} behind the spot above you`
+    : (myEntry.gci > 0 ? "You're in the lead!" : 'No closed commission earned yet this year');
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
 function render() {
+  if (activeTab === 'presidents') {
+    renderPresidentsClub();
+    document.getElementById('you-card').style.display = 'none';
+    return;
+  }
   if (!leaderboard) return;
   const scoped = scopedAgents();
-  renderPodium('sales-podium', rankBy(scoped, salesCmp), 'sales_volume', fmtMoney,
+  renderPodium('sales-podium',   [...scoped].sort(salesCmp),   'sales_volume',  fmtMoney,
     'No sales volume yet this month — be the first!');
-  renderPodium('listing-podium', rankBy(scoped, listingCmp), 'listing_count', v => fmtCount(v) + ' listings',
+  renderPodium('listing-podium', [...scoped].sort(listingCmp), 'listing_count', v => fmtCount(v) + ' listings',
     'No listings taken yet this month — be the first!');
   renderYouCard(scoped);
 }
@@ -320,20 +530,25 @@ const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':proxyKey, 'x
 
 async function load() {
   try {
-    const [officesRes, lbRes] = await Promise.all([
+    const [officesRes, lbRes, pcRes] = await Promise.all([
       fetch(`${PROXY}/offices`, { headers: H() }),
       fetch(`${PROXY}/leaderboard/production`, { headers: H() }),
+      fetch(`${PROXY}/leaderboard/presidents-club`, { headers: H() }),
     ]);
     if (!officesRes.ok) throw new Error('Offices HTTP ' + officesRes.status);
-    if (!lbRes.ok) throw new Error('Leaderboard HTTP ' + lbRes.status);
-    offices = await officesRes.json();
+    if (!lbRes.ok)      throw new Error('Leaderboard HTTP ' + lbRes.status);
+
+    offices     = await officesRes.json();
     leaderboard = await lbRes.json();
+    if (pcRes.ok) pcData = await pcRes.json();
 
     const sel = document.getElementById('office-select');
     sel.innerHTML = '<option value="">All Offices</option>' +
       offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
 
-    document.getElementById('month-label').textContent = `${leaderboard.monthLabel} · Month to Date`;
+    document.getElementById('period-label').textContent =
+      `${leaderboard.monthLabel} · Month to Date`;
+
     render();
   } catch (e) {
     toast('Load failed: ' + e.message, 'err');
