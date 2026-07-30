@@ -337,7 +337,7 @@ header {
           <canvas id="overviewViewsChart" height="220"></canvas>
         </div>
         <div class="report-chart-wrap">
-          <div class="report-chart-title">Views by referrer</div>
+          <div class="report-chart-title">Views by top external sites</div>
           <canvas id="overviewReferrerChart" height="220"></canvas>
         </div>
         <div class="report-chart-wrap">
@@ -845,11 +845,13 @@ function aggregateReferrerBreakdown(series) {
   const totals = {};
   series.forEach((r) => {
     if (r.referrer_host === 'Direct/Unknown') return;
+    if (r.referrer_host === 'johnadams.org' || r.referrer_host.endsWith('.johnadams.org')) return;
     totals[r.referrer_host] = (totals[r.referrer_host] || 0) + r.count;
   });
   return Object.entries(totals)
     .map(([referrer_host, count]) => ({ referrer_host, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
 }
 
 function renderDeviceChart(breakdown, canvasId, storeKey) {
