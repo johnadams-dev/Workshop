@@ -337,6 +337,10 @@ header {
           <canvas id="overviewViewsChart" height="220"></canvas>
         </div>
         <div class="report-chart-wrap">
+          <div class="report-chart-title">Views by referrer</div>
+          <canvas id="overviewReferrerChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
           <div class="report-chart-title">Device type</div>
           <canvas id="overviewDeviceChart" height="220"></canvas>
         </div>
@@ -355,6 +359,10 @@ header {
         <div class="report-chart-wrap">
           <div class="report-chart-title">Top 10 listing agents by views</div>
           <canvas id="overviewTopAgentsChart" height="220"></canvas>
+        </div>
+        <div class="report-chart-wrap">
+          <div class="report-chart-title">Top 10 properties by views</div>
+          <canvas id="overviewTopPropertiesChart" height="220"></canvas>
         </div>
       </div>
     </div>
@@ -798,11 +806,13 @@ async function loadOverviewReport() {
       return;
     }
     renderViewsChart(data.series, 'overviewViewsChart', '_overviewViewsChart');
+    renderBarChart(aggregateReferrerBreakdown(data.series), r => r.referrer_host, 'overviewReferrerChart', '_overviewReferrerChart');
     renderDeviceChart(data.device_breakdown, 'overviewDeviceChart', '_overviewDeviceChart');
     renderPieChart(data.genre_breakdown, d => d.genre, 'overviewGenreChart', '_overviewGenreChart');
     renderPieChart(data.reusable_breakdown, d => d.reusable ? 'Stock' : 'Custom', 'overviewReusableChart', '_overviewReusableChart');
     renderPieChart(data.branded_breakdown, d => d.branded ? 'Branded' : 'Unbranded', 'overviewBrandedChart', '_overviewBrandedChart');
     renderBarChart(data.top_agents, r => r.name || r.email, 'overviewTopAgentsChart', '_overviewTopAgentsChart');
+    renderBarChart(data.top_properties, r => r.address, 'overviewTopPropertiesChart', '_overviewTopPropertiesChart');
   } catch (e) {
     toast('Could not load the overview report: ' + e.message);
   }
@@ -829,6 +839,17 @@ function renderViewsChart(series, canvasId, storeKey) {
       plugins: { legend: { position: 'bottom' } },
     },
   });
+}
+
+function aggregateReferrerBreakdown(series) {
+  const totals = {};
+  series.forEach((r) => {
+    if (r.referrer_host === 'Direct/Unknown') return;
+    totals[r.referrer_host] = (totals[r.referrer_host] || 0) + r.count;
+  });
+  return Object.entries(totals)
+    .map(([referrer_host, count]) => ({ referrer_host, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 function renderDeviceChart(breakdown, canvasId, storeKey) {
