@@ -1166,6 +1166,7 @@ async function deactivate(id) {
 function showTerminateResult(data) {
   const STEP_LABELS = {
     db:                 'Agent deactivated in database',
+    deltanetDisable:    'DeltaNet account disabled',
     deltanetCustomer:   'DeltaNet past-agent record created',
     deltanetGroup:      'Added to DeltaNet "Past Agents" group',
     googleWorkspace:    'Google Workspace account suspended',
@@ -1364,7 +1365,7 @@ async function createAgent() {
     const newAgent = allAgents.find(a => a.email === email);
 
     if (newAgent) {
-      openRosterChangeModal('hired', newAgent);
+      openRosterChangeModal('hired', newAgent, null, { personalEmail, phone });
     }
 
     showOnboardResult(data);
@@ -1553,7 +1554,7 @@ function renderRosterTable(records) {
 // ── Roster Change Modal ────────────────────────────────────────────────────────
 let _rcPendingAction  = null;
 
-function openRosterChangeModal(eventType, agent, pendingAction = null) {
+function openRosterChangeModal(eventType, agent, pendingAction = null, prefill = null) {
   _rcPendingAction = pendingAction;
   document.getElementById('rc-modal-title').textContent = eventType === 'hired' ? 'Log Hire' : 'Log Termination';
   document.getElementById('rc-event-type').value = eventType;
@@ -1567,6 +1568,11 @@ function openRosterChangeModal(eventType, agent, pendingAction = null) {
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('rc-referral-field').style.display   = 'none';
   document.getElementById('rc-destination-field').style.display = 'none';
+
+  // Carry forward what was just entered on the Add Agent form (if any) instead
+  // of asking the user to retype it — re-entry risked the two copies drifting apart.
+  if (prefill?.personalEmail) document.getElementById('rc-personal-email').value = prefill.personalEmail;
+  if (prefill?.phone)         document.getElementById('rc-phone').value         = prefill.phone;
 
   document.getElementById('rc-hire-fields').style.display = eventType === 'hired'      ? '' : 'none';
   document.getElementById('rc-term-fields').style.display = eventType === 'terminated' ? '' : 'none';
