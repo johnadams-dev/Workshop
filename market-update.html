@@ -530,8 +530,45 @@
         if (absorption.monthsSupply < 4) { marketType="Seller's Market"; explanation="Low inventory — properties likely to sell quickly"; }
         else if (absorption.monthsSupply < 6) { marketType="Balanced Market"; explanation="Neutral conditions for buyers and sellers"; }
         else { marketType="Buyer's Market"; explanation="High inventory — buyers have more negotiating power"; }
-        doc.setFontSize(12); doc.text('Market Type: '+marketType, 20, yPos); yPos+=7;
-        doc.setFontSize(10); doc.text(explanation, 20, yPos);
+        doc.setFontSize(12); doc.setTextColor(31,71,136); doc.text('Market Type: '+marketType, 20, yPos); yPos += 10;
+
+        // Market type gauge — spectrum from Seller's to Buyer's market, mirrors RPR-style indicator
+        const gaugeX = 20, gaugeWidth = 170, gaugeY = yPos, gaugeHeight = 6;
+        const sellerEnd = gaugeX + gaugeWidth * 0.4;
+        const balancedEnd = gaugeX + gaugeWidth * 0.6;
+        doc.setFillColor(68,114,196); doc.rect(gaugeX, gaugeY, sellerEnd - gaugeX, gaugeHeight, 'F');
+        doc.setFillColor(173,197,232); doc.rect(sellerEnd, gaugeY, balancedEnd - sellerEnd, gaugeHeight, 'F');
+        doc.setFillColor(237,125,49); doc.rect(balancedEnd, gaugeY, gaugeX + gaugeWidth - balancedEnd, gaugeHeight, 'F');
+
+        const scaleMax = 10; // months of inventory represented by the full width of the gauge
+        const frac = Math.max(0, Math.min(1, absorption.monthsSupply / scaleMax));
+        const pointerX = gaugeX + gaugeWidth * frac;
+        doc.setFillColor(31,71,136);
+        doc.triangle(pointerX - 2.5, gaugeY - 5, pointerX + 2.5, gaugeY - 5, pointerX, gaugeY - 0.5, 'F');
+
+        yPos = gaugeY + gaugeHeight + 6;
+        doc.setFontSize(9);
+        const gaugeLabels = [
+            { text: "Seller's Market", x: gaugeX, align: 'left', active: marketType === "Seller's Market" },
+            { text: 'Balanced Market', x: gaugeX + gaugeWidth / 2, align: 'center', active: marketType === 'Balanced Market' },
+            { text: "Buyer's Market", x: gaugeX + gaugeWidth, align: 'right', active: marketType === "Buyer's Market" }
+        ];
+        gaugeLabels.forEach(l => {
+            doc.setFont(undefined, l.active ? 'bold' : 'normal');
+            doc.setTextColor(l.active ? 31 : 130, l.active ? 71 : 130, l.active ? 136 : 130);
+            doc.text(l.text, l.x, yPos, { align: l.align });
+            if (l.active) {
+                const w = doc.getTextWidth(l.text);
+                const lx = l.align === 'center' ? l.x - w / 2 : l.align === 'right' ? l.x - w : l.x;
+                doc.setDrawColor(31,71,136);
+                doc.line(lx, yPos + 1.5, lx + w, yPos + 1.5);
+            }
+        });
+        doc.setFont(undefined, 'normal');
+        yPos += 10;
+
+        doc.setFontSize(10); doc.setTextColor(60,60,60);
+        doc.text(explanation, 20, yPos);
         if (domChartImageData) {
             doc.addPage(); yPos = 30;
             doc.setFontSize(16); doc.setTextColor(31,71,136); doc.text('Report 3: Days on Market Analysis', 20, yPos); yPos += 10;
