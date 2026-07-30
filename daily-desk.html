@@ -1894,6 +1894,51 @@ tbody tr.clickable { cursor: pointer; }
               <input type="text" id="nc-ext-source" placeholder="e.g. referral, website">
             </div>
           </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Bedrooms</span>
+              <input type="number" id="nc-ext-bedrooms" placeholder="e.g. 3" min="0" step="1">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Bathrooms</span>
+              <input type="number" id="nc-ext-bathrooms" placeholder="e.g. 2" min="0" step="0.5">
+            </div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
+              <select id="nc-ext-property-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
+                <option value="">—</option>
+                <optgroup label="Residential">
+                  <option value="Single Family">Single Family</option>
+                  <option value="Condominium">Condominium</option>
+                  <option value="Single Family Attached">Single Family Attached</option>
+                  <option value="Condotel">Condotel</option>
+                </optgroup>
+                <optgroup label="Manufactured">
+                  <option value="Manufactured Home w/ Land">Manufactured Home w/ Land</option>
+                  <option value="Manufactured Home no Land">Manufactured Home no Land</option>
+                </optgroup>
+                <optgroup label="Multi-Unit">
+                  <option value="Duplex">Duplex</option>
+                  <option value="Triplex">Triplex</option>
+                  <option value="Fourplex">Fourplex</option>
+                  <option value="5+ Units">5+ Units</option>
+                </optgroup>
+                <optgroup label="Land">
+                  <option value="Single Family Lot">Single Family Lot</option>
+                  <option value="Multi Family Land">Multi Family Land</option>
+                  <option value="Commercial Land">Commercial Land</option>
+                  <option value="Industrial Land">Industrial Land</option>
+                </optgroup>
+                <optgroup label="Commercial">
+                  <option value="Commercial Land & Building">Commercial Land &amp; Building</option>
+                  <option value="Business Opportunity">Business Opportunity</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="Boat Slip">Boat Slip</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">List Price</span>
@@ -4586,6 +4631,9 @@ function openNewContractModal() {
   document.getElementById('nc-ext-seller-customer-rows').innerHTML = '';
   document.getElementById('nc-ext-mlsid').value = '';
   document.getElementById('nc-ext-source').value = '';
+  document.getElementById('nc-ext-bedrooms').value = '';
+  document.getElementById('nc-ext-bathrooms').value = '';
+  document.getElementById('nc-ext-property-type').value = '';
   document.getElementById('nc-ext-list-price').value = '';
   document.getElementById('nc-ext-contract-price').value = '';
   document.getElementById('nc-ext-contract-date').value = '';
@@ -4862,6 +4910,9 @@ async function ncSaveExternalContract() {
       sellers:             collectCustomers('nc-ext-seller'),
       mls_id:              document.getElementById('nc-ext-mlsid').value.trim() || null,
       source_of_buyer:     document.getElementById('nc-ext-source').value.trim() || null,
+      bedrooms:            document.getElementById('nc-ext-bedrooms').value ? Number(document.getElementById('nc-ext-bedrooms').value) : null,
+      bathrooms:           document.getElementById('nc-ext-bathrooms').value ? Number(document.getElementById('nc-ext-bathrooms').value) : null,
+      property_type:       document.getElementById('nc-ext-property-type').value || null,
       list_price:          amParseMoney(document.getElementById('nc-ext-list-price').value),
       contract_price:      amParseMoney(document.getElementById('nc-ext-contract-price').value),
       contract_date:       document.getElementById('nc-ext-contract-date').value || null,
@@ -6301,12 +6352,14 @@ function cvToast(ico, msg) {
 
 /* ── Field Corrections ── */
 const FC_FIELD_LABELS = {
-  property_address: 'Property Address',
-  city:              'City',
-  source_of_seller:  'Source of Seller',
-  source_of_buyer:   'Source of Buyer',
-  commission_type:   'Commission Type (percent/fixed)',
-  notes:             'Notes',
+  property_address:      'Property Address',
+  city:                   'City',
+  source_of_seller:       'Source of Seller',
+  source_of_buyer:        'Source of Buyer',
+  commission_type:        'Commission Type (percent/fixed)',
+  commission_rate:        'Total Commission',
+  cooperating_commission: 'Cooperating Commission',
+  notes:                  'Notes',
 };
 const FC_CUSTOMER_FIELD_LABELS = {
   name:    'Name',
