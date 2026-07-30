@@ -397,6 +397,7 @@ let STATE = {
   downloaded: {},
   uploadResults: [],
   uploading: false,
+  uploadProgress: null,
   uploadDone: false,
 };
 
@@ -653,6 +654,28 @@ async function initStep2() {
   if (!STATE.fsTransactions.length && !STATE.fsLoading) await loadFsTransactions();
 }
 
+// FS transaction names are almost always the property address, the seller
+// name, or the buyer name — so compare each of those against transName first
+// (the strongest signal), falling back to the individual address/seller/buyer
+// fields FS also returns. Scores every transaction and picks the best match
+// rather than stopping at the first hit, so a transaction matching on two
+// fields (e.g. address AND seller) wins over one matching on just one.
+function findBestTransactionMatch(transactions, txnDetails) {
+  const addrKey   = (txnDetails.propertyAddress || "").toLowerCase().split(" ")[0] || "";
+  const sellerKey = (txnDetails.sellerName || "").toLowerCase().trim().split(" ").pop() || "";
+  const buyerKey  = (txnDetails.buyerName  || "").toLowerCase().trim().split(" ").pop() || "";
+  const candidates = [addrKey, sellerKey, buyerKey].filter((k) => k.length > 3);
+  if (!candidates.length) return null;
+
+  let best = null, bestScore = 0;
+  for (const t of transactions) {
+    const haystacks = [t.transName, t.address, t.seller, t.buyer].map((s) => (s || "").toLowerCase());
+    const score = candidates.filter((key) => haystacks.some((h) => h.includes(key))).length;
+    if (score > bestScore) { best = t; bestScore = score; }
+  }
+  return bestScore > 0 ? best : null;
+}
+
 async function loadFsTransactions() {
   STATE.fsLoading = true;
   STATE.fsError = null;
@@ -663,18 +686,13 @@ async function loadFsTransactions() {
     STATE.agentNRDSID = result.agentNRDSID;
     STATE.fsTransactions = (result.transactions || []).map((t) => ({
       id: t.transId,
+      transName: t.transName || "",
       address: [t.streetAddress, t.City, t.State, t.Zip].filter(Boolean).join(", "),
       seller: t.sellerParty1Name || t.sellerLandlordName || "",
       buyer: t.buyerParty1Name || t.buyerLandlordName || "",
       type: t.transactionType || "",
     }));
-    const addr = (STATE.txnDetails.propertyAddress || "").toLowerCase();
-    const seller = (STATE.txnDetails.sellerName || "").toLowerCase();
-    STATE.suggestedTxn = STATE.fsTransactions.find((t) => {
-      const a = t.address.toLowerCase(), s = t.seller.toLowerCase();
-      return (addr && addr.split(" ")[0].length > 3 && a.includes(addr.split(" ")[0]))
-          || (seller && seller.split(" ")[0].length > 3 && s.includes(seller.split(" ")[0]));
-    }) || null;
+    STATE.suggestedTxn = findBestTransactionMatch(STATE.fsTransactions, STATE.txnDetails);
   } catch (e) {
     STATE.fsError = e.message;
   }
@@ -885,6 +903,7 @@ function renderStep4() {
         </p>
         ${!STATE.uploadDone ? `
           <button class="btn auto" ${STATE.uploading ? "disabled" : ""} onclick="submitToFormSimplicity()">${STATE.uploading ? "Uploading…" : `Upload ${forms.length} Documents to Form Simplicity`}</button>
+          ${STATE.uploading && STATE.uploadProgress ? `<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#6b7280"><span class="spin" style="width:14px;height:14px;border-width:2px"></span>${esc(STATE.uploadProgress)}</div>` : ""}
         ` : `<div style="font-size:14px;font-weight:600;color:#166534;margin-bottom:16px">✓ Upload complete</div>`}
         ${STATE.uploadResults.length ? `<div style="margin-top:16px">${STATE.uploadResults.map((r) => `<div class="upload-result ${r.type}">${esc(r.msg)}</div>`).join("")}</div>` : ""}
       </div>
@@ -916,23 +935,27 @@ async function handleDownloadAll() {
 async function submitToFormSimplicity() {
   STATE.uploading = true;
   STATE.uploadDone = false;
+  STATE.uploadResults = [];
+  STATE.uploadProgress = "Preparing…";
   render();
-  const results = [];
   try {
     const agentBody = STATE.selectedAgentEmail ? { agentEmail: STATE.selectedAgentEmail } : {};
     let transId;
     if (STATE.selectedTxn === "new") {
+      STATE.uploadProgress = "Creating transaction in Form Simplicity…";
+      render();
       const created = await api('/acc-binder/fs/create-transaction', {
         method: "POST",
-        body: JSON.stringify({ ...agentBody, propertyAddress: STATE.txnDetails.propertyAddress, propertyType: STATE.txnDetails.propertyType, transactionType: STATE.txnDetails.transactionType }),
+        body: JSON.stringify({ ...agentBody, propertyAddress: STATE.txnDetails.propertyAddress, propertyType: STATE.txnDetails.propertyType, transactionType: STATE.txnDetails.transactionType, sellerName: STATE.txnDetails.sellerName }),
       });
       transId = created.transaction?.transId;
       if (!transId) throw new Error("Transaction created but no transId returned.");
-      results.push({ type: "success", msg: `✓ Created new transaction (ID: ${transId})` });
+      STATE.uploadResults.push({ type: "success", msg: `✓ Created new transaction (ID: ${transId})` });
     } else {
       transId = STATE.selectedTxn;
-      results.push({ type: "info", msg: `Using existing transaction (ID: ${transId})` });
+      STATE.uploadResults.push({ type: "info", msg: `Using existing transaction (ID: ${transId})` });
     }
+    render();
 
     const formsToUpload = (STATE.analysisResult.forms || [])
       .map((f, idx) => {
@@ -941,24 +964,28 @@ async function submitToFormSimplicity() {
       })
       .filter((f) => !f.skipped);
 
-    for (const form of formsToUpload) {
+    for (let i = 0; i < formsToUpload.length; i++) {
+      const form = formsToUpload[i];
+      STATE.uploadProgress = `Uploading ${i + 1} of ${formsToUpload.length}: ${form.formName}…`;
+      render();
       try {
         const entry = STATE.splitPDFs[form.formId];
-        if (!entry?.base64) { results.push({ type: "warning", msg: `⚠ No PDF data for: ${form.formName}` }); continue; }
+        if (!entry?.base64) { STATE.uploadResults.push({ type: "warning", msg: `⚠ No PDF data for: ${form.formName}` }); render(); continue; }
         const pageCount = (form.pageEnd || 1) - (form.pageStart || 1) + 1;
         await api('/acc-binder/fs/upload-file', {
           method: "POST",
           body: JSON.stringify({ ...agentBody, transId, formName: form.formName, fileBase64: entry.base64, pageCount }),
         });
-        results.push({ type: "success", msg: `✓ Uploaded: ${form.formName}` });
+        STATE.uploadResults.push({ type: "success", msg: `✓ Uploaded: ${form.formName}` });
       } catch (err) {
-        results.push({ type: "error", msg: `✗ Failed: ${form.formName} — ${err.message}` });
+        STATE.uploadResults.push({ type: "error", msg: `✗ Failed: ${form.formName} — ${err.message}` });
       }
+      render();
     }
   } catch (err) {
-    results.push({ type: "error", msg: `Error: ${err.message}` });
+    STATE.uploadResults.push({ type: "error", msg: `Error: ${err.message}` });
   }
-  STATE.uploadResults = results;
+  STATE.uploadProgress = null;
   STATE.uploading = false;
   STATE.uploadDone = true;
   render();
@@ -970,7 +997,7 @@ function resetSession() {
     step: 0, files: [], analysisResult: null, analysisError: null, formOverrides: {}, splitTarget: null,
     splitting: false, splitPDFs: {}, txnDetails: { sellerName: "", buyerName: "", propertyAddress: "", propertyType: "Residential", transactionType: "Contract on My Listing" },
     selectedAgentEmail: "", agentNRDSID: null, fsTransactions: [], fsLoading: false, fsError: null,
-    suggestedTxn: null, selectedTxn: null, downloaded: {}, uploadResults: [], uploading: false, uploadDone: false,
+    suggestedTxn: null, selectedTxn: null, downloaded: {}, uploadResults: [], uploading: false, uploadProgress: null, uploadDone: false,
   };
   render();
 }
