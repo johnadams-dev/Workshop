@@ -75,6 +75,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .type-btn.sel-bug{border-color:var(--red);background:#FEF2F2;color:var(--red)}
 .type-btn.sel-suggestion{border-color:var(--blue);background:#EFF6FF;color:var(--blue)}
 .type-btn.sel-question{border-color:var(--green);background:#F0FDF4;color:var(--green)}
+.type-btn.sel-idea{border-color:var(--gold);background:#FBF3DD;color:#8A6D1A}
 
 /* ── Submit button ── */
 .btn-primary{background:var(--navy);color:#fff;border:none;border-radius:6px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
@@ -119,6 +120,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-bug{background:#FEE2E2;color:#991B1B}
 .badge-suggestion{background:#DBEAFE;color:#1E40AF}
 .badge-question{background:#D1FAE5;color:#065F46}
+.badge-idea{background:#FBF3DD;color:#8A6D1A}
 .badge-open{background:#FEF3C7;color:#92400E}
 .badge-in_progress{background:#DBEAFE;color:#1D4ED8}
 .badge-waiting{background:#FFE4E6;color:#9F1239}
@@ -210,7 +212,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
     <div id="leaderboard-card" class="leaderboard-card" style="display:none">
       <div class="leaderboard-title">🏆 Top Contributors</div>
-      <div class="leaderboard-sub">Most bugs, suggestions, and questions submitted</div>
+      <div class="leaderboard-sub">Most bugs, suggestions, questions, and ideas submitted</div>
       <div id="leaderboard-list"></div>
     </div>
 
@@ -268,6 +270,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <button type="button" class="type-btn" id="btn-bug"        onclick="selectType('bug')">🐛 Bug</button>
             <button type="button" class="type-btn" id="btn-suggestion" onclick="selectType('suggestion')">💡 Suggestion</button>
             <button type="button" class="type-btn" id="btn-question"   onclick="selectType('question')">❓ Question</button>
+            <button type="button" class="type-btn" id="btn-idea"       onclick="selectType('idea')">✨ Idea</button>
           </div>
         </div>
         <div class="field">
@@ -276,7 +279,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
         <div class="field">
           <label>Details <span style="color:var(--muted);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(optional)</span></label>
-          <textarea id="f-desc" placeholder="For bugs: steps to reproduce, what you expected vs. what happened.&#10;For suggestions: what problem it solves and who it helps.&#10;For questions: any context that helps clarify what you need."></textarea>
+          <textarea id="f-desc" placeholder="For bugs: steps to reproduce, what you expected vs. what happened.&#10;For suggestions: what problem it solves and who it helps.&#10;For questions: any context that helps clarify what you need.&#10;For ideas: what you're picturing and why it'd help."></textarea>
         </div>
         <div class="field">
           <label>Screenshot <span style="color:var(--muted);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">(optional)</span></label>
@@ -300,6 +303,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <option value="bug">Bug</option>
           <option value="suggestion">Suggestion</option>
           <option value="question">Question</option>
+          <option value="idea">Idea</option>
         </select>
         <select id="f-status-filter" onchange="renderFeed()">
           <option value="">All statuses</option>
@@ -479,7 +483,7 @@ async function loadLeaderboard() {
 
 function selectType(type) {
   selectedType = type;
-  ['bug', 'suggestion', 'question'].forEach(t => {
+  ['bug', 'suggestion', 'question', 'idea'].forEach(t => {
     document.getElementById('btn-' + t).className =
       'type-btn' + (t === type ? ' sel-' + t : '');
   });
@@ -487,7 +491,7 @@ function selectType(type) {
 
 async function submitFeedback() {
   const summary = document.getElementById('f-summary').value.trim();
-  if (!selectedType) { alert('Please select Bug, Suggestion, or Question.'); return; }
+  if (!selectedType) { alert('Please select Bug, Suggestion, Question, or Idea.'); return; }
   if (!summary) { alert('Summary is required.'); return; }
 
   const effectiveTool = toolId
@@ -510,7 +514,7 @@ async function submitFeedback() {
     document.getElementById('f-desc').value = '';
     clearScreenshot();
     selectedType = null;
-    ['bug', 'suggestion', 'question'].forEach(t => {
+    ['bug', 'suggestion', 'question', 'idea'].forEach(t => {
       document.getElementById('btn-' + t).className = 'type-btn';
     });
     const msg = document.getElementById('submit-success');
@@ -888,7 +892,7 @@ function showTab(name) {
 function esc(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function fmtType(t) { return {bug:'Bug',suggestion:'Suggestion',question:'Question'}[t] || t; }
+function fmtType(t) { return {bug:'Bug',suggestion:'Suggestion',question:'Question',idea:'Idea'}[t] || t; }
 function fmtStatus(s) { return {open:'Open',in_progress:'In Progress',waiting:'Waiting for Input',resolved:'Resolved'}[s] || s; }
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Feedback',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
