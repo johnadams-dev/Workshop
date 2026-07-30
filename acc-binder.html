@@ -267,7 +267,8 @@ async function api(path, opts = {}) {
   const res = await fetch(PROXY + path, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    const base = err.error || res.statusText;
+    throw new Error(err.detail ? `${base}: ${err.detail}` : base);
   }
   return res.json();
 }
