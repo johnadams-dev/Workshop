@@ -18,6 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
         // ============================================================
@@ -265,16 +266,20 @@
                 </select>
             </div>
 
-            <!-- Email input: shown for unknown users, hidden when role is known -->
-            <div class="form-group" id="fsEmailWrap">
-                <label style="font-weight:600;color:#2c3e50;font-size:15px;">Your Email Address</label>
-                <div style="display:flex;gap:10px;margin-top:8px;">
-                    <input type="email" id="fsEmail" placeholder="agent@adamscameron.com"
-                           style="flex:1;padding:12px 15px;border:2px solid #dee2e6;border-radius:8px;font-size:15px;">
-                    <button class="upload-button" onclick="fsLoadTransactions()" id="fsLoadBtn"
-                            style="white-space:nowrap;padding:12px 20px;border-radius:8px;font-size:14px;">
-                        Find Transactions
-                    </button>
+            <!-- Hidden holder for the verified email used to look up FS files. Never user-editable —
+                 identity must come from a verified Google sign-in (fsAuthGateWrap below) or, for
+                 staff, the agent picker above. Typing an arbitrary email here would let anyone pull
+                 another agent's Form Simplicity files, which is exactly what this gate prevents. -->
+            <div class="form-group" id="fsEmailWrap" style="display:none">
+                <input type="hidden" id="fsEmail">
+                <button type="button" id="fsLoadBtn" style="display:none" onclick="fsLoadTransactions()"></button>
+            </div>
+
+            <!-- Shown when the caller isn't signed in, or is signed in but not recognized as staff/agent -->
+            <div class="form-group" id="fsAuthGateWrap" style="display:none">
+                <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:24px;text-align:center;">
+                    <p id="fsAuthGateMsg" style="margin:0 0 16px;color:#664d03;font-size:14px;line-height:1.5;"></p>
+                    <div id="fsGoogleBtnWrap" style="display:flex;justify-content:center;"></div>
                 </div>
             </div>
 
@@ -473,18 +478,88 @@
     });
 
     // ── FORM SIMPLICITY ─────────────────────────────────────────────
-    const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
-    const PH = { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_CONFIG.proxyKey };
+    // Access requires a Google-verified @adamscameron.com identity — there is
+    // no free-text email fallback. Without that, anyone could type another
+    // agent's email address and pull their Form Simplicity files, since the
+    // underlying /fs/* routes only check the shared proxy key, not who's
+    // asking. Staff get a picker (populated from /fs/active-users, not
+    // client-typed); agents are auto-scoped to their own verified email.
+    const PROXY_BASE      = 'https://mls-proxy-975684028597.us-east1.run.app';
+    const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+    function fsHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'x-proxy-key':  PROXY_CONFIG.proxyKey,
+            'x-user-email': localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || '',
+        };
+    }
 
-    let _fsTrans    = [];
-    let _fsTransId  = null;
-    let _fsInitDone = false;
+    let _fsTrans      = [];
+    let _fsTransId    = null;
+    let _fsInitDone   = false;
+    let _fsGsiReady   = false;
+
+    function fsGoogleSignInInit() {
+        if (_fsGsiReady) return;
+        if (typeof google === 'undefined' || !google.accounts) { setTimeout(fsGoogleSignInInit, 200); return; }
+        _fsGsiReady = true;
+        google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback:  fsHandleGoogleSignIn,
+        });
+        google.accounts.id.renderButton(
+            document.getElementById('fsGoogleBtnWrap'),
+            { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
+        );
+    }
+
+    async function fsHandleGoogleSignIn(response) {
+        let email = '';
+        try { email = JSON.parse(atob(response.credential.split('.')[1])).email || ''; } catch {}
+        if (!email) { fsShowAuthGate('Sign-in failed. Please try again.', true); return; }
+        try {
+            const r = await fetch(`${PROXY_BASE}/config/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: response.credential }),
+            });
+            const data = await r.json();
+            if (!r.ok) {
+                fsShowAuthGate(data.error || 'Sign-in failed. Make sure you\'re using your @adamscameron.com account.', true);
+                return;
+            }
+            localStorage.setItem('ac_user_email', email);
+            localStorage.setItem('ac_proxy_key', data.proxyKey || '');
+        } catch (e) {
+            fsShowAuthGate('Sign-in error: ' + e.message, true);
+            return;
+        }
+        _fsInitDone = false;
+        fsInitSection();
+    }
+
+    function fsShowAuthGate(message, showButton) {
+        document.getElementById('fsEmailWrap').style.display        = 'none';
+        document.getElementById('fsAgentPickerWrap').style.display  = 'none';
+        document.getElementById('fsTransactionWrap').style.display  = 'none';
+        document.getElementById('fsFileWrap').style.display         = 'none';
+        document.getElementById('fsAuthGateMsg').textContent = message;
+        document.getElementById('fsGoogleBtnWrap').style.display = showButton ? 'flex' : 'none';
+        document.getElementById('fsAuthGateWrap').style.display = 'block';
+        if (showButton) fsGoogleSignInInit();
+    }
 
     async function fsInitSection() {
         if (_fsInitDone) return;
         _fsInitDone = true;
 
         const userEmail = localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || '';
+        const proxyKey   = localStorage.getItem('ac_proxy_key')  || sessionStorage.getItem('ac_proxy_key')  || '';
+
+        if (!userEmail || !proxyKey) {
+            fsShowAuthGate('Sign in with your Adams Cameron Google account to access your Form Simplicity files.', true);
+            return;
+        }
 
         try {
             const r = await fetch(`${PROXY_BASE}/lockbox/me`, {
@@ -494,26 +569,22 @@
             const role = me.role || 'unknown';
 
             if (role === 'manager' || role === 'staff') {
-                // Show agent picker, hide email input
-                document.getElementById('fsEmailWrap').style.display = 'none';
+                document.getElementById('fsAuthGateWrap').style.display = 'none';
                 document.getElementById('fsAgentPickerWrap').style.display = 'block';
-                const usersResp = await fetch(`${PROXY_BASE}/fs/active-users`, { headers: PH });
+                const usersResp = await fetch(`${PROXY_BASE}/fs/active-users`, { headers: fsHeaders() });
                 const users = usersResp.ok ? await usersResp.json() : [];
                 const sel = document.getElementById('fsAgentSel');
                 sel.innerHTML = '<option value="">— Select agent —</option>' +
                     users.map(u => `<option value="${u.email}">${u.name} (${u.email})</option>`).join('');
-            } else if (role === 'agent' && userEmail) {
-                // Auto-fill and auto-load — no input needed
-                document.getElementById('fsEmailWrap').style.display = 'none';
+            } else if (role === 'agent') {
+                document.getElementById('fsAuthGateWrap').style.display = 'none';
                 document.getElementById('fsEmail').value = userEmail;
                 fsLoadTransactions();
             } else {
-                // Unknown role or no email — show the email input (default state)
-                if (userEmail) document.getElementById('fsEmail').value = userEmail;
+                fsShowAuthGate("We couldn't match your account to a staff or agent record, so Form Simplicity access isn't available here. Contact the office if you think this is a mistake.", false);
             }
         } catch (e) {
-            // On any error fall back to showing the email input
-            if (userEmail) document.getElementById('fsEmail').value = userEmail;
+            fsShowAuthGate('Could not verify your account. Please try again.', true);
         }
     }
 
@@ -573,7 +644,7 @@
         try {
             // Step 1: resolve NRDS ID from email
             const acct = await fetch(`${PROXY_BASE}/fs/get-account`, {
-                method: 'POST', headers: PH, body: JSON.stringify({ email }),
+                method: 'POST', headers: fsHeaders(), body: JSON.stringify({ email }),
             }).then(r => r.json());
             if (acct.error) throw new Error(acct.error);
             const nrdsId = acct.agentNRDSID || acct.nrdsId || acct.NrdsId;
@@ -583,7 +654,7 @@
 
             // Step 2: list transactions
             const txData = await fetch(`${PROXY_BASE}/fs/list-transactions`, {
-                method: 'POST', headers: PH, body: JSON.stringify({ agentNRDSID: nrdsId }),
+                method: 'POST', headers: fsHeaders(), body: JSON.stringify({ agentNRDSID: nrdsId }),
             }).then(r => r.json());
             if (txData.error) throw new Error(txData.error);
 
@@ -624,7 +695,7 @@
 
         try {
             const data = await fetch(`${PROXY_BASE}/fs/list-files`, {
-                method: 'POST', headers: PH, body: JSON.stringify({ transId }),
+                method: 'POST', headers: fsHeaders(), body: JSON.stringify({ transId }),
             }).then(r => r.json());
             if (data.error) throw new Error(data.error);
 
@@ -653,7 +724,7 @@
 
         try {
             const dl = await fetch(`${PROXY_BASE}/fs/download-file`, {
-                method: 'POST', headers: PH, body: JSON.stringify({ transId, fileId }),
+                method: 'POST', headers: fsHeaders(), body: JSON.stringify({ transId, fileId }),
             }).then(r => r.json());
             if (dl.error) throw new Error(dl.error);
             if (!dl.base64) throw new Error('No file data returned');
@@ -1303,7 +1374,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
         try {
             const resp = await fetch(`${PROXY_BASE}/contract-dates`, {
-                method: 'POST', headers: PH, body: JSON.stringify(body),
+                method: 'POST', headers: fsHeaders(), body: JSON.stringify(body),
             });
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
