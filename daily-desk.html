@@ -5525,21 +5525,24 @@ function renderDrawer(t) {
   document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
 
   const agentDisplayName = p => p.first_name ? `${p.first_name} ${p.last_name}` : (p.external_name || '—');
+  const joinAgentField = (agents, getVal) => agents.length
+    ? agents.map(p => escapeHtml(getVal(p) || '—')).join('<br>')
+    : '—';
   if (isContractView) {
-    const listingAgent = (t.participants || []).find(p => p.role === 'listing_agent' || p.role === 'co_listing_agent');
+    const listingAgents = (t.participants || []).filter(p => p.role === 'listing_agent' || p.role === 'co_listing_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = 'Listing Agent';
-    document.getElementById('drawer-buyer-agent').textContent = listingAgent ? agentDisplayName(listingAgent) : '—';
+    document.getElementById('drawer-buyer-agent').innerHTML = joinAgentField(listingAgents, agentDisplayName);
     document.getElementById('drawer-buyer-brokerage-label').textContent = 'Listing Brokerage';
-    document.getElementById('drawer-buyer-brokerage').textContent = listingAgent ? (listingAgent.external_brokerage || '—') : '—';
+    document.getElementById('drawer-buyer-brokerage').innerHTML = joinAgentField(listingAgents, p => p.external_brokerage);
     document.getElementById('drawer-party-label').textContent = 'Buyer';
     document.getElementById('drawer-party').textContent =
       (t.customers || []).filter(c => c.role === 'buyer').map(c => c.name).filter(Boolean).join(', ') || '—';
   } else {
-    const buyerAgent = (t.participants || []).find(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
+    const buyerAgents = (t.participants || []).filter(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = "Buyer's Agent";
-    document.getElementById('drawer-buyer-agent').textContent = buyerAgent ? agentDisplayName(buyerAgent) : '—';
+    document.getElementById('drawer-buyer-agent').innerHTML = joinAgentField(buyerAgents, agentDisplayName);
     document.getElementById('drawer-buyer-brokerage-label').textContent = "Buyer's Brokerage";
-    document.getElementById('drawer-buyer-brokerage').textContent = buyerAgent ? (buyerAgent.external_brokerage || '—') : '—';
+    document.getElementById('drawer-buyer-brokerage').innerHTML = joinAgentField(buyerAgents, p => p.external_brokerage);
     document.getElementById('drawer-party-label').textContent = 'Seller';
     document.getElementById('drawer-party').textContent =
       (t.customers || []).filter(c => c.role === 'seller').map(c => c.name).filter(Boolean).join(', ') || '—';
