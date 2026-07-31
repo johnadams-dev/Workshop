@@ -2785,8 +2785,30 @@ function sortTodayBy(col) {
   updateSortHeaders();
 }
 
+// Re-fetches just the Today list, not the full renderAll() fan-out (summary +
+// listings + contracts + today + untracked + both notices feeds — 7 requests,
+// several of which run multiple parallel queries each). Marking a checklist
+// item done/not-applicable only ever changes what's pending today, so this is
+// the only data that's actually stale afterward. Clicking several items in a
+// row used to trigger a full renderAll() per click, which could pile up
+// enough concurrent DB connections to exhaust the pool (max: 5 in server.js)
+// and time out.
+async function refreshToday() {
+  const officeId = document.getElementById('officeSelect').value;
+  const qs = officeId === 'all' ? '' : `?office_id=${officeId}`;
+  try {
+    STATE.today = await GET(`/daily-desk/today${qs}`) || [];
+  } catch (e) {
+    console.error('refreshToday failed:', e);
+    return;
+  }
+  document.getElementById('today-count').textContent = STATE.today.length;
+  renderTodayTable(getSortedToday());
+  filterToday();
+}
+
 // Marks a checklist item complete or not-applicable. Pending items disappear
-// from Today once resolved, so a successful PATCH just re-renders the page.
+// from Today once resolved, so a successful PATCH just refreshes Today.
 async function setItemState(btn, state) {
   const row = btn.closest('tr');
   const progressId = row.dataset.progressId;
@@ -2794,7 +2816,7 @@ async function setItemState(btn, state) {
 
   try {
     await PATCH(`/daily-desk/checklist-progress/${progressId}`, { status: newStatus });
-    await renderAll();
+    await refreshToday();
   } catch (e) {
     alert('Failed to update item: ' + e.message);
   }
