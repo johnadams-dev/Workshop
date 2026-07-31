@@ -600,6 +600,21 @@ function photoEl(item, size = "card") {
   return `<img src="${url}" alt="Property photo" class="photo-img photo-${size}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=\\'photo-placeholder photo-${size}\\'><span>No Photo</span></div>'">`;
 }
 
+// Agents with show_on_hotsheet = false (e.g. managers) are hidden from the
+// agent view only — managers still see everything. A hidden agent's name is
+// just omitted from whatever row it's on; the row itself still shows if a
+// non-hidden co-agent/other-side agent is on it. Deal activity only (new
+// listings/contracts/closings/changes) — not upcoming/buyer needs/open houses.
+function maskHiddenAgents(item, isManager) {
+  if (isManager) return item;
+  const masked = { ...item };
+  if (masked.agentHidden) { masked.agentFirst = ""; masked.agentLast = ""; }
+  if (masked.sellingAgentHidden) { masked.sellingAgentFirst = ""; masked.sellingAgentLast = ""; }
+  if (Array.isArray(masked.coListingAgents)) masked.coListingAgents = masked.coListingAgents.filter(a => !a.hidden);
+  if (Array.isArray(masked.coSellingAgents)) masked.coSellingAgents = masked.coSellingAgents.filter(a => !a.hidden);
+  return masked;
+}
+
 function coAgentsHtml(agents) {
   if (!agents || !agents.length) return '';
   return agents.map(a =>
@@ -995,14 +1010,14 @@ function render() {
   ).join("");
 
   const sections = [
-    section("New Listings",                "🏡", "listings",   data.newListings.map(l => listingCard(l, isManager))),
-    section("New Contracts",               "📋", "contracts",  data.newContracts.map(c => contractCard(c, isManager))),
-    section("Closings", "🎉", "closings", data.closings.map(c => closingCard(c, isManager)),
+    section("New Listings",                "🏡", "listings",   data.newListings.map(l => listingCard(maskHiddenAgents(l, isManager), isManager))),
+    section("New Contracts",               "📋", "contracts",  data.newContracts.map(c => contractCard(maskHiddenAgents(c, isManager), isManager))),
+    section("Closings", "🎉", "closings", data.closings.map(c => closingCard(maskHiddenAgents(c, isManager), isManager)),
       `<strong>⚾ Baseball Awards:</strong>&nbsp;` +
       `<span class="badge badge-double">⚾ Double</span> Both sides ACC &nbsp;` +
       `<span class="badge badge-triple">⚾ Triple</span> Both sides + CMG or AC Title &nbsp;` +
       `<span class="badge badge-homerun">🏠 Home Run</span> Both sides + CMG + AC Title`),
-    section("Changes / Withdrawn / Expired","🔄", "changes",   data.changes.map(changeCard)),
+    section("Changes / Withdrawn / Expired","🔄", "changes",   data.changes.map(c => changeCard(maskHiddenAgents(c, isManager)))),
     section("Upcoming Listings",           "📅", "upcoming",   data.upcoming.map(u => upcomingCard(u, isStaffUser))),
     section("Buyer Needs",                 "🔍", "buyers",     data.buyerNeeds.map(b => buyerCard(b, isStaffUser))),
     section("Open Houses",                 "🏠", "openhouses", [...data.openHouses].sort((a, b) => {
