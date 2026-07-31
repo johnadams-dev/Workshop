@@ -19,9 +19,7 @@
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -86,14 +84,6 @@
         .status.error { background: #f8d7da; border: 2px solid #dc3545; color: #721c24; }
         .status.processing { background: #d1ecf1; border: 2px solid #17a2b8; color: #0c5460; }
         .download-section { margin-top: 30px; display: none; }
-        .download-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 15px; margin-top: 20px; }
-        .download-btn {
-            background: white; border: 2px solid #667eea; color: #667eea;
-            padding: 15px 25px; border-radius: 10px; text-decoration: none;
-            display: flex; align-items: center; justify-content: center;
-            gap: 10px; font-weight: 600; transition: all 0.3s;
-        }
-        .download-btn:hover { background: #667eea; color: white; transform: translateY(-2px); }
         .features { background: #f8f9fa; padding: 30px; border-radius: 10px; margin-top: 30px; }
         .features h3 { color: #1f4788; margin-bottom: 15px; }
         .feature-list { list-style: none; padding: 0; }
@@ -106,7 +96,6 @@
             .container { border-radius: 0; }
             h1 { font-size: 1.8em; }
             .content { padding: 20px; }
-            .download-buttons { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -148,25 +137,19 @@
         <div class="status" id="statusMessage"></div>
 
         <div class="download-section" id="downloadSection">
-            <h3 style="color:#1f4788;margin-bottom:15px;">📥 Your Reports Are Ready!</h3>
+            <h3 style="color:#1f4788;margin-bottom:15px;">📥 Your Report Is Ready!</h3>
             <div id="chartPreviewContainer" style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:20px;">
                 <h4 style="color:#1f4788;margin-top:0;">Chart Preview:</h4>
                 <div id="chartPreview" style="text-align:center;max-width:100%;overflow:auto;"></div>
             </div>
-            <p style="margin-bottom:15px;color:#666;">The PDF report includes all analyses plus embedded charts — a complete package for your clients!</p>
-            <div class="download-buttons">
-                <a href="#" class="download-btn" id="downloadPDF">📄 Download PDF Report</a>
-                <a href="#" class="download-btn" id="downloadExcel">📊 Download Excel Data</a>
-                <a href="#" class="download-btn" id="downloadChart">📈 Download Chart (PNG)</a>
-            </div>
+            <p style="margin-bottom:15px;color:#666;">The full report includes all analyses plus embedded charts, in a new tab that's ready to print or save as a PDF from your browser's print dialog.</p>
+            <button class="button-primary" onclick="openPrintableReport()">🖨️ Open Printable Report</button>
         </div>
 
         <div class="features">
             <h3>✨ What You'll Get:</h3>
             <ul class="feature-list">
-                <li><strong>Professional PDF Report</strong> — Client-ready with branding and embedded charts</li>
-                <li><strong>Detailed Excel Workbook</strong> — All calculations and raw data</li>
-                <li><strong>High-Resolution Chart</strong> — Standalone PNG for presentations</li>
+                <li><strong>Printable Report</strong> — Client-ready with branding, opens in a new tab for printing or saving as PDF</li>
                 <li><strong>Price vs Square Footage Analysis</strong> — With trend lines and auto-scaled axes</li>
                 <li><strong>Price Per Sq Ft Breakdown</strong> — Low, median, mean, high</li>
                 <li><strong>Days on Market Analysis</strong> — Color-coded by speed of sale</li>
@@ -187,6 +170,7 @@
     let activeListings = [];
     let soldListings = [];
     let currentChart = null;
+    let lastReportData = null;
 
     function showStatus(message, type) {
         const status = document.getElementById('statusMessage');
@@ -217,13 +201,12 @@
             const totalListings = activeListings.length + soldListings.length;
             if (totalListings === 0 && mlsData.length > 0) showStatus('⚠️ Warning: Status column not found and could not infer from price data. All properties will be plotted together.', 'error');
             if (soldListings.length === 0 && mlsData.length > 0) showStatus('⚠️ Warning: No sold properties found. Absorption rate analysis will be limited.', 'error');
-            showStatus('📊 Generating reports...', 'processing');
+            showStatus('📊 Generating report...', 'processing');
             const chartImageData    = await generateChart(subjectSqft, subjectPrice);
             const domChartImageData = await generateDOMChart(subjectPrice);
-            await generatePDF(subjectSqft, subjectPrice, chartImageData, domChartImageData);
-            generateExcel(subjectSqft, subjectPrice);
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData };
             document.getElementById('downloadSection').style.display = 'block';
-            showStatus('✅ Reports generated successfully!', 'success');
+            showStatus('✅ Report generated successfully!', 'success');
         } catch (error) {
             console.error('Detailed error:', error);
             let errorMessage = error.message;
@@ -416,8 +399,6 @@
         await new Promise(r => setTimeout(r, 500));
         const chartImageData = canvas.toDataURL('image/png');
         document.getElementById('chartPreview').innerHTML = `<img src="${chartImageData}" style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:4px;">`;
-        document.getElementById('downloadChart').href = chartImageData;
-        document.getElementById('downloadChart').download = 'Market_Chart.png';
         return chartImageData;
     }
 
@@ -472,173 +453,167 @@
         return {slope, intercept};
     }
 
-    async function generatePDF(subjectSqft, subjectPrice, chartImageData, domChartImageData) {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+    function openPrintableReport() {
+        if (!lastReportData) return;
+        const { subjectSqft, subjectPrice, chartImageData, domChartImageData } = lastReportData;
+        const reportWindow = window.open('', '_blank');
+        if (!reportWindow) { showStatus('⚠️ Please allow pop-ups for this site to open the printable report', 'error'); return; }
+        reportWindow.document.open();
+        reportWindow.document.write(buildReportHTML(subjectSqft, subjectPrice, chartImageData, domChartImageData));
+        reportWindow.document.close();
+    }
+
+    function buildReportHTML(subjectSqft, subjectPrice, chartImageData, domChartImageData) {
         const logoImg  = document.getElementById('companyLogo');
         const logoData = logoImg ? logoImg.src : null;
-        let yPos = 20;
-        if (logoData) { try { doc.addImage(logoData, 'JPEG', 15, 10, 30, 30); } catch(e) {} }
-        doc.setFontSize(24); doc.setTextColor(31,71,136);
-        doc.text('Market Update Report', 105, yPos, {align:'center'});
-        yPos += 10; doc.setFontSize(10); doc.setTextColor(100,100,100);
-        doc.text('Generated: '+new Date().toLocaleDateString(), 105, yPos, {align:'center'});
-        yPos += 5; doc.setFontSize(8); doc.setTextColor(31,71,136);
-        doc.text('johnadams.org — Florida Real Estate AI Tools', 105, yPos, {align:'center'});
-        yPos += 15;
-        if (subjectSqft !== null && subjectPrice !== null) {
-            doc.setFontSize(16); doc.setTextColor(31,71,136); doc.text('Subject Property', 20, yPos); yPos += 10;
-            doc.autoTable({ startY:yPos, head:[['Property Details','Value']],
-                body:[['Square Feet',subjectSqft.toLocaleString()],['List Price','$'+subjectPrice.toLocaleString()],['Price per Sq Ft','$'+(subjectPrice/subjectSqft).toFixed(2)]],
-                theme:'grid', headStyles:{fillColor:[68,114,196]} });
-            yPos = doc.lastAutoTable.finalY + 15;
-        }
-        doc.setFontSize(16); doc.setTextColor(31,71,136); doc.text('Market Overview', 20, yPos); yPos += 10;
-        doc.autoTable({ startY:yPos, head:[['Metric','Count']],
-            body:[['Active Listings',activeListings.length.toString()],['Sold Listings',soldListings.length.toString()],['Total Properties',mlsData.length.toString()]],
-            theme:'grid', headStyles:{fillColor:[68,114,196]} });
-        doc.addPage(); yPos = 30;
-        doc.setFontSize(16); doc.setTextColor(31,71,136); doc.text('Report 1: Price vs Square Footage Analysis', 20, yPos); yPos += 10;
-        if (chartImageData) { try { doc.addImage(chartImageData,'PNG',15,yPos,180,120); yPos+=125; } catch(e){} }
-        doc.setFontSize(10); doc.setTextColor(60,60,60);
-        const chartDesc = doc.splitTextToSize('The scatter plot displays the relationship between property size and price. Active listings are shown in blue, sold properties in green.'+(subjectSqft!==null&&subjectPrice!==null?' The subject property is marked with a red star.':'')+' The orange dashed line represents the market trend.', 170);
-        doc.text(chartDesc, 20, yPos);
-        doc.addPage(); yPos = 30;
-        doc.setFontSize(16); doc.text('Price per Square Foot Analysis', 20, yPos); yPos += 10;
         const stats = calculateStats();
-        if (stats) {
-            if (subjectSqft !== null && subjectPrice !== null) {
-                doc.autoTable({ startY:yPos, head:[['Metric','Price/Sq Ft','Subject Value']],
-                    body:[['Lowest','$'+stats.low.toFixed(2),'$'+Math.round(stats.low*subjectSqft).toLocaleString()],['Average','$'+stats.mean.toFixed(2),'$'+Math.round(stats.mean*subjectSqft).toLocaleString()],['Median','$'+stats.median.toFixed(2),'$'+Math.round(stats.median*subjectSqft).toLocaleString()],['Highest','$'+stats.high.toFixed(2),'$'+Math.round(stats.high*subjectSqft).toLocaleString()]],
-                    theme:'grid', headStyles:{fillColor:[68,114,196]} });
-                yPos = doc.lastAutoTable.finalY + 10;
-                doc.autoTable({ startY:yPos, body:[['Current Listing','$'+(subjectPrice/subjectSqft).toFixed(2),'$'+subjectPrice.toLocaleString()]], theme:'grid', bodyStyles:{fillColor:[112,173,71],textColor:[255,255,255],fontStyle:'bold'} });
-            } else {
-                doc.autoTable({ startY:yPos, head:[['Metric','Price/Sq Ft']],
-                    body:[['Lowest','$'+stats.low.toFixed(2)],['Average','$'+stats.mean.toFixed(2)],['Median','$'+stats.median.toFixed(2)],['Highest','$'+stats.high.toFixed(2)]],
-                    theme:'grid', headStyles:{fillColor:[68,114,196]} });
-            }
-        }
-        doc.addPage(); yPos = 30;
-        doc.setFontSize(16); doc.text('Market Absorption Rate', 20, yPos); yPos += 10;
         const absorption = calculateAbsorption();
-        doc.autoTable({ startY:yPos, head:[['Metric','Value']],
-            body:[['Total Sales',absorption.soldCount.toString()],['Number of Months',absorption.monthsOfData.toFixed(1)],['Sales per Month',absorption.salesPerMonth.toFixed(2)],['Active Listings',absorption.activeCount.toString()],['Months of Inventory',absorption.monthsSupply.toFixed(2)]],
-            theme:'grid', headStyles:{fillColor:[68,114,196]} });
-        yPos = doc.lastAutoTable.finalY + 10;
         let marketType, explanation;
         if (absorption.monthsSupply < 4) { marketType="Seller's Market"; explanation="Low inventory — properties likely to sell quickly"; }
         else if (absorption.monthsSupply < 6) { marketType="Balanced Market"; explanation="Neutral conditions for buyers and sellers"; }
         else { marketType="Buyer's Market"; explanation="High inventory — buyers have more negotiating power"; }
-        doc.setFontSize(12); doc.setTextColor(31,71,136); doc.text('Market Type: '+marketType, 20, yPos); yPos += 10;
-
-        // Market type gauge — spectrum from Seller's to Buyer's market, mirrors RPR-style indicator
-        const gaugeX = 20, gaugeWidth = 170, gaugeY = yPos, gaugeHeight = 6;
-        const sellerEnd = gaugeX + gaugeWidth * 0.4;
-        const balancedEnd = gaugeX + gaugeWidth * 0.6;
-        doc.setFillColor(68,114,196); doc.rect(gaugeX, gaugeY, sellerEnd - gaugeX, gaugeHeight, 'F');
-        doc.setFillColor(173,197,232); doc.rect(sellerEnd, gaugeY, balancedEnd - sellerEnd, gaugeHeight, 'F');
-        doc.setFillColor(237,125,49); doc.rect(balancedEnd, gaugeY, gaugeX + gaugeWidth - balancedEnd, gaugeHeight, 'F');
-
         const scaleMax = 10; // months of inventory represented by the full width of the gauge
-        const frac = Math.max(0, Math.min(1, absorption.monthsSupply / scaleMax));
-        const pointerX = gaugeX + gaugeWidth * frac;
-        doc.setFillColor(31,71,136);
-        doc.triangle(pointerX - 2.5, gaugeY - 5, pointerX + 2.5, gaugeY - 5, pointerX, gaugeY - 0.5, 'F');
+        const pointerPct = Math.max(0, Math.min(1, absorption.monthsSupply / scaleMax)) * 100;
 
-        yPos = gaugeY + gaugeHeight + 6;
-        doc.setFontSize(9);
-        const gaugeLabels = [
-            { text: "Seller's Market", x: gaugeX, align: 'left', active: marketType === "Seller's Market" },
-            { text: 'Balanced Market', x: gaugeX + gaugeWidth / 2, align: 'center', active: marketType === 'Balanced Market' },
-            { text: "Buyer's Market", x: gaugeX + gaugeWidth, align: 'right', active: marketType === "Buyer's Market" }
-        ];
-        gaugeLabels.forEach(l => {
-            doc.setFont(undefined, l.active ? 'bold' : 'normal');
-            doc.setTextColor(l.active ? 31 : 130, l.active ? 71 : 130, l.active ? 136 : 130);
-            doc.text(l.text, l.x, yPos, { align: l.align });
-            if (l.active) {
-                const w = doc.getTextWidth(l.text);
-                const lx = l.align === 'center' ? l.x - w / 2 : l.align === 'right' ? l.x - w : l.x;
-                doc.setDrawColor(31,71,136);
-                doc.line(lx, yPos + 1.5, lx + w, yPos + 1.5);
-            }
-        });
-        doc.setFont(undefined, 'normal');
-        yPos += 10;
+        const header = `<div class="page-header">${logoData ? `<img src="${logoData}" alt="Adams Cameron & Co.">` : ''}<h1>Market Update Report</h1><div class="meta">Generated: ${new Date().toLocaleDateString()}<br>johnadams.org — Florida Real Estate AI Tools</div></div>`;
+        const footer = `<div class="page-footer">johnadams.org — Florida Real Estate AI Tools | © Adams, Cameron &amp; Co. 2026</div>`;
 
-        doc.setFontSize(10); doc.setTextColor(60,60,60);
-        doc.text(explanation, 20, yPos);
+        const subjectSection = (subjectSqft !== null && subjectPrice !== null) ? `
+            <h2 class="section-title">Subject Property</h2>
+            <table><tr><th>Property Details</th><th>Value</th></tr>
+                <tr><td>Square Feet</td><td>${subjectSqft.toLocaleString()}</td></tr>
+                <tr><td>List Price</td><td>$${subjectPrice.toLocaleString()}</td></tr>
+                <tr><td>Price per Sq Ft</td><td>$${(subjectPrice/subjectSqft).toFixed(2)}</td></tr>
+            </table>` : '';
+
+        const overviewSection = `
+            <h2 class="section-title">Market Overview</h2>
+            <table><tr><th>Metric</th><th>Count</th></tr>
+                <tr><td>Active Listings</td><td>${activeListings.length}</td></tr>
+                <tr><td>Sold Listings</td><td>${soldListings.length}</td></tr>
+                <tr><td>Total Properties</td><td>${mlsData.length}</td></tr>
+            </table>`;
+
+        const chartDescText = 'The scatter plot displays the relationship between property size and price. Active listings are shown in blue, sold properties in green.'
+            + (subjectSqft !== null && subjectPrice !== null ? ' The subject property is marked with a red star.' : '')
+            + ' The orange dashed line represents the market trend.';
+        const priceChartSection = `
+            <h2 class="section-title">Report 1: Price vs Square Footage Analysis</h2>
+            ${chartImageData ? `<img class="chart-img" src="${chartImageData}">` : ''}
+            <p>${chartDescText}</p>`;
+
+        const pricePerSqftSection = stats ? (
+            (subjectSqft !== null && subjectPrice !== null) ? `
+            <h2 class="section-title">Price per Square Foot Analysis</h2>
+            <table><tr><th>Metric</th><th>Price/Sq Ft</th><th>Subject Value</th></tr>
+                <tr><td>Lowest</td><td>$${stats.low.toFixed(2)}</td><td>$${Math.round(stats.low*subjectSqft).toLocaleString()}</td></tr>
+                <tr><td>Average</td><td>$${stats.mean.toFixed(2)}</td><td>$${Math.round(stats.mean*subjectSqft).toLocaleString()}</td></tr>
+                <tr><td>Median</td><td>$${stats.median.toFixed(2)}</td><td>$${Math.round(stats.median*subjectSqft).toLocaleString()}</td></tr>
+                <tr><td>Highest</td><td>$${stats.high.toFixed(2)}</td><td>$${Math.round(stats.high*subjectSqft).toLocaleString()}</td></tr>
+                <tr class="highlight"><td>Current Listing</td><td>$${(subjectPrice/subjectSqft).toFixed(2)}</td><td>$${subjectPrice.toLocaleString()}</td></tr>
+            </table>` : `
+            <h2 class="section-title">Price per Square Foot Analysis</h2>
+            <table><tr><th>Metric</th><th>Price/Sq Ft</th></tr>
+                <tr><td>Lowest</td><td>$${stats.low.toFixed(2)}</td></tr>
+                <tr><td>Average</td><td>$${stats.mean.toFixed(2)}</td></tr>
+                <tr><td>Median</td><td>$${stats.median.toFixed(2)}</td></tr>
+                <tr><td>Highest</td><td>$${stats.high.toFixed(2)}</td></tr>
+            </table>`
+        ) : '';
+
+        const absorptionSection = `
+            <h2 class="section-title">Market Absorption Rate</h2>
+            <table><tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Total Sales</td><td>${absorption.soldCount}</td></tr>
+                <tr><td>Number of Months</td><td>${absorption.monthsOfData.toFixed(1)}</td></tr>
+                <tr><td>Sales per Month</td><td>${absorption.salesPerMonth.toFixed(2)}</td></tr>
+                <tr><td>Active Listings</td><td>${absorption.activeCount}</td></tr>
+                <tr><td>Months of Inventory</td><td>${absorption.monthsSupply.toFixed(2)}</td></tr>
+            </table>
+            <p class="market-type">Market Type: ${marketType}</p>
+            <div class="gauge-wrap">
+                <div class="gauge-bar">
+                    <div class="seg-seller"></div><div class="seg-balanced"></div><div class="seg-buyer"></div>
+                    <div class="gauge-pointer" style="left:${pointerPct}%;"></div>
+                </div>
+                <div class="gauge-labels">
+                    <span class="${marketType === "Seller's Market" ? 'active' : ''}">Seller's Market</span>
+                    <span class="${marketType === 'Balanced Market' ? 'active' : ''}">Balanced Market</span>
+                    <span class="${marketType === "Buyer's Market" ? 'active' : ''}">Buyer's Market</span>
+                </div>
+            </div>
+            <p>${explanation}</p>`;
+
+        let domSection = '';
         if (domChartImageData) {
-            doc.addPage(); yPos = 30;
-            doc.setFontSize(16); doc.setTextColor(31,71,136); doc.text('Report 3: Days on Market Analysis', 20, yPos); yPos += 10;
-            try { doc.addImage(domChartImageData,'PNG',15,yPos,180,120); yPos+=125; } catch(e){}
-            doc.setFontSize(10); doc.setTextColor(60,60,60);
             const soldWithDOM = soldListings.filter(l => l.dom !== null);
-            const hotCount=soldWithDOM.filter(l=>l.dom<=30).length, steadyCount=soldWithDOM.filter(l=>l.dom>30&&l.dom<=90).length, staleCount=soldWithDOM.filter(l=>l.dom>90).length;
-            doc.autoTable({ startY:yPos, head:[['Days on Market','Sold Properties','Interpretation']],
-                body:[['0–30 days',hotCount.toString(),'Hot — High demand, priced to move quickly'],['31–90 days',steadyCount.toString(),'Steady — Normal market pace'],['91+ days',staleCount.toString(),'Stale — May need price adjustment']],
-                theme:'grid', headStyles:{fillColor:[0,137,183]}, bodyStyles:{fontSize:9} });
+            const hotCount = soldWithDOM.filter(l=>l.dom<=30).length;
+            const steadyCount = soldWithDOM.filter(l=>l.dom>30&&l.dom<=90).length;
+            const staleCount = soldWithDOM.filter(l=>l.dom>90).length;
+            domSection = `
+                <h2 class="section-title">Report 3: Days on Market Analysis</h2>
+                <img class="chart-img" src="${domChartImageData}">
+                <table><tr><th>Days on Market</th><th>Sold Properties</th><th>Interpretation</th></tr>
+                    <tr><td>0–30 days</td><td>${hotCount}</td><td>Hot — High demand, priced to move quickly</td></tr>
+                    <tr><td>31–90 days</td><td>${steadyCount}</td><td>Steady — Normal market pace</td></tr>
+                    <tr><td>91+ days</td><td>${staleCount}</td><td>Stale — May need price adjustment</td></tr>
+                </table>`;
         }
-        const pageCount = doc.internal.getNumberOfPages();
-        for (let i=1;i<=pageCount;i++) {
-            doc.setPage(i);
-            if (i > 1 && logoData) {
-                try {
-                    doc.setFillColor(0,137,183); doc.rect(0,0,210,22,'F');
-                    doc.setFillColor(247,220,64); doc.rect(0,22,210,1,'F');
-                    doc.addImage(logoData,'JPEG',4,2,18,18);
-                    doc.setFontSize(9); doc.setTextColor(255,255,255);
-                    doc.text('johnadams.org — Market Update Report', 105, 13, {align:'center'});
-                    doc.setTextColor(31,71,136);
-                } catch(e){}
-            }
-            doc.setFontSize(9); doc.setTextColor(150,150,150);
-            doc.text('johnadams.org — Florida Real Estate AI Tools | © Adams, Cameron & Co. 2026', 105, 285, {align:'center'});
-            doc.text('Page '+i+' of '+pageCount, 190, 285, {align:'right'});
-        }
-        const pdfBlob = doc.output('blob');
-        const pdfUrl  = URL.createObjectURL(pdfBlob);
-        document.getElementById('downloadPDF').href = pdfUrl;
-        document.getElementById('downloadPDF').download = 'Market_Report.pdf';
-    }
 
-    function generateExcel(subjectSqft, subjectPrice) {
-        const wb = XLSX.utils.book_new();
-        const hasSubject = subjectSqft !== null && subjectPrice !== null;
-        const stats = calculateStats();
-        const valueData = [
-            ...(hasSubject ? [['Subject SF', subjectSqft],[]] : []),
-            ['','Price/SF',...(hasSubject?['Subject Value']:[])],
-            ['Lowest', stats?stats.low.toFixed(2):'', ...(hasSubject&&stats?[(stats.low*subjectSqft).toFixed(2)]:[])],
-            ['Average',stats?stats.mean.toFixed(2):'', ...(hasSubject&&stats?[(stats.mean*subjectSqft).toFixed(2)]:[])],
-            ['Median', stats?stats.median.toFixed(2):'', ...(hasSubject&&stats?[(stats.median*subjectSqft).toFixed(2)]:[])],
-            ['Highest',stats?stats.high.toFixed(2):'', ...(hasSubject&&stats?[(stats.high*subjectSqft).toFixed(2)]:[])],
-            [], ...(hasSubject?[['Current Listing',(subjectPrice/subjectSqft).toFixed(2),subjectPrice.toFixed(2)],[]]:[]),
-            ['johnadams.org — Florida Real Estate AI Tools | © Adams, Cameron & Co. 2026']
-        ];
-        const ws1 = XLSX.utils.aoa_to_sheet(valueData);
-        XLSX.utils.book_append_sheet(wb, ws1, 'Value Comparison');
-        const absorption = calculateAbsorption();
-        const absorptionData = [
-            ['Absorption Rate Analysis'],[],
-            ['Total Sales',absorption.soldCount],['Number of Months',absorption.monthsOfData.toFixed(1)],
-            ['Sales/Month',absorption.salesPerMonth.toFixed(2)],['Active Listings',absorption.activeCount],
-            ['Months of Inventory',absorption.monthsSupply.toFixed(2)],[],
-            ['johnadams.org — Florida Real Estate AI Tools | © Adams, Cameron & Co. 2026']
-        ];
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(absorptionData), 'Absorption Rate');
-        const rawData = [['Status','Square Feet','Price','Price/SqFt'],...mlsData.map(d=>[d.status,d.sqft,d.price,d.pricePerSqft.toFixed(2)])];
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rawData), 'Raw Data');
-        const excelBlob = new Blob([s2ab(XLSX.write(wb,{bookType:'xlsx',type:'binary'}))],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-        document.getElementById('downloadExcel').href = URL.createObjectURL(excelBlob);
-        document.getElementById('downloadExcel').download = 'Market_Report.xlsx';
-    }
+        const pages = [
+            subjectSection + overviewSection,
+            priceChartSection,
+            pricePerSqftSection + absorptionSection,
+            domSection
+        ].filter(Boolean).map(content => `<section class="print-page">${header}<div class="page-body">${content}</div>${footer}</section>`).join('');
 
-    function s2ab(s) {
-        const buf = new ArrayBuffer(s.length), view = new Uint8Array(buf);
-        for (let i=0;i<s.length;i++) view[i]=s.charCodeAt(i)&0xFF;
-        return buf;
+        return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Market Update Report</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#333; background:#e9ebef; }
+    .toolbar { position:sticky; top:0; z-index:10; background:#1f4788; padding:12px 20px; display:flex; gap:10px; justify-content:flex-end; box-shadow:0 2px 6px rgba(0,0,0,0.2); }
+    .toolbar button { padding:10px 20px; border:none; border-radius:8px; font-size:0.95em; font-weight:600; cursor:pointer; }
+    .toolbar .print-btn { background:#f7dc40; color:#1f4788; }
+    .toolbar .close-btn { background:rgba(255,255,255,0.15); color:#fff; }
+    .print-page { max-width:850px; margin:20px auto; background:#fff; box-shadow:0 4px 16px rgba(0,0,0,0.15); page-break-after:always; }
+    .print-page:last-child { page-break-after:auto; }
+    .page-header { background:linear-gradient(135deg, #1f4788 0%, #2d5aa0 100%); color:#fff; padding:16px 24px; display:flex; align-items:center; gap:16px; }
+    .page-header img { height:40px; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+    .page-header h1 { font-size:1.3em; }
+    .page-header .meta { margin-left:auto; font-size:0.75em; opacity:0.9; text-align:right; line-height:1.4; }
+    .page-body { padding:24px 30px 10px; min-height:900px; }
+    .page-footer { text-align:center; font-size:0.75em; color:#888; padding:12px 0; border-top:1px solid #eee; }
+    .section-title { color:#1f4788; font-size:1.25em; border-bottom:2px solid #1f4788; padding-bottom:6px; margin:0 0 14px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:18px; }
+    th, td { border:1px solid #ccc; padding:8px 10px; text-align:left; font-size:0.9em; }
+    th { background:#4472C4; color:#fff; }
+    tr:nth-child(even) td { background:#f7f9fc; }
+    tr.highlight td { background:#70AD47 !important; color:#fff; font-weight:bold; }
+    .chart-img { max-width:100%; display:block; border:1px solid #ddd; border-radius:4px; margin-bottom:12px; }
+    p.market-type { font-size:1.05em; color:#1f4788; font-weight:bold; margin-bottom:10px; }
+    .gauge-wrap { margin:16px 0 20px; }
+    .gauge-bar { display:flex; height:14px; border-radius:4px; overflow:hidden; position:relative; }
+    .gauge-bar .seg-seller { background:#4472C4; width:40%; }
+    .gauge-bar .seg-balanced { background:#ADC5E8; width:20%; }
+    .gauge-bar .seg-buyer { background:#ED7D31; width:40%; }
+    .gauge-pointer { position:absolute; top:-9px; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:9px solid #1f4788; transform:translateX(-50%); }
+    .gauge-labels { display:flex; justify-content:space-between; font-size:0.85em; color:#888; margin-top:6px; }
+    .gauge-labels .active { color:#1f4788; font-weight:700; text-decoration:underline; }
+    @media print {
+        body { background:#fff; }
+        .toolbar { display:none; }
+        .print-page { margin:0; box-shadow:none; max-width:none; }
+    }
+</style>
+</head>
+<body>
+    <div class="toolbar no-print">
+        <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+        <button class="close-btn" onclick="window.close()">Close</button>
+    </div>
+    ${pages}
+</body></html>`;
     }
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Market Update',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
