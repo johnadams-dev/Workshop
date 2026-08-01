@@ -322,6 +322,15 @@ header {
         <div class="panel-title">📊 All Tours — Overview</div>
         <div class="panel-sub">Company-wide performance across every saved tour.</div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;">
+        <label for="overviewDateRange" style="font-size:0.8rem;color:var(--slate);">Date range</label>
+        <select id="overviewDateRange" onchange="loadOverviewReport()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;">
+          <option value="">All time</option>
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+      </div>
       <div class="report-stats">
         <div>
           <div class="report-stat-num" id="overviewTotalViews">—</div>
@@ -565,6 +574,7 @@ function showOverviewReport() {
   ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
   document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
   document.getElementById('step-overview').style.display = 'block';
+  document.getElementById('overviewDateRange').value = '';
   loadOverviewReport();
 }
 
@@ -798,7 +808,8 @@ async function loadOverviewReport() {
   document.getElementById('overviewCharts').style.display = 'block';
   document.getElementById('overviewTotalViews').textContent = '—';
   try {
-    const data = await GET('/camerons-stage/analytics/overview');
+    const days = document.getElementById('overviewDateRange').value;
+    const data = await GET('/camerons-stage/analytics/overview' + (days ? `?days=${days}` : ''));
     document.getElementById('overviewTotalViews').textContent = data.total_views;
     if (!data.total_views) {
       document.getElementById('overviewCharts').style.display = 'none';
