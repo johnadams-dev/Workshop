@@ -3117,6 +3117,7 @@ async function nlSaveListing() {
     document.getElementById('nl-commission-type').value,
     ['Total Commission', 'Buyer Broker Commission']
   );
+  if (!confirmCommissionAmount([nlCommissionVal, nlCoopCommissionVal], nlCommissionType, ['Total Commission', 'Buyer Broker Commission'])) return;
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -4030,6 +4031,7 @@ async function amChooseAction(key) {
     amLoadClosingSuggestions();
     amLoadFoundationDonors();
     GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
+      amState.commission_type = txn.commission_type;
       const isFixed = txn.commission_type === 'fixed_fee';
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-commission-rate');
@@ -4098,6 +4100,28 @@ function confirmCommissionType(values, type, fieldLabels) {
     }
   }
   return type;
+}
+
+// Separate from confirmCommissionType above — that one catches likely unit
+// mix-ups (typed a percent into a flat-fee field or vice versa); this one
+// catches a plausible-unit-but-unusual-value typo (e.g. a percent commission
+// over 10%, or a flat fee under $2,500) and just asks the agent to confirm
+// they meant it, without offering to flip the type. Run this AFTER
+// confirmCommissionType has resolved the final type. Returns false if the
+// agent backs out — callers should abort the save in that case, same as any
+// other validation failure in this form.
+function confirmCommissionAmount(values, type, fieldLabels) {
+  const isFixed = type === 'fixed' || type === 'fixed_fee';
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (v == null || isNaN(v)) continue;
+    if (!isFixed && v > 10) {
+      if (!confirm(`${fieldLabels[i]}: ${v}% is a high commission — are you sure that's correct?`)) return false;
+    } else if (isFixed && v < 2500) {
+      if (!confirm(`${fieldLabels[i]}: $${v} is a low flat-fee commission — are you sure that's correct?`)) return false;
+    }
+  }
+  return true;
 }
 
 async function amLoadClosingSuggestions() {
@@ -4208,6 +4232,7 @@ function amUpdateRepFields() {
     // "leave blank" keeps — this contract's commission can differ from the
     // original listing (e.g. negotiated down for this specific buyer).
     GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
+      amState.commission_type = txn.commission_type;
       const isFixed = txn.commission_type === 'fixed_fee';
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-uc-commission-rate');
@@ -4531,6 +4556,7 @@ async function amSubmit() {
     fields.financingType   = document.getElementById('am-financing-type').value || null;
     const commRate = amParseMoney(document.getElementById('am-commission-rate').value);
     const commCoop = amParseMoney(document.getElementById('am-cooperating-commission').value);
+    if (!confirmCommissionAmount([commRate, commCoop], amState.commission_type || 'percent', ['Total Commission', 'Co-Broke Commission'])) return;
     if (commRate != null) fields.commissionRate = commRate;
     if (commCoop != null) fields.cooperatingCommission = commCoop;
   } else if (key === 'under_contract') {
@@ -4554,6 +4580,7 @@ async function amSubmit() {
       }
       const ucCommRate = amParseMoney(document.getElementById('am-uc-commission-rate').value);
       const ucCommCoop = amParseMoney(document.getElementById('am-uc-cooperating-commission').value);
+      if (!confirmCommissionAmount([ucCommRate, ucCommCoop], amState.commission_type || 'percent', ['Commission Rate', 'Co-Broke Commission'])) return;
       if (ucCommRate != null) fields.commissionRate = ucCommRate;
       if (ucCommCoop != null) fields.cooperatingCommission = ucCommCoop;
     } else if (repType === 'co_broke') {
@@ -4933,6 +4960,7 @@ async function ncSaveExternalContract() {
     document.getElementById('nc-ext-commission-type').value,
     ['Buyer Broker Commission']
   );
+  if (!confirmCommissionAmount([extCoopCommissionVal], extCommissionType, ['Buyer Broker Commission'])) return;
   try {
     const txn = await POST('/daily-desk/contracts', {
       property_address:    addr,
