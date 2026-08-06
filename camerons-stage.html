@@ -275,6 +275,9 @@ header {
     <div style="padding:0 0 1.5rem;">
       <button class="btn btn-ghost btn-block" onclick="showOverviewReport()">📊 View Overview Report — All Tours</button>
     </div>
+    <div style="padding:0 0 1.5rem;display:none" id="tourSearchBtnWrap">
+      <button class="btn btn-ghost btn-block" onclick="showTourSearch()">🔍 Search Existing Tours</button>
+    </div>
   </div>
 
   <!-- STEP 2: Existing tour check -->
@@ -376,6 +379,33 @@ header {
       </div>
     </div>
     <button class="btn btn-ghost" onclick="hideOverviewReport()">← Back</button>
+  </div>
+
+  <!-- Search existing tours (staff only) — find any agent's saved tour and grab its links,
+       for pasting into MLS when the agent forgot. Reached from step 1 same as the overview report. -->
+  <div id="step-tour-search" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🔍 Search Existing Tours</div>
+        <div class="panel-sub">Find any agent's saved tour and grab its MLS (unbranded) or branded link.</div>
+      </div>
+      <div class="panel-body" style="padding-bottom:0.75rem;">
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Agent</label>
+            <select class="select-field" id="tsAgentFilter" onchange="searchTours()">
+              <option value="">— All agents —</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Property (address or MLS #)</label>
+            <input type="text" class="select-field" id="tsPropertyFilter" placeholder="e.g. 123 Main St or 1225064" oninput="debouncedSearchTours()" onkeydown="if(event.key==='Enter') searchTours()">
+          </div>
+        </div>
+      </div>
+      <div id="tourSearchResults"><div class="state-msg"><span class="icon">⏳</span>Loading tours…</div></div>
+    </div>
+    <button class="btn btn-ghost" onclick="setStep(1)">← Back</button>
   </div>
 
   <!-- STEP 3: Curation (photos first, so the music pick is informed by the property) -->
@@ -552,10 +582,11 @@ let STATE = {
   music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
   editingTourId: null,
   agentId: null, agentEmail: null, agentLabel: null,
+  isStaff: false,
 };
 let GENRES = [{ id: 'instrumental', label: 'Instrumental', hasVocals: false, cached: false }]; // overwritten by /genres on load
 
-const ALL_STEPS = ['step-listing', 'step-existing', 'step-curate', 'step-generate', 'step-done', 'step-overview'];
+const ALL_STEPS = ['step-listing', 'step-existing', 'step-curate', 'step-generate', 'step-done', 'step-overview', 'step-tour-search'];
 
 function setStep(n) {
   ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
@@ -600,6 +631,10 @@ async function loadListings(agentId) {
   try {
     const q = agentId ? `?agent_id=${agentId}` : '';
     const data = await GET('/camerons-stage/my-listings' + q);
+    // Only staff ever get requiresAgentSelection back — once true, stays true
+    // (a later call with ?agent_id= for a picked agent won't repeat the flag).
+    if (data.requiresAgentSelection) STATE.isStaff = true;
+    document.getElementById('tourSearchBtnWrap').style.display = STATE.isStaff ? 'block' : 'none';
     if (data.requiresAgentSelection) {
       document.getElementById('agentPickerPanel').style.display = 'block';
       document.getElementById('listingPickerPanel').style.display = 'none';
@@ -639,6 +674,80 @@ async function pickAgent(i) {
   STATE.agentEmail = a.email || null;
   STATE.agentLabel = `${a.first_name || ''} ${a.last_name || ''}`.trim();
   await loadListings(a.id);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SEARCH EXISTING TOURS (staff only) — find any agent's saved tour and
+   grab its branded/unbranded links, e.g. to paste into MLS when the
+   listing agent forgot to.
+═══════════════════════════════════════════════════════════════════ */
+function showTourSearch() {
+  ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
+  document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.remove('done'); });
+  document.getElementById('step-tour-search').style.display = 'block';
+  if (!window._tsAgentsLoaded) loadTourSearchAgents();
+  searchTours();
+}
+
+async function loadTourSearchAgents() {
+  window._tsAgentsLoaded = true;
+  try {
+    if (!window._agents) window._agents = await GET('/daily-desk/agents');
+    document.getElementById('tsAgentFilter').innerHTML = `<option value="">— All agents —</option>` +
+      window._agents.map(a => `<option value="${a.id}">${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</option>`).join('');
+  } catch (e) {
+    toast('Could not load agent list: ' + e.message);
+  }
+}
+
+let _tsDebounce = null;
+function debouncedSearchTours() {
+  clearTimeout(_tsDebounce);
+  _tsDebounce = setTimeout(searchTours, 350);
+}
+
+async function searchTours() {
+  const el = document.getElementById('tourSearchResults');
+  el.innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Searching…</div>`;
+  const agentId = document.getElementById('tsAgentFilter').value;
+  const propQuery = document.getElementById('tsPropertyFilter').value.trim();
+  const params = new URLSearchParams();
+  if (agentId) params.set('agent_id', agentId);
+  if (propQuery) params.set('q', propQuery);
+  try {
+    const data = await GET('/camerons-stage/tours-search' + (params.toString() ? '?' + params.toString() : ''));
+    renderTourSearchResults(data.tours || []);
+  } catch (e) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not search tours.<br><small>${e.message}</small></div>`;
+  }
+}
+
+function renderTourSearchResults(tours) {
+  const el = document.getElementById('tourSearchResults');
+  if (!tours.length) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">🎬</span>No tours match those filters.</div>`;
+    return;
+  }
+  window._tourSearchResults = tours;
+  el.innerHTML = tours.map((t, i) => `
+    <div class="listing-row" style="cursor:default;flex-wrap:wrap;">
+      <div>
+        <h3>${escapeHtml(t.address || 'Untitled listing')}${t.mls_id ? ' · MLS #' + escapeHtml(t.mls_id) : ''}</h3>
+        <div class="meta">${escapeHtml(t.agent_name || t.agent_email || 'Unknown agent')} · saved ${new Date(t.created_at).toLocaleDateString()}</div>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="copyTourLink(${i}, false)">Copy MLS Link</button>
+        <button class="btn btn-gold" onclick="copyTourLink(${i}, true)">Copy Branded Link</button>
+        <a href="${t.unbranded_url}" target="_blank" class="btn btn-ghost">Preview</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyTourLink(i, branded) {
+  const t = window._tourSearchResults[i];
+  const url = branded ? t.branded_url : t.unbranded_url;
+  navigator.clipboard.writeText(url).then(() => toast((branded ? 'Branded' : 'MLS (unbranded)') + ' link copied'));
 }
 
 function renderGenreGrid() {
