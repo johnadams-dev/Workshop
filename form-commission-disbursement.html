@@ -77,6 +77,12 @@ function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US'
 function fmtDate(v) { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
 function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
 
+const FINANCING_LABEL = {
+  cash: 'Cash', conventional: 'Conventional', fha: 'FHA', va: 'VA',
+  owner_financing: 'Owner Financing', other: 'Other',
+};
+function financingLabel(v) { return v ? (FINANCING_LABEL[v] || v) : ''; }
+
 function calcCommission(salePrice, rate, type) {
   if (rate == null) return null;
   if (type === 'fixed') return Math.round(Number(rate) * 100) / 100;
@@ -136,6 +142,7 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       ${row2('MLS Number', fmt(mls_number), 'Close Date', fmtDate(ev.close_date))}
       ${row2('Sale Price', fmtMoney(salePrice), 'Title Company', fmt(ev.title_company))}
       ${row2('Mortgage Company', fmt(ev.mortgage_company), 'Office', fmt(t.office_name))}
+      <tr><td class="label">Mortgage Type</td><td colspan="3" class="val">${financingLabel(ev.financing_type) || '&nbsp;'}</td></tr>
     </table>
 
     ${customerSections('Seller', sellers)}
@@ -152,6 +159,7 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
     <table>
       ${row2("Buyer's Agent", agentName(ba), 'NRDS ID', fmt(ba?.nrds_id))}
       ${co_buyers_agent ? row2("Co-Buyer's Agent", agentName(co_buyers_agent), 'NRDS ID', fmt(co_buyers_agent?.nrds_id)) : ''}
+      ${row2('Cooperating Brokerage', fmt(ba?.cooperating_brokerage), "Co-Buyer's Brokerage", fmt(co_buyers_agent?.cooperating_brokerage))}
     </table>
 
     <div class="section-head">Referral (if applicable)</div>

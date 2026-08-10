@@ -2271,6 +2271,10 @@ tbody tr.clickable { cursor: pointer; }
         <div class="dfield-key" id="drawer-party-label">Seller</div>
         <div class="dfield-val" id="drawer-party">—</div>
       </div>
+      <div id="drawer-record-seller-row" style="display:none">
+        <div class="dfield-key">Seller <span style="font-weight:400; text-transform:none; letter-spacing:0;">(record only)</span></div>
+        <div class="dfield-val" id="drawer-record-seller">—</div>
+      </div>
       <div>
         <div class="dfield-key" id="drawer-buyer-agent-label">Buyer's Agent</div>
         <div class="dfield-val" id="drawer-buyer-agent">—</div>
@@ -3426,7 +3430,7 @@ function populateCustomers(ns, rows) {
 // under the 'am-manage' namespace.
 function amCustomerManagementHtml() {
   const label = amState.kind === 'contract' ? 'Buyer' : 'Seller';
-  return `
+  let html = `
     <div style="margin-bottom:14px; padding-top:14px; border-top:1px solid var(--ink-border);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${label}(s)</span>
@@ -3434,19 +3438,40 @@ function amCustomerManagementHtml() {
       </div>
       <div id="am-manage-customer-rows"></div>
     </div>`;
+  // We don't represent the seller on a buyer-side (contract) transaction, but
+  // staff still need to record/update who they are for reference. Kept as a
+  // separate namespace/role from the buyer rows above, same "optional —
+  // record only" pattern used at closing-capture time for external contracts.
+  if (amState.kind === 'contract') {
+    html += `
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Seller(s) <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional — record only)</span></span>
+        <button type="button" onclick="addCustomerRow('am-manage-seller')" style="padding:5px 10px; background:transparent; border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text-muted); cursor:pointer; font-size:12px;">+ Add seller</button>
+      </div>
+      <div id="am-manage-seller-customer-rows"></div>
+    </div>`;
+  }
+  return html;
 }
 
 async function amLoadManageCustomers() {
   const role = amState.kind === 'contract' ? 'buyer' : 'seller';
   let rows = [];
+  let sellerRows = [];
   try {
     const txn = await GET(`/daily-desk/transactions/${amState.id}`);
     rows = (txn.customers || []).filter(c => c.role === role);
+    if (amState.kind === 'contract') sellerRows = (txn.customers || []).filter(c => c.role === 'seller');
   } catch (e) {
     console.error('Failed to load customers:', e);
   }
   amState._originalCustomerIds = rows.map(r => r.id);
   populateCustomers('am-manage', rows);
+  if (amState.kind === 'contract') {
+    amState._originalSellerCustomerIds = sellerRows.map(r => r.id);
+    populateCustomers('am-manage-seller', sellerRows);
+  }
 }
 
 async function loadReferralReport() {
@@ -3559,6 +3584,7 @@ const LISTING_ACTIONS = {
     { key: 'print_listing_contract', icon: '🖨',  title: 'Print Listing / Contract Form', desc: 'Re-open the listing / contract form for printing.' },
   ],
   under_contract: [
+    { key: 'change',                 icon: '✎',  title: 'Change',                 desc: 'Contract price change, closing date extension (addendum), or other update.' },
     { key: 'closing',                icon: '🔑', title: 'Closing',                desc: 'The contract closed.' },
     { key: 'fall_through',           icon: '↩',  title: 'Fall Through',           desc: 'Contract fell through — listing returns to Active.' },
     { key: 'withdrawn',              icon: '🚫', title: 'Withdrawn',              desc: 'Pull the listing off market (can be returned to Active).' },
@@ -3876,26 +3902,34 @@ async function amChooseAction(key) {
   } else if (key === 'change') {
     const labelStyle = 'font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;';
     const selStyle   = 'padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px; width:100%;';
+    // Once under contract, "extension" means the closing date on an
+    // addendum (went_under_contract.close_date) — a different field from an
+    // active listing's own agreement expiration date. Same date input either
+    // way; amSubmit() routes its value to the right field based on status.
+    const isUnderContract = amState.status === 'under_contract';
+    const priceLabel = isUnderContract ? 'New Contract Price (if applicable)' : 'New Price (if applicable)';
+    const dateLabel  = isUnderContract ? 'New Closing Date (if applicable)' : 'New Expiration Date (if extension)';
     fieldsHtml = `
       <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="${labelStyle}">Change Type</span>
           <select id="am-change-type" onchange="amToggleChangeType()" style="${selStyle}">
-            <option value="price">Price Change</option>
+            <option value="price">${isUnderContract ? 'Addendum (Price / Closing Date)' : 'Price Change'}</option>
+            ${isUnderContract ? '' : `
             <option value="back_on_market">Back on Market</option>
-            <option value="extension">Extension</option>
+            <option value="extension">Extension</option>`}
             <option value="agent">Agent Change</option>
             <option value="other">Other</option>
           </select>
         </div>
         <div class="field" id="am-price-wrap" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="${labelStyle}">New Price (if applicable)</span>
+          <span class="field-label" style="${labelStyle}">${priceLabel}</span>
           <input type="text" id="am-new-price" placeholder="$0">
         </div>
       </div>
       <div class="form-row" id="am-dates-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-          <span class="field-label" style="${labelStyle}">New Expiration Date (if extension)</span>
+          <span class="field-label" style="${labelStyle}">${dateLabel}</span>
           <input type="date" id="am-expiration-date">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -4526,8 +4560,13 @@ async function amSubmit() {
     } else {
       const newPrice = amParseMoney(document.getElementById('am-new-price').value);
       if (newPrice != null) fields.newPrice = newPrice;
-      const expirationDate = document.getElementById('am-expiration-date').value;
-      if (expirationDate) fields.expirationDate = expirationDate;
+      const dateVal = document.getElementById('am-expiration-date').value;
+      if (dateVal) {
+        // Under contract, this date is the addendum's new closing date, not
+        // the listing agreement's own expiration date — see fieldsHtml above.
+        if (amState.status === 'under_contract') fields.newCloseDate = dateVal;
+        else fields.expirationDate = dateVal;
+      }
     }
     fields.notes = document.getElementById('am-notes').value || null;
     const correctedAddr = document.getElementById('am-property-address').value.trim();
@@ -4612,6 +4651,15 @@ async function amSubmit() {
     const addRows     = currentRows.filter(r => !r.id).map(({ id, ...rest }) => rest);
     if (addRows.length)   fields.addCustomers = addRows;
     if (removedIds.length) fields.removeCustomerIds = removedIds;
+
+    if (amState.kind === 'contract') {
+      const currentSellerRows = collectCustomers('am-manage-seller');
+      const currentSellerIds  = new Set(currentSellerRows.filter(r => r.id).map(r => r.id));
+      const removedSellerIds  = (amState._originalSellerCustomerIds || []).filter(id => !currentSellerIds.has(id));
+      const addSellerRows     = currentSellerRows.filter(r => !r.id).map(({ id, ...rest }) => rest);
+      if (addSellerRows.length)    fields.addSellerCustomers = addSellerRows;
+      if (removedSellerIds.length) fields.removeSellerCustomerIds = removedSellerIds;
+    }
   }
 
   if (key === 'manage_referrals') {
@@ -5588,7 +5636,14 @@ function renderDrawer(t) {
     document.getElementById('drawer-party-label').textContent = 'Buyer';
     document.getElementById('drawer-party').textContent =
       (t.customers || []).filter(c => c.role === 'buyer').map(c => c.name).filter(Boolean).join(', ') || '—';
+    // We don't represent the seller on a buyer-side transaction, but staff can
+    // still record who they are (via the Change action) for reference — shown
+    // only when at least one has actually been recorded.
+    const recordedSellers = (t.customers || []).filter(c => c.role === 'seller').map(c => c.name).filter(Boolean).join(', ');
+    document.getElementById('drawer-record-seller-row').style.display = recordedSellers ? '' : 'none';
+    document.getElementById('drawer-record-seller').textContent = recordedSellers || '—';
   } else {
+    document.getElementById('drawer-record-seller-row').style.display = 'none';
     const buyerAgents = (t.participants || []).filter(p => p.role === 'buyers_agent' || p.role === 'co_buyers_agent');
     document.getElementById('drawer-buyer-agent-label').textContent = "Buyer's Agent";
     document.getElementById('drawer-buyer-agent').innerHTML = joinAgentField(buyerAgents, agentDisplayName);
