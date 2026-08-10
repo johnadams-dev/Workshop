@@ -3919,7 +3919,7 @@ async function amChooseAction(key) {
             <option value="back_on_market">Back on Market</option>
             <option value="extension">Extension</option>`}
             <option value="agent">Agent Change</option>
-            <option value="other">Other</option>
+            <option value="other">Other (note only)</option>
           </select>
         </div>
         <div class="field" id="am-price-wrap" style="display:flex; flex-direction:column; gap:5px;">
@@ -3928,7 +3928,7 @@ async function amChooseAction(key) {
         </div>
       </div>
       <div class="form-row" id="am-dates-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
-        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+        <div class="field" id="am-date-field-wrap" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="${labelStyle}">${dateLabel}</span>
           <input type="date" id="am-expiration-date">
         </div>
@@ -4318,8 +4318,13 @@ async function amLoadBuyerAgents() {
 function amToggleChangeType() {
   const type = document.getElementById('am-change-type').value;
   const isAgent = type === 'agent';
-  document.getElementById('am-price-wrap').style.display  = isAgent ? 'none' : '';
-  document.getElementById('am-dates-wrap').style.display  = isAgent ? 'none' : '';
+  const isOther = type === 'other';
+  // "Other" is notes-only — distinct from "Addendum"/"Price Change", which
+  // show the same price+date fields either way (the dropdown value itself
+  // isn't read server-side; only which fields end up populated matters).
+  document.getElementById('am-price-wrap').style.display      = (isAgent || isOther) ? 'none' : '';
+  document.getElementById('am-dates-wrap').style.display      = isAgent ? 'none' : '';
+  document.getElementById('am-date-field-wrap').style.display = isOther ? 'none' : '';
   document.getElementById('am-agent-change').style.display = isAgent ? '' : 'none';
   if (isAgent && document.getElementById('am-agent-list').children.length === 0) {
     amLoadCurrentListingAgents();

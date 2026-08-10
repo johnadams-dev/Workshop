@@ -1778,7 +1778,7 @@ function buildOfficeChartData() {
   });
 
   STATE.boxes.forEach(b => {
-    const offId = String(b.assigned_office_id || b.office_id || b.location_office_id || '');
+    const offId = String(b.location_office_id || b.assigned_office_id || b.office_id || '');
     const entry = officeMap[offId];
     if (!entry) return;
     if (b.status === 'checked_out') {
@@ -2019,7 +2019,7 @@ function pickBox(b) {
   const officeId = b.location_office_id || b.assigned_office_id || b.office_id;
   if (officeId) sel.value = String(officeId);
   if (!sel.value) {
-    const name = b.assigned_office_name || b.office_name;
+    const name = b.office_name || b.assigned_office_name;
     if (name) {
       const opt = [...sel.options].find(o => o.text === name);
       if (opt) sel.value = opt.value;
@@ -2226,7 +2226,7 @@ function invSortVal(b, col) {
     case "shackle_code":     return b.shackle_code     || "";
     case "association_abbr": return b.association_abbr || "";
     case "status":           return b.status           || "";
-    case "assigned_office":  return b.assigned_office_name || b.office_name || "";
+    case "assigned_office":  return b.office_name || b.assigned_office_name || "";
     case "agent_name":       return b.agent_name       || "￿";
     case "location_address": return (b.property_address || b.location_address) || "￿";
     case "checkout_at":      return b.checkout_at      || "￿";
@@ -2317,12 +2317,12 @@ function renderInventory(boxes) {
           ${STATUS_CHIP[b.status] || b.status}
           ${invFlagChips(b)}
         </td>
-        <td style="font-size:12px;color:var(--text-muted)">${b.assigned_office_name || b.office_name || '—'}</td>
+        <td style="font-size:12px;color:var(--text-muted)">${b.office_name || b.assigned_office_name || '—'}</td>
         <td style="font-size:13px">${b.agent_name || '—'}</td>
         <td style="font-size:12px;color:var(--text-muted);max-width:200px">
           <span style="overflow:hidden;text-overflow:ellipsis;display:block;max-width:160px;float:left">
             ${b.property_address || b.location_address
-              || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : null)
+              || (b.status !== 'checked_out' ? (b.office_name || b.assigned_office_name) : null)
               || '—'}
           </span>
           ${b.status === 'checked_out' && ['manager', 'staff'].includes(STATE.userRole)
@@ -2423,7 +2423,7 @@ function filterInv() {
       (b.agent_name || '').toLowerCase().includes(q) ||
       (b.property_address || b.location_address || '').toLowerCase().includes(q) ||
       (b.office_name || '').toLowerCase().includes(q);
-    const officeMatch = !office || String(b.assigned_office_id || b.office_id || b.location_office_id || '') === office;
+    const officeMatch = !office || String(b.location_office_id || b.assigned_office_id || b.office_id || '') === office;
 
     let issueMatch = true;
     if (issue) {
@@ -2455,9 +2455,9 @@ function exportCSV() {
     return [
       b.serial_number, b.shackle_code, b.association_abbr, b.status,
       flags.join('; '),
-      b.assigned_office_name || b.office_name || '',
+      b.office_name || b.assigned_office_name || '',
       b.agent_name || '',
-      b.property_address || b.location_address || (b.status !== 'checked_out' ? (b.assigned_office_name || b.office_name) : '') || '',
+      b.property_address || b.location_address || (b.status !== 'checked_out' ? (b.office_name || b.assigned_office_name) : '') || '',
       b.mls_id || '',
       b.checkout_at || ''
     ];
@@ -2798,7 +2798,7 @@ function _renderShacklePreview(box) {
   document.getElementById('sh-p-serial').textContent  = box.serial_number;
   document.getElementById('sh-p-shackle').textContent = box.shackle_code || '—';
   document.getElementById('sh-p-status').textContent  = box.status?.replace('_', ' ') || '—';
-  document.getElementById('sh-p-office').textContent  = box.assigned_office_name || box.office_name || '—';
+  document.getElementById('sh-p-office').textContent  = box.office_name || box.assigned_office_name || '—';
   document.getElementById('sh-preview').style.display  = '';
   document.getElementById('sh-new-row').style.display  = '';
   document.getElementById('sh-btn-row').style.display  = '';
@@ -3039,7 +3039,7 @@ function showScanResult(box) {
 
   const loc = box.status === 'checked_out'
     ? `📍 ${box.property_address || box.location_address || 'Unknown property'}${box.agent_name ? ' — ' + box.agent_name : ''}`
-    : `🏢 ${box.assigned_office_name || box.office_name || 'Unknown office'}`;
+    : `🏢 ${box.office_name || box.assigned_office_name || 'Unknown office'}`;
 
   const bJson = JSON.stringify(box).replace(/'/g, "&#39;");
 
@@ -3052,7 +3052,7 @@ function showScanResult(box) {
       <div class="bp-field"><div class="bp-key">Serial #</div><div class="bp-val amber" style="font-size:18px">${box.serial_number}</div></div>
       <div class="bp-field"><div class="bp-key">Shackle Code</div><div class="bp-val" style="font-size:18px">${box.shackle_code || '—'}</div></div>
       <div class="bp-field"><div class="bp-key">Association</div><div class="bp-val">${box.association_abbr || '—'}</div></div>
-      <div class="bp-field"><div class="bp-key">Office</div><div class="bp-val">${box.assigned_office_name || box.office_name || '—'}</div></div>
+      <div class="bp-field"><div class="bp-key">Office</div><div class="bp-val">${box.office_name || box.assigned_office_name || '—'}</div></div>
     </div>
     <div style="background:rgba(0,0,0,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:13px">${loc}</div>
     <div class="btn-row" style="margin-top:0">
