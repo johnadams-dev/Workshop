@@ -134,6 +134,24 @@ td {
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: rgba(255,255,255,.02); }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+th.sortable:hover { color: var(--text); }
+th.sortable .sort-arrow { display: inline-block; width: 0.9em; opacity: 0.5; }
+th.sortable.sort-active .sort-arrow { opacity: 1; }
+.platform-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: var(--ink-light);
+  color: var(--text-muted);
+  margin-right: 0.2rem;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-block;
@@ -352,15 +370,15 @@ tr:hover td { background: rgba(255,255,255,.02); }
       </div>
       <div class="tbl-wrap">
         <table>
-          <thead>
+          <thead id="recipients-head">
             <tr>
-              <th>Customer</th>
-              <th>Agent</th>
-              <th>Close Date</th>
-              <th>Side</th>
-              <th>Sent</th>
-              <th>Clicked</th>
-              <th>Reviewed</th>
+              <th class="sortable" data-key="customer_name" onclick="sortRecipients('customer_name')">Customer<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="agent_name" onclick="sortRecipients('agent_name')">Agent<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="close_date" onclick="sortRecipients('close_date')">Close Date<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="transaction_side" onclick="sortRecipients('transaction_side')">Side<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="touches_sent" onclick="sortRecipients('touches_sent')">Sent<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="ever_clicked" onclick="sortRecipients('ever_clicked')">Clicked<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="reviewed" onclick="sortRecipients('reviewed')">Reviewed<span class="sort-arrow"></span></th>
               <th></th>
             </tr>
           </thead>
@@ -732,6 +750,14 @@ async function loadFunnel() {
 
 // ── Recipients tab ──────────────────────────────────────────────────────────────
 
+// Platform names as returned by platforms_clicked (see request_events.platform
+// in the DB / trackingRedirect() server-side) — "reply" isn't an external
+// review site, it's the "share feedback with us directly" link.
+const PLATFORM_LABELS = { google: "Google", facebook: "Facebook", zillow: "Zillow", reply: "Reply" };
+
+let _recipientsRows = [];
+let _recipientsSort = { key: "close_date", dir: -1 };
+
 async function loadRecipients() {
   const tbody = document.getElementById("recipients-body");
   tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
@@ -741,29 +767,76 @@ async function loadRecipients() {
     let qs = "?limit=100";
     if (agent) qs += `&agent=${encodeURIComponent(agent)}`;
     if (month) qs += `&month=${encodeURIComponent(month + "-01")}`;
-    const rows = await GET(`/review/recipients${qs}`);
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="loading">No recipients found.</td></tr>`;
-      return;
-    }
-    tbody.innerHTML = rows.map(r => {
-      const clickBadge   = r.ever_clicked ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
-      const reviewBadge  = r.reviewed     ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
-      const confirmBtn   = r.reviewed ? "" : `<button class="btn btn-ghost btn-sm" onclick="openConfirmModal('${esc(r.recipient_id)}')">Mark Reviewed</button>`;
-      return `<tr>
-        <td>${esc(r.customer_name)}</td>
-        <td>${esc(r.agent_name || "—")}</td>
-        <td>${fmtDate(r.close_date)}</td>
-        <td><span class="badge badge-${r.transaction_side === 'buyer' ? 'blue' : 'amber'}">${esc(r.transaction_side)}</span></td>
-        <td>${r.touches_sent || 0}</td>
-        <td>${clickBadge}</td>
-        <td>${reviewBadge}</td>
-        <td>${confirmBtn}</td>
-      </tr>`;
-    }).join("");
+    _recipientsRows = await GET(`/review/recipients${qs}`);
+    renderRecipients();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
   }
+}
+
+function sortRecipients(key) {
+  if (_recipientsSort.key === key) {
+    _recipientsSort.dir *= -1;
+  } else {
+    // First click on a new column: dates/counts/booleans default to
+    // descending (most recent / highest / "yes" first), text columns to
+    // ascending (A→Z) — whichever reads naturally on first click.
+    _recipientsSort = { key, dir: ["customer_name", "agent_name", "transaction_side"].includes(key) ? 1 : -1 };
+  }
+  renderRecipients();
+}
+
+function renderRecipients() {
+  const tbody = document.getElementById("recipients-body");
+  if (!_recipientsRows.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="loading">No recipients found.</td></tr>`;
+    updateSortHeaders();
+    return;
+  }
+
+  const { key, dir } = _recipientsSort;
+  const sorted = [..._recipientsRows].sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (key === "close_date") { av = av || ""; bv = bv || ""; }
+    if (typeof av === "boolean" || typeof bv === "boolean") { av = av ? 1 : 0; bv = bv ? 1 : 0; }
+    if (typeof av === "string") av = av.toLowerCase();
+    if (typeof bv === "string") bv = bv.toLowerCase();
+    if (av == null) av = "";
+    if (bv == null) bv = "";
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+
+  tbody.innerHTML = sorted.map(r => {
+    const platforms = (r.platforms_clicked || []).filter(Boolean);
+    const clickCell = platforms.length
+      ? platforms.map(p => `<span class="platform-tag">${esc(PLATFORM_LABELS[p] || p)}</span>`).join("")
+      : (r.ever_clicked ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`);
+    const reviewBadge = r.reviewed ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
+    const confirmBtn  = r.reviewed ? "" : `<button class="btn btn-ghost btn-sm" onclick="openConfirmModal('${esc(r.recipient_id)}')">Mark Reviewed</button>`;
+    return `<tr>
+      <td>${esc(r.customer_name)}</td>
+      <td>${esc(r.agent_name || "—")}</td>
+      <td>${fmtDate(r.close_date)}</td>
+      <td><span class="badge badge-${r.transaction_side === 'buyer' ? 'blue' : 'amber'}">${esc(r.transaction_side)}</span></td>
+      <td>${r.touches_sent || 0}</td>
+      <td>${clickCell}</td>
+      <td>${reviewBadge}</td>
+      <td>${confirmBtn}</td>
+    </tr>`;
+  }).join("");
+
+  updateSortHeaders();
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll("#recipients-head th.sortable").forEach(th => {
+    const arrow = th.querySelector(".sort-arrow");
+    const active = th.dataset.key === _recipientsSort.key;
+    th.classList.toggle("sort-active", active);
+    arrow.textContent = active ? (_recipientsSort.dir === 1 ? "▲" : "▼") : "";
+  });
 }
 
 function clearFilters() {
