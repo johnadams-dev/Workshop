@@ -788,12 +788,18 @@ function closingCard(item, isManager = false) {
 }
 
 function changeCard(item) {
+  // isExternalListing: this transaction isn't an ACC listing — an ACC agent
+  // is tracking a buyer-side/co-broke deal on a property listed by another
+  // brokerage, so the "listing agent" shown below is genuinely external.
+  // Label it as such and credit the ACC agent who's actually tracking it,
+  // instead of presenting the external brokerage as an ACC listing change.
+  const office = item.isExternalListing ? resolveOffice(item.trackingOffice) : resolveOffice(item.listingOffice);
   return `
-  <div class="card card-change" data-category="changes" data-office="${resolveOffice(item.listingOffice)}">
+  <div class="card card-change" data-category="changes" data-office="${office}">
     <div class="card-body">
       <div class="card-header">
         ${propLink(item.mlsIds, `<h3 class="card-address">${escapeHtml(item.address || "Address TBD")}</h3>`)}
-        <div class="card-mls">${mlsBadges(item.mlsIds)}</div>
+        <div class="card-mls">${mlsBadges(item.mlsIds)} ${item.isExternalListing ? `<span class="badge" style="background:#e0e7ff;color:#3730a3;">External Listing</span>` : ""}</div>
       </div>
       <div class="card-price">${fmtPrice(item.listPrice)}</div>
       <div class="card-meta">
@@ -805,6 +811,11 @@ function changeCard(item) {
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
         ${coAgentsHtml(item.coListingAgents)}
       </div>
+      ${item.isExternalListing && (item.trackingAgentFirst || item.trackingAgentLast) ? `
+      <div class="card-agent" style="border-top:none;padding-top:0;margin-top:-4px;">
+        <span class="card-office">Tracked by ACC buyer's agent:</span>
+        <strong>${escapeHtml(item.trackingAgentFirst)} ${escapeHtml(item.trackingAgentLast)}</strong>
+      </div>` : ""}
     </div>
   </div>`;
 }
@@ -1049,7 +1060,12 @@ function applyFilters() {
 
     sec.querySelectorAll(".card").forEach(card => {
       const offices = (card.dataset.office || "").split("|").filter(Boolean);
-      const matchesOffice = !office || offices.length === 0 || offices.includes(office);
+      // A card whose listing/agent office doesn't resolve to any known ACC
+      // office (external brokerage, or an office-name variant not in the
+      // offices/aliases table) should only show under "All offices" — not
+      // leak into every specific office filter just because it has nothing
+      // to compare against.
+      const matchesOffice = !office || offices.includes(office);
       card.style.display = (catVisible && matchesOffice) ? "" : "none";
       if (matchesOffice) officeCount++;
     });
