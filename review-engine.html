@@ -220,12 +220,40 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
   gap: 0.5rem;
 }
 .step-card {
-  border-bottom: 1px solid var(--ink-border);
-  padding: 1rem;
+  border-top: 3px solid var(--amber);
+  background: var(--ink);
+  padding: 1.25rem 1rem;
+  margin: 1rem;
+  border-radius: var(--r);
 }
-.step-card:last-child { border-bottom: none; }
-.step-label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem; }
-.template-editor { margin-top: 0.75rem; }
+.step-card + .step-card { margin-top: 1.25rem; }
+.step-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--amber);
+  color: #000;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.step-title { font-size: 0.95rem; font-weight: 600; }
+.step-label { font-size: 0.78rem; color: var(--text-muted); }
+.template-editor {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--ink-border);
+}
+.template-editor:first-of-type { border-top: none; padding-top: 0; }
 .field-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block; }
 .tpl-input {
   width: 100%;
@@ -913,10 +941,16 @@ function renderCampaign(c) {
 function renderStep(s) {
   const templates = s.templates || [];
   _stepTemplates[s.step_id] = templates;
+  const variantNote = templates.length > 1
+    ? ` • <span style="color:var(--blue)">${templates.length} variants (A/B)</span>`
+    : "";
   return `<div class="step-card">
-    <div class="step-label">
-      Day ${s.send_offset_days} • Step ${s.step_order} • ${s.channel.toUpperCase()}
-      ${s.skip_if_reviewed ? ' • <span style="color:var(--green-bg)">Skip if reviewed</span>' : ''}
+    <div class="step-header">
+      <span class="step-number">${s.step_order}</span>
+      <span class="step-title">Email ${s.step_order}</span>
+      <span class="step-label">— sent Day ${s.send_offset_days} after closing • ${s.channel.toUpperCase()}
+        ${s.skip_if_reviewed ? ' • <span style="color:var(--green)">skips if already reviewed</span>' : ''}${variantNote}
+      </span>
     </div>
     ${templates.map(t => renderTemplateEditor(t)).join("")}
     <button class="btn btn-ghost btn-sm" onclick="addVariant('${esc(s.step_id)}')">+ New Variant</button>
@@ -930,7 +964,7 @@ function renderTemplateEditor(t) {
     : `<span class="badge badge-dim" style="font-size:.68rem">Inactive</span>`;
   return `<div class="template-editor" id="tpl-${tid}">
     <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-      <span style="font-size:.75rem;color:var(--text-muted)">Variant: <strong>${esc(t.variant_name)}</strong></span>
+      <span class="badge badge-blue" style="font-size:.68rem">Variant ${esc(t.variant_name)}</span>
       ${activeBadge}
       <select class="from-select" id="from-${tid}" onchange="markDirty('${tid}')">
         ${FROM_NAME_OPTIONS.map(o => `<option value="${esc(o.key)}" ${t.from_name_mode === o.key ? 'selected' : ''}>From: ${esc(o.label)}</option>`).join("")}
