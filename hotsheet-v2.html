@@ -1048,6 +1048,11 @@ function render() {
   applyFilters();
 }
 
+// Upcoming Listings and Buyer Needs are agent-submitted notices, not
+// office-attributed deal activity — they should surface to every office
+// view rather than being filtered out of anyone's hotsheet.
+const OFFICE_UNCONSTRAINED = new Set(["upcoming", "buyers"]);
+
 function applyFilters() {
   const office = document.getElementById('officeFilter').value;
   const allSections = document.querySelectorAll(".section");
@@ -1056,6 +1061,7 @@ function applyFilters() {
   allSections.forEach(sec => {
     const cat = sec.dataset.section;
     const catVisible = STATE.activeCategory === "all" || STATE.activeCategory === cat;
+    const unconstrained = OFFICE_UNCONSTRAINED.has(cat);
     let officeCount = 0;
 
     sec.querySelectorAll(".card").forEach(card => {
@@ -1065,7 +1071,7 @@ function applyFilters() {
       // offices/aliases table) should only show under "All offices" — not
       // leak into every specific office filter just because it has nothing
       // to compare against.
-      const matchesOffice = !office || offices.includes(office);
+      const matchesOffice = unconstrained || !office || offices.includes(office);
       card.style.display = (catVisible && matchesOffice) ? "" : "none";
       if (matchesOffice) officeCount++;
     });
