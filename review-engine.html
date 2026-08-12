@@ -411,7 +411,6 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
     <div id="tab-campaigns" class="tab-panel">
       <div class="section-header">
         <h2>Campaign Templates</h2>
-        <button class="btn btn-amber btn-sm" onclick="seedCampaign()">Seed Initial Data</button>
       </div>
       <p class="merge-hint" style="margin-bottom:1rem">
         Merge fields: <code>{{customer_name}}</code> <code>{{first_name}}</code> <code>{{agent_name}}</code>
@@ -705,6 +704,8 @@ const TAB_LOADERS = {
   settings:   loadSettings,
 };
 const _loaded = {};
+const _stepTemplates = {}; // step_id -> that step's current templates, cached at render time so
+                            // addVariant() has something to clone from without a round-trip
 
 function switchTab(name) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -887,7 +888,7 @@ async function loadCampaigns() {
     if (!_loaded.settings) { await loadSettings(); _loaded.settings = true; }
     const campaigns = await GET("/review/campaigns");
     if (!campaigns.length) {
-      container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet. Click "Seed Initial Data" to create the default campaign.</p>`;
+      container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet.</p>`;
       return;
     }
     container.innerHTML = campaigns.map(c => renderCampaign(c)).join("");
@@ -911,12 +912,14 @@ function renderCampaign(c) {
 
 function renderStep(s) {
   const templates = s.templates || [];
+  _stepTemplates[s.step_id] = templates;
   return `<div class="step-card">
     <div class="step-label">
       Day ${s.send_offset_days} • Step ${s.step_order} • ${s.channel.toUpperCase()}
       ${s.skip_if_reviewed ? ' • <span style="color:var(--green-bg)">Skip if reviewed</span>' : ''}
     </div>
     ${templates.map(t => renderTemplateEditor(t)).join("")}
+    <button class="btn btn-ghost btn-sm" onclick="addVariant('${esc(s.step_id)}')">+ New Variant</button>
   </div>`;
 }
 
@@ -969,6 +972,28 @@ async function toggleTemplateActive(tid, active) {
     loadCampaigns();
   } catch (e) {
     alert("Update failed: " + e.message);
+  }
+}
+
+// New variant starts as a clone of the step's first existing template (if
+// any) so there's a sane starting draft to edit rather than a blank email —
+// nothing is sent until you edit it and hit Save, same as any other template.
+async function addVariant(stepId) {
+  const name = prompt('Variant name (e.g. "b"):');
+  if (!name || !name.trim()) return;
+  const base = (_stepTemplates[stepId] || [])[0];
+  try {
+    await POST("/review/templates", {
+      step_id: stepId,
+      variant_name: name.trim(),
+      subject: base ? base.subject : "",
+      body: base ? base.body : "",
+      from_name_mode: base ? base.from_name_mode : "brokerage",
+    });
+    _loaded.campaigns = false;
+    loadCampaigns();
+  } catch (e) {
+    alert("Couldn't create variant: " + e.message);
   }
 }
 
@@ -1029,18 +1054,6 @@ async function sendPreviewTest() {
     status.textContent = "Failed: " + e.message;
   } finally {
     btn.disabled = false;
-  }
-}
-
-async function seedCampaign() {
-  if (!confirm("Seed the default campaign data? This will fail if campaigns already exist.")) return;
-  try {
-    const r = await POST("/review/engine/seed", {});
-    alert(r.message || "Seeded successfully.");
-    _loaded.campaigns = false;
-    loadCampaigns();
-  } catch (e) {
-    alert("Seed failed: " + e.message);
   }
 }
 
