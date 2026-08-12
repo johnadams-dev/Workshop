@@ -321,7 +321,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 }
 .modal-box h3 { margin-bottom: 0.75rem; font-size: 1rem; }
 .modal-box label { font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; margin-top: 0.75rem; }
-.modal-box select, .modal-box input {
+.modal-box select, .modal-box input, .modal-box textarea {
   width: 100%;
   background: var(--ink);
   border: 1px solid var(--ink-border);
@@ -331,6 +331,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
   font: inherit;
   font-size: 0.82rem;
 }
+.modal-box textarea { resize: vertical; min-height: 60px; }
 .modal-btn-row { display: flex; gap: 0.5rem; margin-top: 1.25rem; justify-content: flex-end; }
 </style>
 </head>
@@ -395,6 +396,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
         <input type="text" id="filter-agent" placeholder="Filter by agent name" oninput="loadRecipients()">
         <input type="month" id="filter-month" onchange="loadRecipients()">
         <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openUnattributedModal()">+ Log Unmatched Review</button>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -411,6 +413,25 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
             </tr>
           </thead>
           <tbody id="recipients-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top:2rem">
+        <h2>Unmatched Reviews</h2>
+        <span style="font-size:.75rem;color:var(--text-muted)">Reviews we can see but can't tie to a tracked recipient — not counted in the Funnel above</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Platform</th>
+              <th>Rating</th>
+              <th>Reviewer (as shown)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="unattributed-body"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -583,6 +604,32 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
   </div>
 </div>
 
+<!-- Unmatched-review modal -->
+<div id="unattributed-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Log an Unmatched Review</h3>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-top:-.25rem">
+      For a review visible on a platform that can't be confidently tied to a specific recipient — obscured by initials, a different name, or from someone outside the campaign entirely.
+    </p>
+    <label>Platform</label>
+    <select id="unattributed-platform">
+      <option value="google">Google</option>
+      <option value="facebook">Facebook</option>
+      <option value="zillow">Zillow</option>
+    </select>
+    <label>Rating (optional)</label>
+    <input type="number" id="unattributed-rating" min="1" max="5" placeholder="1–5">
+    <label>Reviewer name (as shown)</label>
+    <input type="text" id="unattributed-reviewer-name" placeholder="e.g. J. S. or a name that doesn't match a recipient">
+    <label>Notes (optional)</label>
+    <textarea id="unattributed-notes" placeholder="Any context — e.g. possibly the buyer's mother, closed around late July"></textarea>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="closeUnattributedModal()">Cancel</button>
+      <button class="btn btn-amber btn-sm" onclick="submitUnattributed()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Preview modal -->
 <div id="preview-modal" class="modal-overlay">
   <div class="modal-box" style="width:min(680px, 92vw);max-height:88vh;display:flex;flex-direction:column">
@@ -726,7 +773,7 @@ function fmtMonth(d) {
 
 const TAB_LOADERS = {
   funnel:     loadFunnel,
-  recipients: loadRecipients,
+  recipients: loadRecipientsTab,
   variants:   loadVariants,
   campaigns:  loadCampaigns,
   settings:   loadSettings,
@@ -873,6 +920,71 @@ function clearFilters() {
   document.getElementById("filter-agent").value = "";
   document.getElementById("filter-month").value = "";
   loadRecipients();
+}
+
+// Recipients tab's actual TAB_LOADERS entry — loads the recipients table plus
+// the Unmatched Reviews list once on first visit. Filter inputs call
+// loadRecipients() directly (not this), so typing in the agent filter doesn't
+// needlessly re-fetch the unmatched-reviews list on every keystroke.
+async function loadRecipientsTab() {
+  await loadRecipients();
+  await loadUnattributedReviews();
+}
+
+async function loadUnattributedReviews() {
+  const tbody = document.getElementById("unattributed-body");
+  tbody.innerHTML = `<tr><td colspan="5" class="loading">Loading…</td></tr>`;
+  try {
+    const rows = await GET("/review/confirmations/unattributed");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="loading">None logged yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td>${fmtDate(r.detected_at)}</td>
+      <td><span class="badge badge-blue">${esc(r.platform)}</span></td>
+      <td>${r.rating || "—"}</td>
+      <td>${esc(r.reviewer_name || "—")}</td>
+      <td style="color:var(--text-muted);font-size:.78rem">${esc(r.notes || "—")}</td>
+    </tr>`).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red)">${esc(e.message)}</td></tr>`;
+  }
+}
+
+function openUnattributedModal() {
+  document.getElementById("unattributed-platform").value = "google";
+  document.getElementById("unattributed-rating").value = "";
+  document.getElementById("unattributed-reviewer-name").value = "";
+  document.getElementById("unattributed-notes").value = "";
+  document.getElementById("unattributed-modal").classList.add("open");
+}
+
+function closeUnattributedModal() {
+  document.getElementById("unattributed-modal").classList.remove("open");
+}
+
+async function submitUnattributed() {
+  const platform      = document.getElementById("unattributed-platform").value;
+  const rating        = document.getElementById("unattributed-rating").value;
+  const reviewerName  = document.getElementById("unattributed-reviewer-name").value.trim();
+  const notes         = document.getElementById("unattributed-notes").value.trim();
+  if (!reviewerName) {
+    alert("Reviewer name is required — it's what makes this findable later if you figure out who it was.");
+    return;
+  }
+  try {
+    await POST("/review/confirm", {
+      platform,
+      rating: rating ? parseInt(rating) : null,
+      reviewerName,
+      notes: notes || null,
+    });
+    closeUnattributedModal();
+    loadUnattributedReviews();
+  } catch (e) {
+    alert("Failed: " + e.message);
+  }
 }
 
 // ── Variants tab ────────────────────────────────────────────────────────────────
