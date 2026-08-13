@@ -407,12 +407,13 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               <th class="sortable" data-key="close_date" onclick="sortRecipients('close_date')">Close Date<span class="sort-arrow"></span></th>
               <th class="sortable" data-key="transaction_side" onclick="sortRecipients('transaction_side')">Side<span class="sort-arrow"></span></th>
               <th class="sortable" data-key="touches_sent" onclick="sortRecipients('touches_sent')">Sent<span class="sort-arrow"></span></th>
+              <th class="sortable" data-key="bounced" onclick="sortRecipients('bounced')">Bounced<span class="sort-arrow"></span></th>
               <th class="sortable" data-key="ever_clicked" onclick="sortRecipients('ever_clicked')">Clicked<span class="sort-arrow"></span></th>
               <th class="sortable" data-key="reviewed" onclick="sortRecipients('reviewed')">Reviewed<span class="sort-arrow"></span></th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="recipients-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+          <tbody id="recipients-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
 
@@ -837,7 +838,7 @@ let _recipientsSort = { key: "close_date", dir: -1 };
 
 async function loadRecipients() {
   const tbody = document.getElementById("recipients-body");
-  tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
   try {
     const agent = document.getElementById("filter-agent").value.trim();
     const month = document.getElementById("filter-month").value;
@@ -847,7 +848,7 @@ async function loadRecipients() {
     _recipientsRows = await GET(`/review/recipients${qs}`);
     renderRecipients();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -866,7 +867,7 @@ function sortRecipients(key) {
 function renderRecipients() {
   const tbody = document.getElementById("recipients-body");
   if (!_recipientsRows.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="loading">No recipients found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="loading">No recipients found.</td></tr>`;
     updateSortHeaders();
     return;
   }
@@ -891,6 +892,10 @@ function renderRecipients() {
       ? platforms.map(p => `<span class="platform-tag">${esc(PLATFORM_LABELS[p] || p)}</span>`).join("")
       : (r.ever_clicked ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`);
     const reviewBadge = r.reviewed ? `<span class="badge badge-green">Yes</span>` : `<span class="badge badge-dim">No</span>`;
+    // A bad address, not just a non-responsive customer — worth telling
+    // apart at a glance since a cluster of these points at a data-quality
+    // problem (stale/mistyped emails) rather than low engagement.
+    const bounceBadge = r.bounced ? `<span class="badge badge-red">Bounced</span>` : `<span class="badge badge-dim">No</span>`;
     const confirmBtn  = r.reviewed ? "" : `<button class="btn btn-ghost btn-sm" onclick="openConfirmModal('${esc(r.recipient_id)}')">Mark Reviewed</button>`;
     return `<tr>
       <td>${esc(r.customer_name)}</td>
@@ -898,6 +903,7 @@ function renderRecipients() {
       <td>${fmtDate(r.close_date)}</td>
       <td><span class="badge badge-${r.transaction_side === 'buyer' ? 'blue' : 'amber'}">${esc(r.transaction_side)}</span></td>
       <td>${r.touches_sent || 0}</td>
+      <td>${bounceBadge}</td>
       <td>${clickCell}</td>
       <td>${reviewBadge}</td>
       <td>${confirmBtn}</td>
