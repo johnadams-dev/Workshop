@@ -136,6 +136,35 @@ function customerSections(label, list) {
   return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
 }
 
+// "Referred By" depends on referral_type: an in-house (acc_agent) referral
+// joins to agents via agent_id (first_name/last_name merged onto the row by
+// /api/forms/transaction/:id's query); referral_dept/realty_referral/other
+// store the name as free text instead.
+function referralName(r) { return r.referral_type === 'acc_agent' ? agentName(r) : fmt(r.referral_name); }
+function referralFee(r) { return r.fee_value != null ? (r.fee_type === 'fixed' ? fmtMoney(r.fee_value) : Number(r.fee_value) + '%') : ''; }
+function referralBlock(label, r) {
+  return `
+    <div class="section-head">${label}</div>
+    <table>
+      ${row2('Referred By', referralName(r), 'Fee', referralFee(r))}
+      ${row2('Company', fmt(r.referral_company), 'Address', fmt(r.referral_address))}
+    </table>`;
+}
+function referralSection(list) {
+  if (!list.length) {
+    return `
+      <div class="section-head">Referral (if applicable)</div>
+      <table>
+        <tr><td class="label">Referred By</td><td class="val">&nbsp;</td><td class="label">Referral %</td><td class="val">&nbsp;</td></tr>
+        <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Address</td><td class="val">&nbsp;</td></tr>
+      </table>`;
+  }
+  return list.map((r, i) => {
+    const sideLabel = r.side === 'buyer' ? 'Buyer-Side Referral' : 'Seller-Side Referral';
+    return referralBlock(list.length > 1 ? `${sideLabel} ${i + 1}` : sideLabel, r);
+  }).join('');
+}
+
 function scenarioLabel(t) {
   const seller = t.represents_seller;
   const buyer  = t.represents_buyer;
@@ -155,7 +184,7 @@ function scenarioLabel(t) {
   return 'In-House Listing';
 }
 
-function render({ transaction: t, mls_number, listing_agents, buyer_agents, closing_event, contract_event, customers }) {
+function render({ transaction: t, mls_number, listing_agents, buyer_agents, closing_event, contract_event, customers, referrals }) {
   const badge = scenarioLabel(t);
   const custs = customers || [];
   const sellers = custs.filter(c => c.role === 'seller');
@@ -196,11 +225,7 @@ function render({ transaction: t, mls_number, listing_agents, buyer_agents, clos
 
     ${agentSection("Buyer's Agent", buyer_agents || [])}
 
-    <div class="section-head">Referral (if applicable)</div>
-    <table>
-      <tr><td class="label">Referred By</td><td class="val">&nbsp;</td><td class="label">Referral %</td><td class="val">&nbsp;</td></tr>
-      <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Address</td><td class="val">&nbsp;</td></tr>
-    </table>
+    ${referralSection(referrals || [])}
 
     <div class="section-head">Source</div>
     <table>
