@@ -185,6 +185,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 .btn-amber { background: var(--amber); color: #000; }
 .btn-ghost { background: var(--ink-light); color: var(--text); border: 1px solid var(--ink-border); }
 .btn-sm { padding: 0.25rem 0.65rem; font-size: 0.75rem; }
+.breakdown-btn.active { background: var(--amber); color: #000; border-color: var(--amber); }
 
 /* ── Filters ── */
 .filters {
@@ -378,11 +379,30 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               <th>Recipients</th>
               <th>Sent</th>
               <th>Clicked</th>
+              <th>Click Rate</th>
               <th>Reviewed</th>
               <th>Review Rate</th>
             </tr>
           </thead>
-          <tbody id="funnel-body"><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+          <tbody id="funnel-body"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top:2rem">
+        <h2>Click-Through Rate By…</h2>
+        <div class="filters" style="margin-bottom:0">
+          <button class="btn btn-ghost btn-sm breakdown-btn active" data-breakdown="by-day" onclick="switchBreakdown('by-day')">Day of Week Sent</button>
+          <button class="btn btn-ghost btn-sm breakdown-btn" data-breakdown="by-office" onclick="switchBreakdown('by-office')">Office</button>
+          <button class="btn btn-ghost btn-sm breakdown-btn" data-breakdown="by-agent" onclick="switchBreakdown('by-agent')">Agent</button>
+        </div>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-muted);margin:-.5rem 0 .75rem">
+        Sorted by volume (Sent), not rate — a rate from a handful of sends isn't meaningful, so the busiest rows lead.
+      </p>
+      <div class="tbl-wrap">
+        <table id="breakdown-table">
+          <thead id="breakdown-head"></thead>
+          <tbody id="breakdown-body"><tr><td class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -798,34 +818,110 @@ function switchTab(name) {
 function initApp() {
   loadFunnel();
   _loaded.funnel = true;
+  loadBreakdown("by-day");
 }
 
 // ── Funnel tab ──────────────────────────────────────────────────────────────────
+
+function fmtRate(pct, okThreshold) {
+  const rate = parseFloat(pct) || 0;
+  const cls = okThreshold != null ? (rate >= okThreshold ? "rate-ok" : rate > 0 ? "rate-low" : "") : "";
+  const str = rate > 0 ? `${rate.toFixed(1)}%` : "—";
+  return `<td class="${cls}">${str}</td>`;
+}
 
 async function loadFunnel() {
   const tbody = document.getElementById("funnel-body");
   try {
     const rows = await GET("/review/funnel");
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="6" class="loading">No data yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">No data yet.</td></tr>`;
       return;
     }
-    tbody.innerHTML = rows.map(r => {
-      const rate = parseFloat(r.review_rate_pct) || 0;
-      const rateCls = rate >= 15 ? "rate-ok" : rate > 0 ? "rate-low" : "";
-      const rateStr = rate > 0 ? `${rate.toFixed(1)}%` : "—";
-      return `<tr>
+    tbody.innerHTML = rows.map(r => `<tr>
         <td>${fmtMonth(r.month)}</td>
         <td>${r.recipients}</td>
         <td>${r.sent}</td>
         <td>${r.clicked}</td>
+        ${fmtRate(r.click_rate_pct)}
         <td>${r.reviewed}</td>
-        <td class="${rateCls}">${rateStr}</td>
-      </tr>`;
-    }).join("");
+        ${fmtRate(r.review_rate_pct, 15)}
+      </tr>`).join("");
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
   }
+}
+
+// ── Click-through breakdowns (day of week / office / agent) ─────────────────────
+// Three different shapes sharing one table region: by-day counts individual
+// sends (a recipient's steps can land on different weekdays, and click-
+// through is a per-send question), by-office/by-agent count recipients like
+// the monthly funnel above just grouped differently. Each fetched once and
+// cached — switching between them re-renders from memory, no re-fetch.
+
+const BREAKDOWN_ENDPOINTS = {
+  "by-day":    "/review/funnel/by-day",
+  "by-office": "/review/funnel/by-office",
+  "by-agent":  "/review/funnel/by-agent",
+};
+const _breakdownCache = {};
+let _activeBreakdown = "by-day";
+
+async function switchBreakdown(kind) {
+  _activeBreakdown = kind;
+  document.querySelectorAll(".breakdown-btn").forEach(b => b.classList.toggle("active", b.dataset.breakdown === kind));
+  if (_breakdownCache[kind]) {
+    renderBreakdown(kind, _breakdownCache[kind]);
+  } else {
+    await loadBreakdown(kind);
+  }
+}
+
+async function loadBreakdown(kind) {
+  document.getElementById("breakdown-body").innerHTML = `<tr><td class="loading">Loading…</td></tr>`;
+  try {
+    const rows = await GET(BREAKDOWN_ENDPOINTS[kind]);
+    _breakdownCache[kind] = rows;
+    if (kind === _activeBreakdown) renderBreakdown(kind, rows);
+  } catch (e) {
+    document.getElementById("breakdown-body").innerHTML =
+      `<tr><td style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+  }
+}
+
+const DAY_NAMES = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function renderBreakdown(kind, rows) {
+  const head = document.getElementById("breakdown-head");
+  const body = document.getElementById("breakdown-body");
+
+  if (kind === "by-day") {
+    head.innerHTML = `<tr><th>Day Sent</th><th>Sent</th><th>Clicked</th><th>Click Rate</th></tr>`;
+    if (!rows.length) { body.innerHTML = `<tr><td colspan="4" class="loading">No data yet.</td></tr>`; return; }
+    // Backend already orders 1(Mon)..7(Sun); re-sort defensively in case a
+    // day never had a send and the row is simply missing from the response.
+    const byDay = new Map(rows.map(r => [r.day_num, r]));
+    body.innerHTML = [1,2,3,4,5,6,7].map(n => {
+      const r = byDay.get(n);
+      if (!r) return `<tr><td>${DAY_NAMES[n]}</td><td>0</td><td>0</td><td>—</td></tr>`;
+      return `<tr><td>${DAY_NAMES[n]}</td><td>${r.sent}</td><td>${r.clicked}</td>${fmtRate(r.click_rate_pct)}</tr>`;
+    }).join("");
+    return;
+  }
+
+  const labelKey = kind === "by-office" ? "office_name" : "agent_name";
+  const label = kind === "by-office" ? "Office" : "Agent";
+  head.innerHTML = `<tr><th>${label}</th><th>Recipients</th><th>Sent</th><th>Clicked</th><th>Click Rate</th><th>Reviewed</th><th>Review Rate</th></tr>`;
+  if (!rows.length) { body.innerHTML = `<tr><td colspan="7" class="loading">No data yet.</td></tr>`; return; }
+  body.innerHTML = rows.map(r => `<tr>
+      <td>${esc(r[labelKey])}</td>
+      <td>${r.recipients}</td>
+      <td>${r.sent}</td>
+      <td>${r.clicked}</td>
+      ${fmtRate(r.click_rate_pct)}
+      <td>${r.reviewed}</td>
+      ${fmtRate(r.review_rate_pct, 15)}
+    </tr>`).join("");
 }
 
 // ── Recipients tab ──────────────────────────────────────────────────────────────
