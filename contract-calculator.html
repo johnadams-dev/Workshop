@@ -27,7 +27,10 @@
         // ============================================================
         const PROXY_CONFIG = {
             geminiProxyUrl: 'https://mls-proxy-975684028597.us-east1.run.app/gemini',
-            proxyKey:       '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37',
+            // Only ever populated by a verified /config/init exchange (see the
+            // upload and Form Simplicity sign-in gates below) — never hardcoded,
+            // so this page's public source never carries the live shared secret.
+            proxyKey:       localStorage.getItem('ac_proxy_key') || '',
             geminiModel:    'gemini-2.5-flash',
             // Google Calendar — users authenticate with their own Google account via OAuth
             calendarClientId: '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com',
@@ -312,6 +315,15 @@
 
         <!-- Upload Section -->
         <div class="upload-section" id="uploadSection">
+            <!-- AI PDF extraction costs real Gemini credits per use, unlike Manual
+                 Entry — gated behind sign-in so the shared proxy key can't be run up
+                 by anyone who finds this page, not just staff. -->
+            <div class="form-group" id="uploadAuthGate" style="display:none">
+                <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:24px;text-align:center;">
+                    <p style="margin:0 0 16px;color:#664d03;font-size:14px;line-height:1.5;">Sign in with your Adams Cameron Google account to use AI contract reading.</p>
+                    <div id="uploadGoogleBtnWrap" style="display:flex;justify-content:center;"></div>
+                </div>
+            </div>
             <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">📤</div>
                 <h3>Upload Your Contract</h3>
@@ -529,13 +541,16 @@
                 return;
             }
             localStorage.setItem('ac_user_email', email);
-            localStorage.setItem('ac_proxy_key', data.proxyKey || '');
+            PROXY_CONFIG.proxyKey = data.proxyKey || '';
+            localStorage.setItem('ac_proxy_key', PROXY_CONFIG.proxyKey);
         } catch (e) {
             fsShowAuthGate('Sign-in error: ' + e.message, true);
             return;
         }
         _fsInitDone = false;
         fsInitSection();
+        // If the upload gate was also waiting on a proxy key, let it proceed now.
+        if (PROXY_CONFIG.proxyKey) document.getElementById('uploadAuthGate').style.display = 'none';
     }
 
     function fsShowAuthGate(message, showButton) {
@@ -764,8 +779,52 @@
         if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
     });
 
+    // Shares the same Google client / /config/init exchange as the Form
+    // Simplicity gate above, just targeting the upload section's own gate
+    // div and re-invoking the caller once a real proxy key is in hand.
+    let _uploadGsiReady = false;
+    function ensureUploadSignIn(onSuccess) {
+        if (PROXY_CONFIG.proxyKey) { onSuccess(); return; }
+        document.getElementById('uploadAuthGate').style.display = 'block';
+        if (typeof google === 'undefined' || !google.accounts) { setTimeout(() => ensureUploadSignIn(onSuccess), 200); return; }
+        if (!_uploadGsiReady) {
+            _uploadGsiReady = true;
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: (response) => uploadHandleGoogleSignIn(response, onSuccess),
+            });
+        }
+        google.accounts.id.renderButton(
+            document.getElementById('uploadGoogleBtnWrap'),
+            { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
+        );
+    }
+
+    async function uploadHandleGoogleSignIn(response, onSuccess) {
+        try {
+            const r = await fetch(`${PROXY_BASE}/config/init`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: response.credential }),
+            });
+            const data = await r.json();
+            if (!r.ok) { showNotification(data.error || 'Sign-in failed. Use your @adamscameron.com account.', 'error'); return; }
+            PROXY_CONFIG.proxyKey = data.proxyKey || '';
+            localStorage.setItem('ac_proxy_key', PROXY_CONFIG.proxyKey);
+            try {
+                const email = JSON.parse(atob(response.credential.split('.')[1])).email || '';
+                if (email) localStorage.setItem('ac_user_email', email);
+            } catch {}
+            document.getElementById('uploadAuthGate').style.display = 'none';
+            if (onSuccess) onSuccess();
+        } catch (e) {
+            showNotification('Sign-in error: ' + e.message, 'error');
+        }
+    }
+
     async function handleFileUpload(file) {
         if (!file.type.includes('pdf')) { showNotification('Please upload a PDF file.', 'error'); return; }
+        if (!PROXY_CONFIG.proxyKey) { ensureUploadSignIn(() => handleFileUpload(file)); return; }
 
         document.getElementById('fileName').textContent = file.name;
         document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';

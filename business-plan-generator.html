@@ -204,6 +204,7 @@
     <div><div class="brand-name">Adams, Cameron & Co.</div><div class="brand-sub">Business Plan Generator</div></div>
   </div>
   <div class="hdr-right">
+    <div id="g-signin-btn"></div>
     <a href="./pathfinder.html" class="btn-icon">← Pathfinder</a>
   </div>
 </header>
@@ -465,9 +466,9 @@
 /* ── CONSTANTS ──────────────────────────────────────────────────── */
 const ADMIN_PW_DEFAULT = 'ac2025admin';
 // FIX 1: Updated to current Cloud Run service URL
-const PROXY_BASE   = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 const CONFIG_URL   = PROXY_BASE + '/config/public';
 
 /* ── STATE ──────────────────────────────────────────────────────── */
@@ -544,17 +545,39 @@ function initOAuth() {
   try {
     google.accounts.id.initialize({
       client_id: OAUTH_CLIENT,
+      // Goes through /config/init (validates the ID token server-side and
+      // checks the @adamscameron.com domain) rather than just decoding the
+      // JWT locally, so the proxy key is only ever handed to a verified
+      // account instead of being hardcoded in this page's source for
+      // anyone to read.
       callback: async (cr) => {
+        try {
+          const r = await fetch(`${PROXY_BASE}/config/init`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ idToken: cr.credential }),
+          });
+          const data = await r.json();
+          if (r.ok) {
+            PROXY_KEY = data.proxyKey || '';
+            if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+          }
+        } catch (e) {}
         const p = JSON.parse(atob(cr.credential.split('.')[1]));
         if (p.email) {
           saveSession(p.email, p.given_name || p.name, p.picture);
           await loadAgentProfile(p.email);
         }
+        const btn = document.getElementById('g-signin-btn');
+        if (btn && PROXY_KEY) btn.style.display = 'none';
       }
     });
+    google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
+
     // Check localStorage session before prompting Google
     const saved = loadSession();
-    if (saved) {
+    if (saved && PROXY_KEY) {
+      document.getElementById('g-signin-btn').style.display = 'none';
       loadAgentProfile(saved.email);
     } else {
       google.accounts.id.prompt();

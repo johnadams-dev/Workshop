@@ -263,9 +263,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
+let PROXY_KEY  = localStorage.getItem('ac_proxy_key')  || '';
 let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
 let isStaff = false;
 let agents  = [];
@@ -591,14 +591,27 @@ async function init() {
 }
 
 // ── Google Sign-In ────────────────────────────────────────────────────────────
-function handleCredential(cred) {
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
+async function handleCredential(cred) {
   try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     USER_EMAIL = payload.email || '';
+    PROXY_KEY  = data.proxyKey || '';
     if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-  } catch(_) {}
+    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
+  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
   document.getElementById('auth-gate').classList.remove('show');
-  if (USER_EMAIL) init(); else toast('Sign-in failed', 'err');
+  if (USER_EMAIL && PROXY_KEY) init(); else toast('Sign-in failed', 'err');
 }
 
 function initGoogleSignIn() {
@@ -613,7 +626,7 @@ function initGoogleSignIn() {
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-if (USER_EMAIL) {
+if (USER_EMAIL && PROXY_KEY) {
   document.getElementById('auth-gate').classList.remove('show');
   init();
 } else if (window.google?.accounts?.id) {

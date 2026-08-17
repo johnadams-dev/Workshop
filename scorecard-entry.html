@@ -247,8 +247,8 @@
 
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
 let S = { email: null, name: null, accessToken: null, history: {}, metrics: [] };
 
@@ -273,7 +273,7 @@ function initPeriod() {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function initAuth() {
   const cachedEmail = localStorage.getItem('ac_user_email');
-  if (cachedEmail) {
+  if (cachedEmail && PROXY_KEY) {
     S.email = cachedEmail;
     S.name  = cachedEmail.split('@')[0];
     document.getElementById('userName').textContent  = S.name;
@@ -295,16 +295,35 @@ function initAuth() {
   });
 }
 
-function onCredential(cr) {
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
+async function onCredential(cr) {
   const p = JSON.parse(atob(cr.credential.split('.')[1]));
-  if (!p.email.endsWith('@adamscameron.com')) {
+  let data;
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cr.credential }),
+    });
+    data = await r.json();
+    if (!r.ok) {
+      setState('signInState');
+      toast(data.error || 'Access restricted to Adams Cameron accounts.', 'err');
+      return;
+    }
+  } catch (e) {
     setState('signInState');
-    toast('Access restricted to Adams Cameron accounts.', 'err');
+    toast('Sign-in error: ' + e.message, 'err');
     return;
   }
-  S.email = p.email;
-  S.name  = p.name || p.given_name || p.email.split('@')[0];
+  S.email   = p.email;
+  S.name    = p.name || p.given_name || p.email.split('@')[0];
+  PROXY_KEY = data.proxyKey || '';
   localStorage.setItem('ac_user_email', S.email);
+  if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
   document.getElementById('userName').textContent  = S.name;
   document.getElementById('userEmail').textContent = S.email;
   document.getElementById('userBadge').style.display = 'block';

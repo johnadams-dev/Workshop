@@ -796,9 +796,9 @@
 
 <script>
 const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const KEY     = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const GCLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
+let KEY    = localStorage.getItem('ac_proxy_key') || '';
 let _email = localStorage.getItem('ac_user_email') || '';
 let _access = null;  // floorAccess object from /api/floor/my-access
 let _offices = [];
@@ -831,7 +831,7 @@ async function api(method, path, body) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
-if (_email) {
+if (_email && KEY) {
   document.getElementById('auth-gate').style.display = 'none'; // skip the gate seamlessly
   initApp();
 } else {
@@ -857,11 +857,24 @@ function initGoogleSignIn() {
   document.getElementById('auth-status').textContent = 'Sign in with your @adamscameron.com account.';
 }
 
-function handleCredential(cred) {
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
+async function handleCredential(cred) {
   try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { document.getElementById('auth-status').textContent = data.error || 'Sign-in failed'; return; }
     const payload = JSON.parse(atob(cred.credential.split('.')[1]));
     _email = payload.email || '';
+    KEY    = data.proxyKey || '';
     if (_email) localStorage.setItem('ac_user_email', _email);
+    if (KEY)    localStorage.setItem('ac_proxy_key', KEY);
     initApp();
   } catch(e) {
     document.getElementById('auth-status').textContent = 'Sign-in error: ' + e.message;

@@ -212,8 +212,9 @@
 </div>
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
+// No proxy key here on purpose — this page has no sign-in gate (public quiz),
+// and GET /bio/quiz-agents is a public route for the same reason.
 const PROXY_URL  = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY  = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const MIN_PHOTO_PX = 50;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -252,9 +253,7 @@ function shuffleArray(arr) {
 
 // ─── Roster Fetch ─────────────────────────────────────────────────────────────
 async function fetchAllAgents() {
-    const res = await fetch(`${PROXY_URL}/bio/quiz-agents`, {
-        headers: { 'x-proxy-key': PROXY_KEY }
-    });
+    const res = await fetch(`${PROXY_URL}/bio/quiz-agents`);
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `Server returned ${res.status}`);

@@ -514,9 +514,9 @@
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY_BASE = sessionStorage.getItem('mls_proxy_url')    || 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
-const PROXY_KEY  = sessionStorage.getItem('mls_proxy_secret') || '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
+const PROXY_BASE = 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
 /* ─────────────────────── SESSION ────────────────────── */
 const AC_SESSION_KEY = 'ac_pathfinder_session';
@@ -549,14 +549,13 @@ const S = {
   timeSink:     '',
   submitting:   false,
   scorecard:    null,
-  tokenClient:  null,
 };
 
 /* ─────────────────────── INIT ───────────────────────── */
 window.addEventListener('load', () => {
   setWeekLabel();
   const saved = loadSession();
-  if (saved) { S.email = saved.email; loadAgent(); return; }
+  if (saved && PROXY_KEY) { S.email = saved.email; loadAgent(); return; }
   const poll = setInterval(() => {
     if (!window.google?.accounts) return;
     clearInterval(poll);
@@ -574,36 +573,48 @@ function setWeekLabel() {
   document.getElementById('weekLabel').textContent = `Week of ${fmt(start)}`;
 }
 
+// Previously had two sign-in paths: this ID-token flow (One Tap) and a
+// separate OAuth access-token flow (tokenClient, wired to the "Sign in with
+// Google" / "Try Again" buttons) that fetched identity from Google's
+// userinfo endpoint directly and never went through /config/init — so the
+// manual sign-in buttons never validated the @adamscameron.com domain
+// server-side or obtained a real proxy key; PROXY_KEY was just hardcoded
+// instead. Collapsed onto the single ID-token flow (also used by every
+// other tool page) so there's one path that always goes through
+// /config/init.
 function initAuth() {
-  S.tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: OAUTH_CLIENT,
-    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-    callback: async (res) => {
-      if (res.error) { showAuthError(); return; }
-      try {
-        const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${res.access_token}` }
-        });
-        const info = await res.ok ? r.json() : null;
-        if (info?.email) { S.email = info.email; saveSession(info.email, info.name, info.picture); await loadAgent(); }
-        else showAuthError();
-      } catch(e) { showAuthError(); }
-    }
-  });
-
-  // Try One Tap first
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
-    callback: async (cred) => {
-      try {
-        const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-        if (payload.email) { S.email = payload.email; saveSession(payload.email, payload.name || '', payload.picture || ''); await loadAgent(); }
-      } catch(e) { showSignIn(); }
-    }
+    callback: handleCredential,
   });
   google.accounts.id.prompt((notification) => {
     if (notification.isNotDisplayed() || notification.isSkippedMoment()) showSignIn();
   });
+}
+
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
+async function handleCredential(cred) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { showAuthError(); return; }
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    if (payload.email) { S.email = payload.email; saveSession(payload.email, payload.name || '', payload.picture || ''); await loadAgent(); }
+    else showAuthError();
+  } catch(e) { showAuthError(); }
+}
+
+function renderGoogleButton() {
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
 }
 
 function showSignIn() {
@@ -612,11 +623,9 @@ function showSignIn() {
       <div class="auth-icon">📋</div>
       <div class="auth-title">Weekly Check-in</div>
       <div class="auth-sub">Sign in with your Adams, Cameron &amp; Co. Google account to begin your check-in.</div>
-      <button class="btn-google" onclick="S.tokenClient.requestAccessToken()">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-        Sign in with Google
-      </button>
+      <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
     </div>`, false);
+  renderGoogleButton();
 }
 
 function showAuthError() {
@@ -625,8 +634,9 @@ function showAuthError() {
       <div class="auth-icon">⚠️</div>
       <div class="auth-title">Access Restricted</div>
       <div class="auth-sub">Please use your @adamscameron.com Google account to check in.</div>
-      <button class="btn-google" onclick="S.tokenClient.requestAccessToken()">Try Again</button>
+      <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
     </div>`, false);
+  renderGoogleButton();
 }
 
 /* ─────────────────────── LOAD AGENT ─────────────────── */

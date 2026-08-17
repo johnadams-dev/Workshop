@@ -442,10 +442,7 @@
   <p class="hero-sub">Build your plan, track your progress, and stay connected with your coach — all in one place.</p>
 
   <div id="preAuth">
-    <button class="signin-btn" onclick="startSignIn()">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-      Sign in with Google
-    </button>
+    <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
     <p class="signin-note">Use your @adamscameron.com account</p>
   </div>
 </div>
@@ -573,8 +570,8 @@
 
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
 const S = {
   user:        null,   // { email, name, picture }
@@ -620,36 +617,30 @@ function loadSession() {
   } catch(_) { return null; }
 }
 // ── Google Auth ────────────────────────────────────────────────────────────────
-let tokenClient;
+// Previously had two sign-in paths: this ID-token flow (handleCredential,
+// used for One Tap / auto_select), and a separate OAuth access-token flow
+// (tokenClient, wired to the explicit "Sign in with Google" button) that
+// fetched identity from Google's userinfo endpoint directly and never went
+// through /config/init at all — so the manual sign-in button never actually
+// validated the @adamscameron.com domain server-side or obtained a real
+// proxy key; PROXY_KEY was just hardcoded instead. Collapsed onto the single
+// ID-token flow (also used by every other tool page) so there's one path
+// that always goes through /config/init.
 const poll = setInterval(() => {
-  if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
+  if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
 }, 100);
 
 function initOAuth() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: OAUTH_CLIENT,
-    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-    callback: async (resp) => {
-      if (resp.error) { console.error(resp); return; }
-      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${resp.access_token}` }
-      });
-      const user = await userRes.json();
-      S.user = { email: user.email, name: user.given_name || user.name, picture: user.picture };
-      saveSession(S.user.email, S.user.name, S.user.picture);
-      onSignedIn();
-    }
-  });
-
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
     callback: handleCredential,
     auto_select: true,
   });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
 
   // Check localStorage session before prompting Google
   const saved = loadSession();
-  if (saved) {
+  if (saved && PROXY_KEY) {
     S.user = { email: saved.email, name: saved.name, picture: saved.picture };
     onSignedIn();
   } else {
@@ -657,15 +648,28 @@ function initOAuth() {
   }
 }
 
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read. Also fixes a
+// pre-existing bug: this used to call an undefined saveCredential(), which
+// threw on every sign-in that went through this path.
 async function handleCredential(response) {
-  saveCredential(response.credential);
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account."); return; }
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+  } catch (e) { alert('Authentication error: ' + e.message); return; }
   const payload = JSON.parse(atob(response.credential.split('.')[1]));
   S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
+  saveSession(S.user.email, S.user.name, S.user.picture);
   onSignedIn();
-}
-
-function startSignIn() {
-  if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
 }
 
 function signOut() {

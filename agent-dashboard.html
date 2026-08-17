@@ -742,7 +742,7 @@
 <div class="state" id="signInState">
   <h2>Sign in to continue</h2>
   <p>Use your @adamscameron.com Google account to view your coaching dashboard.</p>
-  <button class="btn-primary" onclick="startSignIn()">Sign in with Google</button>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
 </div>
 
 <!-- NOT ENROLLED -->
@@ -977,15 +977,22 @@
 
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
 let agentId = null;
 
 // ── Google Auth ────────────────────────────────────────────────────────────────
-let tokenClient;
+// Previously had two sign-in paths: an ID-token flow (auto_select/One Tap)
+// and a separate OAuth access-token flow (tokenClient, wired to the explicit
+// "Sign in with Google" button) that fetched identity from Google's userinfo
+// endpoint directly and never went through /config/init — so the manual
+// sign-in button never validated the @adamscameron.com domain server-side or
+// obtained a real proxy key; PROXY_KEY was just hardcoded instead. Collapsed
+// onto the single ID-token flow (also used by every other tool page) so
+// there's one path that always goes through /config/init.
 const poll = setInterval(() => {
-  if (window.google?.accounts?.oauth2) { clearInterval(poll); initOAuth(); }
+  if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
 }, 100);
 
 /* ── SHARED SESSION AUTH ────────────────────────────────────────────
@@ -1021,32 +1028,26 @@ function loadSession() {
   } catch(_) { return null; }
 }
 
-function initOAuth() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: OAUTH_CLIENT,
-    scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-    callback: async (resp) => {
-      if (resp.error) return;
-      const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${resp.access_token}` }
-      });
-      const user = await r.json();
-      onSignedIn(user.email, user.given_name || user.name, user.picture);
-    }
-  });
+// Renders lazily rather than up front — google.accounts.id.renderButton()
+// into a display:none container (signInState starts hidden) is unreliable,
+// so it's only called right when the sign-in screen is about to be shown.
+let _signinBtnRendered = false;
+function renderSigninButton() {
+  if (_signinBtnRendered) return;
+  _signinBtnRendered = true;
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
+}
 
+function initOAuth() {
   google.accounts.id.initialize({
     client_id: OAUTH_CLIENT,
-    callback: (resp) => {
-      const p = JSON.parse(atob(resp.credential.split('.')[1]));
-      saveSession(p.email, p.given_name || p.name, p.picture);
-      onSignedIn(p.email, p.given_name || p.name, p.picture);
-    },
+    callback: handleCredential,
     auto_select: true,
   });
+
   // Check localStorage session before showing Google prompt
   const saved = loadSession();
-  if (saved) {
+  if (saved && PROXY_KEY) {
     onSignedIn(saved.email, saved.name, null);
   } else {
     google.accounts.id.prompt();
@@ -1055,13 +1056,31 @@ function initOAuth() {
   // Give auto-select 1.5s, then show sign-in prompt if not signed in
   setTimeout(() => {
     if (document.getElementById('loadingState').classList.contains('active')) {
+      renderSigninButton();
       setState('signInState');
     }
   }, 1500);
 }
 
-function startSignIn() {
-  if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
+async function handleCredential(resp) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: resp.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { renderSigninButton(); setState('signInState'); return; }
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+  } catch (e) { renderSigninButton(); setState('signInState'); return; }
+  const p = JSON.parse(atob(resp.credential.split('.')[1]));
+  saveSession(p.email, p.given_name || p.name, p.picture);
+  onSignedIn(p.email, p.given_name || p.name, p.picture);
 }
 
 function signOut() {

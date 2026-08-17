@@ -1339,7 +1339,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="report-card-body">
           <div class="hotsheet-row">
             <div class="hotsheet-desc">Opens the live DeltaNet hotsheet report in a new tab. Shows recent MLS activity across all offices.</div>
-            <a href="https://mls-proxy-975684028597.us-east1.run.app/hotsheet/report?key=530354c4e71b7319e7177b20c28de391d83f15b9638fdd37" target="_blank" class="btn btn-primary">Open Hotsheet →</a>
+            <button type="button" class="btn btn-primary" onclick="openHotsheetReport()">Open Hotsheet →</button>
           </div>
         </div>
       </div>
@@ -2326,6 +2326,13 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 let userEmail   = localStorage.getItem('ac_user_email')   || "";
 let userDisplay = localStorage.getItem('dd_user_display') || userEmail;
 let proxyKey    = localStorage.getItem('ac_proxy_key')  || "";
+
+// Hotsheet report link used to be a static <a href> with the shared proxy
+// key baked into the query string in this page's public source — built
+// dynamically now so the key only ever comes from the signed-in session.
+function openHotsheetReport() {
+  window.open(`${PROXY}/hotsheet/report?key=${encodeURIComponent(proxyKey)}`, '_blank');
+}
 
 let STATE = {
   listings:          [],

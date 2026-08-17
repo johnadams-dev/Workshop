@@ -579,8 +579,8 @@
 <script>
 /* ── CONSTANTS ─────────────────────────────────────────── */
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const PROXY_KEY    = '530354c4e71b7319e7177b20c28de391d83f15b9638fdd37';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
 /* ── STATE ─────────────────────────────────────────────── */
 let userEmail = null;
@@ -653,8 +653,22 @@ async function completeSignIn(email, name, picture) {
   loadConfig();
 }
 
+// Goes through /config/init (validates the ID token server-side and checks
+// the @adamscameron.com domain) rather than just decoding the JWT locally,
+// so the proxy key is only ever handed to a verified account instead of
+// being hardcoded in this page's source for anyone to read.
 async function handleGoogleCredential(response) {
   try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { showSigninError(data.error || 'Sign-in failed.'); return; }
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+
     const payload = JSON.parse(atob(response.credential.split('.')[1]));
     if (!payload.email) throw new Error('No email in credential');
     saveSession(payload.email, payload.name, payload.picture);
@@ -672,7 +686,7 @@ function showSigninError(msg) {
 /* ── AUTO SIGN-IN FROM SESSION ─────────────────────────── */
 window.addEventListener('load', () => {
   const saved = loadSession();
-  if (saved) {
+  if (saved && PROXY_KEY) {
     completeSignIn(saved.email, saved.name, saved.picture, null).catch(e => {
       console.warn('Session restore failed:', e.message);
       clearSession();

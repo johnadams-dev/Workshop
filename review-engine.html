@@ -414,9 +414,17 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
       </div>
       <div class="filters">
         <input type="text" id="filter-agent" placeholder="Filter by agent name" oninput="loadRecipients()">
+        <input type="text" id="filter-customer" placeholder="Filter by recipient name" oninput="loadRecipients()">
         <input type="month" id="filter-month" onchange="loadRecipients()">
         <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openUnattributedModal()">+ Log Unmatched Review</button>
+      </div>
+      <div class="filters" style="margin-bottom:0.75rem">
+        <button class="btn btn-ghost btn-sm" id="scan-bounces-btn" onclick="scanBounces()">🔍 Scan for Bounces</button>
+        <label style="display:flex;align-items:center;gap:.35rem;font-size:.8rem;color:var(--text-muted)">
+          <input type="checkbox" id="bounce-dry-run" checked> Dry run (preview only — nothing recorded or cancelled)
+        </label>
+        <span id="bounce-scan-status" style="font-size:.8rem;color:var(--text-muted)"></span>
       </div>
       <div class="tbl-wrap">
         <table>
@@ -979,11 +987,13 @@ async function loadRecipients() {
   const tbody = document.getElementById("recipients-body");
   tbody.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
   try {
-    const agent = document.getElementById("filter-agent").value.trim();
-    const month = document.getElementById("filter-month").value;
+    const agent    = document.getElementById("filter-agent").value.trim();
+    const customer = document.getElementById("filter-customer").value.trim();
+    const month    = document.getElementById("filter-month").value;
     let qs = "?limit=100";
-    if (agent) qs += `&agent=${encodeURIComponent(agent)}`;
-    if (month) qs += `&month=${encodeURIComponent(month + "-01")}`;
+    if (agent)    qs += `&agent=${encodeURIComponent(agent)}`;
+    if (customer) qs += `&customer=${encodeURIComponent(customer)}`;
+    if (month)    qs += `&month=${encodeURIComponent(month + "-01")}`;
     _recipientsRows = await GET(`/review/recipients${qs}`);
     renderRecipients();
   } catch (e) {
@@ -1061,8 +1071,39 @@ function updateSortHeaders() {
   });
 }
 
+// scanForEmailBounces() (server-side) was never wired into any cron or UI —
+// the only way to run it was a raw POST to /review/engine/scan-bounces, so
+// bounces sitting in the inbox never made it into review_bounces. Defaults
+// to dryRun per the server-side comment's own caution: verify the parsing
+// looks right against this mailbox's real NDR format before trusting it to
+// auto-cancel anything.
+async function scanBounces() {
+  const btn    = document.getElementById("scan-bounces-btn");
+  const status = document.getElementById("bounce-scan-status");
+  const dryRun = document.getElementById("bounce-dry-run").checked;
+  btn.disabled = true;
+  status.textContent = "Scanning…";
+  try {
+    const r = await POST("/review/engine/scan-bounces", { dryRun });
+    const n = r.newBounces?.length || 0;
+    if (dryRun) {
+      status.textContent = n
+        ? `Found ${n} new bounce(s), nothing saved (dry run): ${r.newBounces.map(b => b.email).join(", ")}`
+        : `Scanned ${r.scanned} message(s) — no new bounces found.`;
+    } else {
+      status.textContent = `Recorded ${n} new bounce(s); cancelled ${r.suppressed} pending request(s).`;
+      loadRecipients();
+    }
+  } catch (e) {
+    status.textContent = "Scan failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function clearFilters() {
   document.getElementById("filter-agent").value = "";
+  document.getElementById("filter-customer").value = "";
   document.getElementById("filter-month").value = "";
   loadRecipients();
 }
