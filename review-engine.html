@@ -1218,12 +1218,20 @@ async function loadCampaigns() {
     // load it once (via the same cache the Settings tab uses) regardless of
     // which tab the user opens first.
     if (!_loaded.settings) { await loadSettings(); _loaded.settings = true; }
-    const [campaigns, tests] = await Promise.all([
-      GET("/review/campaigns"),
-      GET("/review/ab-tests"),
-    ]);
+
+    // Fetched separately, not Promise.all'd together: ab-tests failing (a
+    // 404 mid-deploy did exactly this once already) shouldn't blank out the
+    // whole tab when campaigns itself loaded fine — worst case on a real
+    // failure here is the step-level test badges/buttons don't show.
+    const campaigns = await GET("/review/campaigns");
     _activeTestsByStep = {};
-    for (const t of tests) if (t.is_active) _activeTestsByStep[t.step_id] = t;
+    try {
+      const tests = await GET("/review/ab-tests");
+      for (const t of tests) if (t.is_active) _activeTestsByStep[t.step_id] = t;
+    } catch (e) {
+      console.error("Failed to load A/B test status:", e.message);
+    }
+
     if (!campaigns.length) {
       container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet.</p>`;
       return;
