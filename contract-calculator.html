@@ -459,6 +459,7 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <input id="shareUrl" readonly style="flex:1;padding:10px 12px;border:1px solid #c0c9e0;border-radius:8px;font-size:13px;background:#fff;color:#2c3e50;">
                     <button onclick="copyShareUrl()" style="padding:10px 16px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">Copy Link</button>
+                    <button onclick="previewShareUrl()" style="padding:10px 16px;background:#fff;color:#1e3a5f;border:1px solid #1e3a5f;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;">Preview ↗</button>
                 </div>
             </div>
         </div>
@@ -1451,6 +1452,12 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     function copyShareUrl() {
         const url = document.getElementById('shareUrl').value;
         navigator.clipboard.writeText(url).then(() => showNotification('Link copied!', 'success'));
+    }
+
+    function previewShareUrl() {
+        const url = document.getElementById('shareUrl').value;
+        if (!url) return;
+        window.open(url, '_blank', 'noopener');
     }
 
     async function createCalendarEvents() {
