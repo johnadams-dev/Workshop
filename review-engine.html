@@ -459,7 +459,28 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 
     <!-- ── A/B tab ── -->
     <div id="tab-variants" class="tab-panel">
-      <div class="section-header"><h2>A/B Variant Performance</h2></div>
+      <div class="section-header">
+        <h2>Tests</h2>
+        <span style="font-size:.75rem;color:var(--text-muted)">Starting one is done per-step, from its "Start A/B Test" button on the Campaigns tab</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Test</th>
+              <th>Step</th>
+              <th>Started</th>
+              <th>Ends</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ab-tests-body"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top:2rem"><h2>A/B Variant Performance</h2></div>
       <div class="tbl-wrap">
         <table>
           <thead>
@@ -605,6 +626,26 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 
   </div><!-- /content -->
 </div><!-- /app -->
+
+<!-- Start A/B test modal -->
+<div id="abtest-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Start A/B Test</h3>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-top:-.25rem">
+      Splits new recipients on this step evenly across its active variants from this point forward. Already-scheduled sends aren't affected — this only applies to recipients created after the test starts.
+    </p>
+    <label>Test name</label>
+    <input type="text" id="abtest-name" placeholder="e.g. Subject line: urgency vs. gratitude">
+    <label>End date (optional)</label>
+    <input type="date" id="abtest-ends">
+    <label>Notes (optional)</label>
+    <textarea id="abtest-notes" placeholder="What's being tested and why"></textarea>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="closeAbTestModal()">Cancel</button>
+      <button class="btn btn-amber btn-sm" onclick="submitAbTest()">Start Test</button>
+    </div>
+  </div>
+</div>
 
 <!-- Confirm-reviewed modal -->
 <div id="confirm-modal" class="modal-overlay">
@@ -797,7 +838,7 @@ function fmtMonth(d) {
 const TAB_LOADERS = {
   funnel:     loadFunnel,
   recipients: loadRecipientsTab,
-  variants:   loadVariants,
+  variants:   loadVariantsTab,
   campaigns:  loadCampaigns,
   settings:   loadSettings,
 };
@@ -1093,6 +1134,51 @@ async function submitUnattributed() {
 
 // ── Variants tab ────────────────────────────────────────────────────────────────
 
+async function loadVariantsTab() {
+  await Promise.all([loadAbTestsList(), loadVariants()]);
+}
+
+async function loadAbTestsList() {
+  const tbody = document.getElementById("ab-tests-body");
+  try {
+    const rows = await GET("/review/ab-tests");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">No tests started yet — use "Start A/B Test" on a step in the Campaigns tab.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const statusBadge = r.is_active
+        ? `<span class="badge badge-green">Running</span>`
+        : `<span class="badge badge-dim">Ended</span>`;
+      const endBtn = r.is_active
+        ? `<button class="btn btn-ghost btn-sm" onclick="endAbTest('${esc(r.test_id)}')">End Test</button>`
+        : "";
+      return `<tr>
+        <td>${statusBadge}</td>
+        <td>${esc(r.name)}</td>
+        <td>Step ${r.step_order} <span style="color:var(--text-muted);font-size:.78rem">(Day ${r.send_offset_days})</span></td>
+        <td>${fmtDate(r.starts_at)}</td>
+        <td>${r.ends_at ? fmtDate(r.ends_at) : "—"}</td>
+        <td style="color:var(--text-muted);font-size:.78rem">${esc(r.notes || "—")}</td>
+        <td>${endBtn}</td>
+      </tr>`;
+    }).join("");
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:.75rem">${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function endAbTest(testId) {
+  if (!confirm("End this test now? Recipients created after this point will go back to using the step's first active variant instead of being split.")) return;
+  try {
+    await POST(`/review/ab-tests/${testId}/end`, {});
+    loadAbTestsList();
+    _loaded.campaigns = false; // step badges show active-test status too — force a refresh next visit
+  } catch (e) {
+    alert("Failed: " + e.message);
+  }
+}
+
 async function loadVariants() {
   const tbody = document.getElementById("variants-body");
   try {
@@ -1123,6 +1209,8 @@ async function loadVariants() {
 
 // ── Campaigns tab ───────────────────────────────────────────────────────────────
 
+let _activeTestsByStep = {}; // step_id -> ab_tests row, refreshed each time this tab loads
+
 async function loadCampaigns() {
   const container = document.getElementById("campaigns-body");
   try {
@@ -1130,7 +1218,12 @@ async function loadCampaigns() {
     // load it once (via the same cache the Settings tab uses) regardless of
     // which tab the user opens first.
     if (!_loaded.settings) { await loadSettings(); _loaded.settings = true; }
-    const campaigns = await GET("/review/campaigns");
+    const [campaigns, tests] = await Promise.all([
+      GET("/review/campaigns"),
+      GET("/review/ab-tests"),
+    ]);
+    _activeTestsByStep = {};
+    for (const t of tests) if (t.is_active) _activeTestsByStep[t.step_id] = t;
     if (!campaigns.length) {
       container.innerHTML = `<p style="color:var(--text-muted);font-size:.85rem">No campaigns yet.</p>`;
       return;
@@ -1160,6 +1253,13 @@ function renderStep(s) {
   const variantNote = templates.length > 1
     ? ` • <span style="color:var(--blue)">${templates.length} variants (A/B)</span>`
     : "";
+  const activeTest = _activeTestsByStep[s.step_id];
+  const testControl = activeTest
+    ? `<span class="badge badge-green" style="margin-left:.6rem">🧪 Testing: ${esc(activeTest.name)}</span>
+       <button class="btn btn-ghost btn-sm" style="margin-left:.4rem" onclick="endAbTest('${esc(activeTest.test_id)}')">End Test</button>`
+    : (templates.length > 1
+        ? `<button class="btn btn-ghost btn-sm" style="margin-left:.6rem" onclick="openAbTestModal('${esc(s.step_id)}')">Start A/B Test</button>`
+        : "");
   return `<div class="step-card">
     <div class="step-header">
       <span class="step-number">${s.step_order}</span>
@@ -1167,6 +1267,7 @@ function renderStep(s) {
       <span class="step-label">— sent Day ${s.send_offset_days} after closing • ${s.channel.toUpperCase()}
         ${s.skip_if_reviewed ? ' • <span style="color:var(--green)">skips if already reviewed</span>' : ''}${variantNote}
       </span>
+      ${testControl}
     </div>
     ${templates.map(t => renderTemplateEditor(t)).join("")}
     <button class="btn btn-ghost btn-sm" onclick="addVariant('${esc(s.step_id)}')">+ New Variant</button>
@@ -1244,6 +1345,42 @@ async function addVariant(stepId) {
     loadCampaigns();
   } catch (e) {
     alert("Couldn't create variant: " + e.message);
+  }
+}
+
+// ── Start A/B test modal ─────────────────────────────────────────────────────
+let _pendingAbTestStepId = null;
+
+function openAbTestModal(stepId) {
+  _pendingAbTestStepId = stepId;
+  document.getElementById("abtest-name").value = "";
+  document.getElementById("abtest-ends").value = "";
+  document.getElementById("abtest-notes").value = "";
+  document.getElementById("abtest-modal").classList.add("open");
+}
+
+function closeAbTestModal() {
+  _pendingAbTestStepId = null;
+  document.getElementById("abtest-modal").classList.remove("open");
+}
+
+async function submitAbTest() {
+  const name  = document.getElementById("abtest-name").value.trim();
+  const ends  = document.getElementById("abtest-ends").value;
+  const notes = document.getElementById("abtest-notes").value.trim();
+  if (!name) { alert("Test name is required."); return; }
+  try {
+    await POST("/review/ab-tests", {
+      step_id: _pendingAbTestStepId,
+      name,
+      ends_at: ends || null,
+      notes: notes || null,
+    });
+    closeAbTestModal();
+    _loaded.campaigns = false;
+    loadCampaigns();
+  } catch (e) {
+    alert("Couldn't start test: " + e.message);
   }
 }
 
