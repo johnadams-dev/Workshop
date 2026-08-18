@@ -104,6 +104,39 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── MANAGER "VIEW AS" BAR ── */
+    #managerBar {
+      background: var(--ink); padding: .6rem 2rem; display: none;
+    }
+    .manager-bar-inner {
+      max-width: 1100px; margin: 0 auto; display: flex; align-items: center;
+      gap: .9rem; flex-wrap: wrap; position: relative;
+    }
+    .manager-bar-label { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+    .manager-bar-label strong { color: var(--gold-light); font-weight: 600; }
+    #agentSearchWrap { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
+    #agentSearchInput {
+      width: 100%; font-family: 'Outfit', sans-serif; font-size: .82rem;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+      color: var(--cream); border-radius: 8px; padding: .4rem .7rem;
+    }
+    #agentSearchInput::placeholder { color: var(--muted); }
+    #agentSearchResults {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: white; border-radius: 8px; box-shadow: var(--shadow-lg);
+      max-height: 280px; overflow-y: auto; z-index: 50;
+    }
+    .agent-result {
+      padding: .55rem .9rem; font-size: .82rem; cursor: pointer; color: var(--ink-soft);
+      display: flex; justify-content: space-between; gap: .5rem;
+    }
+    .agent-result:hover { background: var(--cream-dark); }
+    .agent-result .office { color: var(--muted); font-size: .75rem; }
+    #backToMyHub {
+      font-size: .74rem; color: var(--gold-light); text-decoration: underline; cursor: pointer;
+      white-space: nowrap; display: none;
+    }
+
     /* ── MAIN LAYOUT ── */
     #mainContent { max-width: 1100px; margin: 0 auto; padding: 0 2rem 4rem; display: none; }
     .section { padding: 2rem 0; }
@@ -195,6 +228,21 @@
   </div>
 </header>
 
+<!-- Manager/admin only — shown after the role check in onSignedIn() resolves.
+     Lets a manager view another agent's hub; the actual data fetch is
+     server-side gated regardless (GET /agent-hub/:agentId 403s a plain
+     agent targeting anyone but themselves), this is just the UI for it. -->
+<div id="managerBar">
+  <div class="manager-bar-inner">
+    <span class="manager-bar-label">Viewing: <strong id="viewingLabel">your own hub</strong></span>
+    <div id="agentSearchWrap">
+      <input id="agentSearchInput" type="text" placeholder="View as another agent…" autocomplete="off" oninput="onAgentSearchInput()" onfocus="onAgentSearchInput()">
+      <div id="agentSearchResults"></div>
+    </div>
+    <span id="backToMyHub" onclick="viewMyOwnHub()">← Back to my own hub</span>
+  </div>
+</div>
+
 <div class="hero">
   <p class="hero-eyebrow">Your Situation, At a Glance</p>
   <h1>Everything about you,<br><em style="font-style:italic">in one place.</em></h1>
@@ -247,7 +295,13 @@ const INTRANET_LINKS = [
   { title: 'ACCAgents Intranet', url: 'https://sites.google.com/adamscameron.com/agent-portal-v2', icon: '🏠', external: true },
 ];
 
-const S = { user: null, agentId: null };
+const S = {
+  user: null,
+  isManager: false,
+  ownAgentId: null,    // the signed-in caller's own agent record, if any
+  viewedAgentId: null, // whichever agent's hub is currently displayed
+  allAgents: null,     // roster, lazily loaded for managers' "View as" search
+};
 
 /* ── SHARED SESSION AUTH ────────────────────────────────────────────
    Same ac_pathfinder_session convention as pathfinder.html/
@@ -318,7 +372,12 @@ function signOut() {
   google.accounts.id.disableAutoSelect();
   clearSession();
   S.user = null;
+  S.isManager = false;
+  S.ownAgentId = null;
+  S.viewedAgentId = null;
+  S.allAgents = null;
   document.getElementById('userChip').style.display = 'none';
+  document.getElementById('managerBar').style.display = 'none';
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('preAuth').style.opacity = '1';
@@ -335,26 +394,118 @@ async function onSignedIn() {
 
   try {
     const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
-    if (!me.agent_id) {
-      document.getElementById('loadingState').innerHTML = '<p>This page is for agents — no agent record was found for your account.</p>';
+    S.isManager = me.role === 'manager';
+    S.ownAgentId = me.agent_id || null;
+
+    if (S.isManager) {
+      document.getElementById('managerBar').style.display = 'block';
+      loadAgentList(); // fire-and-forget — populates the search picker
+    }
+
+    // A manager may view any agent via ?agentId=; a plain agent can only
+    // ever see their own (the backend enforces this too — this is just
+    // about not even attempting to load the wrong page state client-side).
+    const urlAgentId = S.isManager ? new URLSearchParams(location.search).get('agentId') : null;
+    const targetId = urlAgentId || S.ownAgentId;
+
+    if (!targetId) {
+      if (S.isManager) {
+        // Manager with no agent record of their own (pure office staff) —
+        // nothing to default to until they search for someone.
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        document.getElementById('situationSection').innerHTML =
+          '<p class="empty-state">Search for an agent above to view their hub.</p>';
+        renderAlways();
+      } else {
+        document.getElementById('loadingState').innerHTML = '<p>This page is for agents — no agent record was found for your account.</p>';
+      }
       return;
     }
-    S.agentId = me.agent_id;
 
-    const data = await fetch(`${PROXY_BASE}/agent-hub/${me.agent_id}`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-
-    document.querySelector('.hero').style.display = 'none';
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-
-    renderSituation(data);
-    renderAlways();
-    loadReminder(me.agent_id);
+    await loadHubFor(targetId);
   } catch (e) {
     document.getElementById('loadingState').innerHTML = `<p style="color:var(--red)">Couldn't load your hub: ${escapeHtml(e.message)}</p>`;
   }
 }
+
+// Loads and renders the hub for a specific agentId — used both for the
+// signed-in caller's own hub and, for managers, whichever agent they've
+// picked via the "View as" search.
+async function loadHubFor(agentId) {
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('reminderBox').style.display = 'none';
+
+  const data = await fetch(`${PROXY_BASE}/agent-hub/${agentId}`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+  if (data.error) throw new Error(data.error);
+
+  S.viewedAgentId = agentId;
+  document.querySelector('.hero').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+
+  if (S.isManager) {
+    const isSelf = String(agentId) === String(S.ownAgentId);
+    document.getElementById('viewingLabel').textContent = isSelf ? 'your own hub' : `${data.agent.name}'s hub`;
+    document.getElementById('backToMyHub').style.display = (!isSelf && S.ownAgentId) ? 'inline' : 'none';
+    const url = new URL(location.href);
+    if (isSelf) url.searchParams.delete('agentId'); else url.searchParams.set('agentId', agentId);
+    history.replaceState(null, '', url);
+  }
+
+  renderSituation(data);
+  renderAlways();
+  loadReminder(agentId);
+}
+
+function viewMyOwnHub() {
+  document.getElementById('agentSearchInput').value = '';
+  document.getElementById('agentSearchResults').style.display = 'none';
+  loadHubFor(S.ownAgentId).catch(e => alert("Couldn't load your hub: " + e.message));
+}
+
+// ── Manager "view as" agent picker ────────────────────────────────────────────
+// Fetches the full active-agent directory once (small payload, ~237 rows
+// today) and filters client-side as the manager types — same idea as any
+// simple search-as-you-type, no dedicated search endpoint needed for this.
+async function loadAgentList() {
+  try {
+    S.allAgents = await fetch(`${PROXY_BASE}/roster/agents`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+  } catch (e) {
+    S.allAgents = [];
+  }
+}
+
+function onAgentSearchInput() {
+  const q = document.getElementById('agentSearchInput').value.trim().toLowerCase();
+  const results = document.getElementById('agentSearchResults');
+  if (!q || !(S.allAgents || []).length) { results.style.display = 'none'; return; }
+
+  const matches = S.allAgents
+    .filter(a => `${a.first_name} ${a.last_name}`.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!matches.length) { results.style.display = 'none'; return; }
+
+  results.innerHTML = matches.map(a => `
+    <div class="agent-result" onclick="selectAgent(${a.id}, '${escapeHtml(`${a.first_name} ${a.last_name}`).replace(/'/g, "\\'")}')">
+      <span>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</span>
+      <span class="office">${escapeHtml(a.office_name || '')}</span>
+    </div>`).join('');
+  results.style.display = 'block';
+}
+
+function selectAgent(agentId, name) {
+  document.getElementById('agentSearchInput').value = name;
+  document.getElementById('agentSearchResults').style.display = 'none';
+  loadHubFor(agentId).catch(e => alert("Couldn't load that agent's hub: " + e.message));
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('agentSearchWrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('agentSearchResults').style.display = 'none';
+});
 
 function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
