@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Hub — Adams, Cameron &amp; Co.</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #1a1a2e;
+      --ink-soft:   #2d2d4a;
+      --gold:       #c9a84c;
+      --gold-light: #e8c96a;
+      --cream:      #faf8f3;
+      --cream-dark: #f0ece0;
+      --slate:      #5a5a78;
+      --muted:      #8a8aa8;
+      --green:      #2ecc71;
+      --green-soft: rgba(46,204,113,.08);
+      --red:        #e74c3c;
+      --shadow:     0 2px 20px rgba(26,26,46,.08);
+      --shadow-lg:  0 8px 40px rgba(26,26,46,.15);
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 24px rgba(0,0,0,.3);
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--cream);
+      letter-spacing: .02em;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .logo-path { color: var(--gold); }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    #userChip {
+      display: none;
+      align-items: center;
+      gap: .6rem;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 100px;
+      padding: .3rem .8rem .3rem .4rem;
+    }
+    #userAvatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--slate); }
+    #userName { font-size: .82rem; color: var(--cream); }
+    #signOutBtn {
+      background: none; border: none; color: var(--muted); font-size: .72rem;
+      cursor: pointer; text-decoration: underline; padding: 0; margin-left: .3rem;
+    }
+
+    /* ── HERO / PRE-AUTH ── */
+    .hero {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 3.5rem 2rem 2rem;
+      text-align: center;
+    }
+    .hero-eyebrow {
+      font-size: .72rem; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: .6rem;
+    }
+    .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 600; line-height: 1.15; }
+    .hero-sub { font-size: .92rem; color: var(--slate); margin: .9rem 0 1.6rem; line-height: 1.6; }
+    #preAuth { opacity: 0; animation: fadeUp .6s ease .4s forwards; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .signin-note { font-size: .75rem; color: var(--muted); margin-top: .9rem; }
+
+    /* ── LOADING ── */
+    #loadingState { display: none; text-align: center; padding: 5rem 2rem; }
+    .spinner {
+      width: 34px; height: 34px; border: 3px solid var(--cream-dark); border-top-color: var(--gold);
+      border-radius: 50%; margin: 0 auto 1rem; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── MAIN LAYOUT ── */
+    #mainContent { max-width: 1100px; margin: 0 auto; padding: 0 2rem 4rem; display: none; }
+    .section { padding: 2rem 0; }
+    .section-label { font-size: .7rem; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin-bottom: .5rem; }
+    .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; color: var(--ink); margin-bottom: 1.5rem; }
+
+    /* ── REMINDER BOX ── */
+    .reminder-box {
+      background: rgba(201,168,76,.08);
+      border: 1px solid rgba(201,168,76,.25);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: none;
+    }
+    .reminder-label { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
+    .reminder-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
+
+    /* ── PORTAL CARDS (copied from pathfinder.html) ── */
+    .portal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1.25rem; }
+    .portal-card {
+      background: white; border-radius: 14px; padding: 1.75rem; box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,.06); text-decoration: none; color: inherit;
+      display: flex; flex-direction: column; gap: 1rem;
+      transition: transform .22s ease, box-shadow .22s ease; cursor: pointer;
+      position: relative; overflow: hidden;
+    }
+    .portal-card::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+      background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .3s ease;
+    }
+    .portal-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .portal-card:hover::after { transform: scaleX(1); }
+    .portal-card.dim { opacity: .55; }
+    .card-icon { font-size: 2rem; line-height: 1; }
+    .card-badge {
+      position: absolute; top: 1.25rem; right: 1.25rem; font-size: .65rem; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase; padding: .2rem .6rem; border-radius: 100px;
+    }
+    .badge-gold  { background: rgba(201,168,76,.15); color: var(--gold); }
+    .badge-green { background: rgba(46,204,113,.12); color: #27ae60; }
+    .badge-slate { background: rgba(90,90,120,.1); color: var(--slate); }
+    .card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--ink); line-height: 1.2; }
+    .card-desc { font-size: .83rem; color: var(--slate); line-height: 1.6; flex: 1; }
+    .card-action { display: flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 500; color: var(--gold); margin-top: .25rem; }
+    .card-action svg { transition: transform .2s; }
+    .portal-card:hover .card-action svg { transform: translateX(3px); }
+
+    /* ── TRANSACTION CARDS ── */
+    .txn-card {
+      background: white; border-radius: 14px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,.06); margin-bottom: 1rem;
+    }
+    .txn-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .5rem; }
+    .txn-address { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; }
+    .txn-status {
+      font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+      padding: .15rem .55rem; border-radius: 100px; background: rgba(90,90,120,.1); color: var(--slate);
+    }
+    .txn-status.under_contract { background: rgba(201,168,76,.15); color: var(--gold); }
+    .txn-checklist { font-size: .78rem; color: var(--slate); margin: .6rem 0 .9rem; }
+    .txn-checklist strong { color: var(--ink-soft); }
+    .txn-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .txn-tool-link {
+      font-size: .76rem; font-weight: 500; color: var(--gold); text-decoration: none;
+      border: 1px solid rgba(201,168,76,.3); border-radius: 100px; padding: .3rem .8rem;
+      display: inline-flex; align-items: center; gap: .3rem;
+    }
+    .txn-tool-link:hover { background: rgba(201,168,76,.08); }
+
+    .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
+
+    footer { text-align: center; padding: 2.5rem 2rem; font-size: .72rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">Agent <span class="logo-path">Hub</span></div>
+    <div class="header-right">
+      <a href="./index.html" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">← Tools</a>
+      <div id="userChip">
+        <img id="userAvatar" src="" alt="">
+        <span id="userName"></span>
+        <button id="signOutBtn" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="hero">
+  <p class="hero-eyebrow">Your Situation, At a Glance</p>
+  <h1>Everything about you,<br><em style="font-style:italic">in one place.</em></h1>
+  <p class="hero-sub">Active listings and contracts, what's already been done, and what to do next — pulled from every tool you use.</p>
+  <div id="preAuth">
+    <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+    <p class="signin-note">Use your @adamscameron.com account</p>
+  </div>
+</div>
+
+<div id="loadingState">
+  <div class="spinner"></div>
+  <p>Loading your hub…</p>
+</div>
+
+<div id="mainContent">
+  <div class="reminder-box" id="reminderBox">
+    <div class="reminder-label">💡 Pending Steps</div>
+    <div class="reminder-text" id="reminderText"></div>
+  </div>
+
+  <div id="situationSection"></div>
+
+  <div class="section">
+    <p class="section-label">Always Handy</p>
+    <h2 class="section-title">More Tools</h2>
+    <div class="portal-grid" id="alwaysSection"></div>
+  </div>
+</div>
+
+<footer>Adams, Cameron &amp; Co. — Agent Hub</footer>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
+
+// ── External tool links — TBD placeholders, fill in when available. Cards
+// render defensively (grayed/disabled) when a URL is still empty. ─────────
+const FRED_URL      = ''; // TBD — FRED (listing-specific advertising)
+const MCFL_URL      = ''; // TBD — MCFL lives inside DeltaNet (sphere-of-influence tool), not a standalone site
+const AC_SOCIAL_URL = ''; // TBD — AC Social (currently Sprout Social)
+const ASK_CAMERON_URL = 'https://notebook.google.com/notebook/fe6d893f-889c-4004-bebd-386bd25830a8?pli=1';
+
+// Static fallback for the intranet ("ACCAgents") tools section — a live
+// pull via the Google Sites API was attempted and does not currently work
+// (see scripts/verify-google-sites-access.js and agent-hub-plan.md Step 2).
+// Add entries by hand here as needed.
+const INTRANET_LINKS = [
+  { title: 'ACCAgents Intranet', url: 'https://sites.google.com/adamscameron.com/agent-portal-v2', icon: '🏠', external: true },
+];
+
+const S = { user: null, agentId: null };
+
+/* ── SHARED SESSION AUTH ────────────────────────────────────────────
+   Same ac_pathfinder_session convention as pathfinder.html/
+   agent-dashboard.html/coach-dashboard.html. ────────────────────── */
+const AC_SESSION_KEY = 'ac_pathfinder_session';
+
+function saveSession(email, name, picture) {
+  try {
+    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({ email, name, picture, exp: Date.now() + 8 * 60 * 60 * 1000 }));
+  } catch(_) {}
+}
+function clearSession() {
+  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(AC_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.email || s.exp < Date.now()) { localStorage.removeItem(AC_SESSION_KEY); return null; }
+    return s;
+  } catch(_) { return null; }
+}
+
+// ── Google Auth (ID-token flow, matches pathfinder.html) ────────────────────
+const poll = setInterval(() => {
+  if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
+}, 100);
+
+function initOAuth() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
+
+  const saved = loadSession();
+  if (saved && PROXY_KEY) {
+    S.user = { email: saved.email, name: saved.name, picture: saved.picture };
+    onSignedIn();
+  } else {
+    google.accounts.id.prompt();
+  }
+}
+
+// Goes through /config/init (validates the ID token server-side, checks the
+// @adamscameron.com domain) rather than decoding the JWT locally.
+async function handleCredential(response) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account."); return; }
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+  } catch (e) { alert('Authentication error: ' + e.message); return; }
+  const payload = JSON.parse(atob(response.credential.split('.')[1]));
+  S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
+  saveSession(S.user.email, S.user.name, S.user.picture);
+  // Also set the shared ac_user_email key — none of the other
+  // ac_pathfinder_session pages currently do this, which silently blanks
+  // the tool-usage log unless the browser separately visited an
+  // ac_proxy_key-family page first. Doing it correctly here from the start.
+  localStorage.setItem('ac_user_email', S.user.email);
+  onSignedIn();
+}
+
+function signOut() {
+  google.accounts.id.disableAutoSelect();
+  clearSession();
+  S.user = null;
+  document.getElementById('userChip').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('preAuth').style.opacity = '1';
+  document.querySelector('.hero').style.display = '';
+}
+
+// ── Post sign-in ─────────────────────────────────────────────────────────────
+async function onSignedIn() {
+  document.getElementById('preAuth').style.display = 'none';
+  document.getElementById('userAvatar').src = S.user.picture || '';
+  document.getElementById('userName').textContent = S.user.name;
+  document.getElementById('userChip').style.display = 'flex';
+  document.getElementById('loadingState').style.display = 'block';
+
+  try {
+    const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    if (!me.agent_id) {
+      document.getElementById('loadingState').innerHTML = '<p>This page is for agents — no agent record was found for your account.</p>';
+      return;
+    }
+    S.agentId = me.agent_id;
+
+    const data = await fetch(`${PROXY_BASE}/agent-hub/${me.agent_id}`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+
+    document.querySelector('.hero').style.display = 'none';
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+
+    renderSituation(data);
+    renderAlways();
+    loadReminder(me.agent_id);
+  } catch (e) {
+    document.getElementById('loadingState').innerHTML = `<p style="color:var(--red)">Couldn't load your hub: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Reminder (async, doesn't block the rest of the page) ─────────────────────
+async function loadReminder(agentId) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/agent-hub/${agentId}/reminder`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(x => x.json());
+    if (r.text) {
+      document.getElementById('reminderText').textContent = r.text;
+      document.getElementById('reminderBox').style.display = 'block';
+    }
+  } catch (_) { /* reminder is a nice-to-have — silently skip on failure */ }
+}
+
+// ── Situation-conditional sections ────────────────────────────────────────────
+const TOOL_ICON_ARROW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+function renderSituation(data) {
+  const el = document.getElementById('situationSection');
+  const hasActiveTxn     = (data.transactions || []).length > 0;
+  const pathfinderActive = !!data.plan || !!data.enrollment;
+
+  if (hasActiveTxn) {
+    el.innerHTML = renderTransactionsSection(data.transactions, data.checklist);
+  } else if (pathfinderActive) {
+    el.innerHTML = renderProspectingSection(data.strategies);
+  } else {
+    el.innerHTML = renderOnboardingSection(data.deltanetAudit);
+  }
+}
+
+function renderTransactionsSection(transactions, checklist) {
+  const byTxn = {};
+  for (const c of checklist) (byTxn[c.transaction_id] ||= []).push(c);
+
+  const cards = transactions.map(t => {
+    const items = byTxn[t.id] || [];
+    const pending   = items.filter(i => i.progress_status === 'pending').length;
+    const completed = items.filter(i => i.progress_status === 'completed').length;
+
+    const tools = [];
+    if (t.status === 'under_contract') {
+      tools.push({ title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' });
+    }
+    if (t.represents_seller) {
+      tools.push({ title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' });
+      tools.push({ title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' });
+    }
+
+    return `<div class="txn-card">
+      <div class="txn-head">
+        <div class="txn-address">${escapeHtml(t.property_address)}</div>
+        <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
+      </div>
+      <div class="txn-checklist">${items.length ? `<strong>${completed}</strong> done, <strong>${pending}</strong> pending` : 'No checklist steps yet.'}</div>
+      ${tools.length ? `<div class="txn-tools">${tools.map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  return `<div class="section">
+    <p class="section-label">Front and Center</p>
+    <h2 class="section-title">Your Active Listings &amp; Contracts</h2>
+    ${cards || '<p class="empty-state">Nothing active right now.</p>'}
+  </div>`;
+}
+
+// Maps a committed prospecting strategy's slug to a relevant internal/
+// external tool card. Strategies without a specific mapping still render
+// as a plain card (title + icon only) so nothing silently disappears.
+function toolsForStrategy(slug) {
+  const map = {
+    floor_time: [{ title: 'Floor Time', url: './floor-time.html', icon: '📅' }],
+    soi:              [{ title: 'FRED', url: FRED_URL, icon: '📣' }, { title: 'MCFL (via DeltaNet)', url: MCFL_URL, icon: '💌' }],
+    referral_network: [{ title: 'MCFL (via DeltaNet)', url: MCFL_URL, icon: '💌' }],
+    social:           [{ title: 'AC Social', url: AC_SOCIAL_URL, icon: '📱' }],
+  };
+  return map[slug] || [];
+}
+
+function renderProspectingSection(strategies) {
+  const cards = (strategies || []).flatMap(s => {
+    const tools = toolsForStrategy(s.slug);
+    if (tools.length) {
+      return tools.map(t => portalCardHtml(t.title, `Suggested for your "${s.name}" strategy.`, t.url, t.icon, s.is_primary ? 'badge-gold' : 'badge-slate', s.is_primary ? 'Primary' : ''));
+    }
+    return [portalCardHtml(s.name, 'Part of your committed prospecting strategy.', null, s.icon || '🎯', s.is_primary ? 'badge-gold' : 'badge-slate', s.is_primary ? 'Primary' : '')];
+  }).join('');
+
+  return `<div class="section">
+    <p class="section-label">Keep Building</p>
+    <h2 class="section-title">Your Prospecting Tools</h2>
+    <div class="portal-grid">${cards || '<p class="empty-state">No committed strategies yet — visit AC Pathfinder to set some up.</p>'}</div>
+  </div>`;
+}
+
+function renderOnboardingSection(deltanetAudit) {
+  const cards = [
+    portalCardHtml('AC Pathfinder', 'Build your business plan and get matched with a coach.', './pathfinder.html', '🧭', 'badge-gold', 'Start Here'),
+    deltanetAudit
+      ? portalCardHtml('DeltaNet Profile', `Your last audit scored ${deltanetAudit.total_score ?? '—'}/${deltanetAudit.max_score ?? 100}.`, './deltanet-profile-audit.html', '📋', 'badge-slate', '')
+      : portalCardHtml('DeltaNet Profile Audit', "You haven't run a profile audit yet — see how your online presence and database stack up.", './deltanet-profile-audit.html', '📋', 'badge-slate', ''),
+    portalCardHtml('Staff Reference Guide', 'Answers to common questions while you get started.', './staff-guide.html', '📖', 'badge-slate', ''),
+  ].join('');
+
+  return `<div class="section">
+    <p class="section-label">Getting Started</p>
+    <h2 class="section-title">Let's Get You Set Up</h2>
+    <div class="portal-grid">${cards}</div>
+  </div>`;
+}
+
+// ── Always-shown section ──────────────────────────────────────────────────────
+const ALWAYS_LINKS = [
+  { title: 'Online Presence Audit', desc: 'See how you show up in search and on social.', url: './social-audit.html', icon: '🔍', badge: 'badge-slate' },
+  { title: 'Ask Cameron', desc: 'AI assistant for marketing and listing questions (Notebook).', url: ASK_CAMERON_URL, icon: '🤖', badge: 'badge-gold', external: true },
+  { title: 'FRED', desc: 'Listing-specific advertising platform.', url: FRED_URL, icon: '📣', badge: 'badge-slate', external: true },
+  { title: 'MCFL (via DeltaNet)', desc: 'Stay in touch with your sphere of influence.', url: MCFL_URL, icon: '💌', badge: 'badge-slate', external: true },
+  { title: 'AC Social', desc: 'Post to social media.', url: AC_SOCIAL_URL, icon: '📱', badge: 'badge-slate', external: true },
+  ...INTRANET_LINKS.map(l => ({ title: l.title, desc: 'ACCAgents intranet.', url: l.url, icon: l.icon, badge: 'badge-slate', external: true })),
+];
+
+function renderAlways() {
+  document.getElementById('alwaysSection').innerHTML = ALWAYS_LINKS
+    .map(l => portalCardHtml(l.title, l.desc, l.url, l.icon, l.badge, '', l.external))
+    .join('');
+}
+
+// Shared card renderer. A falsy `url` renders a dimmed, non-clickable card
+// (used for the TBD external-link placeholders) instead of linking nowhere.
+function portalCardHtml(title, desc, url, icon, badgeClass, badgeText, external) {
+  const tag   = url ? 'a' : 'div';
+  const attrs = url ? `href="${escapeHtml(url)}"${external ? ' target="_blank" rel="noopener"' : ''}` : '';
+  const cls   = url ? 'portal-card' : 'portal-card dim';
+  return `<${tag} class="${cls}" ${attrs}>
+    <div class="card-icon">${icon}</div>
+    ${badgeText ? `<span class="card-badge ${badgeClass}">${escapeHtml(badgeText)}</span>` : ''}
+    <div class="card-title">${escapeHtml(title)}</div>
+    <div class="card-desc">${escapeHtml(desc)}</div>
+    ${url ? `<div class="card-action">Open ${TOOL_ICON_ARROW}</div>` : `<div class="card-action" style="color:var(--muted)">Link coming soon</div>`}
+  </${tag}>`;
+}
+</script>
+
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Hub',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
