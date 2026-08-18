@@ -138,7 +138,9 @@
     }
 
     /* ── MAIN LAYOUT ── */
-    #mainContent { max-width: 1100px; margin: 0 auto; padding: 0 2rem 4rem; display: none; }
+    #mainContent { max-width: 1300px; margin: 0 auto; padding: 0 2rem 4rem; display: none; }
+    .page-layout { display: flex; align-items: flex-start; gap: 2rem; }
+    #mainCol { flex: 1; min-width: 0; }
     .section { padding: 2rem 0; }
     .section-label { font-size: .7rem; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin-bottom: .5rem; }
     .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; color: var(--ink); margin-bottom: 1.5rem; }
@@ -185,31 +187,122 @@
     .card-action svg { transition: transform .2s; }
     .portal-card:hover .card-action svg { transform: translateX(3px); }
 
-    /* ── TRANSACTION CARDS ── */
+    /* ── TRANSACTION CARDS (compact — click opens the checklist modal) ── */
+    .txn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .9rem; }
     .txn-card {
-      background: white; border-radius: 14px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow);
-      border: 1px solid rgba(26,26,46,.06); margin-bottom: 1rem;
+      background: white; border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: var(--shadow);
+      border: 1px solid rgba(26,26,46,.06); cursor: pointer; transition: transform .18s ease, box-shadow .18s ease;
     }
-    .txn-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .5rem; }
-    .txn-address { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 600; }
+    .txn-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .txn-address { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 600; line-height: 1.25; margin-bottom: .5rem; }
     .txn-status {
-      font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
-      padding: .15rem .55rem; border-radius: 100px; background: rgba(90,90,120,.1); color: var(--slate);
+      font-size: .64rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+      padding: .12rem .5rem; border-radius: 100px; background: rgba(90,90,120,.1); color: var(--slate);
+      display: inline-block; margin-bottom: .6rem;
     }
     .txn-status.under_contract { background: rgba(201,168,76,.15); color: var(--gold); }
-    .txn-checklist { font-size: .78rem; color: var(--slate); margin: .6rem 0 .9rem; }
-    .txn-checklist strong { color: var(--ink-soft); }
-    .txn-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .txn-progress-bar { height: 5px; border-radius: 3px; background: var(--cream-dark); overflow: hidden; margin-bottom: .4rem; }
+    .txn-progress-fill { height: 100%; background: var(--green); border-radius: 3px; }
+    .txn-progress-label { font-size: .72rem; color: var(--slate); }
+    .txn-progress-label strong { color: var(--ink-soft); }
+
+    /* ── TRANSACTION DETAIL MODAL ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(26,26,46,.55);
+      z-index: 500; align-items: flex-start; justify-content: center; padding: 4vh 1.5rem;
+      overflow-y: auto;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white; border-radius: 16px; max-width: 560px; width: 100%;
+      padding: 1.75rem 2rem 2rem; box-shadow: var(--shadow-lg);
+    }
+    .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+    .modal-title { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 600; }
+    .modal-close { background: none; border: none; font-size: 1.4rem; line-height: 1; color: var(--muted); cursor: pointer; }
+    .modal-close:hover { color: var(--ink); }
+    .modal-tools { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
     .txn-tool-link {
       font-size: .76rem; font-weight: 500; color: var(--gold); text-decoration: none;
       border: 1px solid rgba(201,168,76,.3); border-radius: 100px; padding: .3rem .8rem;
       display: inline-flex; align-items: center; gap: .3rem;
     }
     .txn-tool-link:hover { background: rgba(201,168,76,.08); }
+    .checklist-list { display: flex; flex-direction: column; gap: .1rem; }
+    .checklist-item {
+      display: flex; align-items: center; gap: .7rem; padding: .55rem 0;
+      border-bottom: 1px solid var(--cream-dark); font-size: .85rem;
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .checklist-check {
+      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: .68rem;
+    }
+    .checklist-check.completed { background: var(--green-soft); color: #27ae60; }
+    .checklist-check.pending { border: 2px solid var(--cream-dark); }
+    .checklist-check.dismissed { background: var(--cream-dark); color: var(--muted); }
+    .checklist-title { flex: 1; color: var(--ink-soft); }
+    .checklist-item.is-completed .checklist-title,
+    .checklist-item.is-dismissed .checklist-title { color: var(--muted); text-decoration: line-through; }
+    .checklist-link { font-size: .74rem; color: var(--gold); text-decoration: none; white-space: nowrap; }
+    .checklist-link:hover { text-decoration: underline; }
+
+    /* ── LEADERBOARD WIDGET ── */
+    .leaderboard-box { background: white; border-radius: 14px; box-shadow: var(--shadow); border: 1px solid rgba(26,26,46,.06); overflow: hidden; }
+    .leaderboard-row { display: flex; align-items: center; gap: .9rem; padding: .75rem 1.5rem; border-bottom: 1px solid var(--cream-dark); }
+    .leaderboard-row:last-child { border-bottom: none; }
+    .leaderboard-rank {
+      width: 26px; height: 26px; border-radius: 50%; background: var(--cream-dark); color: var(--slate);
+      font-size: .78rem; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .leaderboard-row:nth-child(1) .leaderboard-rank { background: var(--gold); color: white; }
+    .leaderboard-row:nth-child(2) .leaderboard-rank { background: #b8c0cc; color: white; }
+    .leaderboard-row:nth-child(3) .leaderboard-rank { background: #c98a4c; color: white; }
+    .leaderboard-name { flex: 1; font-size: .88rem; font-weight: 500; }
+    .leaderboard-office { font-size: .74rem; color: var(--muted); }
+    .leaderboard-value { font-size: .88rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+    .leaderboard-footer { text-align: center; padding: .8rem; }
+    .leaderboard-footer a { font-size: .78rem; color: var(--gold); text-decoration: none; font-weight: 500; }
+    .leaderboard-footer a:hover { text-decoration: underline; }
 
     .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
 
     footer { text-align: center; padding: 2.5rem 2rem; font-size: .72rem; color: var(--muted); }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 240px; flex-shrink: 0; position: sticky; top: 84px;
+      max-height: calc(100vh - 100px); overflow-y: auto; padding-bottom: 1rem;
+    }
+    .nav-cat { margin-bottom: 1.4rem; }
+    .nav-cat-label {
+      font-size: .66rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: .5rem; padding: 0 .5rem;
+    }
+    .nav-link {
+      display: flex; align-items: center; gap: .6rem; padding: .45rem .5rem; border-radius: 8px;
+      font-size: .84rem; color: var(--ink-soft); text-decoration: none;
+    }
+    .nav-link:hover { background: rgba(26,26,46,.05); color: var(--ink); }
+    .nav-link .nav-icon { font-size: 1rem; width: 1.2rem; text-align: center; flex-shrink: 0; }
+    .nav-pinned {
+      border-top: 1px solid rgba(26,26,46,.08); margin-top: .5rem; padding-top: 1rem;
+    }
+    #sidebarToggle { display: none; }
+
+    @media (max-width: 900px) {
+      .page-layout { flex-direction: column; }
+      #sidebar {
+        width: 100%; position: static; max-height: none; display: none;
+        background: white; border-radius: 12px; box-shadow: var(--shadow); padding: 1rem 1rem 0; margin-bottom: 1.5rem;
+      }
+      #sidebar.open { display: block; }
+      #sidebarToggle {
+        display: flex; align-items: center; gap: .4rem; background: white; border: 1px solid rgba(26,26,46,.1);
+        border-radius: 8px; padding: .55rem 1rem; font-size: .82rem; font-weight: 500; color: var(--ink-soft);
+        cursor: pointer; margin-bottom: 1rem; width: 100%; justify-content: center;
+      }
+    }
   </style>
 </head>
 <body>
@@ -259,17 +352,43 @@
 </div>
 
 <div id="mainContent">
-  <div class="reminder-box" id="reminderBox">
-    <div class="reminder-label">💡 Pending Steps</div>
-    <div class="reminder-text" id="reminderText"></div>
+  <button id="sidebarToggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰ Tools Menu</button>
+
+  <div class="page-layout">
+    <aside id="sidebar"></aside>
+
+    <div id="mainCol">
+      <div class="reminder-box" id="reminderBox">
+        <div class="reminder-label">💡 Pending Steps</div>
+        <div class="reminder-text" id="reminderText"></div>
+      </div>
+
+      <div id="situationSection"></div>
+
+      <div class="section">
+        <p class="section-label">Always Handy</p>
+        <h2 class="section-title">More Tools</h2>
+        <div class="portal-grid" id="alwaysSection"></div>
+      </div>
+
+      <div class="section">
+        <p class="section-label">This Month</p>
+        <h2 class="section-title">Production Leaderboard</h2>
+        <div class="leaderboard-box" id="leaderboardBox"><p class="empty-state" style="padding:1.5rem">Loading…</p></div>
+      </div>
+    </div>
   </div>
+</div>
 
-  <div id="situationSection"></div>
-
-  <div class="section">
-    <p class="section-label">Always Handy</p>
-    <h2 class="section-title">More Tools</h2>
-    <div class="portal-grid" id="alwaysSection"></div>
+<!-- Transaction checklist detail — opened from a compact .txn-card click -->
+<div class="modal-overlay" id="txnModal" onclick="if(event.target===this) closeTxnModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title" id="modalAddress"></div>
+      <button class="modal-close" onclick="closeTxnModal()">&times;</button>
+    </div>
+    <div class="modal-tools" id="modalTools"></div>
+    <div class="checklist-list" id="modalChecklist"></div>
   </div>
 </div>
 
@@ -295,12 +414,89 @@ const INTRANET_LINKS = [
   { title: 'ACCAgents Intranet', url: 'https://sites.google.com/adamscameron.com/agent-portal-v2', icon: '🏠', external: true },
 ];
 
+// ── Sidebar tool menu ─────────────────────────────────────────────────────────
+// Mirrors index.html's category grouping (see CLAUDE.md's Tools Directory),
+// deduped — each cross-listed tool (Lockbox Manager, ACC Binder, Contract
+// Date Calculator, Hotsheet) appears once, under whichever category it's
+// most associated with, rather than repeated per index.html's cross-listing
+// convention — a persistent sidebar benefits more from one entry per item
+// than a long scrolling page does. `gated: true` items only render for
+// S.isManager, same as index.html's managerSection cards.
+const SIDEBAR_CATEGORIES = [
+  { label: 'Find New Prospects', items: [
+    { title: 'Floor Time', url: './floor-time.html', icon: '📅' },
+    { title: 'Agent Notices', url: './agent-notices.html', icon: '📋' },
+    { title: 'Bio Creator', url: './bio-creator.html', icon: '✍️' },
+    { title: 'Photo Updater', url: './photo-updater.html', icon: '🖼️' },
+    { title: 'Online Presence Audit', url: './social-audit.html', icon: '🔍' },
+    { title: 'DeltaNet Profile Audit', url: './deltanet-profile-audit.html', icon: '📋' },
+  ]},
+  { label: 'Listing Marketing', items: [
+    { title: 'Market Update', url: './market-update.html', icon: '📊' },
+    { title: 'MLS Magic', url: 'https://mls-data-sync.web.app/', icon: '✨', external: true },
+    { title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' },
+    { title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' },
+    { title: 'Lockbox Manager', url: './lockbox-app.html', icon: '🔑' },
+    { title: 'ACC Binder', url: './acc-binder.html', icon: '📋' },
+    { title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' },
+    { title: 'Hotsheet', url: './hotsheet-v2.html', icon: '📊' },
+  ]},
+  { label: 'Maintain Relationships', items: [
+    { title: 'Review Engine', url: './review-engine.html', icon: '⭐', gated: true },
+    { title: 'AC Foundation', url: './foundation.html', icon: '🏛' },
+  ]},
+  { label: 'Learn and Find Help', items: [
+    { title: 'AC Pathfinder', url: './pathfinder.html', icon: '🧭' },
+    { title: 'Agent Recognition Quiz', url: './agent-quiz.html', icon: '🧑‍🤝‍🧑' },
+    { title: 'Staff Reference Guide', url: './staff-guide.html', icon: '📖', gated: true },
+  ]},
+  { label: 'Office and Operations', items: [
+    { title: 'Agent Roster', url: './roster.html', icon: '👥' },
+    { title: 'Agent Records', url: './agent-master-form.html', icon: '🗂️', gated: true },
+    { title: 'Daily Desk', url: './daily-desk.html', icon: '📋', gated: true },
+    { title: 'Scorecard Data Entry', url: './scorecard-entry.html', icon: '📊', gated: true },
+    { title: 'Tool Usage', url: './usage-stats.html', icon: '📈', gated: true },
+    { title: 'Production Leaderboard', url: './leaderboard.html', icon: '🏆' },
+  ]},
+];
+
+// Permanent, always at the bottom of the menu regardless of category/role.
+const PINNED_LINKS = [
+  { title: 'Workshop Guide', url: './workshop-guide.html', icon: '📘' },
+  { title: 'Feedback & Support', url: './feedback.html', icon: '💬' },
+  { title: 'Ask Cameron', url: '', icon: '🤖' }, // url filled in from ASK_CAMERON_URL at render time
+];
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar');
+  const categoriesHtml = SIDEBAR_CATEGORIES.map(cat => {
+    const items = cat.items.filter(i => !i.gated || S.isManager);
+    if (!items.length) return '';
+    return `<div class="nav-cat">
+      <div class="nav-cat-label">${escapeHtml(cat.label)}</div>
+      ${items.map(navLinkHtml).join('')}
+    </div>`;
+  }).join('');
+
+  const pinned = PINNED_LINKS.map(l => navLinkHtml(l.title === 'Ask Cameron' ? { ...l, url: ASK_CAMERON_URL, external: true } : l)).join('');
+
+  el.innerHTML = `${categoriesHtml}<div class="nav-pinned">${pinned}</div>`;
+}
+
+function navLinkHtml(item) {
+  return `<a class="nav-link" href="${escapeHtml(item.url)}"${item.external ? ' target="_blank" rel="noopener"' : ''}>
+    <span class="nav-icon">${item.icon}</span><span>${escapeHtml(item.title)}</span>
+  </a>`;
+}
+
 const S = {
   user: null,
   isManager: false,
   ownAgentId: null,    // the signed-in caller's own agent record, if any
   viewedAgentId: null, // whichever agent's hub is currently displayed
   allAgents: null,     // roster, lazily loaded for managers' "View as" search
+  txnById: null,       // current view's transactions, keyed by id — for the checklist modal
+  checklistByTxn: null,// current view's checklist rows, grouped by transaction_id
 };
 
 /* ── SHARED SESSION AUTH ────────────────────────────────────────────
@@ -396,6 +592,8 @@ async function onSignedIn() {
     const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
     S.isManager = me.role === 'manager';
     S.ownAgentId = me.agent_id || null;
+    renderSidebar();
+    loadLeaderboard(); // independent of which agent is being viewed — load once
 
     if (S.isManager) {
       document.getElementById('managerBar').style.display = 'block';
@@ -522,6 +720,41 @@ async function loadReminder(agentId) {
   } catch (_) { /* reminder is a nice-to-have — silently skip on failure */ }
 }
 
+// ── Production Leaderboard widget ─────────────────────────────────────────────
+// GET /leaderboard/production is open to any signed-in agent (no manager
+// gate) — same month-to-date Sales Leader numbers leaderboard.html shows,
+// sliced to the top 5 here. Independent of which agent's hub is being
+// viewed, so this loads once per sign-in rather than per hub switch.
+async function loadLeaderboard() {
+  const box = document.getElementById('leaderboardBox');
+  try {
+    const data = await fetch(`${PROXY_BASE}/leaderboard/production`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+    const top = (data.agents || [])
+      .filter(a => a.sales_volume > 0)
+      .sort((a, b) => b.sales_volume - a.sales_volume)
+      .slice(0, 5);
+
+    if (!top.length) {
+      box.innerHTML = `<p class="empty-state" style="padding:1.5rem">No qualifying sales yet for ${escapeHtml(data.monthLabel || 'this month')}.</p>`;
+      return;
+    }
+
+    const fmt = n => '$' + Math.round(n).toLocaleString();
+    box.innerHTML = top.map((a, i) => `
+      <div class="leaderboard-row">
+        <div class="leaderboard-rank">${i + 1}</div>
+        <div>
+          <div class="leaderboard-name">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</div>
+          <div class="leaderboard-office">${escapeHtml(a.office_name || '')}</div>
+        </div>
+        <div class="leaderboard-value" style="margin-left:auto">${fmt(a.sales_volume)}</div>
+      </div>`).join('') + `<div class="leaderboard-footer"><a href="./leaderboard.html">View Full Leaderboard →</a></div>`;
+  } catch (e) {
+    box.innerHTML = `<p class="empty-state" style="padding:1.5rem">Couldn't load the leaderboard: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
 // ── Situation-conditional sections ────────────────────────────────────────────
 const TOOL_ICON_ARROW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
@@ -539,39 +772,86 @@ function renderSituation(data) {
   }
 }
 
+// Contextual tool links per transaction — this is also where future
+// agent-centric checklist items (tool_key/resource_url on
+// transaction_checklist_items, already fetched by the backend but not yet
+// populated with real data — see agent-hub-plan.md) will surface once
+// they exist, rendered the same way as these hand-picked ones.
+function toolsForTransaction(t) {
+  const tools = [];
+  if (t.status === 'under_contract') tools.push({ title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' });
+  if (t.represents_seller) {
+    tools.push({ title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' });
+    tools.push({ title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' });
+  }
+  return tools;
+}
+
 function renderTransactionsSection(transactions, checklist) {
-  const byTxn = {};
-  for (const c of checklist) (byTxn[c.transaction_id] ||= []).push(c);
+  // Cached for the modal to read from without a re-fetch when a card is clicked.
+  S.txnById = {};
+  S.checklistByTxn = {};
+  for (const t of transactions) S.txnById[t.id] = t;
+  for (const c of checklist) (S.checklistByTxn[c.transaction_id] ||= []).push(c);
 
   const cards = transactions.map(t => {
-    const items = byTxn[t.id] || [];
-    const pending   = items.filter(i => i.progress_status === 'pending').length;
+    const items = S.checklistByTxn[t.id] || [];
     const completed = items.filter(i => i.progress_status === 'completed').length;
+    const total = items.length;
+    const pct = total ? Math.round((completed / total) * 100) : 0;
 
-    const tools = [];
-    if (t.status === 'under_contract') {
-      tools.push({ title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' });
-    }
-    if (t.represents_seller) {
-      tools.push({ title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' });
-      tools.push({ title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' });
-    }
-
-    return `<div class="txn-card">
-      <div class="txn-head">
-        <div class="txn-address">${escapeHtml(t.property_address)}</div>
-        <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
-      </div>
-      <div class="txn-checklist">${items.length ? `<strong>${completed}</strong> done, <strong>${pending}</strong> pending` : 'No checklist steps yet.'}</div>
-      ${tools.length ? `<div class="txn-tools">${tools.map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('')}</div>` : ''}
+    return `<div class="txn-card" onclick="openTxnModal('${t.id}')">
+      <div class="txn-address">${escapeHtml(t.property_address)}</div>
+      <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
+      ${total ? `
+        <div class="txn-progress-bar"><div class="txn-progress-fill" style="width:${pct}%"></div></div>
+        <div class="txn-progress-label"><strong>${completed}</strong> of <strong>${total}</strong> steps done</div>
+      ` : '<div class="txn-progress-label">No checklist steps yet.</div>'}
     </div>`;
   }).join('');
 
   return `<div class="section">
     <p class="section-label">Front and Center</p>
     <h2 class="section-title">Your Active Listings &amp; Contracts</h2>
-    ${cards || '<p class="empty-state">Nothing active right now.</p>'}
+    <div class="txn-grid">${cards || '<p class="empty-state">Nothing active right now.</p>'}</div>
   </div>`;
+}
+
+const CHECKLIST_STATUS_META = {
+  completed:      { cls: 'completed', icon: '✓', rowCls: 'is-completed' },
+  pending:        { cls: 'pending',   icon: '',  rowCls: '' },
+  not_applicable: { cls: 'dismissed', icon: '✕', rowCls: 'is-dismissed' },
+  skipped:        { cls: 'dismissed', icon: '—', rowCls: 'is-dismissed' },
+};
+
+function openTxnModal(txnId) {
+  const t = S.txnById?.[txnId];
+  if (!t) return;
+  const items = (S.checklistByTxn?.[txnId] || []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const tools = toolsForTransaction(t);
+
+  document.getElementById('modalAddress').textContent = t.property_address;
+  document.getElementById('modalTools').innerHTML = tools
+    .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('');
+  document.getElementById('modalChecklist').innerHTML = items.length
+    ? items.map(i => {
+        const meta = CHECKLIST_STATUS_META[i.progress_status] || CHECKLIST_STATUS_META.pending;
+        const link = i.resource_url
+          ? `<a class="checklist-link" href="${escapeHtml(i.resource_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
+          : '';
+        return `<div class="checklist-item ${meta.rowCls}">
+          <span class="checklist-check ${meta.cls}">${meta.icon}</span>
+          <span class="checklist-title">${escapeHtml(i.title)}</span>
+          ${link}
+        </div>`;
+      }).join('')
+    : '<p class="empty-state">No checklist steps yet.</p>';
+
+  document.getElementById('txnModal').classList.add('open');
+}
+
+function closeTxnModal() {
+  document.getElementById('txnModal').classList.remove('open');
 }
 
 // Maps a committed prospecting strategy's slug to a relevant internal/
