@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop Guide — Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --green:#1A7A4C; --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#C0392B;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.7}
+
+.topbar{background:var(--navy);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;border-bottom:3px solid var(--gold);position:sticky;top:0;z-index:100}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-title{color:#fff;font-size:15px;font-weight:500;margin-left:14px}
+.topbar-left{display:flex;align-items:center}
+
+.layout{display:flex;min-height:calc(100vh - 52px)}
+
+/* sidebar */
+.sidebar{width:240px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.sidebar-section{padding:0 16px;margin-bottom:20px}
+.sidebar-label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 8px;margin-bottom:6px}
+.sidebar a{display:block;padding:6px 8px;font-size:13px;color:var(--text);text-decoration:none;border-radius:5px;line-height:1.4}
+.sidebar a:hover{background:var(--bg);color:var(--blue)}
+.sidebar a.active{background:#EFF6FF;color:var(--blue);font-weight:600}
+.sidebar a.sub{padding-left:18px;color:var(--muted);font-size:12px}
+.sidebar a.sub:hover{color:var(--blue)}
+
+/* content */
+.content{flex:1;padding:40px 48px;max-width:860px}
+
+h1{font-size:28px;font-weight:700;color:var(--navy);margin-bottom:8px}
+h2{font-size:20px;font-weight:700;color:var(--navy);margin-top:48px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--border)}
+h3{font-size:16px;font-weight:700;color:var(--navy);margin-top:28px;margin-bottom:10px}
+h3 a{color:inherit;text-decoration:none}
+h3 a:hover{color:var(--blue);text-decoration:underline}
+h4{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:22px;margin-bottom:8px}
+p{margin-bottom:12px;color:#2D3340}
+ul,ol{margin:0 0 14px 22px}
+li{margin-bottom:5px;color:#2D3340}
+strong{color:var(--text)}
+
+.lead{font-size:16px;color:var(--muted);margin-bottom:32px;line-height:1.6}
+
+.tool-open{display:inline-block;font-size:12px;font-weight:700;color:var(--blue);text-decoration:none;margin-bottom:12px}
+.tool-open:hover{text-decoration:underline}
+
+.role-table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0 24px}
+.role-table th{background:var(--navy);color:#fff;padding:9px 12px;text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.role-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+.role-table tr:last-child td{border-bottom:none}
+.role-table tr:nth-child(even) td{background:var(--bg)}
+.role-table a{color:var(--blue);text-decoration:none}
+.role-table a:hover{text-decoration:underline}
+
+.tip{background:var(--gold-lt);border:1px solid var(--gold);border-radius:8px;padding:12px 16px;font-size:13px;margin:16px 0;color:#6B4C00;line-height:1.6}
+.tip strong{color:#4A3300}
+.note{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 16px;font-size:13px;margin:16px 0;color:#1E3A5F;line-height:1.6}
+.note strong{color:#1B3A5C}
+.warn{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:12px 16px;font-size:13px;margin:16px 0;color:#7C2D12;line-height:1.6}
+
+.step-list{list-style:none;margin:0 0 16px;padding:0;counter-reset:steps}
+.step-list li{counter-increment:steps;display:flex;gap:12px;margin-bottom:10px;align-items:flex-start}
+.step-list li::before{content:counter(steps);background:var(--navy);color:#fff;font-size:11px;font-weight:700;min-width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+
+.label-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.pill-mgr{background:#DBEAFE;color:#1D4ED8}
+.pill-coord{background:#F3E8FF;color:#6D28D9}
+.pill-all{background:#D1FAE5;color:#065F46}
+.pill-soon{background:#F3F4F6;color:#6B7280}
+
+.faq-item{margin-bottom:16px}
+.faq-q{font-weight:700;color:var(--navy);margin-bottom:3px}
+
+.divider{border:none;border-top:1px solid var(--border);margin:32px 0}
+
+@media print{
+  .sidebar{display:none}
+  .content{padding:20px;max-width:100%}
+  .topbar{position:static}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">ACC</span>
+    <span class="topbar-title">Workshop Guide</span>
+  </div>
+  <div class="topbar-right">
+    <a href="./index.html" style="font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em">← Tools</a>
+  </div>
+</div>
+
+<div class="layout">
+
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Getting Started</div>
+      <a href="#overview">Overview</a>
+      <a href="#organization">How It's Organized</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Find New Prospects</div>
+      <a href="#floor-time">Floor Time</a>
+      <a href="#upcoming-listings">Upcoming Listings &amp; Buyer Needs</a>
+      <a href="#bio-creator">Agent Bio Creator</a>
+      <a href="#photo-updater">Agent Photo Updater</a>
+      <a href="#online-presence">Online Presence Audit</a>
+      <a href="#deltanet-audit">DeltaNet Profile Audit</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Listing Marketing</div>
+      <a href="#market-update">Comprehensive Market Update</a>
+      <a href="#mls-magic">MLS Magic</a>
+      <a href="#camerons-lens">Cameron's Lens</a>
+      <a href="#camerons-stage">Cameron's Stage</a>
+      <a href="#lockbox">Lockbox Manager</a>
+      <a href="#acc-binder">ACC Binder</a>
+      <a href="#contract-calc">Contract Date Calculator</a>
+      <a href="#hotsheet">Adams Cameron Hotsheet</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Buyer Assistance</div>
+      <a href="#buyer-assistance">Shared Tools</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Maintain Relationships</div>
+      <a href="#review-engine">Review Engine</a>
+      <a href="#foundation">Adams Cameron Foundation</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Learn &amp; Find Help</div>
+      <a href="#pathfinder">AC Pathfinder</a>
+      <a href="#agent-quiz">Agent Recognition Quiz</a>
+      <a href="#feedback-tool">Feedback &amp; Support</a>
+      <a href="#staff-guide">Staff Reference Guide</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Office &amp; Operations</div>
+      <a href="#roster">Agent Roster</a>
+      <a href="#agent-records">Agent Records</a>
+      <a href="#daily-desk">Daily Desk</a>
+      <a href="#scorecard">Scorecard Data Entry</a>
+      <a href="#tool-usage">Tool Usage</a>
+      <a href="#leaderboard">Production Leaderboard</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Reference</div>
+      <a href="#faq">FAQ</a>
+      <a href="#directory">Tool Directory</a>
+      <a href="#contact">Contact &amp; Resources</a>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ═══════════════════════════════════════════════ OVERVIEW -->
+    <h1 id="overview">John's Workshop — Agent Resource Guide</h1>
+    <p class="lead">John's Workshop is the proprietary technology platform built exclusively for Adams Cameron agents, staff, and leadership. Accessible at <strong>johnadams.org</strong>, it brings together a suite of tools that help you prospect for new business, market listings, serve buyers, stay connected with past clients, manage operations, and grow your skills — all in one place.</p>
+
+    <p>Whether you're preparing a listing presentation, calculating contract deadlines, generating a market report, or building a business plan, John's Workshop has a tool for it. Many tools are powered by AI (specifically Claude, Anthropic's AI assistant) and connect directly to DeltaNet, Form Simplicity, the MLS systems, and other platforms you already use.</p>
+
+    <div class="note"><strong>Access:</strong> Log in at johnadams.org using your Adams Cameron credentials. Individual agents log in with their own credentials and see tools relevant to their role; some tools shown here (marked <span class="label-pill pill-mgr">Manager / Staff</span>) are only visible to staff and managers.</div>
+
+    <h2 id="organization">How the Workshop Is Organized</h2>
+    <p>The Workshop is divided into six sections based on what you're trying to accomplish:</p>
+    <ol>
+      <li><strong>Find New Prospects</strong> — Tools to build your pipeline and visibility</li>
+      <li><strong>Listing Marketing</strong> — Tools to market properties and manage listing activity</li>
+      <li><strong>Buyer Assistance</strong> — Tools to support buyer transactions</li>
+      <li><strong>Maintain Relationships</strong> — Tools to stay connected after the close</li>
+      <li><strong>Learn and Find Help</strong> — Coaching, training, and support resources</li>
+      <li><strong>Office &amp; Operations</strong> — Back-office and management tools</li>
+    </ol>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 1: FIND NEW PROSPECTS -->
+    <h2>Section 1: Find New Prospects</h2>
+    <p>These tools help agents generate leads, build their online reputation, and put themselves in front of more potential clients.</p>
+
+    <h3 id="floor-time"><a href="./floor-time.html">Floor Time</a></h3>
+    <p><strong>What it does:</strong> Floor Time is the scheduling system for managing office duty shifts. Staff and managers use it to configure shifts and available time slots, set which agents are eligible to take floor time, collect agent availability preferences, and publish finalized monthly schedules directly to Google Calendar.</p>
+    <p><strong>Who uses it:</strong> Primarily office managers and staff who build the schedule, and agents who submit their availability and view their assigned shifts.</p>
+    <p><strong>When to use it:</strong> At the beginning of each month when floor duty schedules are being built, or whenever you need to check or update your floor time assignments.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How do I sign up for floor time?</strong><br>Log into the Workshop and go to Floor Time under Find New Prospects. Submit your availability for the month.</li>
+      <li><strong>Where do I see my floor time schedule?</strong><br>Once published, schedules are pushed to Google Calendar. You can also view them in the Floor Time tool.</li>
+    </ul>
+    <a href="./floor-time.html" class="tool-open">Open Floor Time →</a>
+
+    <h3 id="upcoming-listings"><a href="./agent-notices.html">Upcoming Listings &amp; Buyer Needs</a></h3>
+    <p><strong>What it does:</strong> This tool lets agents submit upcoming listings (properties not yet on the MLS) and active buyer needs (clients looking for a specific type of property) so they appear on the Adams Cameron Hotsheet for all agents to see.</p>
+    <p><strong>Who uses it:</strong> Any agent who has a new listing coming soon or a buyer actively looking for a property.</p>
+    <p><strong>When to use it:</strong> As soon as you have a listing agreement signed for a property that isn't live yet, or when you have a buyer client with specific needs you'd like to broadcast company-wide.</p>
+    <div class="note"><strong>Why it matters:</strong> This creates an internal network effect — your upcoming listing might match another agent's buyer need, leading to an in-house transaction before the property even hits the MLS.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What is a "buyer need"?</strong><br>It's a brief description of what your buyer client is looking for (e.g., "Buyer needs 3BR/2BA in Port Orange under $350K, cash, quick close"). Posting it lets other agents know to reach out if they have a match.</li>
+      <li><strong>Where do submissions show up?</strong><br>On the Adams Cameron Hotsheet, which all agents receive daily.</li>
+    </ul>
+    <a href="./agent-notices.html" class="tool-open">Open Upcoming Listings &amp; Buyer Needs →</a>
+
+    <h3 id="bio-creator"><a href="./bio-creator.html">Agent Bio Creator &amp; Updater</a></h3>
+    <p><strong>What it does:</strong> This AI-powered tool generates a professional biography for you based on your answers to a short questionnaire. It produces polished, natural-language bios suitable for your Adams Cameron website profile and your DeltaNet agent profile. You can also use it to update an existing bio.</p>
+    <p><strong>Who uses it:</strong> Any agent who needs a professional bio written or updated. New agents should use this as one of their first steps.</p>
+    <p><strong>When to use it:</strong> When you join Adams Cameron, when your experience or credentials change (new designations, years in business milestones, changed specialty areas), or when your current bio feels stale.</p>
+    <ol class="step-list">
+      <li>Go to Agent Bio Creator &amp; Updater in the Workshop.</li>
+      <li>Answer the questionnaire — questions about your background, specialties, geographic areas, designations, personal details, and what makes you unique.</li>
+      <li>The AI generates a professional bio. You can edit, regenerate, or approve it.</li>
+      <li>Once approved, the bio can be pushed to your DeltaNet profile.</li>
+    </ol>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Do I have to use the bio the AI writes?</strong><br>No. The AI provides a starting point. You can edit it to sound more like you before finalizing.</li>
+      <li><strong>What if my bio is already good?</strong><br>You can still use the tool to update individual sections or refresh the language.</li>
+    </ul>
+    <a href="./bio-creator.html" class="tool-open">Open Agent Bio Creator →</a>
+
+    <h3 id="photo-updater"><a href="./photo-updater.html">Agent Photo Updater</a></h3>
+    <p><strong>What it does:</strong> Allows agents to upload a new professional profile photo and push it directly to their DeltaNet account. Optionally, AI enhancement effects can be applied — options include a polished professional look (clean background, improved lighting), a beach scene, or a caricature style.</p>
+    <p><strong>Who uses it:</strong> Any agent who needs to update their headshot or add a DeltaNet profile photo.</p>
+    <p><strong>When to use it:</strong> When you get new professional photos, or when your current photo is outdated.</p>
+    <ol class="step-list">
+      <li>Upload your photo in the tool.</li>
+      <li>Optionally choose an AI enhancement style.</li>
+      <li>Preview the result and confirm.</li>
+      <li>The updated photo is pushed to your DeltaNet profile.</li>
+    </ol>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What photo format works best?</strong><br>A clear headshot with good lighting. Higher resolution is better.</li>
+      <li><strong>Is the AI enhancement required?</strong><br>No, it's optional. You can upload and push your original photo without any AI changes.</li>
+    </ul>
+    <a href="./photo-updater.html" class="tool-open">Open Agent Photo Updater →</a>
+
+    <h3 id="online-presence"><a href="./social-audit.html">Online Presence Audit</a></h3>
+    <p><strong>What it does:</strong> Uses AI (Claude) to evaluate an agent's overall online presence across multiple dimensions: social media activity and consistency, online reviews (Google, Zillow, Realtor.com, etc.), platform profile completeness, local SEO performance, AI search visibility (how you appear in ChatGPT and similar AI tools), brand consistency, and compliance with real estate advertising rules.</p>
+    <p><strong>Who uses it:</strong> Agents who want to understand and improve how they show up online. Managers can also use it to audit agents they coach.</p>
+    <p><strong>When to use it:</strong> Periodically (quarterly or annually) as part of a business review, or when an agent is working to improve their lead generation and visibility.</p>
+    <p><strong>What you get:</strong> A scored assessment with specific findings and actionable recommendations for each area.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What does "AI search visibility" mean?</strong><br>It means how well you show up when someone asks an AI assistant (like ChatGPT or Gemini) "who's a good real estate agent in Daytona Beach?" This is increasingly important as more consumers use AI tools to find local services.</li>
+      <li><strong>Is this audit automatic or does someone review it?</strong><br>The audit is AI-generated based on publicly available information. It's a self-service tool.</li>
+    </ul>
+    <a href="./social-audit.html" class="tool-open">Open Online Presence Audit →</a>
+
+    <h3 id="deltanet-audit"><a href="./deltanet-profile-audit.html">DeltaNet Profile Audit</a></h3>
+    <p><strong>What it does:</strong> Scores how completely an agent's DeltaNet profile is filled out compared to company benchmarks. It checks for a profile photo, biography, designations/certifications listed, reviews collected, lead capture settings, and other completeness factors.</p>
+    <p><strong>Who uses it:</strong> Individual agents checking their own profile, and managers reviewing their agents' DeltaNet presence.</p>
+    <p><strong>When to use it:</strong> When onboarding, after making profile updates, or as part of any profile improvement initiative.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How does this differ from the Online Presence Audit?</strong><br>The DeltaNet Profile Audit is specifically focused on your DeltaNet profile completeness. The Online Presence Audit looks at your broader internet footprint across many platforms.</li>
+      <li><strong>What score should I be aiming for?</strong><br>The audit shows the company benchmark. You should aim to meet or exceed it.</li>
+    </ul>
+    <a href="./deltanet-profile-audit.html" class="tool-open">Open DeltaNet Profile Audit →</a>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 2: LISTING MARKETING -->
+    <h2>Section 2: Listing Marketing</h2>
+    <p>These tools help you market properties more effectively, handle MLS data efficiently, and give listings a competitive edge.</p>
+
+    <h3 id="market-update"><a href="./market-update.html">Comprehensive Market Update</a></h3>
+    <p><strong>What it does:</strong> Generates a full market analysis report from MLS data exports. Upload active listing and sold listing data exported from your MLS, and the tool produces a professional market report including days on market (DOM), absorption rate, price per square foot, list-to-sale price ratios, and other key metrics.</p>
+    <p><strong>Who uses it:</strong> Listing agents preparing for seller presentations, agents working with investor clients, and managers who produce periodic market updates.</p>
+    <p><strong>When to use it:</strong> Before listing presentations, when preparing quarterly market updates for your sphere, or any time a client asks "how's the market?"</p>
+    <ol class="step-list">
+      <li>Export active and sold listing data from your MLS (Daytona or Stellar).</li>
+      <li>Upload the export files in the Comprehensive Market Update tool.</li>
+      <li>The tool processes the data and generates the report.</li>
+      <li>Download or share the finished market analysis.</li>
+    </ol>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What MLS export format does it accept?</strong><br>It's designed to work with standard Daytona MLS and Stellar MLS export formats. Follow the export instructions in the tool.</li>
+      <li><strong>Can I run reports for a specific neighborhood or price range?</strong><br>Yes, by filtering your MLS export before uploading. The tool analyzes whatever data you provide.</li>
+    </ul>
+    <a href="./market-update.html" class="tool-open">Open Comprehensive Market Update →</a>
+
+    <h3 id="mls-magic"><a href="https://mls-data-sync.web.app/">MLS Magic</a></h3>
+    <p><strong>What it does:</strong> Solves the double-MLS challenge for Adams Cameron agents. It reads listings from one MLS system (either Daytona MLS or Stellar MLS) and automatically fills in the data entry fields for the other system, eliminating the need to manually re-enter listing data twice.</p>
+    <p><strong>Who uses it:</strong> Listing agents who enter listings into both the Daytona MLS and Stellar MLS systems.</p>
+    <p><strong>When to use it:</strong> Any time you're entering a new listing or updating an existing one that needs to be in both MLS systems.</p>
+    <div class="note"><strong>Why it matters:</strong> Manually entering the same listing twice is time-consuming and error-prone. MLS Magic can significantly reduce the administrative burden of dual-MLS markets.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Does it post to both MLS systems automatically?</strong><br>It cross-references and auto-fills the data entry sheet. Review and confirm before finalizing submissions.</li>
+      <li><strong>Note on connectivity:</strong> If there's a DeltaNet connectivity issue, MLS Magic may have limited functionality. Check the Workshop status notice.</li>
+    </ul>
+    <a href="https://mls-data-sync.web.app/" class="tool-open">Open MLS Magic →</a>
+
+    <h3 id="camerons-lens"><a href="./camerons-lens.html">Cameron's Lens</a></h3>
+    <p><strong>What it does:</strong> An AI tool that takes your existing listing information and enhances the property description. It produces more compelling, buyer-focused listing copy and suggests specific photo improvements to make the listing more attractive online.</p>
+    <p><strong>Who uses it:</strong> Listing agents who want stronger property descriptions and more effective photography guidance.</p>
+    <p><strong>When to use it:</strong> When entering a new listing, refreshing a stale listing, or before a price reduction to re-energize buyer interest.</p>
+    <ol class="step-list">
+      <li>Enter (or paste) your current listing details — address, bedrooms, baths, features, price, etc.</li>
+      <li>Cameron's Lens generates an enhanced description.</li>
+      <li>It also provides photo suggestions specific to the property type and features.</li>
+      <li>Copy the enhanced description into your MLS listing.</li>
+    </ol>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Can I edit the AI-generated description?</strong><br>Yes, and you should. The AI output is a strong starting point; add your personal knowledge of the property and neighborhood.</li>
+      <li><strong>What kind of photo suggestions does it give?</strong><br>Specific recommendations like "shoot the kitchen from the doorway to show the full depth," "capture the tree line view from the primary bedroom," or "include a twilight exterior shot."</li>
+    </ul>
+    <a href="./camerons-lens.html" class="tool-open">Open Cameron's Lens →</a>
+
+    <h3 id="camerons-stage"><a href="./camerons-stage.html">Cameron's Stage</a></h3>
+    <p><strong>What it does:</strong> Creates a virtual property tour, including an AI-generated custom song for the property. The output is a shareable tour link you can add to your MLS listing or post on social media.</p>
+    <p><strong>Who uses it:</strong> Listing agents looking to differentiate their listings with creative, shareable content.</p>
+    <p><strong>When to use it:</strong> For any listing where you want to stand out — especially higher-value listings, unique properties, or any market where competition for buyers is intense.</p>
+    <p><strong>What you get:</strong> A virtual tour link that can be embedded in MLS listings and shared across social platforms.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What is the AI-generated song?</strong><br>The tool creates an original, property-specific musical jingle or theme song as part of the tour experience. It's a memorable differentiator.</li>
+      <li><strong>Does it replace professional photography?</strong><br>No. Cameron's Stage works best when you already have good photos. It enhances and packages them into a tour experience.</li>
+    </ul>
+    <a href="./camerons-stage.html" class="tool-open">Open Cameron's Stage →</a>
+
+    <h3 id="lockbox"><a href="./lockbox-app.html">Lockbox Manager</a></h3>
+    <p><strong>What it does:</strong> Tracks the company's lockbox inventory across all offices. Records check-in and check-out of individual lockboxes by serial number, the agent they're assigned to, and the property they're on.</p>
+    <p><strong>Who uses it:</strong> Primarily office staff and managers who manage the physical lockbox inventory. Agents can check their assigned lockboxes.</p>
+    <p><strong>When to use it:</strong> When checking out a lockbox for a new listing, returning a lockbox after a closing, or auditing current lockbox inventory.</p>
+    <div class="note">For full step-by-step check-out/check-in instructions, see the <a href="./staff-guide.html#lockbox">Staff Reference Guide</a>.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How do I get a lockbox for my listing?</strong><br>Contact your office. Staff will check it out to you in the Lockbox Manager and record it to your name.</li>
+      <li><strong>What happens if I lose a lockbox?</strong><br>Report it to your office immediately so it can be flagged in the system.</li>
+    </ul>
+    <a href="./lockbox-app.html" class="tool-open">Open Lockbox Manager →</a>
+
+    <h3 id="acc-binder"><a href="./acc-binder.html">ACC Binder</a></h3>
+    <p><strong>What it does:</strong> Accepts an uploaded contract or listing packet (a single PDF with multiple forms) and uses AI to automatically split it into its individual component forms, then uploads those individual forms directly to Form Simplicity.</p>
+    <p><strong>Who uses it:</strong> Transaction coordinators, listing agents, and buyer's agents who need to upload contracts to Form Simplicity.</p>
+    <p><strong>When to use it:</strong> Any time you receive a contract or packet as a single PDF and need to get the individual forms into Form Simplicity quickly and accurately.</p>
+    <div class="note"><strong>Why it matters:</strong> Manually splitting PDFs and uploading them form-by-form is tedious. ACC Binder automates what used to be a multi-step manual process.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What types of documents can I upload?</strong><br>Florida FAR/BAR residential purchase contracts, listing packets, and similar multi-form real estate documents.</li>
+      <li><strong>Does it always identify the forms correctly?</strong><br>The AI is trained on standard Florida real estate forms. For unusual or heavily modified documents, review the splits before finalizing.</li>
+    </ul>
+    <a href="./acc-binder.html" class="tool-open">Open ACC Binder →</a>
+
+    <h3 id="contract-calc"><a href="./contract-calculator.html">Contract Date Calculator</a></h3>
+    <p><strong>What it does:</strong> Calculates all important due dates in a Florida FAR/BAR residential purchase contract automatically. Enter key dates from the contract and it instantly produces a complete timeline — inspection period end date, earnest money deposit deadlines, financing contingency dates, title commitment deadline, closing date, and more.</p>
+    <p><strong>Who uses it:</strong> Agents, transaction coordinators, and anyone managing an active contract.</p>
+    <p><strong>When to use it:</strong> As soon as a contract is executed (both parties signed). This should be one of the first things you do when a sale goes under contract.</p>
+    <ol class="step-list">
+      <li>Enter the contract execution date, effective date, and other key dates from the contract.</li>
+      <li>Enter the number of days specified for each contingency period.</li>
+      <li>The calculator produces a full date timeline accounting for weekends and holidays per Florida contract rules.</li>
+    </ol>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Does it handle both calendar days and business days?</strong><br>Yes. The calculator applies the correct day-counting method for each deadline as specified in the FAR/BAR contract.</li>
+      <li><strong>What if my contract has non-standard addenda with different deadlines?</strong><br>The calculator handles standard FAR/BAR timelines. For unusual addenda, you may need to calculate those dates manually.</li>
+    </ul>
+    <a href="./contract-calculator.html" class="tool-open">Open Contract Date Calculator →</a>
+
+    <h3 id="hotsheet"><a href="./hotsheet-v2.html">Adams Cameron Hotsheet</a></h3>
+    <p><strong>What it does:</strong> Generates the daily activity report for Adams Cameron agents. Shows new listings that came on the market, properties that went under contract, closings that occurred, price changes, upcoming open houses, and submitted buyer needs — all filtered to Adams Cameron activity.</p>
+    <p><strong>Who uses it:</strong> All agents. Also staff and managers.</p>
+    <p><strong>When to use it:</strong> Daily. The Hotsheet is how you stay on top of what's happening in your market and within the company.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>When is the Hotsheet published?</strong><br>Daily, typically in the morning.</li>
+      <li><strong>Can I submit something to appear on the Hotsheet?</strong><br>Yes. Use the <a href="./agent-notices.html">Upcoming Listings &amp; Buyer Needs</a> tool to submit content for Hotsheet inclusion.</li>
+    </ul>
+    <a href="./hotsheet-v2.html" class="tool-open">Open Adams Cameron Hotsheet →</a>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 3: BUYER ASSISTANCE -->
+    <h2 id="buyer-assistance">Section 3: Buyer Assistance</h2>
+    <p>The Buyer Assistance section shares three tools with Listing Marketing, as they serve both sides of a transaction:</p>
+    <ul>
+      <li><a href="#acc-binder">ACC Binder</a> — Split and upload buyer-side contracts to Form Simplicity</li>
+      <li><a href="#contract-calc">Contract Date Calculator</a> — Calculate all FAR/BAR due dates for purchase contracts</li>
+      <li><a href="#hotsheet">Adams Cameron Hotsheet</a> — Monitor daily market activity to find properties for buyers</li>
+    </ul>
+    <div class="tip"><strong>Tip for buyer's agents:</strong> Use the Hotsheet to identify new listings the moment they hit the market. Use Upcoming Listings &amp; Buyer Needs to post your buyer's criteria so listing agents can reach out with properties before they're publicly listed.</div>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 4: MAINTAIN RELATIONSHIPS -->
+    <h2>Section 4: Maintain Relationships</h2>
+    <p>These tools help you stay connected with past clients and participate in company community initiatives.</p>
+
+    <h3 id="review-engine"><a href="./review-engine.html">Review Engine</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> Manages the post-closing review request process. Tracks the full funnel of review requests — who was sent a request, who clicked the link, and who completed a review. Also tracks A/B test results across different email template variants so you can see which messaging gets more reviews, and monitors monthly review targets.</p>
+    <p><strong>Who uses it:</strong> Agents who want to systematically collect online reviews, and managers tracking team review performance.</p>
+    <p><strong>When to use it:</strong> After every closing. A consistent review strategy is one of the highest-ROI activities an agent can do.</p>
+    <div class="note"><strong>Why reviews matter:</strong> Online reviews are a primary trust signal for new clients researching agents. Google, Zillow, and Realtor.com reviews directly influence whether a potential client calls you or a competitor.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How do I send a review request?</strong><br>The Review Engine manages the outreach. Follow the prompts after entering your closed client's information.</li>
+      <li><strong>What platforms does it request reviews for?</strong><br>The tool is designed to drive Google reviews, with options for other platforms.</li>
+      <li><strong>What's the A/B testing feature?</strong><br>The tool tests different request email templates and shows you which version gets more reviews so you can optimize your outreach over time.</li>
+    </ul>
+    <a href="./review-engine.html" class="tool-open">Open Review Engine →</a>
+
+    <h3 id="foundation"><a href="./foundation.html">Adams Cameron Foundation</a></h3>
+    <p><strong>What it does:</strong> Provides agents and staff a window into the Adams Cameron Foundation — the company's charitable giving initiative. Shows office-by-office participation statistics, provides information about the Foundation's partner charities, and allows you to manage your own donation pledge.</p>
+    <p><strong>Who uses it:</strong> Any agent or staff member who participates in or wants to learn about the Adams Cameron Foundation.</p>
+    <p><strong>When to use it:</strong> To set up or update your donation pledge, to see how your office is participating, or to learn about the charities the Foundation supports.</p>
+    <div class="note">Staff processing Foundation thank-you letters to buyers/sellers should see the <a href="./staff-guide.html#foundation-letters">Staff Reference Guide</a> — that's a related but separate workflow from agent pledges shown here.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How do I set up a donation pledge?</strong><br>Log into the Workshop and go to Adams Cameron Foundation under Maintain Relationships. Follow the pledge setup steps.</li>
+      <li><strong>Is participation required?</strong><br>No. The Foundation is a voluntary giving initiative.</li>
+    </ul>
+    <a href="./foundation.html" class="tool-open">Open Adams Cameron Foundation →</a>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 5: LEARN AND FIND HELP -->
+    <h2>Section 5: Learn and Find Help</h2>
+    <p>These resources support your professional growth, help you learn the Adams Cameron system, and give you channels to get help when you need it.</p>
+
+    <h3 id="pathfinder"><a href="./pathfinder.html">AC Pathfinder</a></h3>
+    <p><strong>What it does:</strong> AC Pathfinder is the agent coaching and business planning hub. It helps you build a 12-month business plan tailored to your goals, tracks your weekly progress against that plan, facilitates check-ins, and keeps you connected with your coach.</p>
+    <p><strong>Who uses it:</strong> All agents, especially those participating in Adams Cameron's coaching programs. New agents should engage with Pathfinder early in their career.</p>
+    <p><strong>When to use it:</strong> At the start of the year (or when you join) to set your annual business plan, and then weekly to check in on progress.</p>
+    <p><strong>What you can do in Pathfinder:</strong></p>
+    <ul>
+      <li>Set annual production goals (listings, buyer sides, GCI)</li>
+      <li>Build a weekly activity plan (calls, appointments, open houses)</li>
+      <li>Log weekly activity results</li>
+      <li>Complete scheduled coach check-ins</li>
+      <li>View your progress vs. plan over time</li>
+    </ul>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Do I need a coach to use Pathfinder?</strong><br>The business planning and progress tracking features are available to all agents. Coaching check-in features are most useful if you have an assigned coach.</li>
+      <li><strong>What if I don't know what goals to set?</strong><br>Your manager or coach can help you set realistic goals based on your experience level and market.</li>
+    </ul>
+    <a href="./pathfinder.html" class="tool-open">Open AC Pathfinder →</a>
+
+    <h3 id="agent-quiz"><a href="./agent-quiz.html">Agent Recognition Quiz</a></h3>
+    <p><strong>What it does:</strong> A photo-based identification game that helps agents and staff learn to recognize their Adams Cameron colleagues by face. A photo is shown and you choose the correct name from four options.</p>
+    <p><strong>Who uses it:</strong> New agents learning the Adams Cameron team, and anyone who wants to strengthen their knowledge of colleagues across offices.</p>
+    <p><strong>When to use it:</strong> During onboarding, or any time you want to sharpen your recognition of company colleagues — especially useful before company events or large meetings.</p>
+    <div class="note"><strong>Why it matters:</strong> Adams Cameron has approximately 300 agents across multiple offices. Knowing your colleagues by name and face strengthens the culture of the company and improves referral relationships between agents.</div>
+    <a href="./agent-quiz.html" class="tool-open">Open Agent Recognition Quiz →</a>
+
+    <h3 id="feedback-tool"><a href="./feedback.html">Feedback &amp; Support</a></h3>
+    <p><strong>What it does:</strong> The channel for submitting bug reports, feature requests, and suggestions about Workshop tools. You can also view and vote on items already submitted by other agents, and track the status of requests.</p>
+    <p><strong>Who uses it:</strong> Any agent or staff member who finds a bug, has an idea for a new tool or feature, or wants to see what improvements are in progress.</p>
+    <p><strong>When to use it:</strong> Any time a tool isn't working as expected, or when you have an idea that would make the Workshop more useful.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>What happens after I submit feedback?</strong><br>Items are reviewed by the team. You can track the status in the tool. Other users can vote on your request, which influences prioritization.</li>
+      <li><strong>Who do I contact for urgent technical problems?</strong><br>For urgent issues affecting your work, contact the office directly at (386) 253-8044 in addition to submitting a Feedback report.</li>
+    </ul>
+    <a href="./feedback.html" class="tool-open">Open Feedback &amp; Support →</a>
+
+    <h3 id="staff-guide"><a href="./staff-guide.html">Staff Reference Guide</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> A step-by-step how-to guide for internal staff covering the operations tools. Specifically covers the Daily Desk (managing daily office operations), Market Notices (publishing market update communications), Floor Time (scheduling and managing floor duty), and Lockbox Manager (inventory tracking).</p>
+    <p><strong>Who uses it:</strong> Office staff and managers who operate these systems day-to-day.</p>
+    <p><strong>When to use it:</strong> During training, when onboarding a new staff member, or as a reference when handling an unfamiliar situation in any of these tools.</p>
+    <a href="./staff-guide.html" class="tool-open">Open Staff Reference Guide →</a>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ SECTION 6: OFFICE & OPERATIONS -->
+    <h2>Section 6: Office &amp; Operations</h2>
+    <p>These tools support the management and operational side of Adams Cameron. Most are primarily used by managers and staff, though several are useful for all agents.</p>
+
+    <h3 id="roster"><a href="./roster.html">Agent Roster</a></h3>
+    <p><strong>What it does:</strong> A searchable directory of Adams Cameron agents, office management teams, and featured service partners — including Title, Mortgage, Association, and Property Management partners. The Roster is mobile-installable, meaning you can save it to your phone's home screen for quick access.</p>
+    <p><strong>Who uses it:</strong> All agents and staff.</p>
+    <p><strong>When to use it:</strong> When you need to look up a colleague's contact information, find out which manager covers a specific office, or identify a recommended title, mortgage, or other service partner.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>How do I install it on my phone?</strong><br>Open the Agent Roster in your mobile browser and use your phone's "Add to Home Screen" option. It functions like an app.</li>
+      <li><strong>How current is the information?</strong><br>The Roster pulls from live data. Contact changes made in Agent Records should reflect promptly.</li>
+    </ul>
+    <a href="./roster.html" class="tool-open">Open Agent Roster →</a>
+
+    <h3 id="agent-records"><a href="./agent-master-form.html">Agent Records</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> The administrative tool for viewing and editing agent profile data. Covers contact information, external system IDs (DeltaNet ID, Profit Power ID, NRDS/NAR member number), and notification settings (which alerts and communications each agent receives).</p>
+    <p><strong>Who uses it:</strong> Managers and staff who maintain agent records, and agents who need to update their own contact information or notification preferences.</p>
+    <p><strong>When to use it:</strong> When an agent's phone number or email changes, when a new agent needs their DeltaNet and Profit Power IDs entered, or when notification settings need adjustment.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Can agents edit their own records?</strong><br>Agents can update certain personal information. Managers have broader edit access for their agents.</li>
+      <li><strong>What is the NRDS number?</strong><br>NRDS is the National REALTORS® Database System number — your unique NAR member ID. It's required for MLS access.</li>
+    </ul>
+    <a href="./agent-master-form.html" class="tool-open">Open Agent Records →</a>
+
+    <h3 id="daily-desk"><a href="./daily-desk.html">Daily Desk</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> Provides an office-scoped, real-time view of active listings, contracts currently in progress, and today's specific action items. Pulls live data from DeltaNet, Form Simplicity, and the Adams Cameron transaction database to create a single operational dashboard for each office.</p>
+    <p><strong>Who uses it:</strong> Office managers, staff, and team leaders who need a daily operational overview of what's happening in their office.</p>
+    <p><strong>When to use it:</strong> Every morning to start the day with a clear picture of office activity — what's active, what's under contract, and what needs attention today.</p>
+    <div class="note">For detailed transaction entry and workflow instructions, see the <a href="./staff-guide.html#daily-desk">Staff Reference Guide</a>.</div>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Does each office see its own data?</strong><br>Yes. Daily Desk is scoped by office, so each location sees its own listings and contracts.</li>
+      <li><strong>What are "today's action items"?</strong><br>Items that require attention that day — contract deadlines, expiring listings, or other time-sensitive matters.</li>
+    </ul>
+    <a href="./daily-desk.html" class="tool-open">Open Daily Desk →</a>
+
+    <h3 id="scorecard"><a href="./scorecard-entry.html">Scorecard Data Entry</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> The manual data entry tool for company scorecard metrics that can't be pulled automatically from connected systems. Covers monthly inputs such as advertising spend totals, Facebook review counts, social advocacy participation data, and eBusiness statistics.</p>
+    <p><strong>Who uses it:</strong> Staff and managers responsible for maintaining the company performance scorecard.</p>
+    <p><strong>When to use it:</strong> Monthly, after the close of each month, to enter the period's manual metrics.</p>
+    <a href="./scorecard-entry.html" class="tool-open">Open Scorecard Data Entry →</a>
+
+    <h3 id="tool-usage"><a href="./usage-stats.html">Tool Usage</a> <span class="label-pill pill-mgr">Manager / Staff</span></h3>
+    <p><strong>What it does:</strong> An analytics dashboard showing how often each Workshop tool is being used and by whom. Displays visit counts by tool and by individual user, with a recent activity feed.</p>
+    <p><strong>Who uses it:</strong> Managers and leadership who want to understand Workshop adoption and identify opportunities for agent training or encouragement.</p>
+    <p><strong>When to use it:</strong> When evaluating which tools are getting traction, which agents are engaging with the Workshop, or when planning training initiatives.</p>
+    <h4>Common Questions</h4>
+    <ul>
+      <li><strong>Can individual agents see their own usage?</strong><br>The tool shows data by user, so managers can see individual usage. Check with leadership regarding your own data access.</li>
+      <li><strong>What does this tell me about my agents?</strong><br>Low usage of a tool like AC Pathfinder or Review Engine among specific agents can be a coaching conversation starter.</li>
+    </ul>
+    <a href="./usage-stats.html" class="tool-open">Open Tool Usage →</a>
+
+    <h3 id="leaderboard"><a href="./leaderboard.html">Production Leaderboard</a> <span class="label-pill pill-soon">Coming Soon</span></h3>
+    <p><strong>What it does:</strong> Displays sales rankings for Adams Cameron agents — Sales Leader, Listing Leader, and President's Club GCI rankings — viewable company-wide or filtered by office.</p>
+    <p><strong>Status:</strong> Currently listed as "Coming Soon." This tool is under development.</p>
+    <p><strong>Who will use it:</strong> All agents (to see their ranking), managers (to recognize top performers), and leadership.</p>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ FAQ -->
+    <h2 id="faq">Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I log into John's Workshop?</div>
+      <p>Go to johnadams.org and log in with your Adams Cameron credentials. If you're having login trouble, contact your office or the support line at (386) 253-8044.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">I'm a new agent. Where should I start?</div>
+      <p>Start with these four steps: (1) Use <a href="./bio-creator.html">Agent Bio Creator</a> to write your professional bio, (2) Use <a href="./photo-updater.html">Agent Photo Updater</a> to upload your headshot, (3) Complete your <a href="./deltanet-profile-audit.html">DeltaNet Profile Audit</a> to see what's missing, (4) Open <a href="./pathfinder.html">AC Pathfinder</a> and start your 12-month business plan with your manager.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">A tool isn't working. What do I do?</div>
+      <p>First, check if there's a connectivity notice at the top of the Workshop page — some issues are related to DeltaNet or MLS connectivity that affect multiple tools. If it appears to be a specific tool bug, use the <a href="./feedback.html">Feedback &amp; Support</a> tool to report it, and contact the office at (386) 253-8044 if it's affecting your work urgently.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Are the AI tools private? Does my client data leave Adams Cameron?</div>
+      <p>The Workshop's AI features are built for professional use. Avoid entering personally identifiable client information (full names, SSNs, financial account numbers) into AI tools unless the tool specifically requests it for a defined purpose.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">What does "Beta" mean next to a tool?</div>
+      <p>Tools marked Beta are functional but still being actively refined. You may encounter occasional issues. Use the <a href="./feedback.html">Feedback &amp; Support</a> tool to report any problems you find — your input helps improve the tool.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Can I use Workshop tools on my phone?</div>
+      <p>Yes. The Workshop is mobile-friendly. The Agent Roster specifically can be installed as an app icon on your phone's home screen.</p>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Who do I contact if I need help?</div>
+      <p>Use the <a href="./feedback.html">Feedback &amp; Support</a> tool for non-urgent questions and bug reports. For urgent issues, call the office at (386) 253-8044. You can also reach Adams Cameron through the contact information on the main Adams Cameron &amp; Co. website.</p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ TOOL DIRECTORY -->
+    <h2 id="directory">Quick Reference: Tool Directory</h2>
+    <table class="role-table">
+      <thead>
+        <tr><th>Tool</th><th>Section</th><th>Primary Users</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="#floor-time">Floor Time</a></td><td>Find New Prospects</td><td>Staff, Managers, Agents</td></tr>
+        <tr><td><a href="#upcoming-listings">Upcoming Listings &amp; Buyer Needs</a></td><td>Find New Prospects</td><td>All Agents</td></tr>
+        <tr><td><a href="#bio-creator">Agent Bio Creator &amp; Updater</a></td><td>Find New Prospects</td><td>All Agents</td></tr>
+        <tr><td><a href="#photo-updater">Agent Photo Updater</a></td><td>Find New Prospects</td><td>All Agents</td></tr>
+        <tr><td><a href="#online-presence">Online Presence Audit</a></td><td>Find New Prospects</td><td>All Agents</td></tr>
+        <tr><td><a href="#deltanet-audit">DeltaNet Profile Audit</a></td><td>Find New Prospects</td><td>All Agents, Managers</td></tr>
+        <tr><td><a href="#market-update">Comprehensive Market Update</a></td><td>Listing Marketing</td><td>Listing Agents</td></tr>
+        <tr><td><a href="#mls-magic">MLS Magic</a></td><td>Listing Marketing</td><td>Listing Agents</td></tr>
+        <tr><td><a href="#camerons-lens">Cameron's Lens</a></td><td>Listing Marketing</td><td>Listing Agents</td></tr>
+        <tr><td><a href="#camerons-stage">Cameron's Stage</a></td><td>Listing Marketing</td><td>Listing Agents</td></tr>
+        <tr><td><a href="#lockbox">Lockbox Manager</a></td><td>Listing Marketing / Office</td><td>Staff, Managers</td></tr>
+        <tr><td><a href="#acc-binder">ACC Binder</a></td><td>Listing &amp; Buyer</td><td>All Agents, TCs</td></tr>
+        <tr><td><a href="#contract-calc">Contract Date Calculator</a></td><td>Listing &amp; Buyer</td><td>All Agents, TCs</td></tr>
+        <tr><td><a href="#hotsheet">Adams Cameron Hotsheet</a></td><td>Listing &amp; Buyer</td><td>All Agents</td></tr>
+        <tr><td><a href="#review-engine">Review Engine</a></td><td>Maintain Relationships</td><td>All Agents</td></tr>
+        <tr><td><a href="#foundation">Adams Cameron Foundation</a></td><td>Maintain Relationships</td><td>All Agents &amp; Staff</td></tr>
+        <tr><td><a href="#pathfinder">AC Pathfinder</a></td><td>Learn &amp; Find Help</td><td>All Agents</td></tr>
+        <tr><td><a href="#agent-quiz">Agent Recognition Quiz</a></td><td>Learn &amp; Find Help</td><td>All Agents &amp; Staff</td></tr>
+        <tr><td><a href="#feedback-tool">Feedback &amp; Support</a></td><td>Learn &amp; Find Help</td><td>All Agents &amp; Staff</td></tr>
+        <tr><td><a href="#staff-guide">Staff Reference Guide</a></td><td>Learn &amp; Find Help</td><td>Staff, Managers</td></tr>
+        <tr><td><a href="#roster">Agent Roster</a></td><td>Office &amp; Operations</td><td>All Agents &amp; Staff</td></tr>
+        <tr><td><a href="#agent-records">Agent Records</a></td><td>Office &amp; Operations</td><td>Managers, Staff</td></tr>
+        <tr><td><a href="#daily-desk">Daily Desk</a></td><td>Office &amp; Operations</td><td>Managers, Staff</td></tr>
+        <tr><td><a href="#scorecard">Scorecard Data Entry</a></td><td>Office &amp; Operations</td><td>Staff, Managers</td></tr>
+        <tr><td><a href="#tool-usage">Tool Usage</a></td><td>Office &amp; Operations</td><td>Managers, Leadership</td></tr>
+        <tr><td><a href="#leaderboard">Production Leaderboard</a></td><td>Office &amp; Operations</td><td>All (Coming Soon)</td></tr>
+      </tbody>
+    </table>
+
+    <hr class="divider">
+
+    <!-- ═══════════════════════════════════════════════ CONTACT -->
+    <h2 id="contact">Contact &amp; Additional Resources</h2>
+    <ul>
+      <li><strong>John's Workshop:</strong> johnadams.org</li>
+      <li><strong>Office Phone:</strong> (386) 253-8044</li>
+      <li><strong>Privacy Policy and Terms of Use:</strong> Available in the <a href="./privacy-policy.html">Workshop footer</a></li>
+      <li><strong>Feedback &amp; Support:</strong> Available in the <a href="./feedback.html">Workshop and footer</a></li>
+    </ul>
+
+    <p style="font-size:12px;color:var(--muted);text-align:center;margin-top:32px">Adams Cameron &amp; Co. — For all agents, staff, and leadership</p>
+
+  </main>
+</div>
+
+<script>
+// Highlight active sidebar link on scroll
+const headings = document.querySelectorAll('h2[id], h3[id]');
+const links = document.querySelectorAll('.sidebar a[href^="#"]');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+headings.forEach(h => obs.observe(h));
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Workshop Guide',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
