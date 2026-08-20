@@ -518,30 +518,18 @@ const S = {
   checklistByTxn: null,// current view's checklist rows, grouped by transaction_id
 };
 
-/* ── SHARED SESSION AUTH ────────────────────────────────────────────
-   Same ac_pathfinder_session convention as pathfinder.html/
-   agent-dashboard.html/coach-dashboard.html. ────────────────────── */
-const AC_SESSION_KEY = 'ac_pathfinder_session';
-
-function saveSession(email, name, picture) {
-  try {
-    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({ email, name, picture, exp: Date.now() + 8 * 60 * 60 * 1000 }));
-  } catch(_) {}
-}
-function clearSession() {
-  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
-}
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(AC_SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.email || s.exp < Date.now()) { localStorage.removeItem(AC_SESSION_KEY); return null; }
-    return s;
-  } catch(_) { return null; }
-}
-
-// ── Google Auth (ID-token flow, matches pathfinder.html) ────────────────────
+// ── Auth (ID-token flow) ─────────────────────────────────────────────────────
+// Standard shared-session convention (see docs/CLAUDE.md): every tool page
+// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
+// re-prompting if both are already present, so signing in once on any tool
+// works everywhere. This page previously gated on an additional, page-family-
+// specific ac_pathfinder_session key (still shared with pathfinder.html/
+// agent-dashboard.html/coach-dashboard.html, but not with the rest of the
+// site) — a user already signed in via Daily Desk, Hotsheet, etc. would still
+// get re-prompted here, since those pages never set that key. Fixed to gate
+// on the standard pair only; name (for the header chip) falls back to
+// /lockbox/me's `name` field on a returning visit where there's no fresh JWT
+// to decode. Picture has no such fallback source, so it's just omitted then.
 const poll = setInterval(() => {
   if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
 }, 100);
@@ -550,9 +538,9 @@ function initOAuth() {
   google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
 
-  const saved = loadSession();
-  if (saved && PROXY_KEY) {
-    S.user = { email: saved.email, name: saved.name, picture: saved.picture };
+  const savedEmail = localStorage.getItem('ac_user_email');
+  if (savedEmail && PROXY_KEY) {
+    S.user = { email: savedEmail, name: null, picture: null };
     onSignedIn();
   } else {
     google.accounts.id.prompt();
@@ -574,18 +562,18 @@ async function handleCredential(response) {
   } catch (e) { alert('Authentication error: ' + e.message); return; }
   const payload = JSON.parse(atob(response.credential.split('.')[1]));
   S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
-  saveSession(S.user.email, S.user.name, S.user.picture);
-  // Also set the shared ac_user_email key — none of the other
-  // ac_pathfinder_session pages currently do this, which silently blanks
-  // the tool-usage log unless the browser separately visited an
-  // ac_proxy_key-family page first. Doing it correctly here from the start.
   localStorage.setItem('ac_user_email', S.user.email);
   onSignedIn();
 }
 
 function signOut() {
   google.accounts.id.disableAutoSelect();
-  clearSession();
+  // Clears the shared keys, not a page-specific one — since sign-in is
+  // shared site-wide, sign-out should be too (this previously only cleared
+  // this page's own session, leaving every other tool still "signed in").
+  localStorage.removeItem('ac_proxy_key');
+  localStorage.removeItem('ac_user_email');
+  PROXY_KEY = '';
   S.user = null;
   S.isManager = false;
   S.ownAgentId = null;
@@ -602,13 +590,21 @@ function signOut() {
 // ── Post sign-in ─────────────────────────────────────────────────────────────
 async function onSignedIn() {
   document.getElementById('preAuth').style.display = 'none';
-  document.getElementById('userAvatar').src = S.user.picture || '';
-  document.getElementById('userName').textContent = S.user.name;
+  const avatar = document.getElementById('userAvatar');
+  avatar.style.display = S.user.picture ? '' : 'none';
+  avatar.src = S.user.picture || '';
+  document.getElementById('userName').textContent = S.user.name || S.user.email;
   document.getElementById('userChip').style.display = 'flex';
   document.getElementById('loadingState').style.display = 'block';
 
   try {
     const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    // Returning visit with no fresh JWT to decode (see initOAuth) — S.user.name
+    // is null in that case, so fill it in from here instead.
+    if (!S.user.name && me.name) {
+      S.user.name = me.name;
+      document.getElementById('userName').textContent = me.name;
+    }
     S.isManager = me.role === 'manager';
     S.ownAgentId = me.agent_id || null;
     renderSidebar();

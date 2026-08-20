@@ -701,35 +701,18 @@ const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
-/* ── SHARED SESSION AUTH ────────────────────────────────────────────
-   Uses localStorage so sign-in persists across tabs and page refreshes.
-   8-hour expiry. Same key on every page.
-   ────────────────────────────────────────────────────────────────── */
-const AC_SESSION_KEY = 'ac_pathfinder_session';
-
-function saveSession(email, name, picture) {
-  try {
-    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
-      email, name, picture,
-      exp: Date.now() + 8 * 60 * 60 * 1000
-    }));
-  } catch(_) {}
-}
-
-function clearSession() {
-  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
-}
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(AC_SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.email || s.exp < Date.now()) { localStorage.removeItem(AC_SESSION_KEY); return null; }
-    return s;
-  } catch(_) { return null; }
-}
-
+// Standard shared-session convention (see docs/CLAUDE.md): every tool page
+// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
+// re-prompting if both are already present, so signing in once on any tool
+// works everywhere. This page previously gated on an additional, page-family-
+// specific ac_pathfinder_session key (also shared with pathfinder.html/
+// agent-hub.html/agent-dashboard.html, but not with the rest of the site) —
+// a user already signed in via Daily Desk, Hotsheet, etc. would still get
+// re-prompted here, since those pages never set that key. Fixed to gate on
+// the standard pair only; no dedicated name-source endpoint here, so a
+// returning visit with no fresh JWT to decode falls back to the same
+// email-prefix convention this file already used elsewhere (saved.name ||
+// saved.email?.split('@')[0]).
 
 /* ─────────────────────── STATE ──────────────────────── */
 const S = {
@@ -765,7 +748,11 @@ function signOut() {
   document.getElementById('signInBtn').style.display   = 'block';
   document.getElementById('dashApp').style.display     = 'none';
   document.getElementById('authGate').style.display    = 'flex';
-  clearSession();
+  // Clears the shared keys, not a page-specific one — since sign-in is
+  // shared site-wide, sign-out should be too.
+  localStorage.removeItem('ac_proxy_key');
+  localStorage.removeItem('ac_user_email');
+  PROXY_KEY = '';
   if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
 }
 
@@ -787,7 +774,7 @@ async function handleCredential(credentialResponse) {
     const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
     S.email = payload.email;
     S.name  = payload.name || payload.email.split('@')[0];
-    saveSession(S.email, S.name, null);
+    localStorage.setItem('ac_user_email', S.email);
     onSignedIn();
   } catch(e) {
     console.warn('Sign-in failed:', e);
@@ -807,10 +794,10 @@ window.addEventListener('load', () => {
     google.accounts.id.renderButton(document.getElementById('signInBtn'), { theme: 'outline', size: 'medium', text: 'signin_with' });
     google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
 
-    const saved = loadSession();
-    if (saved && PROXY_KEY) {
-      S.email = saved.email;
-      S.name  = saved.name || saved.email?.split('@')[0];
+    const savedEmail = localStorage.getItem('ac_user_email');
+    if (savedEmail && PROXY_KEY) {
+      S.email = savedEmail;
+      S.name  = savedEmail.split('@')[0];
       onSignedIn();
     } else {
       google.accounts.id.prompt();

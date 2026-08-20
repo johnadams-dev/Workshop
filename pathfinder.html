@@ -595,39 +595,18 @@ const S = {
   totalSteps:  8,
 };
 
-// ── Shared session auth ────────────────────────────────────────────────────────
-/* ── SHARED SESSION AUTH ────────────────────────────────────────────
-   Uses localStorage so sign-in persists across tabs and page refreshes.
-   8-hour expiry — reasonable for a work day.
-   Same key on every page so signing in anywhere covers all pages.
-   ────────────────────────────────────────────────────────────────── */
-const AC_SESSION_KEY = 'ac_pathfinder_session';
-
-function saveSession(email, name, picture) {
-  try {
-    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
-      email, name, picture,
-      exp: Date.now() + 8 * 60 * 60 * 1000
-    }));
-  } catch(_) {}
-}
-
-function clearSession() {
-  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
-}
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(AC_SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.email || s.exp < Date.now()) {
-      localStorage.removeItem(AC_SESSION_KEY);
-      return null;
-    }
-    return s;
-  } catch(_) { return null; }
-}
+// ── Auth ──────────────────────────────────────────────────────────────────────
+// Standard shared-session convention (see docs/CLAUDE.md): every tool page
+// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
+// re-prompting if both are already present, so signing in once on any tool
+// works everywhere. This page previously gated on an additional, page-family-
+// specific ac_pathfinder_session key (also shared with agent-hub.html/
+// agent-dashboard.html/coach-dashboard.html, but not with the rest of the
+// site) — a user already signed in via Daily Desk, Hotsheet, etc. would still
+// get re-prompted here, since those pages never set that key. Fixed to gate
+// on the standard pair only; name/picture (for the header chip) fall back to
+// the agent-profile fetch below on a returning visit where there's no fresh
+// JWT to decode.
 // ── Google Auth ────────────────────────────────────────────────────────────────
 // Previously had two sign-in paths: this ID-token flow (handleCredential,
 // used for One Tap / auto_select), and a separate OAuth access-token flow
@@ -650,10 +629,10 @@ function initOAuth() {
   });
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
 
-  // Check localStorage session before prompting Google
-  const saved = loadSession();
-  if (saved && PROXY_KEY) {
-    S.user = { email: saved.email, name: saved.name, picture: saved.picture };
+  // Check the standard shared session before prompting Google
+  const savedEmail = localStorage.getItem('ac_user_email');
+  if (savedEmail && PROXY_KEY) {
+    S.user = { email: savedEmail, name: null, picture: null };
     onSignedIn();
   } else {
     google.accounts.id.prompt();
@@ -680,13 +659,17 @@ async function handleCredential(response) {
   } catch (e) { alert('Authentication error: ' + e.message); return; }
   const payload = JSON.parse(atob(response.credential.split('.')[1]));
   S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
-  saveSession(S.user.email, S.user.name, S.user.picture);
+  localStorage.setItem('ac_user_email', S.user.email);
   onSignedIn();
 }
 
 function signOut() {
   google.accounts.id.disableAutoSelect();
-  clearSession();
+  // Clears the shared keys, not a page-specific one — since sign-in is
+  // shared site-wide, sign-out should be too.
+  localStorage.removeItem('ac_proxy_key');
+  localStorage.removeItem('ac_user_email');
+  PROXY_KEY = '';
   S.user = null;
   S.agentProfile = null;
   document.getElementById('userChip').style.display = 'none';
@@ -701,8 +684,10 @@ function signOut() {
 async function onSignedIn() {
   // Show user chip
   document.getElementById('preAuth').style.display = 'none';
-  document.getElementById('userAvatar').src = S.user.picture || '';
-  document.getElementById('userName').textContent = S.user.name;
+  const avatar = document.getElementById('userAvatar');
+  avatar.style.display = S.user.picture ? '' : 'none';
+  avatar.src = S.user.picture || '';
+  document.getElementById('userName').textContent = S.user.name || S.user.email;
   document.getElementById('userChip').style.display = 'flex';
 
   // Show loading
@@ -714,6 +699,18 @@ async function onSignedIn() {
       headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email }
     });
     const profile = await profileRes.json();
+
+    // Returning visit with no fresh JWT to decode (see initOAuth) — S.user.name
+    // is null in that case, so fill in name/picture from the profile fetch.
+    if (!S.user.name && profile.found) {
+      const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+      if (name) { S.user.name = name; document.getElementById('userName').textContent = name; }
+      if (profile.photo_url) {
+        S.user.picture = profile.photo_url;
+        avatar.style.display = '';
+        avatar.src = profile.photo_url;
+      }
+    }
 
     // Check coach/staff access
     const coachRes = await fetch(`${PROXY_BASE}/coach/dashboard`, {
