@@ -82,6 +82,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .mine-row-date{display:block;font-size:11px;color:var(--muted);margin-top:2px}
 .btn-edit-mine{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--blue);color:var(--blue);background:#fff;border-radius:5px;cursor:pointer;flex-shrink:0;font-family:inherit}
 .btn-edit-mine:hover{background:#EFF6FF}
+.btn-delete-mine{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--red);color:var(--red);background:#fff;border-radius:5px;cursor:pointer;flex-shrink:0;font-family:inherit}
+.btn-delete-mine:hover{background:#FDF0EE}
+.mine-row-actions{display:flex;gap:6px;flex-shrink:0}
+.mine-card-title-name{font-weight:400;text-transform:none;letter-spacing:0;color:var(--text)}
 .cancel-edit-link{font-size:12px;color:var(--muted);cursor:pointer;margin-right:auto;align-self:center;text-decoration:underline}
 </style>
 </head>
@@ -187,7 +191,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
 
     <div class="card" id="ul-mine-card" style="display:none">
-      <div class="card-title">Your upcoming listings</div>
+      <div class="card-title" id="ul-mine-card-title">Your upcoming listings</div>
       <div id="ul-mine-list"></div>
     </div>
 
@@ -249,7 +253,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
 
     <div class="card" id="bn-mine-card" style="display:none">
-      <div class="card-title">Your buyer needs</div>
+      <div class="card-title" id="bn-mine-card-title">Your buyer needs</div>
       <div id="bn-mine-list"></div>
     </div>
 
@@ -274,6 +278,8 @@ let myUpcoming = [];
 let myBuyerNeeds = [];
 let editingUpcomingId = null;
 let editingBuyerId = null;
+let selectedAgentUpcoming = null; // { id, name } — staff view: whose items ul-mine-list shows
+let selectedAgentBuyer    = null; // { id, name } — staff view: whose items bn-mine-list shows
 
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
 
@@ -309,29 +315,37 @@ function toggleAddressNote() {
 }
 
 // ── Agent picker (shown to staff, hidden for agents) ──────────────────────────
-function buildAgentPicker(containerId, selectId, methodId, valueId, updateFn) {
+// Also drives the "mine list" below each form: whichever agent is selected
+// here is the agent whose outstanding items are shown, editable, and
+// deletable in this tab — this is what makes the page a hub for staff too,
+// not just for the signed-in agent.
+function buildAgentPicker(containerId, selectId, methodId, valueId, type, updateFn) {
   const note = document.getElementById(containerId);
   if (!isStaff || !agents.length) { note.classList.remove('show'); return; }
   note.innerHTML = `
-    <strong>Entering on behalf of an agent</strong> — select the agent:<br style="margin-bottom:4px">
+    <strong>Entering or managing on behalf of an agent</strong> — select the agent:<br style="margin-bottom:4px">
     <select id="${selectId}" style="margin-top:7px;padding:6px 9px;border:1px solid #C9A84C;border-radius:6px;font-size:13px;width:100%;background:#fff">
       <option value="">— Select agent —</option>
-      ${agents.map(a => `<option value="${a.id}" data-email="${esc(a.email||'')}" data-cell="${esc(a.cell_e164||'')}">${esc(a.first_name)} ${esc(a.last_name)} — ${esc(a.office_name||'')}</option>`).join('')}
+      ${agents.map(a => `<option value="${a.id}" data-email="${esc(a.email||'')}" data-cell="${esc(a.cell_e164||'')}" data-name="${esc(a.first_name)} ${esc(a.last_name)}">${esc(a.first_name)} ${esc(a.last_name)} — ${esc(a.office_name||'')}</option>`).join('')}
     </select>`;
   note.classList.add('show');
   document.getElementById(selectId).addEventListener('change', function() {
     const opt = this.selectedOptions[0];
-    if (!opt || !opt.value) return;
-    const email = opt.dataset.email;
-    const cell  = opt.dataset.cell;
-    if (email) {
-      document.getElementById(methodId).value = 'email';
-      document.getElementById(valueId).value = email;
-    } else if (cell) {
-      document.getElementById(methodId).value = 'phone';
-      document.getElementById(valueId).value = cell;
+    const agentId   = opt && opt.value ? parseInt(opt.value, 10) : null;
+    const agentName = opt ? (opt.dataset.name || '') : '';
+    if (opt && opt.value) {
+      const email = opt.dataset.email;
+      const cell  = opt.dataset.cell;
+      if (email) {
+        document.getElementById(methodId).value = 'email';
+        document.getElementById(valueId).value = email;
+      } else if (cell) {
+        document.getElementById(methodId).value = 'phone';
+        document.getElementById(valueId).value = cell;
+      }
+      if (updateFn) updateFn();
     }
-    if (updateFn) updateFn();
+    loadNoticesForSelectedAgent(type, agentId, agentName);
   });
 }
 
@@ -375,7 +389,7 @@ async function submitUpcoming() {
 
     toast(isEditing ? 'Upcoming listing updated.' : 'Upcoming listing submitted — it will appear in the hotsheet.', 'ok');
     resetUpcomingForm();
-    loadMyNotices();
+    refreshMineList('upcoming');
   } catch(e) {
     toast('Failed: '+e.message, 'err');
   } finally {
@@ -438,7 +452,7 @@ async function submitBuyerNeed() {
 
     toast(isEditing ? 'Buyer need updated.' : 'Buyer need submitted — it will appear in the hotsheet.', 'ok');
     resetBuyerForm();
-    loadMyNotices();
+    refreshMineList('buyer');
   } catch(e) {
     toast('Failed: '+e.message, 'err');
   } finally {
@@ -473,36 +487,106 @@ function mineSummary(type, item) {
   return [item.area, item.max_price ? `up to ${item.max_price}` : ''].filter(Boolean).join(' · ') || 'Buyer need';
 }
 
-function renderMineList(type) {
-  const items = type === 'upcoming' ? myUpcoming : myBuyerNeeds;
-  const card = document.getElementById(type === 'upcoming' ? 'ul-mine-card' : 'bn-mine-card');
-  const list = document.getElementById(type === 'upcoming' ? 'ul-mine-list' : 'bn-mine-list');
-  if (!items.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
-  card.style.display = 'block';
-  list.innerHTML = items.map(item => `
+function mineRowHtml(type, item) {
+  return `
     <div class="mine-row">
       <div>
         <div class="mine-row-summary">${esc(mineSummary(type, item))}</div>
         <span class="mine-row-date">Posted ${esc(fmtDateShort(item.created_at))}</span>
       </div>
-      <button type="button" class="btn-edit-mine" data-type="${type}" data-id="${item.id}">Edit</button>
-    </div>`).join('');
+      <div class="mine-row-actions">
+        <button type="button" class="btn-edit-mine" data-type="${type}" data-id="${item.id}">Edit</button>
+        <button type="button" class="btn-delete-mine" data-type="${type}" data-id="${item.id}">Delete</button>
+      </div>
+    </div>`;
+}
+
+function renderMineList(type) {
+  const items    = type === 'upcoming' ? myUpcoming : myBuyerNeeds;
+  const card     = document.getElementById(type === 'upcoming' ? 'ul-mine-card' : 'bn-mine-card');
+  const list     = document.getElementById(type === 'upcoming' ? 'ul-mine-list' : 'bn-mine-list');
+  const titleEl  = document.getElementById(type === 'upcoming' ? 'ul-mine-card-title' : 'bn-mine-card-title');
+  const noun     = type === 'upcoming' ? 'upcoming listings' : 'buyer needs';
+
+  if (isStaff) {
+    const selectedAgent = type === 'upcoming' ? selectedAgentUpcoming : selectedAgentBuyer;
+    if (!selectedAgent) { card.style.display = 'none'; list.innerHTML = ''; return; }
+    if (titleEl) titleEl.textContent = `${selectedAgent.name}'s ${noun}`;
+    card.style.display = 'block';
+    list.innerHTML = items.length
+      ? items.map(item => mineRowHtml(type, item)).join('')
+      : `<div style="font-size:12px;color:var(--muted);padding:4px 0 2px">No outstanding items.</div>`;
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = `Your ${noun}`;
+  if (!items.length) { card.style.display = 'none'; list.innerHTML = ''; return; }
+  card.style.display = 'block';
+  list.innerHTML = items.map(item => mineRowHtml(type, item)).join('');
+}
+
+async function fetchNoticesList(type) {
+  const path = type === 'upcoming' ? '/notices/upcoming' : '/notices/buyer-needs';
+  const r = await fetch(`${PROXY}${path}`, { headers: H() });
+  return r.ok ? await r.json() : [];
 }
 
 async function loadMyNotices() {
-  if (isStaff) return;
+  if (isStaff) { renderMineList('upcoming'); renderMineList('buyer'); return; }
   try {
-    const [upRes, bnRes] = await Promise.all([
-      fetch(`${PROXY}/notices/upcoming`, { headers: H() }),
-      fetch(`${PROXY}/notices/buyer-needs`, { headers: H() }),
-    ]);
-    const up = upRes.ok ? await upRes.json() : [];
-    const bn = bnRes.ok ? await bnRes.json() : [];
+    const [up, bn] = await Promise.all([fetchNoticesList('upcoming'), fetchNoticesList('buyer')]);
     myUpcoming = (up || []).filter(r => (r.agent_email || '').toLowerCase() === USER_EMAIL.toLowerCase());
     myBuyerNeeds = (bn || []).filter(r => (r.agent_email || '').toLowerCase() === USER_EMAIL.toLowerCase());
     renderMineList('upcoming');
     renderMineList('buyer');
   } catch(_) {}
+}
+
+// Staff view: (re)load the currently-selected agent's items for one tab.
+// Passing a falsy agentId clears the list (e.g. picker reset to "— Select agent —").
+async function loadNoticesForSelectedAgent(type, agentId, agentName) {
+  if (type === 'upcoming') selectedAgentUpcoming = agentId ? { id: agentId, name: agentName } : null;
+  else selectedAgentBuyer = agentId ? { id: agentId, name: agentName } : null;
+
+  if (!agentId) {
+    if (type === 'upcoming') myUpcoming = []; else myBuyerNeeds = [];
+    renderMineList(type);
+    return;
+  }
+  try {
+    const list = await fetchNoticesList(type);
+    const filtered = (list || []).filter(r => r.agent_id === agentId);
+    if (type === 'upcoming') myUpcoming = filtered; else myBuyerNeeds = filtered;
+    renderMineList(type);
+  } catch(_) {}
+}
+
+// Refresh whichever list is relevant after a submit/edit/delete — the
+// signed-in agent's own list normally, or (for staff) the currently
+// selected agent's list.
+function refreshMineList(type) {
+  if (isStaff) {
+    const sel = type === 'upcoming' ? selectedAgentUpcoming : selectedAgentBuyer;
+    loadNoticesForSelectedAgent(type, sel ? sel.id : null, sel ? sel.name : '');
+  } else {
+    loadMyNotices();
+  }
+}
+
+async function deleteMine(type, id) {
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  try {
+    const path = type === 'upcoming' ? `${PROXY}/notices/upcoming/${id}` : `${PROXY}/notices/buyer-needs/${id}`;
+    const r = await fetch(path, { method: 'DELETE', headers: H() });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'HTTP '+r.status);
+    toast('Deleted.', 'ok');
+    if (type === 'upcoming' && editingUpcomingId === id) cancelEditUpcoming();
+    if (type === 'buyer' && editingBuyerId === id) cancelEditBuyer();
+    refreshMineList(type);
+  } catch(e) {
+    toast('Failed to delete: ' + e.message, 'err');
+  }
 }
 
 function startEditUpcoming(item) {
@@ -542,15 +626,21 @@ function startEditBuyer(item) {
 }
 
 document.addEventListener('click', e => {
-  const btn = e.target.closest('.btn-edit-mine');
-  if (!btn) return;
-  const id = parseInt(btn.dataset.id, 10);
-  if (btn.dataset.type === 'upcoming') {
-    const item = myUpcoming.find(r => r.id === id);
-    if (item) startEditUpcoming(item);
-  } else {
-    const item = myBuyerNeeds.find(r => r.id === id);
-    if (item) startEditBuyer(item);
+  const editBtn = e.target.closest('.btn-edit-mine');
+  if (editBtn) {
+    const id = parseInt(editBtn.dataset.id, 10);
+    if (editBtn.dataset.type === 'upcoming') {
+      const item = myUpcoming.find(r => r.id === id);
+      if (item) startEditUpcoming(item);
+    } else {
+      const item = myBuyerNeeds.find(r => r.id === id);
+      if (item) startEditBuyer(item);
+    }
+    return;
+  }
+  const delBtn = e.target.closest('.btn-delete-mine');
+  if (delBtn) {
+    deleteMine(delBtn.dataset.type, parseInt(delBtn.dataset.id, 10));
   }
 });
 
@@ -574,8 +664,8 @@ async function init() {
       if (r.ok) agents = await r.json();
       agents.sort((a,b) => (a.last_name||'').localeCompare(b.last_name||''));
     } catch(_) {}
-    buildAgentPicker('upcoming-agent-note', 'ul-upcoming-agent-select', 'ul-contact-method', 'ul-contact-value', updateContactPlaceholder);
-    buildAgentPicker('buyer-agent-note', 'bn-buyer-agent-select', 'bn-contact-method', 'bn-contact-value', updateBnContactPlaceholder);
+    buildAgentPicker('upcoming-agent-note', 'ul-upcoming-agent-select', 'ul-contact-method', 'ul-contact-value', 'upcoming', updateContactPlaceholder);
+    buildAgentPicker('buyer-agent-note', 'bn-buyer-agent-select', 'bn-contact-method', 'bn-contact-value', 'buyer', updateBnContactPlaceholder);
   } else {
     // Pre-fill contact value with agent's email on both tabs
     document.getElementById('ul-contact-method').value = 'email';
