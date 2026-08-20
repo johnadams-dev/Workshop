@@ -671,17 +671,6 @@ tbody tr.clickable { cursor: pointer; }
 .cl-check.checked { background: var(--green); border-color: var(--green); color: var(--ink); }
 .cl-check.dismissed-x { background: var(--text-dim); border-color: var(--text-dim); color: var(--ink); }
 .cl-label { flex: 1; }
-.cl-party {
-  font-size: 10px;
-  font-family: var(--mono);
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  white-space: nowrap;
-  border: 1px solid var(--ink-border);
-  border-radius: var(--r);
-  padding: 2px 6px;
-}
 .cl-action {
   font-size: 10px;
   font-family: var(--mono);
@@ -4089,11 +4078,22 @@ async function amChooseAction(key) {
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-commission-rate');
       const coopEl = document.getElementById('am-cooperating-commission');
-      if (!rateEl) return;
-      document.getElementById('am-commission-unit').textContent = unit;
-      document.getElementById('am-coop-unit').textContent = unit;
-      rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
-      coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+      if (rateEl) {
+        document.getElementById('am-commission-unit').textContent = unit;
+        document.getElementById('am-coop-unit').textContent = unit;
+        rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
+        coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+      }
+      // Prefill with whichever side is closing here (buyer for a contract
+      // closing, seller for a listing closing) — previously left blank
+      // regardless of whether that side was already on file (e.g. sellers
+      // captured at listing time), forcing a re-type or losing the
+      // association. Safe to prefill: the backend upserts by name/email
+      // match rather than blindly inserting, so resubmitting these
+      // unchanged doesn't create duplicates.
+      const closingSide = amState.kind === 'contract' ? 'buyer' : 'seller';
+      const existing = (txn.customers || []).filter(c => c.role === closingSide);
+      if (existing.length) populateCustomers('am', existing);
     }).catch(() => {});
   }
   if (key === 'change') {
@@ -5720,10 +5720,7 @@ function renderDrawer(t) {
       checkHtml = '<div class="cl-check"></div>';
       actionHtml = '<div class="cl-action">Mark done</div>';
     }
-    const partyHtml = item.responsible_party && item.responsible_party !== 'coordinator'
-      ? `<div class="cl-party">${escapeHtml(item.responsible_party.replace(/_/g, ' '))}</div>`
-      : '';
-    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${partyHtml}${actionHtml}</div>`;
+    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${actionHtml}</div>`;
   }).join('') : '<div class="empty">No checklist items.</div>';
 
   const actEl = document.getElementById('drawer-activity');
