@@ -1064,6 +1064,14 @@ async function handleCredential(resp) {
 
 function signOut() {
   google.accounts.id.disableAutoSelect();
+  // Clears the shared keys, not a page-specific one — since sign-in is
+  // shared site-wide, sign-out should be too. Previously this redirected
+  // to pathfinder.html without clearing anything, so that page would just
+  // silently re-authenticate off the still-valid shared session instead of
+  // actually signing the user out.
+  localStorage.removeItem('ac_proxy_key');
+  localStorage.removeItem('ac_user_email');
+  PROXY_KEY = '';
   location.href = './pathfinder.html';
 }
 

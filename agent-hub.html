@@ -247,24 +247,6 @@
     .checklist-link { font-size: .74rem; color: var(--gold); text-decoration: none; white-space: nowrap; }
     .checklist-link:hover { text-decoration: underline; }
 
-    /* ── LEADERBOARD WIDGET ── */
-    .leaderboard-box { background: white; border-radius: 14px; box-shadow: var(--shadow); border: 1px solid rgba(26,26,46,.06); overflow: hidden; }
-    .leaderboard-row { display: flex; align-items: center; gap: .9rem; padding: .75rem 1.5rem; border-bottom: 1px solid var(--cream-dark); }
-    .leaderboard-row:last-child { border-bottom: none; }
-    .leaderboard-rank {
-      width: 26px; height: 26px; border-radius: 50%; background: var(--cream-dark); color: var(--slate);
-      font-size: .78rem; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    }
-    .leaderboard-row:nth-child(1) .leaderboard-rank { background: var(--gold); color: white; }
-    .leaderboard-row:nth-child(2) .leaderboard-rank { background: #b8c0cc; color: white; }
-    .leaderboard-row:nth-child(3) .leaderboard-rank { background: #c98a4c; color: white; }
-    .leaderboard-name { flex: 1; font-size: .88rem; font-weight: 500; }
-    .leaderboard-office { font-size: .74rem; color: var(--muted); }
-    .leaderboard-value { font-size: .88rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
-    .leaderboard-footer { text-align: center; padding: .8rem; }
-    .leaderboard-footer a { font-size: .78rem; color: var(--gold); text-decoration: none; font-weight: 500; }
-    .leaderboard-footer a:hover { text-decoration: underline; }
-
     .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
 
     /* ── COMPLIANCE GAPS ── */
@@ -388,12 +370,6 @@
         <p class="section-label">Always Handy</p>
         <h2 class="section-title">More Tools</h2>
         <div class="portal-grid" id="alwaysSection"></div>
-      </div>
-
-      <div class="section">
-        <p class="section-label">This Month</p>
-        <h2 class="section-title">Production Leaderboard</h2>
-        <div class="leaderboard-box" id="leaderboardBox"><p class="empty-state" style="padding:1.5rem">Loading…</p></div>
       </div>
     </div>
   </div>
@@ -608,7 +584,6 @@ async function onSignedIn() {
     S.isManager = me.role === 'manager';
     S.ownAgentId = me.agent_id || null;
     renderSidebar();
-    loadLeaderboard(); // independent of which agent is being viewed — load once
 
     if (S.isManager) {
       document.getElementById('managerBar').style.display = 'block';
@@ -734,41 +709,6 @@ async function loadReminder(agentId) {
       document.getElementById('reminderBox').style.display = 'block';
     }
   } catch (_) { /* reminder is a nice-to-have — silently skip on failure */ }
-}
-
-// ── Production Leaderboard widget ─────────────────────────────────────────────
-// GET /leaderboard/production is open to any signed-in agent (no manager
-// gate) — same month-to-date Sales Leader numbers leaderboard.html shows,
-// sliced to the top 5 here. Independent of which agent's hub is being
-// viewed, so this loads once per sign-in rather than per hub switch.
-async function loadLeaderboard() {
-  const box = document.getElementById('leaderboardBox');
-  try {
-    const data = await fetch(`${PROXY_BASE}/leaderboard/production`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-    const top = (data.agents || [])
-      .filter(a => a.sales_volume > 0)
-      .sort((a, b) => b.sales_volume - a.sales_volume)
-      .slice(0, 5);
-
-    if (!top.length) {
-      box.innerHTML = `<p class="empty-state" style="padding:1.5rem">No qualifying sales yet for ${escapeHtml(data.monthLabel || 'this month')}.</p>`;
-      return;
-    }
-
-    const fmt = n => '$' + Math.round(n).toLocaleString();
-    box.innerHTML = top.map((a, i) => `
-      <div class="leaderboard-row">
-        <div class="leaderboard-rank">${i + 1}</div>
-        <div>
-          <div class="leaderboard-name">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</div>
-          <div class="leaderboard-office">${escapeHtml(a.office_name || '')}</div>
-        </div>
-        <div class="leaderboard-value" style="margin-left:auto">${fmt(a.sales_volume)}</div>
-      </div>`).join('') + `<div class="leaderboard-footer"><a href="./leaderboard.html">View Full Leaderboard →</a></div>`;
-  } catch (e) {
-    box.innerHTML = `<p class="empty-state" style="padding:1.5rem">Couldn't load the leaderboard: ${escapeHtml(e.message)}</p>`;
-  }
 }
 
 // ── Compliance gaps ────────────────────────────────────────────────────────
