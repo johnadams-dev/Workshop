@@ -246,6 +246,11 @@
     .checklist-item.is-dismissed .checklist-title { color: var(--muted); text-decoration: line-through; }
     .checklist-link { font-size: .74rem; color: var(--gold); text-decoration: none; white-space: nowrap; }
     .checklist-link:hover { text-decoration: underline; }
+    .checklist-party {
+      font-size: .62rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      padding: .1rem .45rem; border-radius: 100px; background: rgba(201,168,76,.15); color: var(--gold);
+      white-space: nowrap; flex-shrink: 0;
+    }
 
     .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
 
@@ -817,6 +822,13 @@ const CHECKLIST_STATUS_META = {
   skipped:        { cls: 'dismissed', icon: '—', rowCls: 'is-dismissed' },
 };
 
+// Appends transactionId=<txnId> to a resource_url, whether or not it
+// already carries a query string (Cameron's Lens's two agent-facing items
+// ship with `?mode=desc`/`?mode=photo` already baked in).
+function withTxnParam(url, txnId) {
+  return url + (url.includes('?') ? '&' : '?') + 'transactionId=' + encodeURIComponent(txnId);
+}
+
 function openTxnModal(txnId) {
   const t = S.txnById?.[txnId];
   if (!t) return;
@@ -829,12 +841,16 @@ function openTxnModal(txnId) {
   document.getElementById('modalChecklist').innerHTML = items.length
     ? items.map(i => {
         const meta = CHECKLIST_STATUS_META[i.progress_status] || CHECKLIST_STATUS_META.pending;
+        const isAgentItem = i.responsible_party === 'agent';
+        const href = i.resource_url ? (isAgentItem ? withTxnParam(i.resource_url, txnId) : i.resource_url) : '';
         const link = i.resource_url
-          ? `<a class="checklist-link" href="${escapeHtml(i.resource_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
+          ? `<a class="checklist-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
           : '';
+        const partyBadge = isAgentItem ? `<span class="checklist-party">Your task</span>` : '';
         return `<div class="checklist-item ${meta.rowCls}">
           <span class="checklist-check ${meta.cls}">${meta.icon}</span>
           <span class="checklist-title">${escapeHtml(i.title)}</span>
+          ${partyBadge}
           ${link}
         </div>`;
       }).join('')

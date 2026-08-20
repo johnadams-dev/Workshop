@@ -621,6 +621,21 @@ async function init() {
     if (g.genres && g.genres.length) { GENRES = g.genres; STATE.genre = g.default || STATE.genre; }
   } catch (e) { /* fall back to the built-in Instrumental-only default */ }
   renderGenreGrid();
+  await maybeDeepLinkFromTransactionId();
+}
+
+// Supports checklist links like camerons-stage.html?transactionId=<uuid> —
+// if the id matches one of the listings loadListings() already fetched,
+// auto-select it instead of leaving the agent to pick it manually. Silently
+// does nothing if there's no match (staff view before an agent is picked,
+// foreign/invalid id, etc.) — this is a convenience shortcut, not a
+// hard dependency.
+async function maybeDeepLinkFromTransactionId() {
+  const txnId = new URLSearchParams(location.search).get('transactionId');
+  if (!txnId || !Array.isArray(window._listings)) return;
+  const idx = window._listings.findIndex(l => l.transaction_id === txnId);
+  if (idx === -1) return;
+  await selectListing(idx);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

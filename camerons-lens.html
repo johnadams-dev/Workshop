@@ -656,6 +656,7 @@ async function handleCredential(cred) {
     if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
   } catch (e) { toast('⚠', 'Sign-in failed: ' + e.message); return; }
   hideAuthGate();
+  maybeDeepLinkFromTransactionId();
 }
 
 function initGoogleSignIn() {
@@ -666,12 +667,39 @@ function initGoogleSignIn() {
 
 if (USER_EMAIL && PROXY_KEY) {
   hideAuthGate();
+  maybeDeepLinkFromTransactionId();
 } else if (window.google?.accounts?.id) {
   initGoogleSignIn();
 } else {
   const _gsiPoll = setInterval(() => {
     if (window.google?.accounts?.id) { clearInterval(_gsiPoll); initGoogleSignIn(); }
   }, 100);
+}
+
+// Supports checklist links like camerons-lens.html?transactionId=<uuid>&mode=desc
+// (or &mode=photo) — resolves the transaction to an MLS# via the same
+// agent-scoped lookup Cameron's Stage uses (this page has no internal
+// transaction model of its own), then lands on the right screen with the
+// search already run, instead of making the agent look the MLS# up again.
+// Silently does nothing on a miss (no transactionId param, no match, or
+// lookup failure) — this is a convenience shortcut, not a hard dependency.
+async function maybeDeepLinkFromTransactionId() {
+  const params = new URLSearchParams(location.search);
+  const txnId = params.get('transactionId');
+  if (!txnId) return;
+  const mode = params.get('mode') === 'photo' ? 'photo' : 'desc';
+  try {
+    const res = await fetch(`${mlsProxyUrl}/camerons-stage/my-listings`, {
+      headers: { 'Accept': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL },
+    });
+    const data = await res.json().catch(() => ({}));
+    const listing = (data.listings || []).find(l => l.transaction_id === txnId);
+    if (!listing || !listing.mls_id) return;
+    showScreen(mode);
+    const inputId = mode === 'photo' ? 'mlsPhotoSearchInput' : 'mlsSearchInput';
+    document.getElementById(inputId).value = listing.mls_id;
+    mlsSearch(mode);
+  } catch (e) { /* no match / lookup failure — leave the normal manual-entry screen in place */ }
 }
 
 let photoType = 'exterior';

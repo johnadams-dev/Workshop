@@ -671,6 +671,17 @@ tbody tr.clickable { cursor: pointer; }
 .cl-check.checked { background: var(--green); border-color: var(--green); color: var(--ink); }
 .cl-check.dismissed-x { background: var(--text-dim); border-color: var(--text-dim); color: var(--ink); }
 .cl-label { flex: 1; }
+.cl-party {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  border: 1px solid var(--ink-border);
+  border-radius: var(--r);
+  padding: 2px 6px;
+}
 .cl-action {
   font-size: 10px;
   font-family: var(--mono);
@@ -5709,7 +5720,10 @@ function renderDrawer(t) {
       checkHtml = '<div class="cl-check"></div>';
       actionHtml = '<div class="cl-action">Mark done</div>';
     }
-    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${actionHtml}</div>`;
+    const partyHtml = item.responsible_party && item.responsible_party !== 'coordinator'
+      ? `<div class="cl-party">${escapeHtml(item.responsible_party.replace(/_/g, ' '))}</div>`
+      : '';
+    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${partyHtml}${actionHtml}</div>`;
   }).join('') : '<div class="empty">No checklist items.</div>';
 
   const actEl = document.getElementById('drawer-activity');
@@ -5744,7 +5758,7 @@ function adminFieldLabel(text) {
 
 function adminItemFieldsHtml(item) {
   return `
-    <div class="form-row" style="display:grid; grid-template-columns:80px 1fr 160px; gap:10px; margin-bottom:8px;">
+    <div class="form-row" style="display:grid; grid-template-columns:80px 1fr 160px 160px; gap:10px; margin-bottom:8px;">
       <div class="field" style="display:flex; flex-direction:column; gap:4px;">
         ${adminFieldLabel('Order')}
         <input type="number" class="ai-sort" value="${item.sort_order ?? 0}" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
@@ -5759,6 +5773,16 @@ function adminItemFieldsHtml(item) {
           <option value="always" ${item.requirement_type === 'always' ? 'selected' : ''}>Always</option>
           <option value="conditional" ${item.requirement_type === 'conditional' ? 'selected' : ''}>Conditional</option>
           <option value="optional" ${item.requirement_type === 'optional' ? 'selected' : ''}>Optional</option>
+        </select>
+      </div>
+      <div class="field" style="display:flex; flex-direction:column; gap:4px;">
+        ${adminFieldLabel('Responsible Party')}
+        <select class="ai-responsible-party" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+          <option value="coordinator" ${(item.responsible_party || 'coordinator') === 'coordinator' ? 'selected' : ''}>Coordinator</option>
+          <option value="agent" ${item.responsible_party === 'agent' ? 'selected' : ''}>Agent</option>
+          <option value="sales_manager" ${item.responsible_party === 'sales_manager' ? 'selected' : ''}>Sales Manager</option>
+          <option value="broker" ${item.responsible_party === 'broker' ? 'selected' : ''}>Broker</option>
+          <option value="compliance_manager" ${item.responsible_party === 'compliance_manager' ? 'selected' : ''}>Compliance Manager</option>
         </select>
       </div>
     </div>
@@ -5831,7 +5855,7 @@ function adminRenderTemplates() {
           ${(t.items || []).map(item => adminItemBlockHtml(item)).join('') || '<div class="empty">No items yet.</div>'}
         </div>
         <div class="admin-new-item" id="admin-new-item-${t.id}" style="display:none; margin-top:10px;">
-          ${adminItemFieldsHtml({ sort_order: (t.items || []).length, title: '', description: '', requirement_type: 'always', tool_key: '', resource_url: '', resource_label: '', is_active: true })}
+          ${adminItemFieldsHtml({ sort_order: (t.items || []).length, title: '', description: '', requirement_type: 'always', tool_key: '', resource_url: '', resource_label: '', responsible_party: 'coordinator', is_active: true })}
           <div class="btn-row" style="margin-top:10px;">
             <button class="btn btn-primary btn-sm" onclick="adminCreateItem(${t.id}, this)">Add Item</button>
             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('admin-new-item-${t.id}').style.display='none'">Cancel</button>
@@ -5851,6 +5875,7 @@ function adminReadItemFields(container) {
     tool_key: container.querySelector('.ai-tool-key').value.trim() || null,
     resource_url: container.querySelector('.ai-resource-url').value.trim() || null,
     resource_label: container.querySelector('.ai-resource-label').value.trim() || null,
+    responsible_party: container.querySelector('.ai-responsible-party').value,
     is_active: container.querySelector('.ai-active').checked,
   };
 }
