@@ -201,10 +201,13 @@
       display: inline-block; margin-bottom: .6rem;
     }
     .txn-status.under_contract { background: rgba(201,168,76,.15); color: var(--gold); }
-    .txn-progress-bar { height: 5px; border-radius: 3px; background: var(--cream-dark); overflow: hidden; margin-bottom: .4rem; }
-    .txn-progress-fill { height: 100%; background: var(--green); border-radius: 3px; }
+    .txn-progress-bar { display: flex; height: 5px; border-radius: 3px; background: var(--cream-dark); overflow: hidden; margin-bottom: .4rem; }
+    .txn-progress-fill { height: 100%; background: var(--green); }
+    .txn-progress-fill.bypassed { background: var(--gold); }
     .txn-progress-label { font-size: .72rem; color: var(--slate); }
     .txn-progress-label strong { color: var(--ink-soft); }
+    .txn-progress-completed { color: var(--green); font-weight: 600; }
+    .txn-progress-bypassed  { color: var(--gold); font-weight: 600; }
 
     /* ── TRANSACTION DETAIL MODAL ── */
     .modal-overlay {
@@ -795,15 +798,25 @@ function renderTransactionsSection(transactions, checklist) {
   const cards = transactions.map(t => {
     const items = S.checklistByTxn[t.id] || [];
     const completed = items.filter(i => i.progress_status === 'completed').length;
+    const bypassed  = items.filter(i => i.progress_status === 'skipped' || i.progress_status === 'not_applicable').length;
     const total = items.length;
-    const pct = total ? Math.round((completed / total) * 100) : 0;
+    const open = total - completed - bypassed;
+    const completedPct = total ? Math.round((completed / total) * 100) : 0;
+    const bypassedPct  = total ? Math.round((bypassed  / total) * 100) : 0;
 
     return `<div class="txn-card" onclick="openTxnModal('${t.id}')">
       <div class="txn-address">${escapeHtml(t.property_address)}</div>
       <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
       ${total ? `
-        <div class="txn-progress-bar"><div class="txn-progress-fill" style="width:${pct}%"></div></div>
-        <div class="txn-progress-label"><strong>${completed}</strong> of <strong>${total}</strong> steps done</div>
+        <div class="txn-progress-bar">
+          <div class="txn-progress-fill" style="width:${completedPct}%"></div>
+          <div class="txn-progress-fill bypassed" style="width:${bypassedPct}%"></div>
+        </div>
+        <div class="txn-progress-label">
+          <span class="txn-progress-completed">${completed} completed</span> ·
+          <span class="txn-progress-bypassed">${bypassed} bypassed</span> ·
+          ${open} open
+        </div>
       ` : '<div class="txn-progress-label">No checklist steps yet.</div>'}
     </div>`;
   }).join('');
