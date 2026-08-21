@@ -3746,23 +3746,26 @@ function amShowChoose() {
   document.querySelector('#am-step-confirm .divider').style.display = '';
   document.getElementById('amChecklistPreview').style.display = '';
 
+  // amState.status can land outside the defined key set for its kind (e.g. a
+  // contract-kind transaction sitting in a listing-only status like 'active'
+  // — normally unreachable, but possible from bad data such as a duplicate).
+  // That's still a transaction an admin needs to be able to delete, so the
+  // "no actions" case must fall through to the delete block below rather
+  // than returning early and silently dropping it.
   const actions = (amState.kind === 'contract' ? CONTRACT_ACTIONS : LISTING_ACTIONS)[amState.status] || [];
   const listEl = document.getElementById('am-step-choose');
 
-  if (!actions.length) {
-    listEl.innerHTML = `<div class="empty">No actions available for this status.</div>`;
-    return;
-  }
-
-  listEl.innerHTML = actions.map(a => `
-    <div class="action-item" onclick="amChooseAction('${a.key}')">
-      <div class="action-item-icon">${a.icon}</div>
-      <div class="action-item-text">
-        <div class="action-item-title">${a.title}</div>
-        <div class="action-item-desc">${a.desc}</div>
-      </div>
-    </div>
-  `).join('');
+  listEl.innerHTML = actions.length
+    ? actions.map(a => `
+        <div class="action-item" onclick="amChooseAction('${a.key}')">
+          <div class="action-item-icon">${a.icon}</div>
+          <div class="action-item-text">
+            <div class="action-item-title">${a.title}</div>
+            <div class="action-item-desc">${a.desc}</div>
+          </div>
+        </div>
+      `).join('')
+    : `<div class="empty">No actions available for this status.</div>`;
 
   if (STATE.isAdmin) {
     listEl.innerHTML += `
