@@ -2451,6 +2451,30 @@ function fmtDate(v) {
   return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
 }
 
+// Mirrors dateSanityError() in daily-desk-routes.js — same rule, client-side,
+// so a bad year (dropped century, stray digit, transposition) gets caught
+// immediately instead of round-tripping to the server. Added 2026-08-21
+// alongside the min/max attributes on nl-list-date/nl-exp-date/am-expiration-date;
+// those alone don't stop manual keyboard entry of an out-of-range year, since
+// native <input type="date"> accepts years up to 275760 unless bounded.
+function dateSanityError(value, label) {
+  if (!value) return null;
+  const m = /^(\d{4})-\d{2}-\d{2}/.exec(String(value));
+  if (!m) return `${label} ("${value}") is not a valid date.`;
+  const year = Number(m[1]);
+  const nowYear = new Date().getFullYear();
+  if (year < 2000 || year > nowYear + 5) {
+    return `${label} ("${value}") has an implausible year — check for a typo.`;
+  }
+  return null;
+}
+// Bounds for the min/max attributes on list_date/expiration_date inputs —
+// kept in sync with dateSanityError()'s range so the browser's own date
+// picker won't scroll/spin past a sane year (typed entry still needs the
+// dateSanityError() check above; native min/max doesn't block typing).
+const DATE_MIN_ATTR = '2000-01-01';
+const DATE_MAX_ATTR = `${new Date().getFullYear() + 5}-12-31`;
+
 const STATUS_CHIP = {
   coming_soon:             ['chip-neutral', 'Coming Soon'],
   active_listing:          ['chip-amber',   'Active'],
@@ -2497,6 +2521,13 @@ async function loadOffices() {
 
 async function init() {
   document.getElementById('admin-chip').textContent = userDisplay || userEmail;
+
+  // Bound the New Listing date pickers so the browser's own widget won't
+  // scroll/spin past a sane year (see DATE_MIN_ATTR/DATE_MAX_ATTR).
+  for (const id of ['nl-list-date', 'nl-exp-date']) {
+    const el = document.getElementById(id);
+    if (el) { el.min = DATE_MIN_ATTR; el.max = DATE_MAX_ATTR; }
+  }
 
   const [, me, sm] = await Promise.all([
     loadOffices(),
@@ -3156,6 +3187,9 @@ async function nlSaveListing() {
     bathrooms: document.getElementById('nl-bathrooms').value ? Number(document.getElementById('nl-bathrooms').value) : null,
     property_type: document.getElementById('nl-property-type').value || null,
   };
+
+  const nlDateError = dateSanityError(body.list_date, 'List date') || dateSanityError(body.expiration_date, 'Expiration date');
+  if (nlDateError) { alert(nlDateError); return; }
 
   try {
     let txn;
@@ -3941,7 +3975,7 @@ async function amChooseAction(key) {
       <div class="form-row" id="am-dates-wrap" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
         <div class="field" id="am-date-field-wrap" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="${labelStyle}">${dateLabel}</span>
-          <input type="date" id="am-expiration-date">
+          <input type="date" id="am-expiration-date" min="${DATE_MIN_ATTR}" max="${DATE_MAX_ATTR}">
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="${labelStyle}">Note</span>
@@ -4589,6 +4623,9 @@ async function amSubmit() {
       if (newPrice != null) fields.newPrice = newPrice;
       const dateVal = document.getElementById('am-expiration-date').value;
       if (dateVal) {
+        const amDateLabel = amState.status === 'under_contract' ? 'Closing date' : 'Expiration date';
+        const amDateError = dateSanityError(dateVal, amDateLabel);
+        if (amDateError) { alert(amDateError); return; }
         // Under contract, this date is the addendum's new closing date, not
         // the listing agreement's own expiration date — see fieldsHtml above.
         if (amState.status === 'under_contract') fields.newCloseDate = dateVal;
