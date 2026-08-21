@@ -2216,7 +2216,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="checklist" id="amChecklistPreview"></div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="amBackToChoose()">← Back</button>
-          <button class="btn btn-primary btn-sm" onclick="amSubmit()">Confirm</button>
+          <button class="btn btn-primary btn-sm" id="am-confirm-btn" onclick="amSubmit()">Confirm</button>
         </div>
       </div>
 
@@ -3746,7 +3746,7 @@ const ACTION_MODAL_SKELETON = `
         <div class="checklist" id="amChecklistPreview"></div>
         <div class="btn-row" style="margin-top:18px">
           <button class="btn btn-ghost btn-sm" onclick="amBackToChoose()">← Back</button>
-          <button class="btn btn-primary btn-sm" onclick="amSubmit()">Confirm</button>
+          <button class="btn btn-primary btn-sm" id="am-confirm-btn" onclick="amSubmit()">Confirm</button>
         </div>
       </div>`;
 
@@ -3816,6 +3816,17 @@ function amShowChoose() {
 }
 function amBackToChoose() {
   amShowChoose();
+}
+// Closing requires attesting the file's been manager-approved in Form
+// Simplicity before Confirm is clickable at all — not just validated after
+// the fact. #am-fs-approved only exists in the DOM for the closing action;
+// for every other action there's nothing to gate on, so the button stays
+// enabled.
+function amUpdateConfirmBtn() {
+  const btn = document.getElementById('am-confirm-btn');
+  if (!btn) return;
+  const fsApproved = document.getElementById('am-fs-approved');
+  btn.disabled = !!(fsApproved && !fsApproved.checked);
 }
 async function amChooseAction(key) {
   const PRINT_FORMS = {
@@ -4062,6 +4073,10 @@ async function amChooseAction(key) {
           </div>
         </div>
       </div>
+      <label style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); cursor:pointer; margin-bottom:14px;">
+        <input type="checkbox" id="am-fs-approved" onchange="amUpdateConfirmBtn()">
+        <span style="font-size:12px; color:var(--text);">File has been approved by manager in Form Simplicity</span>
+      </label>
       `;
   } else if (key === 'under_contract') {
     fieldsHtml = `
@@ -4100,6 +4115,7 @@ async function amChooseAction(key) {
     fieldsHtml += amCustomerManagementHtml();
   }
   fieldsEl.innerHTML = fieldsHtml;
+  amUpdateConfirmBtn();
 
   if (key === 'under_contract') {
     amUpdateRepFields();
@@ -4640,6 +4656,15 @@ async function amSubmit() {
     if (effectiveDate) fields.effectiveDate = effectiveDate;
     fields.notes = document.getElementById('am-notes').value || null;
   } else if (key === 'closing') {
+    // Belt-and-suspenders alongside amUpdateConfirmBtn()'s disabled-button
+    // gate — the button shouldn't be clickable unchecked at all, but this
+    // is the same "validate again at submit time" idiom every other
+    // required field in this function already follows (see agentId,
+    // cooperating brokerage/agent, buyer name below).
+    if (!document.getElementById('am-fs-approved').checked) {
+      alert('Please confirm the file has been approved by manager in Form Simplicity before closing.');
+      return;
+    }
     const salePrice = amParseMoney(document.getElementById('am-sale-price').value);
     if (salePrice != null) fields.salePrice = salePrice;
     const closeDate = document.getElementById('am-close-date').value;
