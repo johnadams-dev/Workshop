@@ -579,6 +579,10 @@ function toast(msg) {
 let STATE = {
   transactionId: null, mlsId: null, address: '', city: '',
   deltaListingId: null, photos: [], genre: 'instrumental',
+  // Property facts captured off the DeltaNet listing lookup, blended into
+  // the ElevenLabs prompt for vocal genres (see doGenerate()) — richer than
+  // just address/city, without dumping the full raw MLS remarks in.
+  bedrooms: null, bathrooms: null, sqft: null, price: null, propertyType: null, remarks: null,
   music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
   editingTourId: null,
   agentId: null, agentEmail: null, agentLabel: null,
@@ -769,6 +773,23 @@ function renderGenreGrid() {
   document.getElementById('genreGrid').innerHTML = GENRES.map(g => `
     <button type="button" class="genre-chip ${g.id === STATE.genre ? 'active' : ''}" onclick="selectGenre('${g.id}')">${g.hasVocals ? '🎤 ' : ''}${escapeHtml(g.label)}</button>
   `).join('');
+
+  // Custom guidance only reaches ElevenLabs for vocal genres (non-vocal
+  // genres are always served from the pool now, never a live call) — hide
+  // the field entirely rather than let an agent type guidance that
+  // silently gets dropped.
+  const selected = GENRES.find(g => g.id === STATE.genre);
+  const toggle = document.getElementById('advancedToggle');
+  const panel = document.getElementById('advancedPanel');
+  if (selected && selected.hasVocals) {
+    toggle.style.display = '';
+  } else {
+    toggle.style.display = 'none';
+    panel.style.display = 'none';
+    toggle.textContent = '+ Advanced: add custom guidelines';
+    document.getElementById('customGuidelines').value = '';
+  }
+
   renderGenreNote();
 }
 
@@ -893,6 +914,21 @@ async function loadListingPhotosAndGoToCurate() {
     STATE.photos = (listing.photo_data || []).map((p, i) => ({
       photo_id: p.id, url: p.url, width: p.width, height: p.height, title: '', included: true, order: i,
     }));
+    // Property facts for the ElevenLabs prompt (vocal genres only — see
+    // doGenerate()). DeltaNet field names, same fallbacks Cameron's Lens
+    // uses (normalizeDeltanetListing()).
+    const truthy = v => v === true || v === 'true' || v === 1 || v === '1';
+    STATE.bedrooms = listing.bedrooms ?? null;
+    STATE.bathrooms = listing.bathrooms_full ?? listing.bathrooms ?? null;
+    STATE.sqft = listing.home_size ?? listing.square_feet ?? listing.sqft ?? null;
+    STATE.price = listing.price_asking ?? listing.list_price ?? listing.price ?? null;
+    STATE.propertyType =
+      truthy(listing.property_type_condo) || truthy(listing.property_type_townhouse) ? 'Condo/Townhouse' :
+      truthy(listing.property_category_multi) ? 'Multi-Family' :
+      truthy(listing.property_category_land) ? 'Land' :
+      truthy(listing.property_category_commercial) ? 'Commercial' :
+      truthy(listing.property_category_residential) ? 'Residential' : null;
+    STATE.remarks = listing.comments || listing.feature_comments || listing.additional_comments || listing.public_remarks || listing.remarks || null;
     renderPhotos();
   } catch (e) {
     toast('Listing lookup failed: ' + e.message);
@@ -1072,7 +1108,11 @@ async function doGenerate() {
   btn.innerHTML = '<div class="spinner"></div> Generating (about 30-60s)…';
   try {
     const customGuidelines = document.getElementById('customGuidelines').value.trim();
-    const data = await POST('/camerons-stage/generate', { address: STATE.address, city: STATE.city, genre: STATE.genre, custom_guidelines: customGuidelines });
+    const data = await POST('/camerons-stage/generate', {
+      address: STATE.address, city: STATE.city, genre: STATE.genre, custom_guidelines: customGuidelines,
+      bedrooms: STATE.bedrooms, bathrooms: STATE.bathrooms, sqft: STATE.sqft, price: STATE.price,
+      propertyType: STATE.propertyType, remarks: STATE.remarks,
+    });
     STATE.music = data;
     document.getElementById('audioPreview').src = data.audio_url;
     document.getElementById('generateResult').style.display = 'block';
