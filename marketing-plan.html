@@ -387,8 +387,29 @@ async function init() {
   document.getElementById('app').style.display = 'block';
   document.getElementById('mainTabLibraryBtn').style.display = isManager ? 'inline-block' : 'none';
   if (isManager) loadKnowledgeSources();
-  await loadListings();
   loadEmphasisOptions();
+
+  // Deep link from a checklist item's "View Marketing Plan" link
+  // (marketing-plan.html?planId=<id>) — go straight to that plan instead of
+  // dropping the agent back at the picker. loadListings() still runs (not
+  // awaited) so the "My Listings" tab is populated if they click Back.
+  loadListings();
+  const planId = new URLSearchParams(location.search).get('planId');
+  if (planId) {
+    try {
+      const { plan } = await GET(`/marketing-plan/plans/${planId}`);
+      STATE.transactionId = plan.transaction_id || null;
+      STATE.mlsId = plan.mls_id || null;
+      STATE.address = plan.address || (plan.facts && plan.facts.address) || '';
+      STATE.city = (plan.facts && plan.facts.city) || '';
+      STATE.isManual = !plan.transaction_id && !plan.mls_id;
+      currentPlan = plan;
+      setStep('plan');
+      renderPlan(plan);
+    } catch (e) {
+      toast('Could not load that plan: ' + e.message);
+    }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
