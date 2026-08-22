@@ -98,6 +98,13 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
 .plan-section h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; color: var(--ink); margin-bottom: 0.4rem; }
 .plan-section p { font-size: 0.88rem; color: var(--ink-soft); white-space: pre-wrap; }
 
+.task-row { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--cream-dark); align-items: start; }
+.task-row:last-child { border-bottom: none; }
+.task-row.excluded { opacity: 0.45; }
+.task-row input[type="checkbox"] { margin-top: 4px; }
+.task-row input[type="text"] { width: 100%; border: 1px solid var(--border-mid); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; font-family: inherit; font-weight: 500; margin-bottom: 4px; }
+.task-row textarea { width: 100%; border: 1px solid var(--border-mid); border-radius: 6px; padding: 6px 10px; font-size: 0.82rem; font-family: inherit; color: var(--slate); resize: vertical; min-height: 40px; }
+
 .kb-row { display: grid; grid-template-columns: 1fr auto auto; gap: 0.75rem; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--cream-dark); font-size: 0.85rem; }
 .kb-row:last-child { border-bottom: none; }
 .kb-meta { font-size: 0.74rem; color: var(--slate); }
@@ -180,6 +187,13 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
         <button class="btn btn-primary btn-block" onclick="useManualEntry()">Continue →</button>
       </div>
     </div>
+
+    <div class="panel" id="emphasisPanel" style="display:none">
+      <div class="panel-body" style="padding-bottom:1rem;">
+        <div class="panel-sub" style="margin-bottom:0.6rem;">Emphasize any of these strategies? (optional — leave blank for a balanced plan)</div>
+        <div id="emphasisChecks" style="display:flex;flex-wrap:wrap;gap:0.5rem;"></div>
+      </div>
+    </div>
   </div>
 
   <!-- STEP 2: generated plan -->
@@ -201,6 +215,23 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
       <button class="btn btn-ghost" onclick="backToPick()">← Back</button>
       <button class="btn btn-primary" style="flex:1" id="printBtn" onclick="openPrintableReport()" disabled>🖨️ Open Printable Report</button>
       <button class="btn btn-gold" style="flex:1" id="driveBtn" onclick="saveToGoogleDrive()" disabled>💾 Save to Google Drive</button>
+    </div>
+    <div style="margin-top:0.75rem;">
+      <button class="btn btn-ghost btn-block" id="suggestBtn" onclick="proposeTasks()" disabled>💡 Suggest Checklist Items</button>
+      <div class="field-hint" id="suggestHint" style="text-align:center;margin-top:6px;"></div>
+    </div>
+
+    <!-- Editable preview of AI-suggested tasks — nothing is created until confirmed -->
+    <div class="panel" id="taskPreviewPanel" style="display:none;margin-top:1rem;">
+      <div class="panel-head">
+        <div class="panel-title">Suggested checklist items</div>
+        <div class="panel-sub">Review, edit, or uncheck any you don't want — nothing is added until you confirm.</div>
+      </div>
+      <div id="taskPreviewList"></div>
+      <div class="panel-body" style="padding-top:0.75rem;">
+        <button class="btn btn-gold btn-block" id="approveTasksBtn" onclick="confirmApproveTasks()">✅ Approve & Add to My Checklist</button>
+        <div class="field-hint" id="approveResult" style="text-align:center;margin-top:8px;"></div>
+      </div>
     </div>
   </div>
 
@@ -315,9 +346,10 @@ function escapeHtml(str) {
 let STATE = {
   transactionId: null, mlsId: null, address: '', city: '',
   bedrooms: null, bathrooms: null, sqft: null, price: null, propertyType: null, remarks: null,
-  isManual: false,
+  isManual: false, emphasize: [],
 };
 let currentPlan = null;
+let proposedTasks = [];
 
 async function init() {
   try {
@@ -328,6 +360,34 @@ async function init() {
   document.getElementById('kbPanel').style.display = isManager ? 'block' : 'none';
   if (isManager) loadKnowledgeSources();
   await loadListings();
+  loadEmphasisOptions();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EMPHASIS PICKER — options are just the Knowledge Library's own
+   categories (not a hardcoded list), so it grows automatically as new
+   strategies get added there. Toggle-chip UI, same idiom as the genre
+   picker in camerons-stage.html.
+═══════════════════════════════════════════════════════════════════ */
+function labelizeCategory(cat) {
+  return String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function loadEmphasisOptions() {
+  try {
+    const { categories } = await GET('/marketing-plan/knowledge-categories');
+    if (!categories.length) return; // nothing uploaded yet — leave the panel hidden
+    document.getElementById('emphasisPanel').style.display = 'block';
+    document.getElementById('emphasisChecks').innerHTML = categories.map(cat => `
+      <button type="button" class="tab-btn" onclick="toggleEmphasis('${cat}', this)">${escapeHtml(labelizeCategory(cat))}</button>
+    `).join('');
+  } catch (e) { /* emphasis picker is optional — fail silently */ }
+}
+
+function toggleEmphasis(cat, btn) {
+  const i = STATE.emphasize.indexOf(cat);
+  if (i === -1) { STATE.emphasize.push(cat); btn.classList.add('active'); }
+  else { STATE.emphasize.splice(i, 1); btn.classList.remove('active'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -476,9 +536,11 @@ function setStep(step) {
 
 function backToPick() {
   currentPlan = null;
+  proposedTasks = [];
   document.getElementById('upcomingPrompt').style.display = 'none';
   document.getElementById('printBtn').disabled = true;
   document.getElementById('driveBtn').disabled = true;
+  document.getElementById('taskPreviewPanel').style.display = 'none';
   setStep('pick');
 }
 
@@ -487,11 +549,13 @@ async function generatePlan() {
   document.getElementById('planBody').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Generating your marketing plan…</div>`;
   document.getElementById('printBtn').disabled = true;
   document.getElementById('driveBtn').disabled = true;
+  proposedTasks = [];
+  document.getElementById('taskPreviewPanel').style.display = 'none';
   try {
     const { plan } = await POST('/marketing-plan/generate', {
       transaction_id: STATE.transactionId, mls_id: STATE.mlsId, address: STATE.address, city: STATE.city,
       bedrooms: STATE.bedrooms, bathrooms: STATE.bathrooms, sqft: STATE.sqft, price: STATE.price,
-      propertyType: STATE.propertyType, remarks: STATE.remarks,
+      propertyType: STATE.propertyType, remarks: STATE.remarks, emphasize: STATE.emphasize,
     });
     currentPlan = plan;
     renderPlan(plan);
@@ -510,6 +574,83 @@ function renderPlan(plan) {
   document.getElementById('printBtn').disabled = false;
   document.getElementById('driveBtn').disabled = false;
   document.getElementById('upcomingPrompt').style.display = STATE.isManual ? 'block' : 'none';
+
+  document.getElementById('taskPreviewPanel').style.display = 'none';
+  const suggestBtn = document.getElementById('suggestBtn');
+  const suggestHint = document.getElementById('suggestHint');
+  suggestBtn.innerHTML = '💡 Suggest Checklist Items';
+  if (plan.transaction_id) {
+    suggestBtn.disabled = false;
+    suggestHint.textContent = '';
+  } else {
+    suggestBtn.disabled = true;
+    suggestHint.textContent = "Pick a listing from My Listings to enable this — this plan isn't tied to a transaction yet.";
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SUGGEST → APPROVE: propose tactical checklist items from the plan,
+   let the agent review/edit/uncheck, then confirm to actually create
+   them on the transaction's checklist (surfaces in agent-hub.html).
+═══════════════════════════════════════════════════════════════════ */
+async function proposeTasks() {
+  if (!currentPlan) return;
+  const btn = document.getElementById('suggestBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Suggesting…';
+  try {
+    const { items } = await POST(`/marketing-plan/plans/${currentPlan.id}/propose-tasks`, {});
+    proposedTasks = items.map(it => ({ ...it, included: true }));
+    renderTaskPreview();
+  } catch (e) {
+    toast('Could not suggest tasks: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '💡 Suggest Checklist Items';
+  }
+}
+
+function renderTaskPreview() {
+  const panel = document.getElementById('taskPreviewPanel');
+  const list = document.getElementById('taskPreviewList');
+  if (!proposedTasks.length) {
+    panel.style.display = 'block';
+    list.innerHTML = `<div class="state-msg"><span class="icon">🤷</span>No tasks suggested.</div>`;
+    document.getElementById('approveTasksBtn').style.display = 'none';
+    return;
+  }
+  document.getElementById('approveTasksBtn').style.display = 'block';
+  document.getElementById('approveResult').textContent = '';
+  list.innerHTML = proposedTasks.map((t, i) => `
+    <div class="task-row ${t.included ? '' : 'excluded'}">
+      <input type="checkbox" ${t.included ? 'checked' : ''} onchange="proposedTasks[${i}].included=this.checked; renderTaskPreview()">
+      <div>
+        <input type="text" value="${escapeHtml(t.title)}" oninput="proposedTasks[${i}].title=this.value">
+        <textarea oninput="proposedTasks[${i}].description=this.value">${escapeHtml(t.description || '')}</textarea>
+      </div>
+    </div>
+  `).join('');
+  panel.style.display = 'block';
+}
+
+async function confirmApproveTasks() {
+  const chosen = proposedTasks.filter(t => t.included && t.title.trim());
+  if (!chosen.length) { toast('Check at least one item first.'); return; }
+  const btn = document.getElementById('approveTasksBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Adding…';
+  try {
+    const { items } = await POST(`/marketing-plan/plans/${currentPlan.id}/approve`, {
+      items: chosen.map(t => ({ title: t.title.trim(), description: (t.description || '').trim() })),
+    });
+    document.getElementById('approveResult').innerHTML =
+      `${items.length} item${items.length === 1 ? '' : 's'} added to your checklist — <a href="./agent-hub.html" target="_blank" style="color:var(--gold);font-weight:600;">view in Agent Hub →</a>`;
+    btn.innerHTML = '✅ Added';
+  } catch (e) {
+    toast('Could not add items: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '✅ Approve & Add to My Checklist';
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
