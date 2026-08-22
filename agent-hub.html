@@ -156,6 +156,11 @@
     }
     .reminder-label { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
     .reminder-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
+    .reminder-summary { font-size: .82rem; color: var(--ink-soft); margin-bottom: .75rem; }
+    .reminder-group-label { font-size: .72rem; font-weight: 600; color: var(--ink); margin: .8rem 0 .15rem; }
+    .reminder-group-label:first-child { margin-top: 0; }
+    .checklist-check.checkable { cursor: pointer; }
+    .checklist-check.checkable:hover { border-color: var(--gold); }
 
     /* ── PORTAL CARDS (copied from pathfinder.html) ── */
     .portal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1.25rem; }
@@ -192,8 +197,14 @@
     .txn-card {
       background: white; border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: var(--shadow);
       border: 1px solid rgba(26,26,46,.06); cursor: pointer; transition: transform .18s ease, box-shadow .18s ease;
+      position: relative;
     }
     .txn-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .txn-card.has-pending { border-color: rgba(231,76,60,.35); }
+    .txn-pending-badge {
+      position: absolute; top: .9rem; right: .9rem; font-size: .64rem; font-weight: 700;
+      background: var(--red); color: #fff; padding: .15rem .55rem; border-radius: 100px;
+    }
     .txn-address { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 600; line-height: 1.25; margin-bottom: .5rem; }
     .txn-status {
       font-size: .64rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
@@ -363,7 +374,8 @@
     <div id="mainCol">
       <div class="reminder-box" id="reminderBox">
         <div class="reminder-label">💡 Pending Steps</div>
-        <div class="reminder-text" id="reminderText"></div>
+        <div class="reminder-summary" id="reminderSummary"></div>
+        <div class="checklist-list" id="reminderList"></div>
       </div>
 
       <div class="section" id="complianceGapsWrap" style="display:none">
@@ -515,6 +527,7 @@ const S = {
   allAgents: null,     // roster, lazily loaded for managers' "View as" search
   txnById: null,       // current view's transactions, keyed by id — for the checklist modal
   checklistByTxn: null,// current view's checklist rows, grouped by transaction_id
+  hubData: null,       // last-loaded full rollup — reused by checkbox handlers to re-render without a re-fetch
 };
 
 // ── Auth (ID-token flow) ─────────────────────────────────────────────────────
@@ -652,6 +665,7 @@ async function loadHubFor(agentId) {
   if (data.error) throw new Error(data.error);
 
   S.viewedAgentId = agentId;
+  S.hubData = data;
   document.querySelector('.hero').style.display = 'none';
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('mainContent').style.display = 'block';
@@ -668,7 +682,7 @@ async function loadHubFor(agentId) {
   renderComplianceGapsSection(data.complianceGaps);
   renderSituation(data);
   renderAlways();
-  loadReminder(agentId);
+  renderPendingSteps();
 }
 
 function viewMyOwnHub() {
@@ -723,15 +737,90 @@ function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── Reminder (async, doesn't block the rest of the page) ─────────────────────
-async function loadReminder(agentId) {
+// ── Pending Steps — a real checkable list built straight from the already-
+// fetched checklist data, not a single AI-generated paragraph (that read as
+// one long run-on sentence and couldn't be acted on directly). Scoped to
+// the agent's own outstanding items (responsible_party='agent') — the
+// coordinator's own open prep-work is still visible via the modal/progress
+// bar, just not surfaced here as something the agent needs to act on.
+function renderPendingSteps() {
+  const data = S.hubData;
+  const box = document.getElementById('reminderBox');
+  if (!data) { box.style.display = 'none'; return; }
+
+  const addrByTxn = {};
+  for (const t of (data.transactions || [])) addrByTxn[t.id] = t.property_address;
+
+  const pending = (data.checklist || []).filter(c => c.responsible_party === 'agent' && c.progress_status === 'pending');
+  if (!pending.length) { box.style.display = 'none'; return; }
+
+  const byTxn = {};
+  for (const c of pending) (byTxn[c.transaction_id] ||= []).push(c);
+  const txnCount = Object.keys(byTxn).length;
+
+  document.getElementById('reminderSummary').textContent =
+    `You have ${pending.length} pending step${pending.length === 1 ? '' : 's'} across ${txnCount} transaction${txnCount === 1 ? '' : 's'}.`;
+
+  document.getElementById('reminderList').innerHTML = Object.entries(byTxn).map(([txnId, items]) => `
+    <div class="reminder-group-label">${escapeHtml(addrByTxn[txnId] || 'Untitled listing')}</div>
+    ${items.slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map(i => renderChecklistItemRow(i, txnId)).join('')}
+  `).join('');
+
+  box.style.display = 'block';
+}
+
+// Shared row renderer — used by both the Pending Steps list above and the
+// transaction detail modal, so a checkbox toggled in either place looks and
+// behaves identically. Only the agent's own pending items are actually
+// clickable; everything else (completed/dismissed/coordinator-owned) stays
+// the same static status dot it always was.
+function renderChecklistItemRow(i, txnId) {
+  const meta = CHECKLIST_STATUS_META[i.progress_status] || CHECKLIST_STATUS_META.pending;
+  const isAgentItem = i.responsible_party === 'agent';
+  const checkable = isAgentItem && i.progress_status === 'pending';
+  const href = i.resource_url ? (isAgentItem ? withTxnParam(i.resource_url, txnId) : i.resource_url) : '';
+  const link = i.resource_url
+    ? `<a class="checklist-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
+    : '';
+  const partyBadge = isAgentItem ? `<span class="checklist-party">Your task</span>` : '';
+  const checkAttrs = checkable ? `class="checklist-check ${meta.cls} checkable" onclick="toggleChecklistItem('${i.progress_id}', '${txnId}')" title="Mark complete"` : `class="checklist-check ${meta.cls}"`;
+  return `<div class="checklist-item ${meta.rowCls}" data-progress-id="${i.progress_id}">
+    <span ${checkAttrs}>${meta.icon}</span>
+    <span class="checklist-title">${escapeHtml(i.title)}</span>
+    ${partyBadge}
+    ${link}
+  </div>`;
+}
+
+// Marks an agent-owned item complete (check-off only — there's no un-check
+// affordance here; reopening a completed step is a coordinator/Daily Desk
+// action, same as it already is for every other checklist item in this
+// system). Updates S.hubData in place and re-renders from it rather than
+// re-fetching the whole hub over the network.
+async function toggleChecklistItem(progressId, txnId) {
+  const row = (S.hubData.checklist || []).find(c => String(c.progress_id) === String(progressId));
+  if (!row) return;
+  const prevStatus = row.progress_status;
+  row.progress_status = 'completed'; // optimistic
+  renderPendingSteps();
+  renderSituation(S.hubData);
+  if (document.getElementById('txnModal').classList.contains('open')) openTxnModal(txnId);
+
   try {
-    const r = await fetch(`${PROXY_BASE}/agent-hub/${agentId}/reminder`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(x => x.json());
-    if (r.text) {
-      document.getElementById('reminderText').textContent = r.text;
-      document.getElementById('reminderBox').style.display = 'block';
-    }
-  } catch (_) { /* reminder is a nice-to-have — silently skip on failure */ }
+    const res = await fetch(`${PROXY_BASE}/daily-desk/checklist-progress/${progressId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      body: JSON.stringify({ status: 'completed' }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || res.statusText);
+  } catch (e) {
+    row.progress_status = prevStatus; // revert on failure
+    renderPendingSteps();
+    renderSituation(S.hubData);
+    if (document.getElementById('txnModal').classList.contains('open')) openTxnModal(txnId);
+    alert("Couldn't mark that complete: " + e.message);
+  }
 }
 
 // ── Compliance gaps ────────────────────────────────────────────────────────
@@ -831,6 +920,7 @@ function toolsForTransaction(t) {
   if (t.represents_seller) {
     tools.push({ title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' });
     tools.push({ title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' });
+    tools.push({ title: 'Develop a Business Plan', url: './business-plan-generator.html', icon: '📈' });
   }
   return tools;
 }
@@ -850,8 +940,13 @@ function renderTransactionsSection(transactions, checklist) {
     const open = total - completed - bypassed;
     const completedPct = total ? Math.round((completed / total) * 100) : 0;
     const bypassedPct  = total ? Math.round((bypassed  / total) * 100) : 0;
+    // Highlighted count is specifically the agent's own outstanding items —
+    // coordinator prep-work still "open" isn't something the agent can act
+    // on, so it shouldn't read as an urgent flag on their card.
+    const agentPending = items.filter(i => i.responsible_party === 'agent' && i.progress_status === 'pending').length;
 
-    return `<div class="txn-card" onclick="openTxnModal('${t.id}')">
+    return `<div class="txn-card ${agentPending ? 'has-pending' : ''}" onclick="openTxnModal('${t.id}')">
+      ${agentPending ? `<span class="txn-pending-badge">${agentPending} pending</span>` : ''}
       <div class="txn-address">${escapeHtml(t.property_address)}</div>
       <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
       ${total ? `
@@ -899,21 +994,7 @@ function openTxnModal(txnId) {
   document.getElementById('modalTools').innerHTML = tools
     .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('');
   document.getElementById('modalChecklist').innerHTML = items.length
-    ? items.map(i => {
-        const meta = CHECKLIST_STATUS_META[i.progress_status] || CHECKLIST_STATUS_META.pending;
-        const isAgentItem = i.responsible_party === 'agent';
-        const href = i.resource_url ? (isAgentItem ? withTxnParam(i.resource_url, txnId) : i.resource_url) : '';
-        const link = i.resource_url
-          ? `<a class="checklist-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
-          : '';
-        const partyBadge = isAgentItem ? `<span class="checklist-party">Your task</span>` : '';
-        return `<div class="checklist-item ${meta.rowCls}">
-          <span class="checklist-check ${meta.cls}">${meta.icon}</span>
-          <span class="checklist-title">${escapeHtml(i.title)}</span>
-          ${partyBadge}
-          ${link}
-        </div>`;
-      }).join('')
+    ? items.map(i => renderChecklistItemRow(i, txnId)).join('')
     : '<p class="empty-state">No checklist steps yet.</p>';
 
   document.getElementById('txnModal').classList.add('open');
