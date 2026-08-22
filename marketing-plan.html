@@ -145,6 +145,13 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
 
 <div class="app" id="app">
 
+  <div class="tabs" id="mainTabs" style="margin-bottom:1.25rem;">
+    <button class="tab-btn active" id="mainTabBuildBtn" onclick="showMainTab('build')">Build a Plan</button>
+    <button class="tab-btn" id="mainTabLibraryBtn" onclick="showMainTab('library')" style="display:none">Knowledge Library</button>
+  </div>
+
+  <div id="mainTabBuild">
+
   <!-- STEP 1: pick a listing -->
   <div id="step-pick">
     <div class="panel">
@@ -188,10 +195,17 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
       </div>
     </div>
 
-    <div class="panel" id="emphasisPanel" style="display:none">
-      <div class="panel-body" style="padding-bottom:1rem;">
+    <!-- Shown once a listing/MLS#/manual entry is picked and its facts are
+         loaded — a deliberate pause before generating, not an automatic
+         trigger the moment something's picked. -->
+    <div class="panel" id="readyPanel" style="display:none">
+      <div class="panel-head">
+        <div class="panel-title" id="readyAddress">Ready to generate</div>
+      </div>
+      <div class="panel-body">
         <div class="panel-sub" style="margin-bottom:0.6rem;">Emphasize any of these strategies? (optional — leave blank for a balanced plan)</div>
-        <div id="emphasisChecks" style="display:flex;flex-wrap:wrap;gap:0.5rem;"></div>
+        <div id="emphasisChecks" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;"></div>
+        <button class="btn btn-primary btn-block" onclick="generatePlan()">Generate Marketing Plan →</button>
       </div>
     </div>
   </div>
@@ -235,8 +249,13 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
     </div>
   </div>
 
-  <!-- Knowledge Library — manager/admin only -->
-  <div class="panel" id="kbPanel" style="display:none">
+  </div> <!-- /mainTabBuild -->
+
+  <!-- Knowledge Library — its own tab, manager/admin only. Kept out of the
+       Build a Plan flow entirely so it's never visible mid-workflow (it's an
+       occasional content-maintenance task, not something to touch per plan). -->
+  <div id="mainTabLibrary" style="display:none">
+  <div class="panel" id="kbPanel">
     <div class="panel-head">
       <div class="panel-title">Knowledge Library</div>
       <div class="panel-sub">Real ACC marketing-program source material the plan is grounded in. Paste a Google Drive doc link, paste text directly, or upload a file.</div>
@@ -272,6 +291,7 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
     </div>
     <div id="kbList"><div class="state-msg"><span class="icon">⏳</span>Loading…</div></div>
   </div>
+  </div> <!-- /mainTabLibrary -->
 
 </div>
 
@@ -357,18 +377,33 @@ async function init() {
     isManager = me.role === 'admin' || me.role === 'manager';
   } catch (e) { isManager = false; }
   document.getElementById('app').style.display = 'block';
-  document.getElementById('kbPanel').style.display = isManager ? 'block' : 'none';
+  document.getElementById('mainTabLibraryBtn').style.display = isManager ? 'inline-flex' : 'none';
   if (isManager) loadKnowledgeSources();
   await loadListings();
   loadEmphasisOptions();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   TOP-LEVEL TABS — Build a Plan vs. Knowledge Library. Kept fully
+   separate so the Knowledge Library (an occasional admin content-
+   maintenance task) never shows up mid-workflow while building a plan.
+═══════════════════════════════════════════════════════════════════ */
+function showMainTab(tab) {
+  document.getElementById('mainTabBuildBtn').classList.toggle('active', tab === 'build');
+  document.getElementById('mainTabLibraryBtn').classList.toggle('active', tab === 'library');
+  document.getElementById('mainTabBuild').style.display = tab === 'build' ? 'block' : 'none';
+  document.getElementById('mainTabLibrary').style.display = tab === 'library' ? 'block' : 'none';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    EMPHASIS PICKER — options are just the Knowledge Library's own
    categories (not a hardcoded list), so it grows automatically as new
    strategies get added there. Toggle-chip UI, same idiom as the genre
-   picker in camerons-stage.html.
+   picker in camerons-stage.html. Rendered into the "ready to generate"
+   panel once a listing's facts are loaded — not shown up front, since
+   it's a choice made in the context of a specific listing.
 ═══════════════════════════════════════════════════════════════════ */
+let emphasisCategories = [];
 function labelizeCategory(cat) {
   return String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -376,12 +411,16 @@ function labelizeCategory(cat) {
 async function loadEmphasisOptions() {
   try {
     const { categories } = await GET('/marketing-plan/knowledge-categories');
-    if (!categories.length) return; // nothing uploaded yet — leave the panel hidden
-    document.getElementById('emphasisPanel').style.display = 'block';
-    document.getElementById('emphasisChecks').innerHTML = categories.map(cat => `
-      <button type="button" class="tab-btn" onclick="toggleEmphasis('${cat}', this)">${escapeHtml(labelizeCategory(cat))}</button>
-    `).join('');
+    emphasisCategories = categories;
   } catch (e) { /* emphasis picker is optional — fail silently */ }
+}
+
+function renderEmphasisChecks() {
+  const el = document.getElementById('emphasisChecks');
+  if (!emphasisCategories.length) { el.innerHTML = ''; return; }
+  el.innerHTML = emphasisCategories.map(cat => `
+    <button type="button" class="tab-btn ${STATE.emphasize.includes(cat) ? 'active' : ''}" onclick="toggleEmphasis('${cat}', this)">${escapeHtml(labelizeCategory(cat))}</button>
+  `).join('');
 }
 
 function toggleEmphasis(cat, btn) {
@@ -456,7 +495,7 @@ async function selectListing(i) {
   STATE.address = l.address;
   STATE.city = l.city;
   STATE.isManual = false;
-  await fetchListingFactsAndGenerate();
+  await loadListingFacts();
 }
 
 async function pickByMls() {
@@ -465,17 +504,20 @@ async function pickByMls() {
   STATE.transactionId = null;
   STATE.mlsId = mlsId;
   STATE.isManual = false;
-  await fetchListingFactsAndGenerate();
+  await loadListingFacts();
 }
 
-async function fetchListingFactsAndGenerate() {
-  setStep('plan');
-  document.getElementById('planAddress').textContent = STATE.address || ('MLS #' + STATE.mlsId);
-  document.getElementById('planSub').textContent = 'Looking up listing details…';
-  document.getElementById('planBody').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading listing…</div>`;
+// Looks up the listing's facts and — once loaded — pauses on a "ready to
+// generate" panel (emphasis picker + an explicit Generate button) rather
+// than auto-generating the instant a listing's picked. Skips straight to
+// showing an existing plan instead, if this transaction already has one.
+async function loadListingFacts() {
+  const btnRow = document.getElementById('readyPanel');
+  btnRow.style.display = 'none';
+  document.getElementById('listingPickerBody').style.opacity = '0.5';
   try {
     const { listing } = await GET(`/camerons-stage/listing/${encodeURIComponent(STATE.mlsId)}`);
-    if (!listing) { toast('Could not find that listing in DeltaNet.'); backToPick(); return; }
+    if (!listing) { toast('Could not find that listing in DeltaNet.'); return; }
     if (!STATE.address) STATE.address = listing.UnparsedAddress || listing.Address || listing.address || listing.StreetAddress || ('MLS #' + STATE.mlsId);
     if (!STATE.city) STATE.city = listing.city_cleaned || listing.City || listing.city || '';
     const truthy = v => v === true || v === 'true' || v === 1 || v === '1';
@@ -492,10 +534,27 @@ async function fetchListingFactsAndGenerate() {
     STATE.remarks = listing.comments || listing.feature_comments || listing.additional_comments || listing.public_remarks || listing.remarks || null;
   } catch (e) {
     toast('Listing lookup failed: ' + e.message);
-    backToPick();
     return;
+  } finally {
+    document.getElementById('listingPickerBody').style.opacity = '1';
   }
-  await checkExistingOrGenerate();
+  await afterFactsLoaded();
+}
+
+async function afterFactsLoaded() {
+  if (STATE.transactionId) {
+    try {
+      const { plan } = await GET(`/marketing-plan/plans?transaction_id=${STATE.transactionId}`);
+      if (plan) { currentPlan = plan; setStep('plan'); renderPlan(plan); return; }
+    } catch (e) { /* fall through to the ready panel */ }
+  }
+  showReadyPanel();
+}
+
+function showReadyPanel() {
+  document.getElementById('readyAddress').textContent = 'Ready to generate: ' + (STATE.address || STATE.city || ('MLS #' + STATE.mlsId));
+  renderEmphasisChecks();
+  document.getElementById('readyPanel').style.display = 'block';
 }
 
 function useManualEntry() {
@@ -511,19 +570,7 @@ function useManualEntry() {
   STATE.propertyType = document.getElementById('manPropertyType').value.trim() || null;
   STATE.remarks = document.getElementById('manNotes').value.trim() || null;
   if (!STATE.address && !STATE.city) { toast('Enter at least a city, so the plan has something to work with.'); return; }
-  setStep('plan');
-  document.getElementById('planAddress').textContent = STATE.address || (STATE.city + ' (pre-market)');
-  generatePlan();
-}
-
-async function checkExistingOrGenerate() {
-  if (STATE.transactionId) {
-    try {
-      const { plan } = await GET(`/marketing-plan/plans?transaction_id=${STATE.transactionId}`);
-      if (plan) { currentPlan = plan; renderPlan(plan); return; }
-    } catch (e) { /* fall through to generate */ }
-  }
-  await generatePlan();
+  showReadyPanel();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -545,6 +592,8 @@ function backToPick() {
 }
 
 async function generatePlan() {
+  setStep('plan');
+  document.getElementById('planAddress').textContent = STATE.address || STATE.city || ('MLS #' + STATE.mlsId);
   document.getElementById('planSub').textContent = 'Grounded in ACC\'s own marketing programs — this can take 15-30s.';
   document.getElementById('planBody').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Generating your marketing plan…</div>`;
   document.getElementById('printBtn').disabled = true;
