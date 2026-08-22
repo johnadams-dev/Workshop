@@ -671,6 +671,7 @@ tbody tr.clickable { cursor: pointer; }
 .cl-check.checked { background: var(--green); border-color: var(--green); color: var(--ink); }
 .cl-check.dismissed-x { background: var(--text-dim); border-color: var(--text-dim); color: var(--ink); }
 .cl-label { flex: 1; }
+.cl-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; font-weight: normal; }
 .cl-action {
   font-size: 10px;
   font-family: var(--mono);
@@ -5785,7 +5786,8 @@ function renderDrawer(t) {
       checkHtml = '<div class="cl-check"></div>';
       actionHtml = '<div class="cl-action">Mark done</div>';
     }
-    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}</div>${actionHtml}</div>`;
+    const descHtml = item.description ? `<div class="cl-desc">${escapeHtml(item.description)}</div>` : '';
+    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}${descHtml}</div>${actionHtml}</div>`;
   }).join('') : '<div class="empty">No checklist items.</div>';
 
   const actEl = document.getElementById('drawer-activity');

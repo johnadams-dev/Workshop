@@ -256,6 +256,7 @@
     .checklist-check.pending { border: 2px solid var(--cream-dark); }
     .checklist-check.dismissed { background: var(--cream-dark); color: var(--muted); }
     .checklist-title { flex: 1; color: var(--ink-soft); }
+    .checklist-desc { font-size: .74rem; color: var(--muted); font-weight: normal; margin-top: .15rem; }
     .checklist-item.is-completed .checklist-title,
     .checklist-item.is-dismissed .checklist-title { color: var(--muted); text-decoration: line-through; }
     .checklist-link { font-size: .74rem; color: var(--gold); text-decoration: none; white-space: nowrap; }
@@ -784,9 +785,10 @@ function renderChecklistItemRow(i, txnId) {
     : '';
   const partyBadge = isAgentItem ? `<span class="checklist-party">Your task</span>` : '';
   const checkAttrs = checkable ? `class="checklist-check ${meta.cls} checkable" onclick="toggleChecklistItem('${i.progress_id}', '${txnId}')" title="Mark complete"` : `class="checklist-check ${meta.cls}"`;
+  const descHtml = i.description ? `<div class="checklist-desc">${escapeHtml(i.description)}</div>` : '';
   return `<div class="checklist-item ${meta.rowCls}" data-progress-id="${i.progress_id}">
     <span ${checkAttrs}>${meta.icon}</span>
-    <span class="checklist-title">${escapeHtml(i.title)}</span>
+    <div class="checklist-title">${escapeHtml(i.title)}${descHtml}</div>
     ${partyBadge}
     ${link}
   </div>`;
