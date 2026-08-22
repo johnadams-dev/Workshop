@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YETWYXQ92E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-YETWYXQ92E');
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cameron's Stage — Outside Listings — Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+
+<style>
+:root {
+  --ink:        #1a1a2e;
+  --ink-soft:   #2d2d4a;
+  --gold:       #c9a84c;
+  --gold-light: #e8c96a;
+  --cream:      #faf8f3;
+  --cream-dark: #f0ece0;
+  --slate:      #5a5a78;
+  --muted:      #8a8aa8;
+  --card:       #ffffff;
+  --border:     rgba(26,26,46,0.10);
+  --border-mid: rgba(26,26,46,0.16);
+  --shadow:     0 2px 20px rgba(26,26,46,0.08);
+  --shadow-lg:  0 8px 40px rgba(26,26,46,0.14);
+  --red:        #c0392b;
+  --green:      #27ae60;
+  --r:          10px;
+  --r-lg:       14px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── AUTH GATE ── */
+#auth-gate {
+  position: fixed; inset: 0; background: var(--ink);
+  display: flex; align-items: center; justify-content: center; z-index: 999;
+}
+#auth-gate .box { text-align: center; color: var(--cream); }
+#auth-gate h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; margin-bottom: 1.5rem; }
+#auth-gate .box a { display: inline-block; margin-top: 16px; font-size: 12px; color: rgba(250,248,243,0.55); text-decoration: none; letter-spacing: .03em; }
+
+/* ── NOT AUTHORIZED ── */
+#not-authorized {
+  position: fixed; inset: 0; background: var(--ink); display: none;
+  align-items: center; justify-content: center; z-index: 998; text-align: center;
+}
+#not-authorized .box { color: var(--cream); max-width: 360px; padding: 2rem; }
+#not-authorized h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin-bottom: 0.75rem; }
+#not-authorized p { color: rgba(250,248,243,0.7); font-size: 0.9rem; margin-bottom: 1.25rem; }
+#not-authorized a { color: var(--gold); font-size: 0.85rem; text-decoration: none; }
+
+/* ── HEADER ── */
+header {
+  background: var(--ink);
+  padding: 0 2rem;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 24px rgba(0,0,0,0.3);
+}
+.header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 1rem; height: 64px; }
+.back-link { color: var(--muted); font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.back-link:hover { color: var(--gold); }
+.header-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+.logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--cream); }
+.logo span { color: var(--gold); }
+.header-tool { font-size: 0.8rem; color: var(--muted); font-weight: 300; }
+.header-badge {
+  margin-left: auto; font-family: monospace; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--gold); border: 1px solid rgba(201,168,76,0.3); padding: 3px 10px; border-radius: 100px; background: rgba(201,168,76,0.08);
+}
+
+.app { max-width: 780px; margin: 0 auto; padding: 2.5rem 2rem; display: none; }
+
+/* ── STEP INDICATOR ── */
+.steps { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
+.step-dot {
+  flex: 1; height: 4px; border-radius: 100px; background: var(--cream-dark); transition: background 0.2s;
+}
+.step-dot.active, .step-dot.done { background: var(--gold); }
+
+.panel { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden; margin-bottom: 1.5rem; }
+.panel-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--cream-dark); }
+.panel-title { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; }
+.panel-sub { font-size: 0.8rem; color: var(--slate); margin-top: 4px; }
+.panel-body { padding: 1.5rem; }
+
+.field { margin-bottom: 1.1rem; }
+.field label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); display: block; margin-bottom: 6px; }
+.field input, .field textarea {
+  width: 100%; border: 1px solid var(--border-mid); background: var(--cream); color: var(--ink);
+  font-family: inherit; font-size: 0.9rem; padding: 10px 12px; border-radius: 7px; outline: none;
+}
+.field input:focus, .field textarea:focus { border-color: var(--gold); }
+.field textarea { resize: vertical; min-height: 60px; }
+.field-hint { font-size: 0.74rem; color: var(--slate); margin-top: 4px; }
+.field-hint.internal { color: #7a5a10; }
+
+.mls-row { display: flex; }
+.mls-row input { flex: 1; border: 1px solid var(--border-mid); border-right: none; background: var(--cream); font-family: monospace; font-size: 0.95rem; padding: 10px 12px; border-radius: 7px 0 0 7px; outline: none; }
+.mls-row button { background: var(--gold); border: none; padding: 10px 18px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-radius: 0 7px 7px 0; }
+.mls-row button:hover:not(:disabled) { background: var(--gold-light); }
+.mls-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.listing-preview { display: flex; gap: 1rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--cream-dark); border-bottom: 1px solid var(--cream-dark); }
+.listing-preview img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--cream-dark); flex-shrink: 0; }
+.listing-preview h3 { font-size: 1rem; font-weight: 600; }
+.listing-preview .meta { font-size: 0.8rem; color: var(--slate); margin-top: 3px; }
+.listing-preview .price { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; font-weight: 600; color: var(--ink); margin-top: 4px; }
+
+/* ── BUTTONS ── */
+.btn { border: none; padding: 0.75rem 1.4rem; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: background 0.15s, transform 0.1s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.btn-primary { background: var(--ink); color: var(--cream); }
+.btn-primary:hover:not(:disabled) { background: var(--ink-soft); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn-gold { background: var(--gold); color: var(--ink); }
+.btn-gold:hover:not(:disabled) { background: var(--gold-light); }
+.btn-ghost { background: transparent; color: var(--slate); border: 1px solid var(--border-mid); }
+.btn-ghost:hover { background: var(--cream); }
+.btn-block { width: 100%; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── PHOTO TILES ── */
+.photo-toolbar { padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--cream-dark); display: flex; gap: 0.75rem; align-items: center; background: var(--cream); font-size: 0.8rem; }
+.photo-toolbar button { background: transparent; border: none; color: var(--slate); text-decoration: underline; cursor: pointer; font-size: 0.8rem; }
+.photo-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; padding: 1.25rem; }
+.photo-tile {
+  border: 1px solid var(--border-mid); border-radius: var(--r); background: var(--card); overflow: hidden;
+  cursor: grab; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.photo-tile:active { cursor: grabbing; }
+.photo-tile.excluded { opacity: 0.4; }
+.photo-tile.dragging { opacity: 0.3; }
+.photo-tile.drag-over { box-shadow: 0 0 0 3px var(--gold); transform: scale(1.02); }
+.photo-tile-img-wrap { position: relative; width: 100%; aspect-ratio: 4/3; background: var(--cream-dark); }
+.photo-tile-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.photo-tile-order {
+  position: absolute; top: 8px; left: 8px; background: rgba(26,26,46,0.75); color: var(--cream);
+  font-family: monospace; font-size: 0.7rem; padding: 2px 8px; border-radius: 100px;
+}
+.photo-tile-reorder { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.photo-tile-reorder button {
+  background: rgba(26,26,46,0.75); color: var(--cream); border: none; border-radius: 4px;
+  width: 24px; height: 22px; cursor: pointer; font-size: 0.7rem;
+}
+.photo-tile-reorder button:disabled { opacity: 0.35; cursor: not-allowed; }
+.photo-tile-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.photo-title-input { width: 100%; border: 1px solid var(--border-mid); border-radius: 6px; padding: 6px 10px; font-size: 0.85rem; font-family: inherit; }
+.photo-tile-exclude { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--slate); }
+
+/* ── GENRE PICKER ── */
+.genre-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+.genre-chip {
+  border: 1px solid var(--border-mid); background: var(--cream); color: var(--ink);
+  padding: 7px 14px; border-radius: 100px; font-size: 0.8rem; font-family: inherit; cursor: pointer; transition: all 0.15s;
+}
+.genre-chip:hover { border-color: var(--gold); }
+.genre-chip.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+.genre-note { font-size: 0.78rem; color: var(--slate); margin: -0.75rem 0 1.25rem; min-height: 1.2em; }
+.genre-note .warn { color: #9a6b10; }
+
+.advanced-toggle { background: none; border: none; padding: 0; margin: -0.5rem 0 1rem; font-size: 0.8rem; color: var(--slate); cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
+.advanced-toggle:hover { color: var(--ink); text-decoration-color: var(--gold); }
+.advanced-panel { display: none; margin: -0.5rem 0 1.25rem; }
+.advanced-panel textarea {
+  width: 100%; border: 1px solid var(--border-mid); background: var(--cream); border-radius: 8px;
+  padding: 10px 12px; font-family: inherit; font-size: 0.85rem; color: var(--ink); resize: vertical; min-height: 64px;
+}
+.advanced-panel textarea:focus { outline: none; border-color: var(--gold); }
+.advanced-hint { font-size: 0.74rem; color: var(--slate); margin-top: 4px; }
+
+.photo-row { display: grid; grid-template-columns: 1fr auto; gap: 0.9rem; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--cream-dark); }
+.photo-row:last-child { border-bottom: none; }
+
+.state-msg { padding: 3rem 1.5rem; text-align: center; color: var(--muted); font-size: 0.9rem; }
+.state-msg .icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+
+.share-box { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.share-box input { flex: 1; min-width: 0; border: 1px solid var(--border-mid); border-radius: 7px; padding: 10px 12px; font-family: monospace; font-size: 0.85rem; background: var(--cream); }
+.share-box .btn { flex-shrink: 0; white-space: nowrap; }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--cream); padding: 10px 20px; border-radius: 8px; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 1000; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="box">
+    <h1>Cameron's <span style="color:var(--gold)">Stage</span></h1>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <a href="./index.html">← Tools</a>
+  </div>
+</div>
+
+<div id="not-authorized">
+  <div class="box">
+    <h1>Manager access required</h1>
+    <p>This tool builds tours for listings outside our own roster and is limited to managers and admins.</p>
+    <a href="./index.html">← Back to Tools</a>
+  </div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">John <span>Adams</span></div>
+    <span class="header-tool">/ Cameron's Stage — Outside Listings</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:1rem;">
+      <a href="./feedback.html?tool=camerons-stage-external" class="back-link">Feedback</a>
+      <a href="./index.html" class="back-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        All Tools
+      </a>
+      <div class="header-divider"></div>
+      <span class="header-badge" style="margin-left:0">Manager</span>
+    </div>
+  </div>
+</header>
+
+<div class="app" id="app">
+  <div class="steps">
+    <div class="step-dot" id="dot-1"></div>
+    <div class="step-dot" id="dot-2"></div>
+    <div class="step-dot" id="dot-3"></div>
+    <div class="step-dot" id="dot-4"></div>
+  </div>
+
+  <!-- STEP 1: MLS lookup + outside-agent identity -->
+  <div id="step-search">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Look up a listing</div>
+        <div class="panel-sub">Any active MLS listing, not just ours — search by MLS #.</div>
+      </div>
+      <div class="panel-body" style="padding-bottom:1rem;">
+        <div class="mls-row">
+          <input type="text" id="mlsInput" placeholder="e.g. O5215314" onkeydown="if(event.key==='Enter') doLookup()">
+          <button id="lookupBtn" onclick="doLookup()">Look Up</button>
+        </div>
+      </div>
+      <div id="listingPreviewWrap"></div>
+      <div class="panel-body" id="identityFields" style="display:none;padding-top:1.25rem;">
+        <div class="field">
+          <label>Agent name *</label>
+          <input type="text" id="extAgentName" placeholder="Full name">
+        </div>
+        <div class="field">
+          <label>Brokerage</label>
+          <input type="text" id="extAgentBrokerage" placeholder="Their current brokerage">
+        </div>
+        <div class="field">
+          <label>Internal note</label>
+          <textarea id="extNote" maxlength="500" placeholder="Any context worth keeping on file — not shown on the tour"></textarea>
+          <div class="field-hint internal">Internal only. Never appears on the tour page.</div>
+        </div>
+      </div>
+    </div>
+    <div id="searchStepActions" style="display:none;gap:0.75rem;">
+      <button class="btn btn-primary btn-block" id="continueToCurateBtn" onclick="continueToCurate()" disabled>Continue to Photos →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Curation -->
+  <div id="step-curate" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="curateAddress">Curate photos</div>
+        <div class="panel-sub">Drag to reorder (or use the arrows), add an optional title, uncheck any you want to leave out.</div>
+      </div>
+      <div class="photo-toolbar">
+        <span id="photoCount">0 photos</span>
+        <button onclick="selectAllPhotos(true)">Select all</button>
+        <button onclick="selectAllPhotos(false)">Select none</button>
+      </div>
+      <div id="photoList" class="photo-tiles"></div>
+    </div>
+    <div style="display:flex;gap:0.75rem;">
+      <button class="btn btn-ghost" onclick="setStep(1)">← Back</button>
+      <button class="btn btn-primary" style="flex:1" onclick="goToGenerate()">Continue to Music →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Generate music -->
+  <div id="step-generate" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title" id="generateAddress">—</div>
+        <div class="panel-sub">Now that you've seen the photos, pick a song for the tour.</div>
+      </div>
+      <div class="genre-grid" style="padding:1.5rem 1.5rem 0;margin-bottom:0.75rem;">
+        <button type="button" class="genre-chip active" id="tabExisting" onclick="showMusicTab('existing')">📼 Reuse a Song</button>
+        <button type="button" class="genre-chip" id="tabCreateNew" onclick="showMusicTab('new')">🎵 Create New</button>
+      </div>
+
+      <div class="panel-body" id="existingTab">
+        <div class="panel-sub" style="margin-bottom:0.75rem">Instrumental and area-themed songs, free to reuse on any listing — no need to generate something new if one of these works.</div>
+        <div id="recordingsList"><div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div></div>
+      </div>
+
+      <div class="panel-body" id="createNewTab" style="display:none">
+        <div class="genre-grid" id="genreGrid"></div>
+        <div class="genre-note" id="genreNote"></div>
+        <button type="button" class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">+ Advanced: add custom guidelines</button>
+        <div class="advanced-panel" id="advancedPanel">
+          <textarea id="customGuidelines" maxlength="300" placeholder="e.g. mention the pool and the golf course view, keep the mood upbeat and celebratory" oninput="renderGenreNote()"></textarea>
+          <div class="advanced-hint">Blended into the song prompt. Generating with custom guidelines always uses fresh AI generation, even for genres normally served instantly.</div>
+        </div>
+        <button class="btn btn-primary btn-block" id="generateBtn" onclick="doGenerate()">🎵 Generate Song</button>
+        <div id="generateResult" style="margin-top:1rem;display:none;">
+          <audio controls style="width:100%" id="audioPreview"></audio>
+          <button class="btn btn-ghost btn-block" style="margin-top:1rem" onclick="resetGenerate()">🔁 (Re)create a custom song</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.75rem;">
+      <button class="btn btn-ghost" onclick="setStep(2)">← Back to Photos</button>
+      <button class="btn btn-primary" style="flex:1;display:none" id="saveBtn" onclick="doSave()">Save Tour</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Done -->
+  <div id="step-done" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">🎉 Tour ready</div>
+        <div class="panel-sub">Share this link — it's the branded view, with Adams, Cameron & Co. contact info in the footer.</div>
+      </div>
+      <div class="panel-body">
+        <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Tour link</label>
+        <div class="share-box">
+          <input type="text" id="brandedTourUrl" readonly>
+          <button class="btn btn-gold" onclick="copyUrl('brandedTourUrl')">Copy</button>
+          <a id="previewBrandedLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
+          <button class="btn btn-ghost" onclick="setStep(3)">← Back to Music</button>
+          <button class="btn btn-ghost" style="flex:1" onclick="location.reload()">Build Another</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG / AUTH
+═══════════════════════════════════════════════════════════════════ */
+const PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+let userEmail = localStorage.getItem('ac_user_email') || "";
+let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  window.addEventListener('load', boot);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || "";
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || "";
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    await boot();
+  } catch (e) {
+    alert('Authentication error: ' + e.message);
+  }
+}
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail, ...(opts.headers || {}) };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const GET  = (p)    => api(p);
+const POST = (p, b) => api(p, { method: 'POST', body: JSON.stringify(b) });
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ROLE GATE — manager/admin only
+═══════════════════════════════════════════════════════════════════ */
+async function boot() {
+  try {
+    const me = await GET('/lockbox/me');
+    if (me.role !== 'admin' && me.role !== 'manager') {
+      document.getElementById('not-authorized').style.display = 'flex';
+      return;
+    }
+  } catch (e) {
+    document.getElementById('not-authorized').style.display = 'flex';
+    return;
+  }
+  document.getElementById('app').style.display = 'block';
+  init();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let STATE = {
+  mlsId: null, address: '', city: '', photos: [], genre: 'instrumental',
+  bedrooms: null, bathrooms: null, sqft: null, price: null, propertyType: null, remarks: null,
+  music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
+  extAgentName: '', extAgentBrokerage: '', extNote: '',
+};
+let GENRES = [{ id: 'instrumental', label: 'Instrumental', hasVocals: false, cached: false }];
+
+const ALL_STEPS = ['step-search', 'step-curate', 'step-generate', 'step-done'];
+
+function setStep(n) {
+  ALL_STEPS.forEach(id => document.getElementById(id).style.display = 'none');
+  const map = { 1: 'step-search', 2: 'step-curate', 3: 'step-generate', 4: 'step-done' };
+  document.getElementById(map[n]).style.display = 'block';
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.toggle('active', i === n);
+    dot.classList.toggle('done', i < n);
+  }
+}
+
+async function init() {
+  setStep(1);
+  try {
+    const g = await GET('/camerons-stage/genres');
+    if (g.genres && g.genres.length) { GENRES = g.genres; STATE.genre = g.default || STATE.genre; }
+  } catch (e) { /* fall back to the built-in Instrumental-only default */ }
+  renderGenreGrid();
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP 1 — MLS LOOKUP
+═══════════════════════════════════════════════════════════════════ */
+async function doLookup() {
+  const mlsId = document.getElementById('mlsInput').value.trim();
+  if (!mlsId) return;
+  const btn = document.getElementById('lookupBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  document.getElementById('listingPreviewWrap').innerHTML = '';
+  document.getElementById('identityFields').style.display = 'none';
+  document.getElementById('continueToCurateBtn').disabled = true;
+  try {
+    const { listing } = await GET(`/camerons-stage/external/listing/${encodeURIComponent(mlsId)}`);
+    if (!listing) {
+      document.getElementById('listingPreviewWrap').innerHTML = `<div class="state-msg"><span class="icon">🔍</span>No listing found for MLS #${escapeHtml(mlsId)}.</div>`;
+      return;
+    }
+    STATE.mlsId = listing.mlsId || mlsId;
+    STATE.address = listing.address || ('MLS #' + STATE.mlsId);
+    STATE.city = listing.city || '';
+    STATE.bedrooms = listing.bedrooms;
+    STATE.bathrooms = listing.bathrooms;
+    STATE.sqft = listing.sqft;
+    STATE.price = listing.price;
+    STATE.propertyType = listing.propertyType;
+    STATE.remarks = listing.remarks;
+    STATE.photos = (listing.photos || []).map((p, i) => ({ url: p.url, title: p.title || '', included: true, order: i }));
+
+    const thumb = STATE.photos[0]?.url || '';
+    document.getElementById('listingPreviewWrap').innerHTML = `
+      <div class="listing-preview">
+        ${thumb ? `<img src="${thumb}">` : ''}
+        <div>
+          <h3>${escapeHtml(STATE.address)}${STATE.city ? ', ' + escapeHtml(STATE.city) : ''}</h3>
+          <div class="meta">${[STATE.propertyType, STATE.bedrooms ? STATE.bedrooms + ' bed' : null, STATE.bathrooms ? STATE.bathrooms + ' bath' : null, STATE.sqft ? STATE.sqft.toLocaleString() + ' sqft' : null].filter(Boolean).join(' · ')}</div>
+          ${STATE.price ? `<div class="price">$${Number(STATE.price).toLocaleString()}</div>` : ''}
+          <div class="meta">${STATE.photos.length} photo${STATE.photos.length === 1 ? '' : 's'} available${listing.listOfficeName ? ' · Listed by ' + escapeHtml(listing.listOfficeName) : ''}</div>
+        </div>
+      </div>`;
+    document.getElementById('identityFields').style.display = 'block';
+    document.getElementById('continueToCurateBtn').disabled = false;
+    document.getElementById('continueToCurateBtn').parentElement.style.display = 'flex';
+  } catch (e) {
+    document.getElementById('listingPreviewWrap').innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Lookup failed.<br><small>${escapeHtml(e.message)}</small></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Look Up';
+  }
+}
+
+function continueToCurate() {
+  STATE.extAgentName = document.getElementById('extAgentName').value.trim();
+  STATE.extAgentBrokerage = document.getElementById('extAgentBrokerage').value.trim();
+  STATE.extNote = document.getElementById('extNote').value.trim();
+  if (!STATE.extAgentName) { toast('Agent name is required.'); return; }
+  document.getElementById('curateAddress').textContent = STATE.address;
+  renderPhotos();
+  setStep(2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP 2 — CURATION (identical mechanics to camerons-stage.html)
+═══════════════════════════════════════════════════════════════════ */
+let dragFromIndex = null;
+
+function renderPhotos() {
+  const el = document.getElementById('photoList');
+  document.getElementById('photoCount').textContent = `${STATE.photos.filter(p => p.included).length} of ${STATE.photos.length} included`;
+  if (!STATE.photos.length) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">📷</span>No photos available for this listing.</div>`;
+    return;
+  }
+  el.innerHTML = STATE.photos.map((p, i) => `
+    <div class="photo-tile ${p.included ? '' : 'excluded'}" draggable="true"
+         ondragstart="onTileDragStart(event, ${i})" ondragover="onTileDragOver(event, ${i})"
+         ondragleave="onTileDragLeave(event)" ondrop="onTileDrop(event, ${i})" ondragend="onTileDragEnd(event)">
+      <div class="photo-tile-img-wrap">
+        <img src="${p.url}" loading="lazy">
+        <span class="photo-tile-order">${i + 1}</span>
+        <div class="photo-tile-reorder">
+          <button onclick="movePhoto(${i},-1)" ${i === 0 ? 'disabled' : ''} title="Move earlier">▲</button>
+          <button onclick="movePhoto(${i},1)" ${i === STATE.photos.length - 1 ? 'disabled' : ''} title="Move later">▼</button>
+        </div>
+      </div>
+      <div class="photo-tile-body">
+        <input class="photo-title-input" placeholder="Optional title (e.g. Primary Suite)" value="${escapeHtml(p.title || '')}" oninput="STATE.photos[${i}].title=this.value">
+        <label class="photo-tile-exclude">
+          <input type="checkbox" ${p.included ? 'checked' : ''} onchange="STATE.photos[${i}].included=this.checked; renderPhotos()"> Include in tour
+        </label>
+      </div>
+    </div>
+  `).join('');
+}
+
+function movePhoto(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= STATE.photos.length) return;
+  [STATE.photos[i], STATE.photos[j]] = [STATE.photos[j], STATE.photos[i]];
+  renderPhotos();
+}
+
+function selectAllPhotos(val) {
+  STATE.photos.forEach(p => p.included = val);
+  renderPhotos();
+}
+
+function onTileDragStart(e, i) {
+  dragFromIndex = i;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(i));
+  e.currentTarget.classList.add('dragging');
+}
+function onTileDragOver(e, i) {
+  e.preventDefault();
+  if (i !== dragFromIndex) e.currentTarget.classList.add('drag-over');
+}
+function onTileDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onTileDrop(e, i) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragFromIndex === null || dragFromIndex === i) return;
+  const [moved] = STATE.photos.splice(dragFromIndex, 1);
+  STATE.photos.splice(i, 0, moved);
+  dragFromIndex = null;
+  renderPhotos();
+}
+function onTileDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.photo-tile.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragFromIndex = null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP 3 — MUSIC (identical mechanics to camerons-stage.html)
+═══════════════════════════════════════════════════════════════════ */
+function renderGenreGrid() {
+  document.getElementById('genreGrid').innerHTML = GENRES.map(g => `
+    <button type="button" class="genre-chip ${g.id === STATE.genre ? 'active' : ''}" onclick="selectGenre('${g.id}')">${g.hasVocals ? '🎤 ' : ''}${escapeHtml(g.label)}</button>
+  `).join('');
+
+  const selected = GENRES.find(g => g.id === STATE.genre);
+  const toggle = document.getElementById('advancedToggle');
+  const panel = document.getElementById('advancedPanel');
+  if (selected && selected.hasVocals) {
+    toggle.style.display = '';
+  } else {
+    toggle.style.display = 'none';
+    panel.style.display = 'none';
+    toggle.textContent = '+ Advanced: add custom guidelines';
+    document.getElementById('customGuidelines').value = '';
+  }
+  renderGenreNote();
+}
+
+function renderGenreNote() {
+  const g = GENRES.find(x => x.id === STATE.genre);
+  const note = document.getElementById('genreNote');
+  if (!g) { note.textContent = ''; return; }
+  const hasGuidelines = !!document.getElementById('customGuidelines')?.value.trim();
+  const bits = [];
+  if (g.hasVocals) bits.push(`🎤 Custom song about this property!`);
+  bits.push((g.cached && !hasGuidelines)
+    ? `Served instantly from our library — no fees.`
+    : `<span class="warn">ACC pays AI fees</span> for this one — generated fresh for this listing.`);
+  note.innerHTML = bits.join(' ');
+}
+
+function selectGenre(id) {
+  STATE.genre = id;
+  renderGenreGrid();
+}
+
+function toggleAdvanced() {
+  const panel = document.getElementById('advancedPanel');
+  const open = panel.style.display === 'block';
+  panel.style.display = open ? 'none' : 'block';
+  document.getElementById('advancedToggle').textContent = open
+    ? '+ Advanced: add custom guidelines'
+    : '− Advanced: add custom guidelines';
+}
+
+function goToGenerate() {
+  document.getElementById('generateAddress').textContent = STATE.address;
+  setStep(3);
+  renderGenreGrid();
+
+  const hasMusic = !!STATE.music.audio_url;
+  document.getElementById('generateBtn').style.display = hasMusic ? 'none' : 'flex';
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('generateBtn').innerHTML = '🎵 Generate Song';
+  document.getElementById('generateResult').style.display = hasMusic ? 'block' : 'none';
+  if (hasMusic) document.getElementById('audioPreview').src = STATE.music.audio_url;
+
+  showMusicTab(hasMusic ? 'new' : 'existing');
+}
+
+function resetGenerate() {
+  document.getElementById('generateResult').style.display = 'none';
+  document.getElementById('saveBtn').style.display = 'none';
+  document.getElementById('generateBtn').style.display = 'flex';
+}
+
+async function doGenerate() {
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating (about 30-60s)…';
+  try {
+    const customGuidelines = document.getElementById('customGuidelines').value.trim();
+    const data = await POST('/camerons-stage/generate', {
+      address: STATE.address, city: STATE.city, genre: STATE.genre, custom_guidelines: customGuidelines,
+      bedrooms: STATE.bedrooms, bathrooms: STATE.bathrooms, sqft: STATE.sqft, price: STATE.price,
+      propertyType: STATE.propertyType, remarks: STATE.remarks,
+    });
+    STATE.music = data;
+    document.getElementById('audioPreview').src = data.audio_url;
+    document.getElementById('generateResult').style.display = 'block';
+    document.getElementById('saveBtn').style.display = 'block';
+    btn.style.display = 'none';
+  } catch (e) {
+    toast('Song generation failed: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '🎵 Generate Song';
+  }
+}
+
+function showMusicTab(tab) {
+  document.getElementById('tabCreateNew').classList.toggle('active', tab === 'new');
+  document.getElementById('tabExisting').classList.toggle('active', tab === 'existing');
+  document.getElementById('createNewTab').style.display = tab === 'new' ? 'block' : 'none';
+  document.getElementById('existingTab').style.display = tab === 'existing' ? 'block' : 'none';
+  document.getElementById('saveBtn').style.display = STATE.music.audio_url ? 'block' : 'none';
+  if (tab === 'existing' && !window._recordingsLoaded) loadRecordings();
+}
+
+async function loadRecordings() {
+  window._recordingsLoaded = true;
+  const el = document.getElementById('recordingsList');
+  el.innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading recordings…</div>`;
+  try {
+    const { recordings } = await GET('/camerons-stage/recordings?reusable_only=1');
+    if (!recordings.length) { el.innerHTML = `<div class="state-msg">No reusable recordings yet — create a new one.</div>`; return; }
+    window._recordings = recordings;
+    el.innerHTML = recordings.map((r, i) => `
+      <div class="photo-row">
+        <div>
+          <div style="font-weight:500">${escapeHtml(r.genre || 'Instrumental')}${r.address ? ' — ' + escapeHtml(r.address) : ''}</div>
+          <audio controls style="width:100%;margin-top:6px" src="${r.audio_url}"></audio>
+        </div>
+        <button class="btn btn-gold" style="height:fit-content" onclick="pickRecording(${i})">Use This</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load recordings.<br><small>${escapeHtml(e.message)}</small></div>`;
+  }
+}
+
+function pickRecording(i) {
+  const r = window._recordings[i];
+  STATE.music = {
+    audio_url: r.audio_url, music_track_id: r.music_track_id, music_prompt: r.music_prompt,
+    music_length_ms: r.music_length_ms || 60000, genre: r.genre, lyrics: r.lyrics || null,
+  };
+  document.getElementById('saveBtn').style.display = 'block';
+  toast('Recording selected — click Save Tour to use it.');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP 4 — SAVE (is_external:true, only the branded link is ever shown)
+═══════════════════════════════════════════════════════════════════ */
+async function doSave() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  const photo_config = STATE.photos.map((p, i) => ({
+    url: p.url, title: p.title || '', included: !!p.included, order: i,
+  }));
+
+  try {
+    const result = await POST('/camerons-stage/tours', {
+      transaction_id: null, delta_listing_id: null, mls_id: STATE.mlsId, address: STATE.address,
+      agent_email: null, genre: STATE.music.genre,
+      music_prompt: STATE.music.music_prompt, music_length_ms: STATE.music.music_length_ms,
+      music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, lyrics: STATE.music.lyrics, photo_config,
+      is_external: true, external_agent_name: STATE.extAgentName,
+      external_agent_brokerage: STATE.extAgentBrokerage, external_note: STATE.extNote,
+    });
+    const id = result.id;
+    document.getElementById('brandedTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
+    document.getElementById('previewBrandedLink').href = `./camerons-stage-view.html?id=${id}&brand=1`;
+    setStep(4);
+  } catch (e) {
+    toast('Save failed: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = 'Save Tour';
+  }
+}
+
+function copyUrl(id) {
+  const input = document.getElementById(id);
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => toast('Link copied'));
+}
+</script>
+
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:"Cameron's Stage — Outside Listings",email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>

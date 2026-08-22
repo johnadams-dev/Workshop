@@ -572,6 +572,15 @@ function mgrControlsHtml(item) {
 }
 
 function renderFeed() {
+  // renderFeed() fully replaces #feed's innerHTML every time it runs (filter
+  // change, after a vote/status update, etc.), which destroys and recreates
+  // every item's vote-${id} div. voteState's `loaded` flags used to survive
+  // that rebuild, so toggleDesc() would see loaded:true from before and skip
+  // re-fetching — leaving the freshly-recreated div stuck on its "Loading…"
+  // placeholder forever. Clearing the cache here means a fresh DOM always
+  // gets a fresh load.
+  for (const id in voteState) delete voteState[id];
+
   const tf = document.getElementById('f-type-filter').value;
   const sf = document.getElementById('f-status-filter').value;
   const lf = document.getElementById('f-tool-filter').value;
