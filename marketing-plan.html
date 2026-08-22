@@ -64,6 +64,14 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
 .tab-btn { border: 1px solid var(--border-mid); background: var(--cream); color: var(--ink); padding: 7px 14px; border-radius: 100px; font-size: 0.8rem; font-family: inherit; cursor: pointer; }
 .tab-btn.active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
 
+/* Top-level section tabs — underline style, same convention as
+   agent-notices.html's .tabs/.tab (not the pill-chip .tab-btn above,
+   which is for smaller in-panel sub-tabs). */
+.main-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; }
+.main-tab { padding: 10px 20px; font-size: 0.88rem; font-weight: 600; font-family: inherit; cursor: pointer; border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+.main-tab.active { color: var(--ink); border-bottom-color: var(--gold); }
+.main-tab:hover:not(.active) { color: var(--ink); }
+
 .select-field { width: 100%; border: 1px solid var(--border-mid); background: var(--cream); color: var(--ink); font-family: inherit; font-size: 0.9rem; padding: 10px 12px; border-radius: 7px; outline: none; }
 .select-field:focus { border-color: var(--gold); }
 
@@ -145,9 +153,9 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
 
 <div class="app" id="app">
 
-  <div class="tabs" id="mainTabs" style="margin-bottom:1.25rem;">
-    <button class="tab-btn active" id="mainTabBuildBtn" onclick="showMainTab('build')">Build a Plan</button>
-    <button class="tab-btn" id="mainTabLibraryBtn" onclick="showMainTab('library')" style="display:none">Knowledge Library</button>
+  <div class="main-tabs" id="mainTabs">
+    <button class="main-tab active" id="mainTabBuildBtn" onclick="showMainTab('build')">Build a Plan</button>
+    <button class="main-tab" id="mainTabLibraryBtn" onclick="showMainTab('library')" style="display:none">Knowledge Library</button>
   </div>
 
   <div id="mainTabBuild">
@@ -377,7 +385,7 @@ async function init() {
     isManager = me.role === 'admin' || me.role === 'manager';
   } catch (e) { isManager = false; }
   document.getElementById('app').style.display = 'block';
-  document.getElementById('mainTabLibraryBtn').style.display = isManager ? 'inline-flex' : 'none';
+  document.getElementById('mainTabLibraryBtn').style.display = isManager ? 'inline-block' : 'none';
   if (isManager) loadKnowledgeSources();
   await loadListings();
   loadEmphasisOptions();
@@ -404,6 +412,10 @@ function showMainTab(tab) {
    it's a choice made in the context of a specific listing.
 ═══════════════════════════════════════════════════════════════════ */
 let emphasisCategories = [];
+// Collateral (flyers/print materials) is always included and can't be
+// unchecked — every plan should account for it regardless of what else
+// gets emphasized.
+const LOCKED_EMPHASIS = ['collateral'];
 function labelizeCategory(cat) {
   return String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -413,17 +425,26 @@ async function loadEmphasisOptions() {
     const { categories } = await GET('/marketing-plan/knowledge-categories');
     emphasisCategories = categories;
   } catch (e) { /* emphasis picker is optional — fail silently */ }
+  // Always offer Collateral even if nothing's been tagged that way in the
+  // Knowledge Library yet — it's locked on regardless.
+  for (const cat of LOCKED_EMPHASIS) {
+    if (!emphasisCategories.includes(cat)) emphasisCategories.push(cat);
+    if (!STATE.emphasize.includes(cat)) STATE.emphasize.push(cat);
+  }
 }
 
 function renderEmphasisChecks() {
   const el = document.getElementById('emphasisChecks');
   if (!emphasisCategories.length) { el.innerHTML = ''; return; }
-  el.innerHTML = emphasisCategories.map(cat => `
-    <button type="button" class="tab-btn ${STATE.emphasize.includes(cat) ? 'active' : ''}" onclick="toggleEmphasis('${cat}', this)">${escapeHtml(labelizeCategory(cat))}</button>
-  `).join('');
+  el.innerHTML = emphasisCategories.map(cat => {
+    const locked = LOCKED_EMPHASIS.includes(cat);
+    const active = locked || STATE.emphasize.includes(cat);
+    return `<button type="button" class="tab-btn ${active ? 'active' : ''}" ${locked ? 'disabled title="Always included"' : `onclick="toggleEmphasis('${cat}', this)"`}>${escapeHtml(labelizeCategory(cat))}${locked ? ' 🔒' : ''}</button>`;
+  }).join('');
 }
 
 function toggleEmphasis(cat, btn) {
+  if (LOCKED_EMPHASIS.includes(cat)) return;
   const i = STATE.emphasize.indexOf(cat);
   if (i === -1) { STATE.emphasize.push(cat); btn.classList.add('active'); }
   else { STATE.emphasize.splice(i, 1); btn.classList.remove('active'); }
@@ -473,10 +494,15 @@ async function loadAgentPicker() {
   }
 }
 
-function renderListings(listings, warning) {
+function renderListings(allListings, warning) {
   const el = document.getElementById('listingPickerBody');
+  // A marketing plan only makes sense for a listing that's actually being
+  // marketed right now — /my-listings also returns under_contract/closed
+  // ones (Cameron's Stage cares about those too), so filter here rather
+  // than changing that shared endpoint.
+  const listings = allListings.filter(l => l.status === 'active_listing');
   if (!listings.length) {
-    el.innerHTML = `<div class="state-msg"><span class="icon">🏠</span>${warning || 'No listings found under your name yet.'}<br><small>Use the MLS # or manual-entry tabs above instead.</small></div>`;
+    el.innerHTML = `<div class="state-msg"><span class="icon">🏠</span>${warning || 'No active listings found under your name.'}<br><small>Use the MLS # or manual-entry tabs above instead.</small></div>`;
     window._listings = [];
     return;
   }
@@ -716,7 +742,7 @@ function openPrintableReport() {
 }
 
 function buildReportHTML(plan) {
-  const header = `<div class="page-header"><h1>Marketing Plan</h1><div class="meta">${escapeHtml(plan.address || '')}<br>Generated: ${new Date(plan.created_at).toLocaleDateString()}</div></div>`;
+  const header = `<div class="page-header"><img src="https://www.adamscameron.com/images/layout/adams-cameron-logo.png" alt="Adams Cameron & Co. Realtors" class="logo"><h1>Marketing Plan</h1><div class="meta">${escapeHtml(plan.address || '')}<br>Generated: ${new Date(plan.created_at).toLocaleDateString()}</div></div>`;
   const footer = `<div class="page-footer">© Adams, Cameron &amp; Co. — for internal/agent use</div>`;
   const body = (plan.sections || []).map(s => `<h2 class="section-title">${escapeHtml(s.heading)}</h2><p>${escapeHtml(s.body)}</p>`).join('');
   return `<!DOCTYPE html>
@@ -730,6 +756,7 @@ body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#333; 
 .toolbar .close-btn { background:rgba(255,255,255,0.15); color:#fff; }
 .print-page { max-width:850px; margin:20px auto; background:#fff; box-shadow:0 4px 16px rgba(0,0,0,0.15); }
 .page-header { background:linear-gradient(135deg, #1a1a2e 0%, #2d2d4a 100%); color:#fff; padding:20px 30px; }
+.page-header .logo { max-width:180px; height:auto; margin-bottom:12px; display:block; }
 .page-header h1 { font-size:1.4em; margin-bottom:6px; }
 .page-header .meta { font-size:0.8em; opacity:0.85; line-height:1.5; }
 .page-body { padding:24px 30px 10px; }
@@ -844,6 +871,10 @@ function showKbTab(tab) {
   document.getElementById('kbFileTab').style.display = tab === 'file' ? 'block' : 'none';
 }
 
+// Same option set as the upload form's #kbCategory select — kept in one
+// place so the inline per-row editor below always matches it.
+const KB_CATEGORIES = ['syndication', 'digital_ads', 'direct_mail', 'collateral', 'community', 'open_house', 'compliance', 'brand', 'other'];
+
 async function loadKnowledgeSources() {
   const el = document.getElementById('kbList');
   el.innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading…</div>`;
@@ -857,12 +888,26 @@ async function loadKnowledgeSources() {
           <div>${escapeHtml(s.title)}</div>
           <div class="kb-meta">Uploaded ${new Date(s.uploaded_at).toLocaleDateString()}${s.uploaded_by ? ' by ' + escapeHtml(s.uploaded_by) : ''}</div>
         </div>
-        <span class="kb-cat">${escapeHtml(s.category || 'other')}</span>
+        <select class="kb-cat" style="font-family:inherit;text-transform:none;letter-spacing:normal;cursor:pointer;" onchange="updateKbCategory(${i}, this.value)">
+          ${KB_CATEGORIES.map(c => `<option value="${c}" ${s.category === c ? 'selected' : ''}>${escapeHtml(labelizeCategory(c))}</option>`).join('')}
+        </select>
         <button class="btn btn-ghost" onclick="deleteKbSource(${i})">Delete</button>
       </div>
     `).join('');
   } catch (e) {
     el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function updateKbCategory(i, category) {
+  const s = window._kbSources[i];
+  try {
+    await api(`/marketing-plan/knowledge-sources/${s.id}`, { method: 'PUT', body: JSON.stringify({ category }) });
+    s.category = category;
+    toast('Category updated');
+  } catch (e) {
+    toast('Could not update category: ' + e.message);
+    loadKnowledgeSources(); // revert the select to the real value
   }
 }
 
