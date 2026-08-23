@@ -853,12 +853,13 @@ function describeDnStatusChange(dnStatus) {
   return 'its status changed';
 }
 
-// Board slugs from listing_gaps (source_mls_id/missing_mls_id) to a
-// friendly name — mirrors mlsBoardFromSource()'s slugs in
-// daily-desk-routes.js (mls_stellar / mls_dbar / mls_mystatemls).
-const MLS_BOARD_NAMES = { mls_stellar: 'Stellar MLS', mls_dbar: 'Daytona MLS', mls_mystatemls: 'My State MLS' };
-function mlsBoardLabel(slug) {
-  return MLS_BOARD_NAMES[slug] || (slug || 'the other board');
+// listing_gaps.source_mls_id/missing_mls_id are plain integers, not the
+// mls_stellar/mls_dbar string slugs used elsewhere in this repo (e.g.
+// daily-desk-routes.js's transaction_id_links) — confirmed live against a
+// real gap. scheduler.js's own MLS_IDS constant is { STELLAR: 1, DBAR: 2 }.
+const MLS_BOARD_NAMES = { 1: 'Stellar MLS', 2: 'Daytona MLS' };
+function mlsBoardLabel(id) {
+  return MLS_BOARD_NAMES[id] || `MLS #${id}`;
 }
 
 function renderComplianceGapsSection(gaps, mlsGaps) {
