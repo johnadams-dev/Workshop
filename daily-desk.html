@@ -2482,6 +2482,19 @@ function dateSanityError(value, label) {
   }
   return null;
 }
+
+// Non-Shared Commission (NSC) — a flat dollar amount, distinct from
+// commission_rate/cooperating_commission (which are usually percentages).
+// Always a whole dollar amount, $0-$2000 — never a percentage. Mirrored
+// server-side (nscValidationError in daily-desk-routes.js) as the real
+// enforcement; this is just faster feedback before the round-trip.
+function nscValidationError(value, label) {
+  if (value == null || value === '') return null;
+  if (!Number.isInteger(value)) return `${label} must be a whole dollar amount (no cents).`;
+  if (value < 0) return `${label} cannot be negative.`;
+  if (value > 2000) return `${label} cannot exceed $2,000.`;
+  return null;
+}
 // Bounds for the min/max attributes on list_date/expiration_date inputs —
 // kept in sync with dateSanityError()'s range so the browser's own date
 // picker won't scroll/spin past a sane year (typed entry still needs the
@@ -3207,6 +3220,9 @@ async function nlSaveListing() {
 
   const nlDateError = dateSanityError(body.list_date, 'List date') || dateSanityError(body.expiration_date, 'Expiration date');
   if (nlDateError) { alert(nlDateError); return; }
+  const nlNscError = nscValidationError(body.listing_non_shared_commission, 'Non-Shared Commission (Listing)')
+    || nscValidationError(body.buyer_non_shared_commission, 'Non-Shared Commission (Buyer)');
+  if (nlNscError) { alert(nlNscError); return; }
 
   try {
     let txn;
@@ -4720,6 +4736,8 @@ async function amSubmit() {
     if (commRate != null) fields.commissionRate = commRate;
     if (commCoop != null) fields.cooperatingCommission = commCoop;
     const nonSharedCommission = amParseMoney(document.getElementById('am-non-shared-commission').value);
+    const nscError = nscValidationError(nonSharedCommission, `Non-Shared Commission (${amState.kind === 'contract' ? 'Buyer' : 'Listing'})`);
+    if (nscError) { alert(nscError); return; }
     if (nonSharedCommission != null) fields.nonSharedCommission = nonSharedCommission;
   } else if (key === 'under_contract') {
     const contractDate = document.getElementById('am-contract-date').value;
@@ -4746,6 +4764,8 @@ async function amSubmit() {
       if (ucCommRate != null) fields.commissionRate = ucCommRate;
       if (ucCommCoop != null) fields.cooperatingCommission = ucCommCoop;
       const ucNonSharedCommission = amParseMoney(document.getElementById('am-uc-non-shared-commission').value);
+      const ucNscError = nscValidationError(ucNonSharedCommission, 'Non-Shared Commission (Buyer)');
+      if (ucNscError) { alert(ucNscError); return; }
       if (ucNonSharedCommission != null) fields.buyerNonSharedCommission = ucNonSharedCommission;
     } else if (repType === 'co_broke') {
       fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
@@ -5134,6 +5154,9 @@ async function ncSaveExternalContract() {
     ['Buyer Broker Commission']
   );
   if (!confirmCommissionAmount([extCoopCommissionVal], extCommissionType, ['Buyer Broker Commission'])) return;
+  const extNonSharedCommission = amParseMoney(document.getElementById('nc-ext-non-shared-commission').value);
+  const extNscError = nscValidationError(extNonSharedCommission, 'Non-Shared Commission (Buyer)');
+  if (extNscError) { alert(extNscError); return; }
   try {
     const txn = await POST('/daily-desk/contracts', {
       property_address:    addr,
@@ -5155,7 +5178,7 @@ async function ncSaveExternalContract() {
       expected_close_date:     document.getElementById('nc-ext-close-date').value || null,
       cooperating_commission:  isNaN(extCoopCommissionVal) ? null : extCoopCommissionVal,
       commission_type:         extCommissionType,
-      buyer_non_shared_commission: amParseMoney(document.getElementById('nc-ext-non-shared-commission').value),
+      buyer_non_shared_commission: extNonSharedCommission,
       office_id:               document.getElementById('nc-ext-office').value || null,
       agent_id:                agentId,
       split_pct:               extSplitPct,
@@ -6710,6 +6733,13 @@ async function submitFieldCorrection() {
 
   if (!fieldName) { alert('Please select a field to correct.'); return; }
   if (!reason)    { alert('A reason is required.'); document.getElementById('fc-reason').focus(); return; }
+  if (fieldName === 'listing_non_shared_commission' || fieldName === 'buyer_non_shared_commission') {
+    const nscError = nscValidationError(
+      newValue === '' ? null : Number(newValue),
+      fieldName === 'listing_non_shared_commission' ? 'Non-Shared Commission (Listing)' : 'Non-Shared Commission (Buyer)'
+    );
+    if (nscError) { alert(nscError); return; }
+  }
 
   try {
     const url = customerId
