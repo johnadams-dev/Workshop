@@ -123,7 +123,14 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   const salePrice = ev.sale_price ?? t.current_price;
   const totalComm = calcCommission(salePrice, t.commission_rate, t.commission_type);
   const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission, t.commission_type);
-  const accComm   = (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
+  // Adams, Cameron's true total take: net of the shared commission split
+  // plus both non-shared commissions (NSC) -- flat amounts ACC collects
+  // and does not split with the cooperating brokerage.
+  const hasAnyComm = totalComm != null || coopComm != null || t.listing_non_shared_commission != null || t.buyer_non_shared_commission != null;
+  const accComm = hasAnyComm
+    ? (totalComm != null && coopComm != null ? totalComm - coopComm : 0)
+      + Number(t.listing_non_shared_commission || 0) + Number(t.buyer_non_shared_commission || 0)
+    : null;
   const refs = referrals || [];
   const custs = customers || [];
   const sellers = custs.filter(c => c.role === 'seller');
@@ -197,6 +204,16 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td class="amt">${fmtMoney(coopComm)}</td>
         <td style="font-size:8pt; color:#555;">Paid to buyer's brokerage</td>
       </tr>
+      ${t.listing_non_shared_commission != null ? `<tr>
+        <td>Non-Shared Commission (Listing) — NSC</td>
+        <td class="amt">${fmtMoney(t.listing_non_shared_commission)}</td>
+        <td>&nbsp;</td>
+      </tr>` : ''}
+      ${t.buyer_non_shared_commission != null ? `<tr>
+        <td>Non-Shared Commission (Buyer) — NSC</td>
+        <td class="amt">${fmtMoney(t.buyer_non_shared_commission)}</td>
+        <td>&nbsp;</td>
+      </tr>` : ''}
       ${refs.length ? refs.map(r => {
         const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', realty_referral: 'Realty Referral', other: 'Other' };
         const sideLabel = r.side === 'buyer' ? 'Contract Side' : 'Listing Side';

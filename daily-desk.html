@@ -1711,6 +1711,12 @@ tbody tr.clickable { cursor: pointer; }
               <input type="text" id="nl-coop-commission" placeholder="e.g. 3">
             </div>
           </div>
+          <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px;">
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Non-Shared Commission (Listing) <span title="This commission is included in the buyer engagement and seller engagement letters. Often called a Transaction Fee by third parties." style="cursor:help; color:var(--text-muted);">ⓘ</span></span>
+              <input type="text" id="nl-non-shared-commission" value="250">
+            </div>
+          </div>
         </div>
         <div style="margin-top:14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -1730,6 +1736,10 @@ tbody tr.clickable { cursor: pointer; }
               <button type="button" onclick="addCustomerRow('nl-buyer')" style="padding:5px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:12px;">+ Add another buyer</button>
             </div>
             <div id="nl-buyer-customer-rows"></div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-top:10px; max-width:50%;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Non-Shared Commission (Buyer) <span title="This commission is included in the buyer engagement and seller engagement letters. Often called a Transaction Fee by third parties." style="cursor:help; color:var(--text-muted);">ⓘ</span></span>
+              <input type="text" id="nl-buyer-non-shared-commission" value="250">
+            </div>
           </div>
         </div>
         <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
@@ -1977,7 +1987,10 @@ tbody tr.clickable { cursor: pointer; }
                 <input type="text" id="nc-ext-coop-commission" placeholder="e.g. 3" style="flex:1;">
               </div>
             </div>
-            <div></div>
+            <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Non-Shared Commission (Buyer) <span title="This commission is included in the buyer engagement and seller engagement letters. Often called a Transaction Fee by third parties." style="cursor:help; color:var(--text-muted);">ⓘ</span></span>
+              <input type="text" id="nc-ext-non-shared-commission" value="250">
+            </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
@@ -3162,6 +3175,7 @@ async function nlSaveListing() {
     ['Total Commission', 'Buyer Broker Commission']
   );
   if (!confirmCommissionAmount([nlCommissionVal, nlCoopCommissionVal], nlCommissionType, ['Total Commission', 'Buyer Broker Commission'])) return;
+  const nlAlsoBuyer = document.getElementById('nl-also-buyer').checked;
   const body = {
     transaction_type: 'seller',
     property_address: address,
@@ -3178,12 +3192,14 @@ async function nlSaveListing() {
     commission_rate: isNaN(nlCommissionVal) ? null : nlCommissionVal,
     cooperating_commission: isNaN(nlCoopCommissionVal) ? null : nlCoopCommissionVal,
     commission_type: nlCommissionType,
+    listing_non_shared_commission: amParseMoney(document.getElementById('nl-non-shared-commission').value),
+    buyer_non_shared_commission: nlAlsoBuyer ? amParseMoney(document.getElementById('nl-buyer-non-shared-commission').value) : null,
     fs_transaction_id: document.getElementById('nl-fs-trans-id').value || null,
     split_pct: nlSplitPct,
     co_agents: nlCoAgents,
     sellers: collectCustomers('nl'),
-    represents_buyer_at_listing: document.getElementById('nl-also-buyer').checked || false,
-    buyers: document.getElementById('nl-also-buyer').checked ? collectCustomers('nl-buyer') : [],
+    represents_buyer_at_listing: nlAlsoBuyer,
+    buyers: nlAlsoBuyer ? collectCustomers('nl-buyer') : [],
     bedrooms: document.getElementById('nl-bedrooms').value ? Number(document.getElementById('nl-bedrooms').value) : null,
     bathrooms: document.getElementById('nl-bathrooms').value ? Number(document.getElementById('nl-bathrooms').value) : null,
     property_type: document.getElementById('nl-property-type').value || null,
@@ -4063,7 +4079,7 @@ async function amChooseAction(key) {
       </div>
       <div style="border-top:1px solid var(--ink-border); padding-top:14px; margin-bottom:14px;">
         <div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">Commission Adjustment <span style="font-size:9px; text-transform:none; letter-spacing:0;">(leave blank to keep current)</span></div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Commission Rate <span id="am-commission-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
             <input type="text" id="am-commission-rate" placeholder="e.g. 6">
@@ -4071,6 +4087,10 @@ async function amChooseAction(key) {
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Co-Broke Commission <span id="am-coop-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
             <input type="text" id="am-cooperating-commission" placeholder="e.g. 3">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Non-Shared Commission (${closingParty}) <span title="This commission is included in the buyer engagement and seller engagement letters. Often called a Transaction Fee by third parties." style="cursor:help; color:var(--text-muted);">ⓘ</span></span>
+            <input type="text" id="am-non-shared-commission" placeholder="e.g. 250">
           </div>
         </div>
       </div>
@@ -4137,6 +4157,11 @@ async function amChooseAction(key) {
         document.getElementById('am-coop-unit').textContent = unit;
         rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
         coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+      }
+      const nscEl = document.getElementById('am-non-shared-commission');
+      if (nscEl) {
+        const currentNsc = amState.kind === 'contract' ? txn.buyer_non_shared_commission : txn.listing_non_shared_commission;
+        nscEl.placeholder = currentNsc != null ? String(currentNsc) : 'e.g. 250';
       }
       // Prefill with whichever side is closing here (buyer for a contract
       // closing, seller for a listing closing) — previously left blank
@@ -4323,7 +4348,7 @@ function amUpdateRepFields() {
       </div>
       <div style="border-top:1px solid var(--ink-border); padding-top:14px; margin-bottom:14px;">
         <div style="${labelStyle} margin-bottom:10px;">Commission Adjustment <span style="font-size:9px; text-transform:none; letter-spacing:0;">(leave blank to keep the listing's commission)</span></div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="${labelStyle}">Commission Rate <span id="am-uc-commission-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
             <input type="text" id="am-uc-commission-rate" placeholder="e.g. 6">
@@ -4331,6 +4356,10 @@ function amUpdateRepFields() {
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="${labelStyle}">Co-Broke Commission <span id="am-uc-coop-unit" style="text-transform:none; letter-spacing:0;">(%)</span></span>
             <input type="text" id="am-uc-cooperating-commission" placeholder="e.g. 3">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${labelStyle}">Non-Shared Commission (Buyer) <span title="This commission is included in the buyer engagement and seller engagement letters. Often called a Transaction Fee by third parties." style="cursor:help; color:var(--text-muted);">ⓘ</span></span>
+            <input type="text" id="am-uc-non-shared-commission" placeholder="e.g. 250">
           </div>
         </div>
       </div>`;
@@ -4344,11 +4373,13 @@ function amUpdateRepFields() {
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-uc-commission-rate');
       const coopEl = document.getElementById('am-uc-cooperating-commission');
+      const nscEl  = document.getElementById('am-uc-non-shared-commission');
       if (!rateEl) return;
       document.getElementById('am-uc-commission-unit').textContent = unit;
       document.getElementById('am-uc-coop-unit').textContent = unit;
       rateEl.placeholder = txn.commission_rate != null ? String(txn.commission_rate) : (isFixed ? 'e.g. 6000' : 'e.g. 6');
       coopEl.placeholder = txn.cooperating_commission != null ? String(txn.cooperating_commission) : (isFixed ? 'e.g. 3000' : 'e.g. 3');
+      if (nscEl) nscEl.placeholder = txn.buyer_non_shared_commission != null ? String(txn.buyer_non_shared_commission) : 'e.g. 250';
     }).catch(() => {});
   } else if (repType === 'co_broke') {
     el.innerHTML = `
@@ -4688,6 +4719,8 @@ async function amSubmit() {
     if (!confirmCommissionAmount([commRate, commCoop], amState.commission_type || 'percent', ['Total Commission', 'Co-Broke Commission'])) return;
     if (commRate != null) fields.commissionRate = commRate;
     if (commCoop != null) fields.cooperatingCommission = commCoop;
+    const nonSharedCommission = amParseMoney(document.getElementById('am-non-shared-commission').value);
+    if (nonSharedCommission != null) fields.nonSharedCommission = nonSharedCommission;
   } else if (key === 'under_contract') {
     const contractDate = document.getElementById('am-contract-date').value;
     if (contractDate) fields.contractDate = contractDate;
@@ -4712,6 +4745,8 @@ async function amSubmit() {
       if (!confirmCommissionAmount([ucCommRate, ucCommCoop], amState.commission_type || 'percent', ['Commission Rate', 'Co-Broke Commission'])) return;
       if (ucCommRate != null) fields.commissionRate = ucCommRate;
       if (ucCommCoop != null) fields.cooperatingCommission = ucCommCoop;
+      const ucNonSharedCommission = amParseMoney(document.getElementById('am-uc-non-shared-commission').value);
+      if (ucNonSharedCommission != null) fields.buyerNonSharedCommission = ucNonSharedCommission;
     } else if (repType === 'co_broke') {
       fields.cooperatingBrokerage = document.getElementById('am-coop-brokerage').value || null;
       fields.cooperatingAgentName = document.getElementById('am-coop-agent').value || null;
@@ -5120,6 +5155,7 @@ async function ncSaveExternalContract() {
       expected_close_date:     document.getElementById('nc-ext-close-date').value || null,
       cooperating_commission:  isNaN(extCoopCommissionVal) ? null : extCoopCommissionVal,
       commission_type:         extCommissionType,
+      buyer_non_shared_commission: amParseMoney(document.getElementById('nc-ext-non-shared-commission').value),
       office_id:               document.getElementById('nc-ext-office').value || null,
       agent_id:                agentId,
       split_pct:               extSplitPct,
@@ -6592,6 +6628,8 @@ const FC_FIELD_LABELS = {
   commission_type:        'Commission Type (percent/fixed)',
   commission_rate:        'Total Commission',
   cooperating_commission: 'Cooperating Commission',
+  listing_non_shared_commission: 'Non-Shared Commission (Listing)',
+  buyer_non_shared_commission:   'Non-Shared Commission (Buyer)',
   notes:                  'Notes',
 };
 const FC_CUSTOMER_FIELD_LABELS = {
