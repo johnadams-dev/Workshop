@@ -281,6 +281,7 @@
     }
     .gap-pill.untracked { background: rgba(231,76,60,.12); color: var(--red); }
     .gap-pill.mismatch  { background: rgba(201,168,76,.15); color: var(--gold); }
+    .gap-pill.mlsgap    { background: rgba(90,90,120,.12); color: var(--slate); }
 
     footer { text-align: center; padding: 2.5rem 2rem; font-size: .72rem; color: var(--muted); }
 
@@ -680,7 +681,7 @@ async function loadHubFor(agentId) {
     history.replaceState(null, '', url);
   }
 
-  renderComplianceGapsSection(data.complianceGaps);
+  renderComplianceGapsSection(data.complianceGaps, data.mlsGaps);
   renderSituation(data);
   renderAlways();
   renderPendingSteps();
@@ -852,12 +853,21 @@ function describeDnStatusChange(dnStatus) {
   return 'its status changed';
 }
 
-function renderComplianceGapsSection(gaps) {
+// Board slugs from listing_gaps (source_mls_id/missing_mls_id) to a
+// friendly name — mirrors mlsBoardFromSource()'s slugs in
+// daily-desk-routes.js (mls_stellar / mls_dbar / mls_mystatemls).
+const MLS_BOARD_NAMES = { mls_stellar: 'Stellar MLS', mls_dbar: 'Daytona MLS', mls_mystatemls: 'My State MLS' };
+function mlsBoardLabel(slug) {
+  return MLS_BOARD_NAMES[slug] || (slug || 'the other board');
+}
+
+function renderComplianceGapsSection(gaps, mlsGaps) {
   const untracked  = (gaps && gaps.untracked) || [];
   const mismatches = (gaps && gaps.statusMismatches) || [];
+  const mlsGapRows = mlsGaps || [];
   const wrap = document.getElementById('complianceGapsWrap');
 
-  if (!untracked.length && !mismatches.length) {
+  if (!untracked.length && !mismatches.length && !mlsGapRows.length) {
     wrap.style.display = 'none';
     return;
   }
@@ -891,7 +901,22 @@ function renderComplianceGapsSection(gaps) {
     </div>`;
   }).join('');
 
-  document.getElementById('complianceGapsBox').innerHTML = untrackedRows + mismatchRows;
+  const mlsGapRowsHtml = mlsGapRows.map(g => {
+    const onBoard = mlsBoardLabel(g.source_mls_id);
+    const missingBoard = mlsBoardLabel(g.missing_mls_id);
+    const price = g.list_price ? fmtGapPrice(g.list_price) : null;
+    const detail = `Listed on ${onBoard}${price ? ` at ${price}` : ''}, but not showing on ${missingBoard} — worth checking whether it should be there too.`;
+    return `
+    <div class="gap-row">
+      <div>
+        <div class="gap-address">${escapeHtml(g.address || 'Address unknown')}</div>
+        <div class="gap-detail">${detail}</div>
+      </div>
+      <span class="gap-pill mlsgap">MLS Gap</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('complianceGapsBox').innerHTML = untrackedRows + mismatchRows + mlsGapRowsHtml;
 }
 
 // ── Situation-conditional sections ────────────────────────────────────────────
