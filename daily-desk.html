@@ -802,6 +802,10 @@ tbody tr.clickable { cursor: pointer; }
 .report-card { background: var(--ink-mid); border: 1px solid var(--ink-border); border-radius: var(--r); overflow: hidden; margin-bottom: 20px; }
 .report-card-head { padding: 16px 20px; border-bottom: 1px solid var(--ink-border); display: flex; align-items: center; gap: 12px; }
 .report-card-icon { width: 34px; height: 34px; background: var(--ink-light); border: 1px solid var(--ink-border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.report-index { display: grid; gap: 12px; max-width: 640px; }
+.report-index-item { cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 0; }
+.report-index-item:hover { border-color: var(--amber); background: var(--ink-light); }
+.report-index-item .report-card-head { border-bottom: none; }
 .report-card-title { font-size: 15px; font-weight: 600; }
 .report-card-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .report-card-body { padding: 20px; }
@@ -835,19 +839,20 @@ tbody tr.clickable { cursor: pointer; }
   body.print-reports > .shell { display: block !important; }
   body.print-reports .topbar, body.print-reports .office-bar, body.print-reports .nav { display: none !important; }
   body.print-reports .content { overflow: visible !important; height: auto !important; padding: 0; max-width: 100%; }
-  body.print-reports #page-reports { display: block !important; }
-  body.print-reports #page-reports { padding: 0.6in 0.65in; }
-  body.print-reports #page-reports > .section-head, body.print-reports #page-reports .report-card { display: none; }
-  body.print-reports[data-print-target="eom"] #eom-card, body.print-reports[data-print-target="exp"] #exp-card, body.print-reports[data-print-target="don"] #don-card { display: block !important; border: none; background: #fff; color: #000; }
-  body.print-reports #page-reports .report-card-head .btn, body.print-reports #page-reports .controls { display: none !important; }
-  body.print-reports #page-reports .report-card-head { padding-bottom: 8pt; border-bottom: 1pt solid #ccc; margin-bottom: 12pt; }
-  body.print-reports #page-reports .office-section { page-break-inside: avoid; }
-  body.print-reports #page-reports table { font-size: 9pt; }
-  body.print-reports #page-reports thead th { background: #f0f0f0; color: #333; }
-  body.print-reports #page-reports tbody td, body.print-reports #page-reports .td-muted, body.print-reports #page-reports .summary-stat-key { color: #333; }
-  body.print-reports #page-reports .summary-stat { background: #f5f5f5; border: 1pt solid #ddd; }
-  body.print-reports #page-reports .summary-stat-val { color: #333; }
-  body.print-reports #page-reports .chip { border: 1pt solid #aaa; color: #333; background: #f5f5f5; }
+  /* Each report now lives on its own .page-report page, shown one at a time via
+     .page.active — printing just prints whichever one is currently open. */
+  body.print-reports .page-report.active { display: block !important; padding: 0.6in 0.65in; }
+  body.print-reports .page-report.active > .btn { display: none !important; } /* hide "← Back to Reports" */
+  body.print-reports .page-report.active .report-card-head .btn, body.print-reports .page-report.active .controls { display: none !important; }
+  body.print-reports .page-report.active .report-card { border: none; background: #fff; color: #000; }
+  body.print-reports .page-report.active .report-card-head { padding-bottom: 8pt; border-bottom: 1pt solid #ccc; margin-bottom: 12pt; }
+  body.print-reports .page-report.active .office-section { page-break-inside: avoid; }
+  body.print-reports .page-report.active table { font-size: 9pt; }
+  body.print-reports .page-report.active thead th { background: #f0f0f0; color: #333; }
+  body.print-reports .page-report.active tbody td, body.print-reports .page-report.active .td-muted, body.print-reports .page-report.active .summary-stat-key { color: #333; }
+  body.print-reports .page-report.active .summary-stat { background: #f5f5f5; border: 1pt solid #ddd; }
+  body.print-reports .page-report.active .summary-stat-val { color: #333; }
+  body.print-reports .page-report.active .chip { border: 1pt solid #aaa; color: #333; background: #f5f5f5; }
 }
 </style>
 </head>
@@ -1325,10 +1330,56 @@ tbody tr.clickable { cursor: pointer; }
       <div class="section-head" style="margin-bottom:20px;">
         <div>
           <div style="font-size:18px; font-weight:600; margin-bottom:3px;">Reports</div>
-          <div style="font-size:12px; color:var(--text-muted);">Hotsheet activity, end-of-month summaries, and expiring listings.</div>
+          <div style="font-size:12px; color:var(--text-muted);">Choose a report.</div>
         </div>
       </div>
 
+      <div class="report-index">
+        <div class="report-card report-index-item" onclick="showPage('report-hotsheet')">
+          <div class="report-card-head">
+            <div class="report-card-icon">🏠</div>
+            <div>
+              <div class="report-card-title">Hotsheet Report</div>
+              <div class="report-card-desc">Live feed of MLS activity — new listings, price changes, status updates.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-card report-index-item" onclick="showPage('report-eom')">
+          <div class="report-card-head">
+            <div class="report-card-icon">📋</div>
+            <div>
+              <div class="report-card-title">End of Month Report</div>
+              <div class="report-card-desc">New listings and contracts for a selected month, organized by office.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-card report-index-item" onclick="showPage('report-expiring')">
+          <div class="report-card-head">
+            <div class="report-card-icon">⏳</div>
+            <div>
+              <div class="report-card-title">Expiring Listings</div>
+              <div class="report-card-desc">Active, coming soon, and under-contract listings with approaching expiration dates.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-card report-index-item" onclick="showPage('report-virtual-tours')">
+          <div class="report-card-head">
+            <div class="report-card-icon">🎬</div>
+            <div>
+              <div class="report-card-title">Virtual Tours</div>
+              <div class="report-card-desc">Which listings have a real tour, which need one, and who's providing what.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-reports -->
+
+    <div class="page page-report" id="page-report-hotsheet">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
       <div class="report-card">
         <div class="report-card-head">
           <div class="report-card-icon">🏠</div>
@@ -1344,7 +1395,10 @@ tbody tr.clickable { cursor: pointer; }
           </div>
         </div>
       </div>
+    </div><!-- /page-report-hotsheet -->
 
+    <div class="page page-report" id="page-report-eom">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
       <div class="report-card" id="eom-card">
         <div class="report-card-head">
           <div class="report-card-icon">📋</div>
@@ -1352,7 +1406,7 @@ tbody tr.clickable { cursor: pointer; }
             <div class="report-card-title">End of Month Report</div>
             <div class="report-card-desc">New listings and contracts for a selected month, organized by office.</div>
           </div>
-          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint('eom')">🖨 Print</button>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint()">🖨 Print</button>
         </div>
         <div class="report-card-body">
           <div class="controls">
@@ -1369,7 +1423,10 @@ tbody tr.clickable { cursor: pointer; }
           <div id="eom-output"></div>
         </div>
       </div>
+    </div><!-- /page-report-eom -->
 
+    <div class="page page-report" id="page-report-expiring">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
       <div class="report-card" id="exp-card">
         <div class="report-card-head">
           <div class="report-card-icon">⏳</div>
@@ -1377,7 +1434,7 @@ tbody tr.clickable { cursor: pointer; }
             <div class="report-card-title">Expiring Listings</div>
             <div class="report-card-desc">Active, coming soon, and under-contract listings with approaching expiration dates.</div>
           </div>
-          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint('exp')">🖨 Print</button>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint()">🖨 Print</button>
         </div>
         <div class="report-card-body">
           <div class="controls">
@@ -1398,8 +1455,38 @@ tbody tr.clickable { cursor: pointer; }
           <div id="exp-output"></div>
         </div>
       </div>
+    </div><!-- /page-report-expiring -->
 
-    </div><!-- /page-reports -->
+    <div class="page page-report" id="page-report-virtual-tours">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
+      <div class="report-card" id="vt-card">
+        <div class="report-card-head">
+          <div class="report-card-icon">🎬</div>
+          <div>
+            <div class="report-card-title">Virtual Tours</div>
+            <div class="report-card-desc">Which listings have a real tour, which need one, and who's providing what.</div>
+          </div>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint()">🖨 Print</button>
+          <button class="btn btn-ghost" onclick="vtExportCsv()">⬇ CSV</button>
+        </div>
+        <div class="report-card-body">
+          <div class="controls">
+            <div class="field-group">
+              <span class="field-label">Office</span>
+              <select id="vt-office" onchange="rptLoadVirtualTours()"><option value="">All Offices</option></select>
+            </div>
+            <div class="field-group">
+              <span class="field-label">Show</span>
+              <select id="vt-provider" onchange="vtRenderTable()">
+                <option value="needs_replacement" selected>Needs replacement</option>
+                <option value="all">All active listings</option>
+              </select>
+            </div>
+          </div>
+          <div id="vt-output"></div>
+        </div>
+      </div>
+    </div><!-- /page-report-virtual-tours -->
 
     <!-- ═══ FOUNDATION PAGE ═══ -->
     <div class="page" id="page-foundation">
@@ -2602,7 +2689,7 @@ function toggleTheme() {
   }
 }
 
-const MORE_PAGES = ['caravan', 'reports', 'foundation', 'referrals', 'admin'];
+const MORE_PAGES = ['caravan', 'reports', 'report-hotsheet', 'report-eom', 'report-expiring', 'report-virtual-tours', 'foundation', 'referrals', 'admin'];
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2618,6 +2705,8 @@ function showPage(name, el) {
     btn.style.display = 'none';
     if (name === 'foundation') foundationInit();
     if (name === 'referrals')  loadReferralReport();
+    if (name === 'report-expiring') rptLoadExpiring();
+    if (name === 'report-virtual-tours' && !vtData) rptLoadVirtualTours();
   } else {
     if (el) el.classList.add('active');
     btn.style.display = '';
@@ -6861,6 +6950,7 @@ function rptInit() {
     (STATE.offices || []).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
   document.getElementById('eom-office').innerHTML = officeOpts;
   document.getElementById('exp-office').innerHTML = officeOpts;
+  document.getElementById('vt-office').innerHTML = officeOpts;
 
   const now  = new Date();
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -6869,15 +6959,117 @@ function rptInit() {
   rptLoadExpiring();
 }
 
-function rptPrint(which) {
+function rptPrint() {
+  // Each report is its own page now, shown one at a time — no need to target
+  // a specific card by name any more, the active .page-report is the one.
   document.body.classList.add('print-reports');
-  document.body.setAttribute('data-print-target', which);
   window.print();
 }
 window.addEventListener('afterprint', () => {
   document.body.classList.remove('print-reports');
-  document.body.removeAttribute('data-print-target');
 });
+
+// ── Virtual Tours report ────────────────────────────────────────────────────
+let vtData = null; // last fetched /daily-desk/report/virtual-tours response
+
+async function rptLoadVirtualTours() {
+  const officeId = document.getElementById('vt-office').value || 'all';
+  const output = document.getElementById('vt-output');
+  output.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    vtData = await GET(`/daily-desk/report/virtual-tours?office_id=${officeId}`);
+    vtPopulateProviderFilter();
+    vtRenderTable();
+  } catch (e) {
+    output.innerHTML = `<div class="empty-state">Failed to load: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function vtPopulateProviderFilter() {
+  const sel = document.getElementById('vt-provider');
+  const current = sel.value || 'needs_replacement';
+  const opts = [
+    '<option value="needs_replacement">Needs replacement</option>',
+    '<option value="all">All active listings</option>',
+    ...vtData.summary.by_provider.map(p => `<option value="${escapeHtml(p.key)}">${escapeHtml(p.label)} (${p.count})</option>`),
+  ];
+  sel.innerHTML = opts.join('');
+  sel.value = current;
+}
+
+function vtFilteredRows() {
+  if (!vtData) return [];
+  const filter = document.getElementById('vt-provider').value;
+  return vtData.rows.filter(r => {
+    if (filter === 'all') return true;
+    if (filter === 'needs_replacement') return r.needs_replacement;
+    return r.provider_key === filter;
+  });
+}
+
+function vtRenderTable() {
+  if (!vtData) return;
+  const { summary } = vtData;
+  const hasTour = summary.total_active - summary.needs_new_tour - summary.needs_link_paste;
+  const pctHasTour = summary.total_active ? Math.round((hasTour / summary.total_active) * 100) : 0;
+
+  const summaryHtml = `
+    <div class="office-summary" style="margin-bottom:12px;">
+      <div class="summary-stat"><div class="summary-stat-val">${hasTour} / ${summary.total_active}</div><div class="summary-stat-key">Have a real tour (${pctHasTour}%)</div></div>
+      <div class="summary-stat"><div class="summary-stat-val">${summary.needs_new_tour}</div><div class="summary-stat-key">Need a new tour</div></div>
+      <div class="summary-stat"><div class="summary-stat-val">${summary.needs_link_paste}</div><div class="summary-stat-key">Tour built — needs pasting into MLS</div></div>
+    </div>
+    <div style="margin-bottom:16px;">
+      ${summary.by_provider.map(p => `<span class="chip">${escapeHtml(p.label)}: ${p.count}</span>`).join(' ')}
+    </div>`;
+
+  const rows = vtFilteredRows();
+  if (!rows.length) {
+    document.getElementById('vt-output').innerHTML = summaryHtml + '<div class="empty-state">No listings match this filter.</div>';
+    return;
+  }
+
+  const tableHtml = `
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Address</th><th>Office</th><th>Agent</th><th>Status</th>
+        <th>Current Tour</th><th>Cameron's Stage Link</th><th>MLS#</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="td-addr">${escapeHtml(r.address || '')}<div class="td-muted">${escapeHtml(r.city || '')}</div></td>
+            <td>${escapeHtml(r.office_name || '')}</td>
+            <td>${escapeHtml(r.agent_name || '')}</td>
+            <td>${escapeHtml(r.status || '')}</td>
+            <td>${r.vtour_url ? `<a href="${escapeHtml(r.vtour_url)}" target="_blank" rel="noopener">${escapeHtml(r.provider_label)}</a>` : escapeHtml(r.provider_label)}</td>
+            <td>${r.cs_tour_url ? `<a href="${escapeHtml(r.cs_tour_url)}" target="_blank" rel="noopener">Copy link →</a>` : (r.needs_new_tour ? '<span class="td-muted">Needs new tour</span>' : '')}</td>
+            <td>${escapeHtml(r.mls_id || '')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+
+  document.getElementById('vt-output').innerHTML = summaryHtml + tableHtml;
+}
+
+function vtExportCsv() {
+  const rows = vtFilteredRows();
+  if (!rows.length) return;
+  const header = ['Address', 'City', 'Office', 'Agent', 'Status', 'Provider', 'Current Tour URL', "Cameron's Stage Link", 'MLS#'];
+  const csvRows = rows.map(r => [
+    r.address || '', r.city || '', r.office_name || '', r.agent_name || '', r.status || '',
+    r.provider_label || '', r.vtour_url || '', r.cs_tour_url || '', r.mls_id || '',
+  ]);
+  const csv = [header, ...csvRows]
+    .map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))
+    .join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `virtual-tours-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 const RPT_STATUS_CHIP = {
   active_listing: ['chip-amber',   'Active'],
