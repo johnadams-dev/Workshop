@@ -677,27 +677,36 @@ if (USER_EMAIL && PROXY_KEY) {
 }
 
 // Supports checklist links like camerons-lens.html?transactionId=<uuid>&mode=desc
-// (or &mode=photo) — resolves the transaction to an MLS# via the same
-// agent-scoped lookup Cameron's Stage uses (this page has no internal
-// transaction model of its own), then lands on the right screen with the
-// search already run, instead of making the agent look the MLS# up again.
-// Silently does nothing on a miss (no transactionId param, no match, or
-// lookup failure) — this is a convenience shortcut, not a hard dependency.
+// (or &mode=photo) — resolves the transaction to an MLS# via
+// GET /daily-desk/transactions/:id (this page has no internal transaction
+// model of its own), then lands on the right screen with the search already
+// run, instead of making the agent look the MLS# up again.
+//
+// Used to go through /camerons-stage/my-listings instead, but that endpoint
+// is scoped to "this signed-in agent's own listings" (it 404/empties for
+// staff callers unless an ?agent_id= is also supplied, which this page has
+// no way to know) — wrong tool for "resolve the MLS# of this ALREADY-KNOWN
+// transaction," which isn't agent-scoped at all. /transactions/:id has no
+// such scoping and already returns id_links in its payload.
+//
+// Silently does nothing on a miss (no transactionId param, no mls_% link on
+// file, or lookup failure) — this is a convenience shortcut, not a hard
+// dependency.
 async function maybeDeepLinkFromTransactionId() {
   const params = new URLSearchParams(location.search);
   const txnId = params.get('transactionId');
   if (!txnId) return;
   const mode = params.get('mode') === 'photo' ? 'photo' : 'desc';
   try {
-    const res = await fetch(`${mlsProxyUrl}/camerons-stage/my-listings`, {
+    const res = await fetch(`${mlsProxyUrl}/daily-desk/transactions/${encodeURIComponent(txnId)}`, {
       headers: { 'Accept': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL },
     });
-    const data = await res.json().catch(() => ({}));
-    const listing = (data.listings || []).find(l => l.transaction_id === txnId);
-    if (!listing || !listing.mls_id) return;
+    const txn = await res.json().catch(() => ({}));
+    const mlsLink = (txn.id_links || []).find(l => l.id_type === 'listing' && String(l.system).startsWith('mls_'));
+    if (!mlsLink || !mlsLink.external_id) return;
     showScreen(mode);
     const inputId = mode === 'photo' ? 'mlsPhotoSearchInput' : 'mlsSearchInput';
-    document.getElementById(inputId).value = listing.mls_id;
+    document.getElementById(inputId).value = mlsLink.external_id;
     mlsSearch(mode);
   } catch (e) { /* no match / lookup failure — leave the normal manual-entry screen in place */ }
 }

@@ -946,9 +946,18 @@ function toolsForTransaction(t) {
   const tools = [];
   if (t.status === 'under_contract') tools.push({ title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' });
   if (t.represents_seller) {
-    tools.push({ title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' });
-    tools.push({ title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' });
-    tools.push({ title: 'Develop a Business Plan', url: './business-plan-generator.html', icon: '📈' });
+    // These three pages all support ?transactionId=<uuid> deep links (their
+    // own maybeDeepLinkFromTransactionId()) the same way the checklist items
+    // below do via withTxnParam() — these hand-picked tool links were never
+    // wired up to it, so they landed on each tool's bare home screen instead
+    // of this transaction. contract-calculator.html has no such support, so
+    // left as-is.
+    tools.push({ title: "Cameron's Stage", url: withTxnParam('./camerons-stage.html', t.id), icon: '🎵' });
+    tools.push({ title: "Cameron's Lens", url: withTxnParam('./camerons-lens.html', t.id), icon: '📸' });
+    // Was business-plan-generator.html (the Pathfinder business-plan tool,
+    // not listing-specific) — pointed at the wrong tool entirely. This is
+    // the per-listing plan we built to replace it here.
+    tools.push({ title: 'Marketing Plan', url: withTxnParam('./marketing-plan.html', t.id), icon: '📈' });
   }
   return tools;
 }
