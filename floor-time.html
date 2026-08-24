@@ -658,8 +658,9 @@
       <p id="availability-subtitle">Enter or update availability preferences on behalf of an agent.</p>
     </div>
 
-    <!-- Agent selector -->
-    <div class="card">
+    <!-- Agent selector — coordinator/manager only; a self-service agent
+         skips straight to their own record, see initApp/isSelfService -->
+    <div class="card" id="avail-agent-picker-card">
       <div class="card-head"><span class="card-head-label">Agent</span></div>
       <div class="card-body">
         <div class="form-field" style="max-width:340px">
@@ -801,6 +802,7 @@ const GCLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleuserco
 let KEY    = localStorage.getItem('ac_proxy_key') || '';
 let _email = localStorage.getItem('ac_user_email') || '';
 let _access = null;  // floorAccess object from /api/floor/my-access
+function isSelfService() { return !!_access && _access.role === 'agent'; }
 let _offices = [];
 let _shifts  = [];
 let _showInactive = false;
@@ -912,6 +914,14 @@ async function initApp() {
   const hasAdminAccess = _access.can_configure_shifts || _access.can_set_eligibility || _access.can_publish;
   document.getElementById('nav-admin-wrap').style.display = hasAdminAccess ? '' : 'none';
 
+  // Self-service agent: no "pick an agent" step (that card + the roster
+  // it's populated from are coordinator-only, see onOfficeChange) and the
+  // page copy should read as first-person rather than "on behalf of".
+  if (isSelfService()) {
+    document.getElementById('avail-agent-picker-card').style.display = 'none';
+    document.querySelector('#page-availability .page-header h1').textContent = 'My Floor Duty Availability';
+  }
+
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 
@@ -985,14 +995,26 @@ function onOfficeChange() {
     `Set which agents are eligible for floor duty at ${name}.`;
   document.getElementById('schedule-subtitle').textContent =
     `Manage the availability window and scheduling period for ${name}.`;
-  document.getElementById('availability-subtitle').textContent =
-    `Enter or update availability preferences for agents at ${name}.`;
+  document.getElementById('availability-subtitle').textContent = isSelfService()
+    ? `Set your own floor duty availability at ${name}.`
+    : `Enter or update availability preferences for agents at ${name}.`;
   _schedEligAgents = [];
   loadShifts(officeId);
-  loadEligibility(officeId);
-  loadAvailAgents(officeId);
   initScheduleMonth();
   loadPeriods(officeId);
+
+  if (isSelfService()) {
+    // No "pick an agent" step for self-service — the agent-selector card
+    // and the whole-office roster it's populated from (loadAvailAgents) are
+    // coordinator-only; go straight to their own availability record.
+    // /availability/agents/:officeId and /eligibility/office/:officeId are
+    // both staff-only now (see requireStaffAccess server-side), so skip
+    // calling them entirely rather than let them 403.
+    selectAvailAgent(_access.agent_id);
+  } else {
+    loadEligibility(officeId);
+    loadAvailAgents(officeId);
+  }
 }
 
 // ── Show inactive toggle ────────────────────────────────────────────────────
@@ -1936,8 +1958,12 @@ async function loadAvailAgents(officeId) {
   }
 }
 
-document.getElementById('avail-agent-select').addEventListener('change', async e => {
-  const id = parseInt(e.target.value, 10);
+document.getElementById('avail-agent-select').addEventListener('change', e => selectAvailAgent(parseInt(e.target.value, 10) || null));
+
+// Pulled out of the select's change handler so self-service mode (see
+// initApp) can select the signed-in agent directly, without going through
+// the "Select Agent" dropdown at all — that dropdown stays coordinator-only.
+async function selectAvailAgent(id) {
   if (!id) {
     _availAgentId = null;
     document.getElementById('avail-content').style.display = 'none';
@@ -1949,7 +1975,7 @@ document.getElementById('avail-agent-select').addEventListener('change', async e
   renderAvailDefaults();
   populateAvailPeriods();
   document.getElementById('avail-content').style.display = 'block';
-});
+}
 
 async function loadAvailDefaults(agentId) {
   try {
