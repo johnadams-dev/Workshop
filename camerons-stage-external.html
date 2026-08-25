@@ -448,8 +448,11 @@ let STATE = {
   mlsId: null, address: '', city: '', photos: [], genre: 'instrumental',
   bedrooms: null, bathrooms: null, sqft: null, price: null, propertyType: null, remarks: null,
   music: { audio_url: null, music_track_id: null, music_prompt: null, music_length_ms: 60000 },
-  extAgentName: '', extAgentBrokerage: '', extNote: '',
+  extAgentName: '', extAgentBrokerage: '', extNote: '', mlsSource: null,
 };
+// Which board a lookup came from — no picker in the UI, the backend tries
+// Bridge (Stellar) then falls back to Spark (DBAR) automatically.
+const MLS_SOURCE_LABELS = { stellar: 'Stellar', dbar: 'DBAR' };
 let GENRES = [{ id: 'instrumental', label: 'Instrumental', hasVocals: false, cached: false }];
 
 const ALL_STEPS = ['step-search', 'step-curate', 'step-generate', 'step-done'];
@@ -492,7 +495,7 @@ async function doLookup() {
   document.getElementById('identityFields').style.display = 'none';
   document.getElementById('continueToCurateBtn').disabled = true;
   try {
-    const { listing } = await GET(`/camerons-stage/external/listing/${encodeURIComponent(mlsId)}`);
+    const { listing, source } = await GET(`/camerons-stage/external/listing/${encodeURIComponent(mlsId)}`);
     if (!listing) {
       document.getElementById('listingPreviewWrap').innerHTML = `<div class="state-msg"><span class="icon">🔍</span>No listing found for MLS #${escapeHtml(mlsId)}.</div>`;
       return;
@@ -506,14 +509,16 @@ async function doLookup() {
     STATE.price = listing.price;
     STATE.propertyType = listing.propertyType;
     STATE.remarks = listing.remarks;
+    STATE.mlsSource = source || null;
     STATE.photos = (listing.photos || []).map((p, i) => ({ url: p.url, title: p.title || '', included: true, order: i }));
 
     const thumb = STATE.photos[0]?.url || '';
+    const sourceLabel = MLS_SOURCE_LABELS[STATE.mlsSource] || null;
     document.getElementById('listingPreviewWrap').innerHTML = `
       <div class="listing-preview">
         ${thumb ? `<img src="${thumb}">` : ''}
         <div>
-          <h3>${escapeHtml(STATE.address)}${STATE.city ? ', ' + escapeHtml(STATE.city) : ''}</h3>
+          <h3>${escapeHtml(STATE.address)}${STATE.city ? ', ' + escapeHtml(STATE.city) : ''}${sourceLabel ? ` <span class="meta">(${sourceLabel})</span>` : ''}</h3>
           <div class="meta">${[STATE.propertyType, STATE.bedrooms ? STATE.bedrooms + ' bed' : null, STATE.bathrooms ? STATE.bathrooms + ' bath' : null, STATE.sqft ? STATE.sqft.toLocaleString() + ' sqft' : null].filter(Boolean).join(' · ')}</div>
           ${STATE.price ? `<div class="price">$${Number(STATE.price).toLocaleString()}</div>` : ''}
           <div class="meta">${STATE.photos.length} photo${STATE.photos.length === 1 ? '' : 's'} available${listing.listOfficeName ? ' · Listed by ' + escapeHtml(listing.listOfficeName) : ''}</div>
@@ -768,6 +773,7 @@ async function doSave() {
       music_track_id: STATE.music.music_track_id, audio_url: STATE.music.audio_url, lyrics: STATE.music.lyrics, photo_config,
       is_external: true, external_agent_name: STATE.extAgentName,
       external_agent_brokerage: STATE.extAgentBrokerage, external_note: STATE.extNote,
+      external_mls_source: STATE.mlsSource,
     });
     const id = result.id;
     document.getElementById('brandedTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
