@@ -392,8 +392,16 @@ async function init() {
   // Deep link from a checklist item's "View Marketing Plan" link
   // (marketing-plan.html?planId=<id>) — go straight to that plan instead of
   // dropping the agent back at the picker. loadListings() still runs (not
-  // awaited) so the "My Listings" tab is populated if they click Back.
-  loadListings();
+  // awaited here) so the "My Listings" tab is populated if they click Back.
+  //
+  // Also supports ?transactionId=<uuid> (agent-hub's "Develop a Business
+  // Plan" tool link) — same pattern as camerons-stage.html's own
+  // maybeDeepLinkFromTransactionId(): auto-select the matching listing once
+  // loadListings() resolves, landing on its existing plan or the "ready to
+  // generate" panel instead of the bare picker. Unlike planId, this one does
+  // have to wait on the listings load, since it finds the transaction by
+  // scanning window._listings rather than fetching it directly.
+  const listingsLoaded = loadListings();
   const planId = new URLSearchParams(location.search).get('planId');
   if (planId) {
     try {
@@ -408,6 +416,16 @@ async function init() {
       renderPlan(plan);
     } catch (e) {
       toast('Could not load that plan: ' + e.message);
+    }
+  } else {
+    const txnId = new URLSearchParams(location.search).get('transactionId');
+    if (txnId) {
+      await listingsLoaded;
+      const idx = (window._listings || []).findIndex(l => l.transaction_id === txnId);
+      if (idx !== -1) await selectListing(idx);
+      // No match (staff view before an agent is picked, foreign/invalid id,
+      // etc.) — silently leave the normal picker in place, same as
+      // camerons-stage.html's version of this deep link.
     }
   }
 }
