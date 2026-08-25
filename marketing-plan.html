@@ -741,6 +741,7 @@ function renderTaskPreview() {
       <div>
         <input type="text" value="${escapeHtml(t.title)}" oninput="proposedTasks[${i}].title=this.value">
         <textarea oninput="proposedTasks[${i}].description=this.value">${escapeHtml(t.description || '')}</textarea>
+        ${t.toolLabel ? `<div class="field-hint">🔗 Will link to: ${escapeHtml(t.toolLabel)}</div>` : ''}
       </div>
     </div>
   `).join('');
@@ -755,7 +756,7 @@ async function confirmApproveTasks() {
   btn.innerHTML = '<div class="spinner"></div> Adding…';
   try {
     const { items } = await POST(`/marketing-plan/plans/${currentPlan.id}/approve`, {
-      items: chosen.map(t => ({ title: t.title.trim(), description: (t.description || '').trim() })),
+      items: chosen.map(t => ({ title: t.title.trim(), description: (t.description || '').trim(), tool: t.tool || null })),
     });
     document.getElementById('approveResult').innerHTML =
       `${items.length} item${items.length === 1 ? '' : 's'} added to your checklist — <a href="./agent-hub.html" target="_blank" style="color:var(--gold);font-weight:600;">view in Agent Hub →</a>`;
