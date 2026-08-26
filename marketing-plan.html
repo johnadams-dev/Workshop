@@ -689,9 +689,12 @@ function renderPlan(plan) {
   document.getElementById('planAddress').textContent = plan.address || STATE.address || 'Marketing Plan';
   document.getElementById('planSub').textContent = 'Generated ' + new Date(plan.created_at).toLocaleString();
   const sections = plan.sections || [];
-  document.getElementById('planBody').innerHTML = sections.length
+  const contextNote = (plan.facts && plan.facts.agentContext)
+    ? `<p class="field-hint" style="margin-bottom:1rem;">✨ Personalized using the listing agent's Pathfinder business plan and bio.</p>`
+    : '';
+  document.getElementById('planBody').innerHTML = contextNote + (sections.length
     ? sections.map(s => `<div class="plan-section"><h3>${escapeHtml(s.heading)}</h3><p>${escapeHtml(s.body)}</p></div>`).join('')
-    : `<div class="state-msg"><span class="icon">📄</span>No sections returned.</div>`;
+    : `<div class="state-msg"><span class="icon">📄</span>No sections returned.</div>`);
   document.getElementById('printBtn').disabled = false;
   document.getElementById('driveBtn').disabled = false;
   document.getElementById('upcomingPrompt').style.display = STATE.isManual ? 'block' : 'none';
