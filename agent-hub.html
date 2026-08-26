@@ -145,6 +145,20 @@
     .section-label { font-size: .7rem; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); margin-bottom: .5rem; }
     .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; color: var(--ink); margin-bottom: 1.5rem; }
 
+    /* ── WHY BANNER ── prominent callout for the agent's Pathfinder "Why" */
+    .why-banner {
+      background: rgba(201,168,76,.08); border: 1px solid rgba(201,168,76,.25); border-radius: 10px;
+      padding: 1.1rem 1.4rem; margin: 1.5rem 0 0;
+    }
+    .why-banner-label {
+      display: block; font-size: .66rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: .4rem;
+    }
+    .why-banner p {
+      font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1.2rem; color: var(--ink);
+      line-height: 1.5; margin: 0;
+    }
+
     /* ── REMINDER BOX ── */
     .reminder-box {
       background: rgba(201,168,76,.08);
@@ -378,6 +392,11 @@
     <aside id="sidebar"></aside>
 
     <div id="mainCol">
+      <div class="why-banner" id="whyBanner" style="display:none">
+        <span class="why-banner-label">Why I'm in this business</span>
+        <p id="whyBannerText"></p>
+      </div>
+
       <div class="section" id="complianceGapsWrap" style="display:none">
         <p class="section-label" style="color:var(--red)">Needs Attention</p>
         <h2 class="section-title">Compliance Gaps</h2>
@@ -691,10 +710,22 @@ async function loadHubFor(agentId) {
     history.replaceState(null, '', url);
   }
 
+  renderWhyBanner(data);
   renderComplianceGapsSection(data.complianceGaps, data.mlsGaps);
   renderSituation(data);
   renderAlways();
   renderPendingSteps();
+}
+
+// Prominent callout for the agent's Pathfinder "Why" (plans.why_text) — only
+// shown when they've actually recorded one; most agents haven't completed
+// Pathfinder at all, and this shouldn't imply otherwise with an empty box.
+function renderWhyBanner(data) {
+  const why = (data.plan && data.plan.why_text || '').trim();
+  const el = document.getElementById('whyBanner');
+  if (!why) { el.style.display = 'none'; return; }
+  document.getElementById('whyBannerText').textContent = why;
+  el.style.display = 'block';
 }
 
 function viewMyOwnHub() {
