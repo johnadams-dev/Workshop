@@ -256,6 +256,13 @@ header {
         <div class="panel-sub">Pick which agent's listing you're building a tour for.</div>
       </div>
       <div class="panel-body" id="agentPickerBody"><div class="state-msg"><span class="icon">⏳</span>Loading agents…</div></div>
+      <div class="mls-fallback">
+        <label>Or look up a listing by MLS #</label>
+        <div class="mls-row">
+          <input type="text" id="mlsDirectStaff" placeholder="e.g. 1225064" onkeydown="if(event.key==='Enter') pickByMls('mlsDirectStaff')">
+          <button onclick="pickByMls('mlsDirectStaff')">Look Up</button>
+        </div>
+      </div>
     </div>
     <div class="panel" id="listingPickerPanel" style="display:none">
       <div class="panel-head">
@@ -876,8 +883,8 @@ async function selectListing(i) {
   await afterListingPicked();
 }
 
-async function pickByMls() {
-  const mlsId = document.getElementById('mlsDirect').value.trim();
+async function pickByMls(inputId = 'mlsDirect') {
+  const mlsId = document.getElementById(inputId).value.trim();
   if (!mlsId) return;
   resetTourState();
   STATE.transactionId = null;
@@ -886,17 +893,23 @@ async function pickByMls() {
 }
 
 async function afterListingPicked() {
-  // Check for an existing tour first, if we know the transaction
-  if (STATE.transactionId) {
-    try {
-      const { tour } = await GET(`/camerons-stage/library/${STATE.transactionId}`);
-      if (tour) {
-        STATE._existingTour = tour;
-        await showTourReport(tour);
-        return;
-      }
-    } catch (e) { /* fall through to curation */ }
-  }
+  // Check for an existing tour first — by transaction_id when we have one
+  // (picked from an agent's own listing list), otherwise by MLS # directly
+  // (the staff/agent-picker-screen MLS lookup never has a transaction_id at
+  // this point, only the number that was typed in).
+  try {
+    let tour = null;
+    if (STATE.transactionId) {
+      ({ tour } = await GET(`/camerons-stage/library/${STATE.transactionId}`));
+    } else if (STATE.mlsId) {
+      ({ tour } = await GET(`/camerons-stage/library-by-mls/${encodeURIComponent(STATE.mlsId)}`));
+    }
+    if (tour) {
+      STATE._existingTour = tour;
+      await showTourReport(tour);
+      return;
+    }
+  } catch (e) { /* fall through to curation */ }
   await loadListingPhotosAndGoToCurate();
 }
 
