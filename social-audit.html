@@ -387,10 +387,46 @@ function dotClass(s) {
 }
 
 // Minimal markdown-to-HTML converter
+// Markdown pipe-tables (GFM style — a header row, a |---|---| separator row,
+// then one or more data rows, one per line) aren't handled by md2html()'s
+// regex chain below, which only ever sees them as plain text — single
+// newlines between the rows then collapse under normal HTML whitespace
+// rules, so the whole table visually runs together on one line with no
+// borders. Detected and converted to a real <table> (styled by the existing
+// .report-body table/th/td rules) before any of that runs.
+function renderMdTables(text) {
+  const lines = text.split('\n');
+  const isSep = l => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+  const splitRow = l => l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c => c.trim());
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.includes('|') && i + 1 < lines.length && isSep(lines[i + 1])) {
+      const header = splitRow(line);
+      let j = i + 2;
+      const bodyRows = [];
+      while (j < lines.length && lines[j].trim() && lines[j].includes('|')) {
+        bodyRows.push(splitRow(lines[j]));
+        j++;
+      }
+      const thead = '<tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr>';
+      const tbody = bodyRows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+      out.push(`<table>${thead}${tbody}</table>`);
+      i = j;
+    } else {
+      out.push(line);
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
 function md2html(text) {
   if (!text) return '';
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const escaped = text.replace(/\r\n/g, '\n')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return renderMdTables(escaped)
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
     .replace(/`([^`]+)`/g,'<code>$1</code>')
@@ -832,8 +868,8 @@ function buildExportHtml(audit) {
          <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:center;font-weight:bold;color:${sc(score)}">${score ?? '—'}/100</td>
          <td style="padding:6px 12px;border-bottom:1px solid #eee;text-align:center">${em(score)}</td></tr>`
   ).join('');
-  const toHtml = (text) => (text || '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const toHtml = (text) => renderMdTables((text || '').replace(/\r\n/g, '\n')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
     .replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/^## (.+)$/gm,"<h2>$1</h2>").replace(/^# (.+)$/gm,"<h2>$1</h2>")
     .replace(/^[*-] (.+)$/gm,'<li>$1</li>').replace(/(<li>[\s\S]*?<\/li>)(\n(?!<li>)|$)/g,'<ul>$1</ul>')
