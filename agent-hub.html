@@ -301,6 +301,10 @@
     }
     .nav-link:hover { background: rgba(26,26,46,.05); color: var(--ink); }
     .nav-link .nav-icon { font-size: 1rem; width: 1.2rem; text-align: center; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto; flex-shrink: 0; font-size: .58rem; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; padding: .15rem .5rem; border-radius: 100px;
+    }
     .nav-pinned {
       border-top: 1px solid rgba(26,26,46,.08); margin-top: .5rem; padding-top: 1rem;
     }
@@ -516,8 +520,14 @@ function renderSidebar() {
 }
 
 function navLinkHtml(item) {
+  // gated items only ever reach here for a signed-in manager/admin (see the
+  // .filter() in renderSidebar) — the badge exists so THEY can tell, at a
+  // glance, which of the items they're seeing aren't available to the
+  // agents they support, not to gate anything itself (the route/page
+  // they link to enforces that server-side regardless).
+  const badge = item.gated ? `<span class="nav-badge badge-slate">Manager Only</span>` : '';
   return `<a class="nav-link" href="${escapeHtml(item.url)}"${item.external ? ' target="_blank" rel="noopener"' : ''}>
-    <span class="nav-icon">${item.icon}</span><span>${escapeHtml(item.title)}</span>
+    <span class="nav-icon">${item.icon}</span><span>${escapeHtml(item.title)}</span>${badge}
   </a>`;
 }
 
