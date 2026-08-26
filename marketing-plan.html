@@ -523,10 +523,11 @@ async function loadAgentPicker() {
   const el = document.getElementById('agentPickerWrap');
   try {
     const agents = await GET('/daily-desk/agents');
+    agents.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
     window._agents = agents;
     el.innerHTML = `<select class="select-field" onchange="loadListings(this.value)">
       <option value="">— Select an agent —</option>
-      ${agents.map(a => `<option value="${a.id}">${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</option>`).join('')}
+      ${agents.map(a => `<option value="${a.id}">${escapeHtml((a.last_name || '') + ', ' + (a.first_name || ''))}</option>`).join('')}
     </select>`;
   } catch (e) {
     el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load agents.</div>`;

@@ -1862,7 +1862,7 @@ function buildOpenSlots(period) {
   }
 
   const agentOpts = _schedEligAgents.map(a =>
-    `<option value="${a.id}">${esc(a.first_name)} ${esc(a.last_name)}</option>`
+    `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`
   ).join('');
 
   const rows = open.map(a => {
@@ -1952,7 +1952,7 @@ async function loadAvailAgents(officeId) {
     _availAgents = await api('GET', '/api/floor/availability/agents/' + officeId);
     sel.innerHTML = '<option value="">— select an agent —</option>' +
       _availAgents.map(a =>
-        `<option value="${a.id}">${esc(a.first_name)} ${esc(a.last_name)}${a.is_eligible ? '' : ' ◦'}</option>`
+        `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}${a.is_eligible ? '' : ' ◦'}</option>`
       ).join('');
   } catch(e) {
     sel.innerHTML = `<option value="">Error: ${esc(e.message)}</option>`;

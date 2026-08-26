@@ -2992,7 +2992,7 @@ async function loadAllAgents() {
 
 function buildAgentOptions(agents) {
   return '<option value="">Select agent…</option>'
-    + agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}${a.office_name ? ' — ' + escapeHtml(a.office_name) : ''}</option>`).join('');
+    + agents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}${a.office_name ? ' — ' + escapeHtml(a.office_name) : ''}</option>`).join('');
 }
 
 async function toggleCoAgent(btnId, areaId, selId, splitPrimaryId, splitCoId) {
@@ -3073,7 +3073,7 @@ async function nlLoadAgents() {
     nlAgents = [];
   }
   const opts = '<option value="">Select agent…</option>' +
-    nlAgents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+    nlAgents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   document.getElementById('nl-agent').innerHTML = opts;
 }
 
@@ -3354,7 +3354,7 @@ function _buildReferralRow(ns, idx, data = {}) {
   const sideLabel = side === 'buyer' ? 'Buyer Side' : 'Seller Side';
   const sideColor = side === 'buyer' ? 'var(--blue)' : 'var(--amber)';
   const agentOpts = (_referralAgents || []).map(a =>
-    `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`
+    `<option value="${a.id}" ${String(a.id) === String(data.agent_id) ? 'selected' : ''}>${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`
   ).join('');
   return `<div class="referral-row" data-ns="${ns}" data-ridx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
     <input type="hidden" class="ref-side" value="${side}">
@@ -4541,7 +4541,7 @@ async function amLoadBuyerAgents() {
   try {
     const agents = await GET(`/daily-desk/agents?office_id=${officeId}`);
     sel.innerHTML = '<option value="">Select agent…</option>' +
-      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   } catch (e) {
     sel.innerHTML = '<option value="">Failed to load</option>';
   }
@@ -4652,7 +4652,7 @@ async function amAddAgentRow(preAgentId = null, preOfficeId = null, preSplit = n
   try {
     const agents = await GET(`/daily-desk/agents${officeId ? `?office_id=${officeId}` : ''}`);
     agentSel.innerHTML = '<option value="">Select agent…</option>' +
-      agents.map(a => `<option value="${a.id}" ${String(a.id) === String(preAgentId) ? 'selected' : ''}>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+      agents.map(a => `<option value="${a.id}" ${String(a.id) === String(preAgentId) ? 'selected' : ''}>${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   } catch (_) {
     agentSel.innerHTML = '<option value="">Failed to load</option>';
   }
@@ -4664,7 +4664,7 @@ async function amRefreshAgentOpts(officeSelect) {
   try {
     const agents = await GET(`/daily-desk/agents${officeSelect.value ? `?office_id=${officeSelect.value}` : ''}`);
     agentSel.innerHTML = '<option value="">Select agent…</option>' +
-      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   } catch (_) {
     agentSel.innerHTML = '<option value="">Failed to load</option>';
   }
@@ -5164,7 +5164,7 @@ async function ncLoadAccBuyerAgents() {
   try {
     const agents = await GET(`/daily-desk/agents?office_id=${officeId}`);
     sel.innerHTML = '<option value="">Select agent…</option>' +
-      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   } catch (e) {
     sel.innerHTML = '<option value="">Failed to load</option>';
   }
@@ -5245,7 +5245,7 @@ async function ncLoadExtAgents() {
   try {
     const agents = await GET(`/daily-desk/agents?office_id=${officeId}`);
     sel.innerHTML = '<option value="">Select agent…</option>' +
-      agents.map(a => `<option value="${a.id}">${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</option>`).join('');
+      agents.map(a => `<option value="${a.id}">${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</option>`).join('');
   } catch (e) {
     sel.innerHTML = '<option value="">Failed to load</option>';
   }

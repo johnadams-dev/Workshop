@@ -679,7 +679,7 @@ async function loadAgentPicker() {
     window._agents = agents;
     el.innerHTML = `<select class="select-field" id="agentSelect" onchange="pickAgent(this.value)">
       <option value="">— Select an agent —</option>
-      ${agents.map((a, i) => `<option value="${i}">${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</option>`).join('')}
+      ${agents.map((a, i) => `<option value="${i}">${escapeHtml((a.last_name || '') + ', ' + (a.first_name || ''))}</option>`).join('')}
     </select>`;
   } catch (e) {
     el.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Could not load the agent list.<br><small>${e.message}</small></div>`;
@@ -713,7 +713,7 @@ async function loadTourSearchAgents() {
   try {
     if (!window._agents) window._agents = await GET('/daily-desk/agents');
     document.getElementById('tsAgentFilter').innerHTML = `<option value="">— All agents —</option>` +
-      window._agents.map(a => `<option value="${a.id}">${escapeHtml((a.first_name || '') + ' ' + (a.last_name || ''))}</option>`).join('');
+      window._agents.map(a => `<option value="${a.id}">${escapeHtml((a.last_name || '') + ', ' + (a.first_name || ''))}</option>`).join('');
   } catch (e) {
     toast('Could not load agent list: ' + e.message);
   }

@@ -700,6 +700,7 @@ function viewMyOwnHub() {
 async function loadAgentList() {
   try {
     S.allAgents = await fetch(`${PROXY_BASE}/roster/agents`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    S.allAgents.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
   } catch (e) {
     S.allAgents = [];
   }
@@ -711,14 +712,14 @@ function onAgentSearchInput() {
   if (!q || !(S.allAgents || []).length) { results.style.display = 'none'; return; }
 
   const matches = S.allAgents
-    .filter(a => `${a.first_name} ${a.last_name}`.toLowerCase().includes(q))
+    .filter(a => `${a.last_name}, ${a.first_name}`.toLowerCase().includes(q))
     .slice(0, 8);
 
   if (!matches.length) { results.style.display = 'none'; return; }
 
   results.innerHTML = matches.map(a => `
-    <div class="agent-result" onclick="selectAgent(${a.id}, '${escapeHtml(`${a.first_name} ${a.last_name}`).replace(/'/g, "\\'")}')">
-      <span>${escapeHtml(a.first_name)} ${escapeHtml(a.last_name)}</span>
+    <div class="agent-result" onclick="selectAgent(${a.id}, '${escapeHtml(`${a.last_name}, ${a.first_name}`).replace(/'/g, "\\'")}')">
+      <span>${escapeHtml(a.last_name)}, ${escapeHtml(a.first_name)}</span>
       <span class="office">${escapeHtml(a.office_name || '')}</span>
     </div>`).join('');
   results.style.display = 'block';
