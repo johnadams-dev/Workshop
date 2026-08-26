@@ -213,6 +213,10 @@ header { background: var(--ink); padding: 0 2rem; position: sticky; top: 0; z-in
       <div class="panel-body">
         <div class="panel-sub" style="margin-bottom:0.6rem;">Emphasize any of these strategies? (optional — leave blank for a balanced plan)</div>
         <div id="emphasisChecks" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.25rem;"></div>
+        <div class="field" style="margin-bottom:1.25rem;">
+          <label>Anything specific to include or leave out?</label>
+          <textarea id="customInstructions" placeholder="e.g. &quot;Emphasize international marketing — this seller has European buyers in mind&quot; or &quot;Skip print media entirely, no budget for it&quot;"></textarea>
+        </div>
         <button class="btn btn-primary btn-block" onclick="generatePlan()">Generate Marketing Plan →</button>
       </div>
     </div>
@@ -374,7 +378,7 @@ function escapeHtml(str) {
 let STATE = {
   transactionId: null, mlsId: null, address: '', city: '',
   bedrooms: null, bathrooms: null, sqft: null, price: null, propertyType: null, remarks: null,
-  isManual: false, emphasize: [],
+  isManual: false, emphasize: [], customInstructions: '',
 };
 let currentPlan = null;
 let proposedTasks = [];
@@ -666,11 +670,13 @@ async function generatePlan() {
   document.getElementById('driveBtn').disabled = true;
   proposedTasks = [];
   document.getElementById('taskPreviewPanel').style.display = 'none';
+  STATE.customInstructions = document.getElementById('customInstructions').value.trim();
   try {
     const { plan } = await POST('/marketing-plan/generate', {
       transaction_id: STATE.transactionId, mls_id: STATE.mlsId, address: STATE.address, city: STATE.city,
       bedrooms: STATE.bedrooms, bathrooms: STATE.bathrooms, sqft: STATE.sqft, price: STATE.price,
       propertyType: STATE.propertyType, remarks: STATE.remarks, emphasize: STATE.emphasize,
+      customInstructions: STATE.customInstructions,
     });
     currentPlan = plan;
     renderPlan(plan);
