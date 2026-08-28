@@ -185,6 +185,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 .btn-amber { background: var(--amber); color: #000; }
 .btn-ghost { background: var(--ink-light); color: var(--text); border: 1px solid var(--ink-border); }
 .btn-sm { padding: 0.25rem 0.65rem; font-size: 0.75rem; }
+.review-check-link { text-decoration: none; }
 .breakdown-btn.active { background: var(--amber); color: #000; border-color: var(--amber); }
 
 /* ── Filters ── */
@@ -411,6 +412,12 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
     <div id="tab-recipients" class="tab-panel">
       <div class="section-header">
         <h2>Recipients</h2>
+        <div style="display:flex;align-items:center;gap:.6rem;font-size:.8rem;color:var(--text-muted)">
+          Check for reviews:
+          <a href="https://business.google.com/reviews?hl=en" target="_blank" rel="noopener" class="btn btn-ghost btn-sm review-check-link">Google</a>
+          <a id="check-facebook-link" href="#" target="_blank" rel="noopener" class="btn btn-ghost btn-sm review-check-link" style="display:none">Facebook</a>
+          <a id="check-zillow-link" href="#" target="_blank" rel="noopener" class="btn btn-ghost btn-sm review-check-link" style="display:none">Zillow</a>
+        </div>
       </div>
       <div class="filters">
         <input type="text" id="filter-agent" placeholder="Filter by agent name" oninput="loadRecipients()">
@@ -983,6 +990,28 @@ const PLATFORM_LABELS = { google: "Google", facebook: "Facebook", zillow: "Zillo
 let _recipientsRows = [];
 let _recipientsSort = { key: "close_date", dir: -1 };
 
+// Shared with the Settings tab's loadSettings() — cached so visiting both
+// tabs in one session doesn't fetch /review/settings twice. The Facebook/
+// Zillow "check for reviews" links need this even if Settings has never
+// been opened, since tabs load lazily (see TAB_LOADERS).
+let _reviewSettingsCache = null;
+async function getReviewSettings() {
+  if (_reviewSettingsCache) return _reviewSettingsCache;
+  _reviewSettingsCache = await GET("/review/settings");
+  return _reviewSettingsCache;
+}
+
+// The Google link is fixed (the Business Profile reviews dashboard, not a
+// per-office/customer-facing URL) — only Facebook/Zillow come from Settings,
+// and only render if actually configured there, so this never links out to
+// a blank "#".
+function applyReviewCheckLinks(settings) {
+  const fb = document.getElementById("check-facebook-link");
+  const zl = document.getElementById("check-zillow-link");
+  if (settings.facebook) { fb.href = settings.facebook; fb.style.display = ""; } else { fb.style.display = "none"; }
+  if (settings.zillow)   { zl.href = settings.zillow;   zl.style.display = ""; } else { zl.style.display = "none"; }
+}
+
 async function loadRecipients() {
   const tbody = document.getElementById("recipients-body");
   tbody.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
@@ -1115,6 +1144,7 @@ function clearFilters() {
 async function loadRecipientsTab() {
   await loadRecipients();
   await loadUnattributedReviews();
+  getReviewSettings().then(applyReviewCheckLinks).catch(() => {});
 }
 
 async function loadUnattributedReviews() {
@@ -1501,7 +1531,8 @@ let FROM_NAME_OPTIONS = [];
 
 async function loadSettings() {
   try {
-    const data = await GET("/review/settings");
+    const data = await getReviewSettings();
+    applyReviewCheckLinks(data);
     document.getElementById("setting-facebook").value        = data.facebook        || "";
     document.getElementById("setting-zillow").value          = data.zillow          || "";
     document.getElementById("setting-google-fallback").value = data.google_fallback || "";
@@ -1610,6 +1641,11 @@ async function saveSettings() {
       officeGoogleUrls,
     });
     FROM_NAME_OPTIONS = fromNameOptions;
+    // Keep the Recipients tab's "check for reviews" links in sync — without
+    // this they'd keep showing whatever facebook/zillow URLs were cached
+    // before this save, until a full page reload.
+    _reviewSettingsCache = null;
+    getReviewSettings().then(applyReviewCheckLinks).catch(() => {});
     status.style.color = "var(--green, #2d7a3a)";
     status.textContent = "Saved.";
     setTimeout(() => { status.textContent = ""; status.style.color = ""; }, 3000);
