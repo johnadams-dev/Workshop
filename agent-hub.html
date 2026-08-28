@@ -280,12 +280,24 @@
       padding: .1rem .45rem; border-radius: 100px; background: rgba(201,168,76,.15); color: var(--gold);
       white-space: nowrap; flex-shrink: 0;
     }
-    .checklist-due {
+    .checklist-target {
       font-size: .62rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
       padding: .1rem .45rem; border-radius: 100px; background: rgba(90,90,120,.12); color: var(--slate);
       white-space: nowrap; flex-shrink: 0;
     }
-    .checklist-due.overdue { background: rgba(231,76,60,.12); color: var(--red); }
+    .commit-group-label { font-size: .72rem; font-weight: 600; color: var(--ink); margin: .8rem 0 .15rem; display: flex; align-items: center; gap: .4rem; }
+    .commit-group-label:first-child { margin-top: 0; }
+
+    .checkin-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+      background: rgba(90,90,120,.06); border: 1px solid rgba(90,90,120,.18); border-radius: 10px;
+      padding: .85rem 1.4rem; margin: 1.5rem 0 0; font-size: .85rem; color: var(--ink-soft);
+    }
+    .checkin-banner.due { background: rgba(201,168,76,.08); border-color: rgba(201,168,76,.3); }
+    .checkin-banner-cta {
+      font-size: .78rem; font-weight: 600; color: var(--gold); text-decoration: none; white-space: nowrap; flex-shrink: 0;
+    }
+    .checkin-banner-cta:hover { text-decoration: underline; }
 
     .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
 
@@ -417,10 +429,12 @@
 
       <div id="situationSection"></div>
 
-      <div class="section" id="pathfinderTasksWrap" style="display:none">
+      <div class="checkin-banner" id="checkinBanner" style="display:none"></div>
+
+      <div class="section" id="pathfinderCommitmentsWrap" style="display:none">
         <p class="section-label">Pathfinder</p>
-        <h2 class="section-title">Your Pathfinder Tasks</h2>
-        <div class="checklist-list" id="pathfinderTasksList"></div>
+        <h2 class="section-title">Your Committed Activities</h2>
+        <div class="checklist-list" id="pathfinderCommitmentsList"></div>
       </div>
 
       <div class="section">
@@ -725,7 +739,8 @@ async function loadHubFor(agentId) {
   renderWhyBanner(data);
   renderComplianceGapsSection(data.complianceGaps, data.mlsGaps);
   renderSituation(data);
-  renderPathfinderTasksSection(data.playbookTasks);
+  renderCheckinBanner(data);
+  renderPathfinderCommitmentsSection(data.commitmentActivities);
   renderAlways();
   renderPendingSteps();
 }
@@ -975,70 +990,85 @@ function renderComplianceGapsSection(gaps, mlsGaps) {
   document.getElementById('complianceGapsBox').innerHTML = untrackedRows + mismatchRows + mlsGapRowsHtml;
 }
 
-// ── Pathfinder playbook tasks ────────────────────────────────────────────────
-// Open tasks from the agent's active Pathfinder playbook(s) (e.g. a new-
-// listing or under-contract day-by-day task list seeded off agent_playbooks
-// — see agent-hub-routes.js). Placed above More Tools, hidden entirely when
-// there's nothing open, same show/hide idiom as Compliance Gaps above.
-function fmtTaskDate(v) {
+// ── Pathfinder check-in status ──────────────────────────────────────────────
+// Only shown for agents with an active coaching enrollment — checkin.html
+// itself refuses to run without one ("no-enrollment" screen, gated on
+// profile.enrollment_id), so prompting an unenrolled agent to check in would
+// just send them to a dead end. data.checkins is already fetched by
+// agent-hub-routes.js (ordered check_in_date DESC, LIMIT 6) but was unused
+// until now; checkin_schedule rows create a placeholder checkins row
+// (completed=false) ahead of the agent actually submitting it, so "last
+// checkin" means the most recent row with completed=true, not just the most
+// recent row.
+function fmtLocalDate(v) {
   if (!v) return null;
-  // Bare YYYY-MM-DD (due_date is a date-only column) must be parsed as LOCAL
-  // midnight, not UTC midnight, or it displays a day early west of UTC —
-  // same fix as daily-desk.html's fmtDate().
+  // Bare YYYY-MM-DD (check_in_date is a date-only column) must be parsed as
+  // LOCAL midnight, not UTC midnight — same fix as daily-desk.html's fmtDate().
   const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : new Date(v);
-  return isNaN(d.getTime()) ? null : d;
+  return isNaN(d.getTime()) ? null : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function renderPathfinderTasksSection(tasks) {
-  const wrap = document.getElementById('pathfinderTasksWrap');
-  const list = tasks || [];
+function renderCheckinBanner(data) {
+  const banner = document.getElementById('checkinBanner');
+  if (!data.enrollment) { banner.style.display = 'none'; return; }
+
+  const lastCompleted = (data.checkins || []).find(c => c.completed);
+  banner.style.display = 'flex';
+
+  if (lastCompleted) {
+    banner.className = 'checkin-banner';
+    banner.innerHTML = `<span>✅ Last Pathfinder check-in: <strong>${fmtLocalDate(lastCompleted.check_in_date) || 'recently'}</strong></span>`;
+  } else {
+    banner.className = 'checkin-banner due';
+    banner.innerHTML = `<span>📋 You haven't submitted a Pathfinder check-in yet.</span>
+      <a class="checkin-banner-cta" href="./checkin.html">Check In Now →</a>`;
+  }
+}
+
+// ── Pathfinder committed activities ─────────────────────────────────────────
+// Read-only view of what the agent has actually committed to in Pathfinder —
+// agent_strategies.commitments (jsonb: {activity_slug: weekly/monthly
+// target}), flattened server-side into one row per committed activity with
+// its human-readable label/unit/cadence (see agent-hub-routes.js). Placed
+// above More Tools, hidden entirely when the agent hasn't committed to
+// anything yet, same show/hide idiom as Compliance Gaps above.
+//
+// (An earlier version of this section pulled from agent_playbooks/
+// agent_playbook_tasks instead — that table pair turned out to be dead: no
+// page anywhere ever creates an agent_playbooks row, so it was always empty.
+// Commitments are the real, live data.)
+function renderPathfinderCommitmentsSection(activities) {
+  const wrap = document.getElementById('pathfinderCommitmentsWrap');
+  const list = activities || [];
   if (!list.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
-  document.getElementById('pathfinderTasksList').innerHTML = list.map(renderPlaybookTaskRow).join('');
-}
 
-function renderPlaybookTaskRow(t) {
-  const dueDate = fmtTaskDate(t.due_date);
-  const overdue = !!(dueDate && dueDate < new Date().setHours(0, 0, 0, 0));
-  const dueBadge = dueDate
-    ? `<span class="checklist-due${overdue ? ' overdue' : ''}">${overdue ? 'Overdue' : 'Due'} ${String(dueDate.getMonth() + 1).padStart(2, '0')}/${String(dueDate.getDate()).padStart(2, '0')}</span>`
-    : '';
-  const context = t.property_address || t.anchor_label || t.playbook_name;
-  const link = t.resource_url
-    ? `<a class="checklist-link" href="${escapeHtml(t.resource_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(t.resource_label || 'Open')}</a>`
-    : '';
-  return `<div class="checklist-item" data-playbook-task-id="${t.id}">
-    <span class="checklist-check pending checkable" onclick="togglePlaybookTask(${t.id})" title="Mark complete"></span>
-    <div class="checklist-title">${escapeHtml(t.title)}${t.description ? `<div class="checklist-desc">${escapeHtml(t.description)}</div>` : ''}${context ? `<div class="checklist-desc">${escapeHtml(context)}</div>` : ''}</div>
-    ${dueBadge}
-    ${link}
-  </div>`;
-}
-
-// Optimistic remove-on-complete (mirrors toggleChecklistItem) — completed
-// tasks never come back from the backend query (it filters completed_at IS
-// NULL), so on success the row just stays gone rather than flipping to a
-// checked state.
-async function togglePlaybookTask(taskId) {
-  const tasks = S.hubData.playbookTasks || [];
-  const idx = tasks.findIndex(t => t.id === taskId);
-  if (idx === -1) return;
-  const [removed] = tasks.splice(idx, 1);
-  renderPathfinderTasksSection(tasks);
-
-  try {
-    const res = await fetch(`${PROXY_BASE}/playbook-task/${taskId}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
-      body: JSON.stringify({}),
-    });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(result.error || res.statusText);
-  } catch (e) {
-    tasks.splice(idx, 0, removed); // revert on failure
-    renderPathfinderTasksSection(tasks);
-    alert("Couldn't mark that complete: " + e.message);
+  const byStrategy = {};
+  for (const a of list) {
+    (byStrategy[a.strategy_slug] ||= { name: a.strategy_name, icon: a.strategy_icon, isPrimary: a.is_primary, items: [] }).items.push(a);
   }
+
+  document.getElementById('pathfinderCommitmentsList').innerHTML = Object.values(byStrategy).map(group => `
+    <div class="commit-group-label">
+      <span>${group.icon || '🎯'} ${escapeHtml(group.name)}</span>
+      ${group.isPrimary ? '<span class="checklist-party">Primary</span>' : ''}
+    </div>
+    ${group.items.map(renderCommitmentActivityRow).join('')}
+  `).join('');
+}
+
+function renderCommitmentActivityRow(a) {
+  // target comes back from Postgres as a numeric-typed string (pg's default
+  // for the numeric type, to avoid float precision loss) — Number() it back
+  // for display so "15.00" doesn't show trailing zeros.
+  const target = Number(a.target);
+  const period = a.is_monthly_target ? '/mo' : '/wk';
+  const unit = a.unit ? ` ${escapeHtml(a.unit)}` : '';
+  const targetBadge = `<span class="checklist-target">${isNaN(target) ? a.target : target}${unit}${period}</span>`;
+  return `<div class="checklist-item">
+    <div class="checklist-title">${escapeHtml(a.label)}${a.hint ? `<div class="checklist-desc">${escapeHtml(a.hint)}</div>` : ''}</div>
+    ${targetBadge}
+  </div>`;
 }
 
 // ── Situation-conditional sections ────────────────────────────────────────────
