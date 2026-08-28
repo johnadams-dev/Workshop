@@ -293,6 +293,84 @@
       text-underline-offset: 2px;
     }
 
+    /* ── TOOL SEARCH ── */
+    .search-wrap {
+      position: relative;
+      max-width: 820px;
+      margin: 1.5rem auto 0;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      background: var(--card-bg);
+      border: 1px solid rgba(26,26,46,0.1);
+      border-radius: 10px;
+      padding: 0.8rem 1.2rem;
+      box-shadow: var(--shadow);
+    }
+    .search-box:focus-within {
+      border-color: var(--gold);
+      box-shadow: var(--shadow-hover);
+    }
+    .search-icon { font-size: 0.95rem; flex-shrink: 0; }
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    .search-empty {
+      max-width: 820px;
+      margin: 1.5rem auto 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .card.search-hidden { display: none !important; }
+
+    /* Resource dropdown — same typeahead-results convention as
+       agent-hub.html's #agentSearchResults picker: absolute-positioned
+       panel under the input, shown only while there are matches. */
+    .resource-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      border-radius: 10px;
+      box-shadow: var(--shadow-hover);
+      max-height: 360px;
+      overflow-y: auto;
+      z-index: 50;
+    }
+    .resource-result {
+      display: block;
+      padding: 0.7rem 1.2rem;
+      border-bottom: 1px solid rgba(26,26,46,0.06);
+      text-decoration: none;
+      color: inherit;
+    }
+    .resource-result:last-child { border-bottom: none; }
+    a.resource-result:hover { background: var(--cream-dark); }
+    .resource-result-name {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .resource-result-name .ext-arrow { color: var(--gold); font-weight: 400; margin-left: 0.3rem; }
+    .resource-result-desc {
+      font-size: 0.78rem;
+      color: var(--slate);
+      margin-top: 0.15rem;
+      line-height: 1.5;
+    }
+
     /* ── STATUS BANNER ── */
     /* Hand-edited when there's an active incident worth flagging site-wide —
        not driven by any status API, just add/remove the markup below. */
@@ -568,6 +646,15 @@
   <div class="notice">
     These applications are developed in-house and considered beta releases. While tested, you may experience errors. If you do, please let us know via <a href="./feedback.html">Feedback &amp; Support</a> and include: your device type (computer, Android, or iPhone), which tool you were using, and what went wrong. Your feedback helps improve these tools for everyone.
   </div>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="tool-search" placeholder="Search tools and resources… (press / to focus)" oninput="filterTools()" autocomplete="off">
+    </div>
+    <div class="resource-results" id="resource-results"></div>
+  </div>
+  <p class="search-empty" id="search-empty" style="display:none">No tools matched your search.</p>
 </div>
 
 <!-- FIND NEW PROSPECTS -->
@@ -1071,6 +1158,7 @@
   </div>
 </footer>
 
+<script src="./tools-directory.js"></script>
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
@@ -1165,6 +1253,102 @@ if (localStorage.getItem('ac_is_manager') === '1') {
 // Initialize as soon as the Google SDK loads
 if (window.google?.accounts?.id) { initGoogleSignIn(); }
 else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
+
+// ── Tool + resource search ──────────────────────────────────────────────────
+// Reads WORKSHOP_RESOURCES (tools-directory.js). Workshop tools filter the
+// existing static .card grid in place; ACC resources (no permanent card on
+// this page) surface in a typeahead-style dropdown under the search box,
+// same convention as agent-hub.html's #agentSearchResults picker.
+function escapeHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function resourceMatchText(entry) {
+  return [entry.name, entry.description, ...(entry.tags || [])].filter(Boolean).join(' ').toLowerCase();
+}
+
+function filterTools() {
+  const query = document.getElementById('tool-search').value.trim().toLowerCase();
+  const resultsEl = document.getElementById('resource-results');
+  const emptyEl = document.getElementById('search-empty');
+
+  if (!query) {
+    document.querySelectorAll('.card.search-hidden').forEach(c => c.classList.remove('search-hidden'));
+    document.querySelectorAll('.section, hr.divider').forEach(el => el.style.display = '');
+    document.querySelectorAll('.quick-nav a').forEach(a => a.style.display = '');
+    resultsEl.style.display = 'none';
+    emptyEl.style.display = 'none';
+    return;
+  }
+
+  const words = query.split(/\s+/).filter(Boolean);
+  const matches = (text) => words.every(w => text.includes(w));
+
+  // Workshop tools — toggle search-hidden only, never style.display directly,
+  // so this composes safely with the independent manager-card role gating
+  // (a still-role-hidden manager card that matches stays hidden because its
+  // own inline display:none is untouched; once revealed, an already-passing
+  // match shows it with no extra code needed here).
+  let anyCardVisible = false;
+  (typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [])
+    .filter(t => t.kind === 'workshop' && t.url)
+    .forEach(t => {
+      const hit = matches(resourceMatchText(t));
+      document.querySelectorAll(`a.card[href="${t.url}"]`).forEach(card => {
+        card.classList.toggle('search-hidden', !hit);
+      });
+    });
+
+  document.querySelectorAll('.section').forEach(section => {
+    const cards = section.querySelectorAll('a.card');
+    const visible = Array.from(cards).some(c => getComputedStyle(c).display !== 'none');
+    if (cards.length) {
+      section.style.display = visible ? '' : 'none';
+      const divider = section.previousElementSibling;
+      if (divider && divider.tagName === 'HR') divider.style.display = visible ? '' : 'none';
+      if (visible) anyCardVisible = true;
+    }
+    const pill = document.querySelector(`.quick-nav a[href="#${section.id}"]`);
+    if (pill) pill.style.display = visible ? '' : 'none';
+  });
+
+  // ACC resources — dropdown panel, not part of the static grid.
+  const resourceMatches = (typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [])
+    .filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
+
+  if (resourceMatches.length) {
+    resultsEl.innerHTML = resourceMatches.map(r => {
+      const tag = r.url ? 'a' : 'div';
+      const attrs = r.url ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : '';
+      const arrow = r.url ? '<span class="ext-arrow">↗</span>' : '';
+      return `<${tag} class="resource-result" ${attrs}>
+        <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
+        <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
+      </${tag}>`;
+    }).join('');
+    resultsEl.style.display = 'block';
+  } else {
+    resultsEl.style.display = 'none';
+  }
+
+  emptyEl.style.display = (!anyCardVisible && !resourceMatches.length) ? '' : 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.search-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('resource-results').style.display = 'none';
+});
+
+// "/" focuses the search box, matching the common web-app convention — no
+// existing global shortcut in this repo to conflict with.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/') return;
+  const active = document.activeElement;
+  const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  if (typing) return;
+  e.preventDefault();
+  document.getElementById('tool-search').focus();
+});
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Workshop',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
