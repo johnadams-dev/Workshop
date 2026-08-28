@@ -4260,7 +4260,7 @@ async function amChooseAction(key) {
     amLoadFoundationDonors();
     GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
       amState.commission_type = txn.commission_type;
-      const isFixed = txn.commission_type === 'fixed_fee';
+      const isFixed = txn.commission_type === 'fixed';
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-commission-rate');
       const coopEl = document.getElementById('am-cooperating-commission');
@@ -4355,7 +4355,7 @@ function confirmCommissionType(values, type, fieldLabels) {
 // agent backs out — callers should abort the save in that case, same as any
 // other validation failure in this form.
 function confirmCommissionAmount(values, type, fieldLabels) {
-  const isFixed = type === 'fixed' || type === 'fixed_fee';
+  const isFixed = type === 'fixed';
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
     if (v == null || isNaN(v)) continue;
@@ -4481,7 +4481,7 @@ function amUpdateRepFields() {
     // original listing (e.g. negotiated down for this specific buyer).
     GET(`/daily-desk/transactions/${amState.id}`).then(txn => {
       amState.commission_type = txn.commission_type;
-      const isFixed = txn.commission_type === 'fixed_fee';
+      const isFixed = txn.commission_type === 'fixed';
       const unit = isFixed ? '($)' : '(%)';
       const rateEl = document.getElementById('am-uc-commission-rate');
       const coopEl = document.getElementById('am-uc-cooperating-commission');
