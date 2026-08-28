@@ -146,6 +146,37 @@
     .section-title { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 600; color: var(--ink); margin-bottom: 1.5rem; }
 
     /* ── WHY BANNER ── prominent callout for the agent's Pathfinder "Why" */
+    /* ── TOOL SEARCH ── (same pattern as index.html's) */
+    .search-wrap { position: relative; margin: 1.5rem 0 0; }
+    .search-box {
+      display: flex; align-items: center; gap: .7rem;
+      background: white; border: 1px solid rgba(26,26,46,.1); border-radius: 10px;
+      padding: .8rem 1.2rem; box-shadow: var(--shadow);
+    }
+    .search-box:focus-within { border-color: var(--gold); box-shadow: var(--shadow-lg); }
+    .search-icon { font-size: .95rem; flex-shrink: 0; }
+    .search-box input {
+      flex: 1; border: none; outline: none; background: transparent;
+      font-family: 'DM Sans', sans-serif; font-size: .95rem; color: var(--ink);
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    .search-empty { margin: 1rem 0 0; text-align: center; font-size: .85rem; color: var(--muted); }
+    .nav-link.search-hidden, .portal-card.search-hidden { display: none !important; }
+    .resource-results {
+      display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+      background: white; border-radius: 10px; box-shadow: var(--shadow-lg);
+      max-height: 360px; overflow-y: auto; z-index: 50;
+    }
+    .resource-result {
+      display: block; padding: .7rem 1.2rem; border-bottom: 1px solid rgba(26,26,46,.06);
+      text-decoration: none; color: inherit;
+    }
+    .resource-result:last-child { border-bottom: none; }
+    a.resource-result:hover { background: var(--cream-dark); }
+    .resource-result-name { font-size: .88rem; font-weight: 500; color: var(--ink); }
+    .resource-result-name .ext-arrow { color: var(--gold); font-weight: 400; margin-left: .3rem; }
+    .resource-result-desc { font-size: .78rem; color: var(--slate); margin-top: .15rem; line-height: 1.5; }
+
     .why-banner {
       background: rgba(201,168,76,.08); border: 1px solid rgba(201,168,76,.25); border-radius: 10px;
       padding: 1.1rem 1.4rem; margin: 1.5rem 0 0;
@@ -410,6 +441,15 @@
     <aside id="sidebar"></aside>
 
     <div id="mainCol">
+      <div class="search-wrap">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="search" id="tool-search" placeholder="Search tools and resources… (press / to focus)" oninput="filterTools()" autocomplete="off">
+        </div>
+        <div class="resource-results" id="resource-results"></div>
+      </div>
+      <p class="search-empty" id="search-empty" style="display:none">No tools matched your search.</p>
+
       <div class="why-banner" id="whyBanner" style="display:none">
         <span class="why-banner-label">Why I'm in this business</span>
         <p id="whyBannerText"></p>
@@ -460,6 +500,7 @@
 
 <footer>Adams, Cameron &amp; Co. — Agent Hub</footer>
 
+<script src="./tools-directory.js"></script>
 <script>
 const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
@@ -808,6 +849,93 @@ document.addEventListener('click', (e) => {
 function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ── Tool + resource search ──────────────────────────────────────────────────
+// Same WORKSHOP_RESOURCES data source and dropdown convention as index.html's
+// search. This page has no single static grid to filter, though — instead
+// it scopes to the two "browse everything" surfaces already on the page: the
+// sidebar's tool menu and the "More Tools" (#alwaysSection) cards. The
+// situational content above them (active-listing cards, prospecting-strategy
+// suggestions, per-transaction tool links) is deliberately left alone, same
+// as index.html leaves manager-gated cards' own visibility alone — search
+// only ever adds/removes the search-hidden class, never touches an
+// element's own display style directly.
+function resourceMatchText(entry) {
+  return [entry.name, entry.description, ...(entry.tags || [])].filter(Boolean).join(' ').toLowerCase();
+}
+
+function filterTools() {
+  const query = document.getElementById('tool-search').value.trim().toLowerCase();
+  const resultsEl = document.getElementById('resource-results');
+  const emptyEl = document.getElementById('search-empty');
+  const alwaysWrap = document.getElementById('alwaysSection')?.closest('.section');
+
+  if (!query) {
+    document.querySelectorAll('.nav-link.search-hidden, .portal-card.search-hidden').forEach(el => el.classList.remove('search-hidden'));
+    document.querySelectorAll('#sidebar .nav-cat').forEach(cat => cat.style.display = '');
+    if (alwaysWrap) alwaysWrap.style.display = '';
+    resultsEl.style.display = 'none';
+    emptyEl.style.display = 'none';
+    return;
+  }
+
+  const words = query.split(/\s+/).filter(Boolean);
+  const matches = (text) => words.every(w => text.includes(w));
+  const resources = typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [];
+
+  let anyVisible = false;
+  resources.filter(t => t.kind === 'workshop' && t.url).forEach(t => {
+    const hit = matches(resourceMatchText(t));
+    document.querySelectorAll(`#sidebar a[href="${t.url}"], #alwaysSection a[href="${t.url}"]`).forEach(el => {
+      el.classList.toggle('search-hidden', !hit);
+      if (hit) anyVisible = true;
+    });
+  });
+
+  document.querySelectorAll('#sidebar .nav-cat').forEach(cat => {
+    const visible = Array.from(cat.querySelectorAll('.nav-link')).some(l => getComputedStyle(l).display !== 'none');
+    cat.style.display = visible ? '' : 'none';
+  });
+  if (alwaysWrap) {
+    const visible = Array.from(document.querySelectorAll('#alwaysSection a')).some(c => getComputedStyle(c).display !== 'none');
+    alwaysWrap.style.display = visible ? '' : 'none';
+  }
+
+  const resourceMatches = resources.filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
+  if (resourceMatches.length) {
+    resultsEl.innerHTML = resourceMatches.map(r => {
+      const tag = r.url ? 'a' : 'div';
+      const attrs = r.url ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : '';
+      const arrow = r.url ? '<span class="ext-arrow">↗</span>' : '';
+      return `<${tag} class="resource-result" ${attrs}>
+        <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
+        <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
+      </${tag}>`;
+    }).join('');
+    resultsEl.style.display = 'block';
+    anyVisible = true;
+  } else {
+    resultsEl.style.display = 'none';
+  }
+
+  emptyEl.style.display = anyVisible ? 'none' : '';
+}
+
+document.addEventListener('click', (e) => {
+  const wrap = document.querySelector('.search-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('resource-results').style.display = 'none';
+});
+
+// "/" focuses the search box, same as index.html's — no existing global
+// shortcut on this page to conflict with.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/') return;
+  const active = document.activeElement;
+  const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  if (typing) return;
+  e.preventDefault();
+  document.getElementById('tool-search').focus();
+});
 
 // ── Pending Steps — a real checkable list built straight from the already-
 // fetched checklist data, not a single AI-generated paragraph (that read as
