@@ -204,6 +204,48 @@
         .btn-calendar      { background: #6f42c1; color: white; }
         .btn-calendar:hover{ background: #5a359a; transform: translateY(-2px); }
 
+        .cal-modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center; z-index: 1000; padding: 20px;
+        }
+        .cal-modal {
+            background: white; border-radius: 16px; max-width: 480px; width: 100%;
+            max-height: 80vh; display: flex; flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .cal-modal-header { padding: 24px 24px 12px; border-bottom: 1px solid #e9ecef; }
+        .cal-modal-header h3 { font-size: 19px; color: #2c3e50; margin-bottom: 4px; }
+        .cal-modal-header p  { font-size: 13px; color: #6c757d; }
+        .cal-modal-selectall {
+            display: flex; justify-content: flex-end; gap: 12px; padding: 10px 24px 0;
+        }
+        .cal-modal-selectall button {
+            background: none; border: none; color: #6f42c1; font-size: 13px;
+            font-weight: 600; cursor: pointer; padding: 0;
+        }
+        .cal-modal-selectall button:hover { text-decoration: underline; }
+        .cal-modal-list { overflow-y: auto; padding: 12px 24px; flex: 1; }
+        .cal-date-row {
+            display: flex; align-items: center; gap: 12px; padding: 10px 0;
+            border-bottom: 1px solid #f1f3f5; cursor: pointer;
+        }
+        .cal-date-row:last-child { border-bottom: none; }
+        .cal-date-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: #6f42c1; cursor: pointer; }
+        .cal-date-row-text { flex: 1; min-width: 0; }
+        .cal-date-row-label { font-size: 14px; font-weight: 600; color: #2c3e50; }
+        .cal-date-row-date  { font-size: 13px; color: #6c757d; }
+        .cal-modal-actions {
+            display: flex; gap: 12px; padding: 16px 24px 24px; border-top: 1px solid #e9ecef;
+        }
+        .cal-modal-actions button {
+            flex: 1; padding: 12px; border: none; border-radius: 25px;
+            font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;
+        }
+        .cal-modal-cancel  { background: #e9ecef; color: #495057; }
+        .cal-modal-cancel:hover  { background: #dee2e6; }
+        .cal-modal-confirm { background: #6f42c1; color: white; }
+        .cal-modal-confirm:hover { background: #5a359a; }
+
         @media print {
             body { background: white; padding: 0; }
             .container { box-shadow: none; max-width: 100%; }
@@ -223,7 +265,7 @@
 <div class="container">
     <div style="padding:10px 16px 0;text-align:right"><a href="./feedback.html?tool=contract-calculator" style="font-size:13px;color:#666;text-decoration:none;margin-right:12px">Feedback</a><a href="./index.html" style="font-size:13px;color:#666;text-decoration:none">← Tools</a></div>
     <div class="header">
-        <img src="https://www.adamscameron.com/images/layout/adams-cameron-logo.png"
+        <img src="images/ac-logo.png"
              alt="Adams Cameron & Co. Realtors" class="logo" id="logoImg">
         <h1>Contract Date Calculator</h1>
         <p>Florida FAR/BAR Residential Contract</p>
@@ -386,7 +428,7 @@
 
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Additional Deposit (days) <span class="label-description">Line 36 — If blank, use 10 days. Enter 0 if N/A</span></label>
+                    <label>Additional Deposit (days) <span class="label-description">Lines 36-37 — Enter 0 if line 37 (deposit amount) is blank; otherwise use line 36's days (10 if blank)</span></label>
                     <input type="number" id="additionalDeposit" value="10" min="0" required>
                     <div class="ai-confidence" id="additionalDepositConfidence"></div>
                 </div>
@@ -464,6 +506,24 @@
             </div>
         </div>
 
+    </div>
+</div>
+
+<div class="cal-modal-overlay" id="calendarModalOverlay">
+    <div class="cal-modal">
+        <div class="cal-modal-header">
+            <h3>Add to Google Calendar</h3>
+            <p>Choose which dates to add — unchecked dates will be skipped.</p>
+        </div>
+        <div class="cal-modal-selectall">
+            <button type="button" onclick="toggleAllCalendarDates(true)">Select All</button>
+            <button type="button" onclick="toggleAllCalendarDates(false)">Deselect All</button>
+        </div>
+        <div class="cal-modal-list" id="calModalList"></div>
+        <div class="cal-modal-actions">
+            <button type="button" class="cal-modal-cancel" onclick="closeCalendarModal()">Cancel</button>
+            <button type="button" class="cal-modal-confirm" onclick="confirmCalendarSelection()">Add Selected</button>
+        </div>
     </div>
 </div>
 
@@ -905,12 +965,12 @@ Return a JSON object with these exact fields:
 - effectiveDate (string YYYY-MM-DD): Date from line 2
 - closingDate (string YYYY-MM-DD): Date from line 53
 - initialDepositDays (number): Days from line 33, default 3 if blank
-- additionalDepositDays (number): Days from line 36, default 10 if blank, 0 if N/A
+- additionalDepositDays (number): The additional escrow deposit spans lines 36-37 — line 36 is a number of days, line 37 is a dollar amount. Line 37 is what determines whether an additional deposit exists at all: if line 37 is blank, there is NO additional deposit, and you must return 0 regardless of anything written on line 36. Only if line 37 has a dollar amount should you look at line 36 for the day count (default 10 if line 36 itself is blank but line 37 is filled in).
 - financingDays (number): Days from line 89, default 30 if blank
 - titleDays (number): Days before closing from line 155, default 15 if blank
 - floodDays (number): Days from line 225, default 20 if blank
 - inspectionDays (number): Days from line 261, default 15 if blank
-- transactionType (string "cash" or "financed"): Check Paragraph 8; default "financed"
+- transactionType (string "cash" or "financed"): Determine this from the checkboxes, not from whether fields elsewhere happen to contain text. If the checkbox on line 88 (Paragraph 8(a)) is checked, this is a CASH transaction — return "cash" even if fields in the financing section (Paragraph 8(b) and its sub-fields) are also filled in, since those are frequently left over/inapplicable on a cash deal. Only return "financed" if the checkbox on line 89 (Paragraph 8(b)) is checked instead. Line 88 always takes priority over the presence of financing text — check the actual checkbox, don't infer the type from which fields have values.
 
 Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
@@ -1331,6 +1391,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
     // ── GOOGLE CALENDAR ─────────────────────────────────────────────
     let gapiInited = false, tokenClient, accessToken = null;
+    let pendingCalendarSelection = null; // set by confirmCalendarSelection(), consumed once auth resolves
 
     function gapiInit() {
         gapi.client.init({
@@ -1346,7 +1407,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
             callback: res => {
                 if (res.error) { showNotification('Calendar auth failed.', 'error'); return; }
                 accessToken = res.access_token;
-                createCalendarEvents();
+                createCalendarEvents(pendingCalendarSelection || []);
             },
         });
     }
@@ -1365,9 +1426,38 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     function addToGoogleCalendar() {
         if (!calculatedDates.length) { showNotification('Calculate dates first.', 'error'); return; }
         if (!gapiInited) { showNotification('Calendar API loading — try again in a moment.', 'error'); return; }
-        const propId = document.getElementById('resultPropertyId').textContent;
-        if (!confirm(`Add ${calculatedDates.length} events to Google Calendar for:\n\n${propId}\n\nClick OK to authorize with Google.`)) return;
-        accessToken ? createCalendarEvents() : tokenClient.requestAccessToken();
+        openCalendarModal();
+    }
+
+    function openCalendarModal() {
+        const list = document.getElementById('calModalList');
+        list.innerHTML = calculatedDates.map((item, i) => `
+            <label class="cal-date-row">
+                <input type="checkbox" class="cal-date-checkbox" data-idx="${i}" checked>
+                <div class="cal-date-row-text">
+                    <div class="cal-date-row-label">${item.label}</div>
+                    <div class="cal-date-row-date">${item.date.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' })}</div>
+                </div>
+            </label>
+        `).join('');
+        document.getElementById('calendarModalOverlay').style.display = 'flex';
+    }
+
+    function closeCalendarModal() {
+        document.getElementById('calendarModalOverlay').style.display = 'none';
+    }
+
+    function toggleAllCalendarDates(checked) {
+        document.querySelectorAll('.cal-date-checkbox').forEach(cb => cb.checked = checked);
+    }
+
+    function confirmCalendarSelection() {
+        const selected = Array.from(document.querySelectorAll('.cal-date-checkbox:checked'))
+            .map(cb => calculatedDates[parseInt(cb.dataset.idx, 10)]);
+        if (!selected.length) { showNotification('Select at least one date to add.', 'error'); return; }
+        pendingCalendarSelection = selected;
+        closeCalendarModal();
+        accessToken ? createCalendarEvents(selected) : tokenClient.requestAccessToken();
     }
 
     // ── Save & Share ─────────────────────────────────────────────────────────
@@ -1460,10 +1550,10 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         window.open(url, '_blank', 'noopener');
     }
 
-    async function createCalendarEvents() {
+    async function createCalendarEvents(items) {
         const propId = document.getElementById('resultPropertyId').textContent;
         let ok = 0, fail = 0;
-        for (const item of calculatedDates) {
+        for (const item of items) {
             try {
                 const dateStr = item.date.toISOString().split('T')[0];
                 await gapi.client.calendar.events.insert({

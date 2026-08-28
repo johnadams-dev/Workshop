@@ -385,13 +385,24 @@ function renderGiftHistory(gifts) {
     el.innerHTML = '<p style="padding:18px;color:var(--muted);font-size:13px">No gift history yet. Gifts are recorded when a transaction closes with you as a participating agent.</p>';
     return;
   }
+  const fmtGiftAmount = g => {
+    if (g.donation_type === 'fixed_amount' && g.fixed_amount != null) {
+      return '$' + Number(g.fixed_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    if (g.donation_type === 'percentage' && g.percentage_rate != null) {
+      return Number(g.percentage_rate).toFixed(2) + '% of commission';
+    }
+    return '—';
+  };
   el.innerHTML =
     '<table>' +
-      '<thead><tr><th>Closing Date</th><th>Side</th></tr></thead>' +
+      '<thead><tr><th>Closing Date</th><th>Customer</th><th>Side</th><th>Gift</th></tr></thead>' +
       '<tbody>' + gifts.map(g =>
         '<tr>' +
           '<td style="font-variant-numeric:tabular-nums">' + fmtDate(g.closing_date) + '</td>' +
+          '<td>' + escapeHtml(g.customer_name || '—') + '</td>' +
           '<td>' + (g.side === 'buyer' ? 'Buyer-side' : 'Seller-side') + '</td>' +
+          '<td>' + fmtGiftAmount(g) + '</td>' +
         '</tr>'
       ).join('') +
       '</tbody>' +
@@ -499,6 +510,12 @@ function fmtDate(v) {
   const d = new Date(v + 'T00:00:00');
   if (isNaN(d)) return '—';
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : String(s);
+  return div.innerHTML;
 }
 
 // ── Active Donations (manager/admin only) ─────────────────────────────────────

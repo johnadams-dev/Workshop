@@ -280,6 +280,12 @@
       padding: .1rem .45rem; border-radius: 100px; background: rgba(201,168,76,.15); color: var(--gold);
       white-space: nowrap; flex-shrink: 0;
     }
+    .checklist-due {
+      font-size: .62rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      padding: .1rem .45rem; border-radius: 100px; background: rgba(90,90,120,.12); color: var(--slate);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .checklist-due.overdue { background: rgba(231,76,60,.12); color: var(--red); }
 
     .empty-state { font-size: .85rem; color: var(--muted); padding: 1.5rem 0; }
 
@@ -410,6 +416,12 @@
       </div>
 
       <div id="situationSection"></div>
+
+      <div class="section" id="pathfinderTasksWrap" style="display:none">
+        <p class="section-label">Pathfinder</p>
+        <h2 class="section-title">Your Pathfinder Tasks</h2>
+        <div class="checklist-list" id="pathfinderTasksList"></div>
+      </div>
 
       <div class="section">
         <p class="section-label">Always Handy</p>
@@ -713,6 +725,7 @@ async function loadHubFor(agentId) {
   renderWhyBanner(data);
   renderComplianceGapsSection(data.complianceGaps, data.mlsGaps);
   renderSituation(data);
+  renderPathfinderTasksSection(data.playbookTasks);
   renderAlways();
   renderPendingSteps();
 }
@@ -960,6 +973,72 @@ function renderComplianceGapsSection(gaps, mlsGaps) {
   }).join('');
 
   document.getElementById('complianceGapsBox').innerHTML = untrackedRows + mismatchRows + mlsGapRowsHtml;
+}
+
+// ── Pathfinder playbook tasks ────────────────────────────────────────────────
+// Open tasks from the agent's active Pathfinder playbook(s) (e.g. a new-
+// listing or under-contract day-by-day task list seeded off agent_playbooks
+// — see agent-hub-routes.js). Placed above More Tools, hidden entirely when
+// there's nothing open, same show/hide idiom as Compliance Gaps above.
+function fmtTaskDate(v) {
+  if (!v) return null;
+  // Bare YYYY-MM-DD (due_date is a date-only column) must be parsed as LOCAL
+  // midnight, not UTC midnight, or it displays a day early west of UTC —
+  // same fix as daily-desk.html's fmtDate().
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function renderPathfinderTasksSection(tasks) {
+  const wrap = document.getElementById('pathfinderTasksWrap');
+  const list = tasks || [];
+  if (!list.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  document.getElementById('pathfinderTasksList').innerHTML = list.map(renderPlaybookTaskRow).join('');
+}
+
+function renderPlaybookTaskRow(t) {
+  const dueDate = fmtTaskDate(t.due_date);
+  const overdue = !!(dueDate && dueDate < new Date().setHours(0, 0, 0, 0));
+  const dueBadge = dueDate
+    ? `<span class="checklist-due${overdue ? ' overdue' : ''}">${overdue ? 'Overdue' : 'Due'} ${String(dueDate.getMonth() + 1).padStart(2, '0')}/${String(dueDate.getDate()).padStart(2, '0')}</span>`
+    : '';
+  const context = t.property_address || t.anchor_label || t.playbook_name;
+  const link = t.resource_url
+    ? `<a class="checklist-link" href="${escapeHtml(t.resource_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(t.resource_label || 'Open')}</a>`
+    : '';
+  return `<div class="checklist-item" data-playbook-task-id="${t.id}">
+    <span class="checklist-check pending checkable" onclick="togglePlaybookTask(${t.id})" title="Mark complete"></span>
+    <div class="checklist-title">${escapeHtml(t.title)}${t.description ? `<div class="checklist-desc">${escapeHtml(t.description)}</div>` : ''}${context ? `<div class="checklist-desc">${escapeHtml(context)}</div>` : ''}</div>
+    ${dueBadge}
+    ${link}
+  </div>`;
+}
+
+// Optimistic remove-on-complete (mirrors toggleChecklistItem) — completed
+// tasks never come back from the backend query (it filters completed_at IS
+// NULL), so on success the row just stays gone rather than flipping to a
+// checked state.
+async function togglePlaybookTask(taskId) {
+  const tasks = S.hubData.playbookTasks || [];
+  const idx = tasks.findIndex(t => t.id === taskId);
+  if (idx === -1) return;
+  const [removed] = tasks.splice(idx, 1);
+  renderPathfinderTasksSection(tasks);
+
+  try {
+    const res = await fetch(`${PROXY_BASE}/playbook-task/${taskId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      body: JSON.stringify({}),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || res.statusText);
+  } catch (e) {
+    tasks.splice(idx, 0, removed); // revert on failure
+    renderPathfinderTasksSection(tasks);
+    alert("Couldn't mark that complete: " + e.message);
+  }
 }
 
 // ── Situation-conditional sections ────────────────────────────────────────────
