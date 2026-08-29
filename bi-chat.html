@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BI Reporting Assistant — Workshop</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c;
+      --cream: #faf8f3; --cream-dark: #f0ece0; --slate: #5a5a78;
+      --muted: #8a8aa8; --card-bg: #fff; --red: #c0392b; --green: #27ae60;
+      --shadow: 0 2px 20px rgba(26,26,46,.08);
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+
+    header {
+      background: var(--ink); padding: 0 2rem; display: flex;
+      align-items: center; justify-content: space-between; height: 56px;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; color: var(--gold); font-size: 1.25rem; font-weight: 600; text-decoration: none; }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .back-link { font-size: 0.8rem; color: rgba(255,255,255,.6); text-decoration: none; }
+    .back-link:hover { color: var(--gold); }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; margin-bottom: .25rem; }
+    .subtitle { color: var(--slate); font-size: .9rem; margin-bottom: 1.5rem; }
+
+    /* auth states */
+    #signin-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: 1rem; text-align: center;
+    }
+    #signin-screen h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; }
+    #signin-screen p { color: var(--slate); font-size: .9rem; }
+    #denied-screen {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 60vh; gap: .75rem; text-align: center;
+    }
+    #denied-screen h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: var(--red); }
+    #denied-screen p { color: var(--slate); font-size: .9rem; }
+    #data-screen { display: none; }
+    .spinner { color: var(--muted); font-size: .9rem; }
+
+    /* schema bar */
+    .schema-bar {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      background: var(--card-bg); border-radius: 10px; box-shadow: var(--shadow);
+      padding: .75rem 1.1rem; margin-bottom: 1.5rem; font-size: .82rem; color: var(--slate);
+    }
+    .schema-bar .spacer { flex: 1; }
+    .btn-mini {
+      padding: .4rem .9rem; border-radius: 999px; border: 1px solid var(--cream-dark);
+      background: var(--card-bg); color: var(--ink); font-size: .8rem; cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: .3rem;
+    }
+    .btn-mini:hover { border-color: var(--gold); }
+    .btn-mini:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* top tabs */
+    .top-tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+    .top-tab {
+      padding: .45rem 1.1rem; border-radius: 999px; border: 1px solid var(--cream-dark);
+      background: var(--card-bg); color: var(--slate); font-size: .85rem; cursor: pointer;
+    }
+    .top-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+    /* sample question chips */
+    .chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
+    .chip {
+      padding: .45rem .9rem; border-radius: 999px; border: 1px dashed var(--gold);
+      background: rgba(201,168,76,.08); color: var(--ink-soft); font-size: .82rem; cursor: pointer;
+      text-align: left;
+    }
+    .chip:hover { background: rgba(201,168,76,.16); }
+
+    /* chat */
+    #chat-log { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem; }
+    .msg { max-width: 85%; }
+    .msg.user { align-self: flex-end; }
+    .msg.assistant { align-self: flex-start; }
+    .bubble {
+      border-radius: 12px; padding: .75rem 1rem; font-size: .92rem; line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .msg.user .bubble { background: var(--ink); color: #fff; }
+    .msg.assistant .bubble { background: var(--card-bg); box-shadow: var(--shadow); color: var(--ink); }
+    .msg.assistant .bubble.error { border: 1px solid var(--red); color: var(--red); background: #fdf1ef; }
+    .sql-toggle { margin-top: .5rem; }
+    .sql-toggle summary {
+      cursor: pointer; font-size: .78rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .04em; font-weight: 500; user-select: none;
+    }
+    .sql-toggle summary:hover { color: var(--gold); }
+    .sql-block {
+      margin-top: .5rem; background: var(--ink); color: #e8e6f0; border-radius: 8px;
+      padding: .75rem 1rem; font-family: monospace; font-size: .8rem; overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .sql-block .attempt-meta { color: var(--muted); font-size: .72rem; margin-bottom: .3rem; }
+    .sql-block .attempt-error { color: #f2a4a4; }
+    .result-table-wrap { margin-top: .6rem; overflow-x: auto; }
+    .result-table { border-collapse: collapse; font-size: .8rem; width: 100%; }
+    .result-table th { text-align: left; padding: .4rem .7rem; background: var(--cream); color: var(--slate); font-weight: 500; white-space: nowrap; }
+    .result-table td { padding: .4rem .7rem; border-top: 1px solid var(--cream-dark); white-space: nowrap; }
+    .feedback-row { display: flex; align-items: center; gap: .5rem; margin-top: .6rem; }
+    .fb-btn {
+      border: 1px solid var(--cream-dark); background: var(--card-bg); border-radius: 6px;
+      padding: .25rem .55rem; cursor: pointer; font-size: .85rem;
+    }
+    .fb-btn:hover { border-color: var(--gold); }
+    .fb-btn.active-up { background: rgba(39,174,96,.12); border-color: var(--green); }
+    .fb-btn.active-down { background: rgba(192,57,43,.12); border-color: var(--red); }
+
+    /* input row */
+    .input-row { display: flex; gap: .6rem; position: sticky; bottom: 1rem; }
+    #question-input {
+      flex: 1; border: 1px solid var(--cream-dark); border-radius: 10px; padding: .7rem .9rem;
+      font-family: inherit; font-size: .92rem; resize: vertical; min-height: 46px; max-height: 160px;
+      background: var(--card-bg);
+    }
+    #question-input:focus { outline: none; border-color: var(--gold); }
+    #send-btn {
+      background: var(--ink); color: #fff; border: none; border-radius: 10px; padding: 0 1.4rem;
+      font-size: .9rem; cursor: pointer; font-weight: 500;
+    }
+    #send-btn:hover:not(:disabled) { background: var(--ink-soft); }
+    #send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* history tab */
+    #history-screen { display: none; }
+    .hist-card { background: var(--card-bg); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .hist-meta { font-size: .78rem; color: var(--muted); margin-bottom: .4rem; }
+    .hist-q { font-weight: 500; margin-bottom: .4rem; }
+    .hist-a { font-size: .88rem; color: var(--slate); white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">Workshop</a>
+  <div class="header-right">
+    <a href="./feedback.html?tool=bi-chat" class="back-link">Feedback</a>
+    <a href="./index.html" class="back-link">← Tools</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div id="signin-screen">
+    <h2>BI Reporting Assistant</h2>
+    <p>Sign in with your Adams Cameron account to continue.</p>
+    <div id="g-signin-btn"></div>
+    <p class="spinner" id="signin-status">Checking your account…</p>
+  </div>
+
+  <div id="denied-screen">
+    <h2>Access Restricted</h2>
+    <p>This page is available to managers and administrators only.</p>
+  </div>
+
+  <div id="data-screen">
+    <h1>BI Reporting Assistant</h1>
+    <p class="subtitle">Ask a question about company data in plain English — every answer shows the exact SQL and results behind it.</p>
+
+    <div class="schema-bar">
+      <span id="schema-status">Loading schema…</span>
+      <div class="spacer"></div>
+      <button class="btn-mini" id="refresh-schema-btn" onclick="refreshSchema()">↻ Refresh Schema</button>
+      <a class="btn-mini" id="download-schema-link" href="#" target="_blank">⬇ Download Schema</a>
+    </div>
+
+    <div class="top-tabs">
+      <button class="top-tab active" id="tab-chat-btn" onclick="showTab('chat')">Chat</button>
+      <button class="top-tab" id="tab-history-btn" onclick="showTab('history')">History</button>
+    </div>
+
+    <div id="chat-screen">
+      <div class="chips" id="sample-chips">
+        <button class="chip" onclick="askSample(this)">How many closings have we had in Ormond Mainland office broken down by month?</button>
+        <button class="chip" onclick="askSample(this)">Tell me about the activity on the listing on Front Street</button>
+      </div>
+
+      <div id="chat-log"></div>
+
+      <div class="input-row">
+        <textarea id="question-input" placeholder="Ask a question about company data…" onkeydown="onInputKeydown(event)"></textarea>
+        <button id="send-btn" onclick="sendQuestion()">Ask</button>
+      </div>
+    </div>
+
+    <div id="history-screen">
+      <div id="history-list"><p class="spinner">Loading…</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
+let _email    = localStorage.getItem('ac_user_email') || '';
+
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': _email });
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+if (_email && PROXY_KEY) {
+  enterApp();
+} else {
+  if (window.google?.accounts?.id) { initGoogleSignIn(); }
+  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
+}
+
+async function handleCredential(cred) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { document.getElementById('signin-status').textContent = data.error || 'Sign-in failed'; return; }
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    _email    = payload.email || '';
+    PROXY_KEY = data.proxyKey || '';
+    if (_email)    localStorage.setItem('ac_user_email', _email);
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+    enterApp();
+  } catch (e) {
+    document.getElementById('signin-status').textContent = 'Sign-in error: ' + e.message;
+  }
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt();
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
+  });
+}
+
+function enterApp() {
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('data-screen').style.display = 'block';
+  loadSchema();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.getElementById('tab-chat-btn').classList.toggle('active', name === 'chat');
+  document.getElementById('tab-history-btn').classList.toggle('active', name === 'history');
+  document.getElementById('chat-screen').style.display = name === 'chat' ? 'block' : 'none';
+  document.getElementById('history-screen').style.display = name === 'history' ? 'block' : 'none';
+  if (name === 'history') loadHistory();
+}
+
+// ── Schema bar ────────────────────────────────────────────────────────────────
+function handle403(r) {
+  if (r.status === 403) {
+    document.getElementById('data-screen').style.display = 'none';
+    document.getElementById('denied-screen').style.display = 'flex';
+    return true;
+  }
+  return false;
+}
+
+async function loadSchema() {
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/schema`, { headers: H() });
+    if (handle403(r)) return;
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const data = await r.json();
+    renderSchemaStatus(data);
+  } catch (e) {
+    document.getElementById('schema-status').textContent = 'Could not load schema: ' + e.message;
+  }
+}
+
+function renderSchemaStatus(data) {
+  const when = data.refreshedAt ? new Date(data.refreshedAt).toLocaleString() : 'never';
+  document.getElementById('schema-status').textContent =
+    `${data.tableCount ?? '—'} tables, ${data.viewCount ?? '—'} views · last refreshed ${when}`;
+  document.getElementById('download-schema-link').href =
+    `${PROXY_BASE}/bi-chat/schema/download`;
+}
+
+async function refreshSchema() {
+  const btn = document.getElementById('refresh-schema-btn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/schema/refresh`, { method: 'POST', headers: H() });
+    if (handle403(r)) return;
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const data = await r.json();
+    renderSchemaStatus(data);
+  } catch (e) {
+    alert('Refresh failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Refresh Schema';
+  }
+}
+
+// The download link needs the auth headers, which a plain <a> can't send —
+// intercept the click and fetch+blob it instead, same reasoning as any other
+// proxy-key-gated download in this repo's tool pages.
+document.getElementById('download-schema-link').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/schema/download`, { headers: H() });
+    if (handle403(r)) return;
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const text = await r.text();
+    const blob = new Blob([text], { type: 'text/markdown' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `bi-chat-schema-${new Date().toISOString().slice(0,10)}.md`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Download failed: ' + e.message);
+  }
+});
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function onInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuestion(); }
+}
+
+function askSample(btn) {
+  document.getElementById('question-input').value = btn.textContent;
+  sendQuestion();
+}
+
+function appendUserBubble(question) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.innerHTML = `<div class="bubble">${escapeHtml(question)}</div>`;
+  log.appendChild(div);
+  log.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  return div;
+}
+
+function renderAttempt(a) {
+  const meta = `Round ${a.round}${a.ok ? ` · ${a.row_count ?? 0} rows` : ' · error'}`;
+  const body = a.ok ? escapeHtml(a.sql) : `${escapeHtml(a.sql)}\n\n-- ${escapeHtml(a.error || '')}`;
+  const errClass = a.ok ? '' : ' attempt-error';
+  return `<div class="attempt-meta">${meta}</div><div class="${errClass}">${body}</div>`;
+}
+
+function appendAssistantBubble(id, answer, sqlStatements, errored) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = 'msg assistant';
+
+  const attempts = sqlStatements || [];
+  const sqlHtml = attempts.length
+    ? `<details class="sql-toggle"><summary>View SQL (${attempts.length} ${attempts.length === 1 ? 'query' : 'attempts'})</summary>
+         <div class="sql-block">${attempts.map(renderAttempt).join('<hr style="border-color:#3a3a5a;margin:.5rem 0">')}</div>
+       </details>`
+    : '';
+
+  const lastOk = [...attempts].reverse().find(a => a.ok);
+  const resultHtml = lastOk ? renderResultTable(lastOk) : '';
+
+  const feedbackHtml = id ? `
+    <div class="feedback-row">
+      <button class="fb-btn" data-dir="1" onclick="sendFeedback(${id}, 1, this)">👍</button>
+      <button class="fb-btn" data-dir="-1" onclick="sendFeedback(${id}, -1, this)">👎</button>
+    </div>` : '';
+
+  div.innerHTML = `<div class="bubble${errored ? ' error' : ''}">${escapeHtml(answer)}</div>${sqlHtml}${resultHtml}${feedbackHtml}`;
+  log.appendChild(div);
+  log.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+// Result rows aren't returned by /ask (only the SQL attempt log is, to keep
+// the payload small) — this renders from the tool_result-shaped preview only
+// when present; otherwise just the row count from the attempt is shown.
+function renderResultTable(attempt) {
+  if (!attempt.preview || !attempt.preview.rows || !attempt.preview.rows.length) return '';
+  const cols = attempt.preview.columns || Object.keys(attempt.preview.rows[0]);
+  const rowsHtml = attempt.preview.rows.map(row =>
+    `<tr>${cols.map(c => `<td>${escapeHtml(row[c])}</td>`).join('')}</tr>`
+  ).join('');
+  return `<div class="result-table-wrap"><table class="result-table">
+    <thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table></div>`;
+}
+
+async function sendQuestion() {
+  const input = document.getElementById('question-input');
+  const question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  appendUserBubble(question);
+
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = true;
+  const log = document.getElementById('chat-log');
+  const thinking = document.createElement('div');
+  thinking.className = 'msg assistant';
+  thinking.innerHTML = `<div class="bubble">⏳ Thinking…</div>`;
+  log.appendChild(thinking);
+  log.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/ask`, {
+      method: 'POST', headers: H(), body: JSON.stringify({ question }),
+    });
+    thinking.remove();
+    if (handle403(r)) return;
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    appendAssistantBubble(data.id, data.answer, data.sqlStatements, !!data.error);
+  } catch (e) {
+    thinking.remove();
+    appendAssistantBubble(null, 'Something went wrong: ' + e.message, [], true);
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+async function sendFeedback(id, dir, btn) {
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/log/${id}/feedback`, {
+      method: 'PATCH', headers: H(), body: JSON.stringify({ score: dir }),
+    });
+    if (handle403(r)) return;
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const row = btn.parentElement;
+    row.querySelectorAll('.fb-btn').forEach(b => b.classList.remove('active-up', 'active-down'));
+    btn.classList.add(dir === 1 ? 'active-up' : 'active-down');
+  } catch (e) {
+    alert('Could not save feedback: ' + e.message);
+  }
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const el = document.getElementById('history-list');
+  el.innerHTML = '<p class="spinner">Loading…</p>';
+  try {
+    const r = await fetch(`${PROXY_BASE}/bi-chat/log?limit=50`, { headers: H() });
+    if (handle403(r)) return;
+    if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+    const { entries } = await r.json();
+    if (!entries.length) { el.innerHTML = '<p class="spinner">No questions asked yet.</p>'; return; }
+    el.innerHTML = entries.map(e => `
+      <div class="hist-card">
+        <div class="hist-meta">${escapeHtml(e.asked_by_email)} · ${new Date(e.asked_at).toLocaleString()}${e.feedback_score ? (e.feedback_score > 0 ? ' · 👍' : ' · 👎') : ''}</div>
+        <div class="hist-q">${escapeHtml(e.question)}</div>
+        <div class="hist-a">${escapeHtml(e.final_answer || e.error_message || '')}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = '<p class="spinner">Could not load history: ' + escapeHtml(e.message) + '</p>';
+  }
+}
+</script>
+
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'BI Reporting Assistant',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
