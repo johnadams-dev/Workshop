@@ -91,6 +91,22 @@
     .msg.user .bubble { background: var(--ink); color: #fff; }
     .msg.assistant .bubble { background: var(--card-bg); box-shadow: var(--shadow); color: var(--ink); }
     .msg.assistant .bubble.error { border: 1px solid var(--red); color: var(--red); background: #fdf1ef; }
+    /* Rendered markdown (the model's answer, shared by the chat bubble and
+       the History tab) needs real block spacing instead of preserving
+       literal newlines — plain-text bubbles (user question, "Thinking…")
+       keep the default pre-wrap above. */
+    .bubble.md { white-space: normal; }
+    .md-content p { margin-bottom: .6rem; }
+    .md-content p:last-child { margin-bottom: 0; }
+    .md-content ul, .md-content ol { padding-left: 1.3rem; margin-bottom: .6rem; }
+    .md-content li { margin-bottom: .25rem; }
+    .md-content strong { font-weight: 600; color: var(--ink); }
+    .md-content code { background: var(--cream-dark); padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+    .md-content h1, .md-content h2, .md-content h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; margin: .4rem 0 .4rem; }
+    .md-content table { border-collapse: collapse; width: 100%; margin: .6rem 0; font-size: .85rem; }
+    .md-content th { text-align: left; padding: .4rem .6rem; background: var(--cream); color: var(--slate); font-weight: 500; border-bottom: 1px solid var(--cream-dark); }
+    .md-content td { padding: .4rem .6rem; border-bottom: 1px solid var(--cream-dark); }
+    .md-content a { color: var(--gold); }
     .sql-toggle { margin-top: .5rem; }
     .sql-toggle summary {
       cursor: pointer; font-size: .78rem; color: var(--muted); text-transform: uppercase;
@@ -137,7 +153,7 @@
     .hist-card { background: var(--card-bg); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.25rem; margin-bottom: 1rem; }
     .hist-meta { font-size: .78rem; color: var(--muted); margin-bottom: .4rem; }
     .hist-q { font-weight: 500; margin-bottom: .4rem; }
-    .hist-a { font-size: .88rem; color: var(--slate); white-space: pre-wrap; }
+    .hist-a { font-size: .88rem; color: var(--slate); }
   </style>
 </head>
 <body>
@@ -212,6 +228,59 @@ const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY,
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Minimal markdown-to-HTML converter — same implementation as
+// social-audit.html's (proven there against real markdown-table output).
+// The assistant's answer routinely comes back with **bold**, tables, and
+// lists; without this it rendered as literal pipes/asterisks in a
+// white-space:pre-wrap bubble.
+function renderMdTables(text) {
+  const lines = text.split('\n');
+  const isSep = l => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(l);
+  const splitRow = l => l.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c => c.trim());
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.includes('|') && i + 1 < lines.length && isSep(lines[i + 1])) {
+      const header = splitRow(line);
+      let j = i + 2;
+      const bodyRows = [];
+      while (j < lines.length && lines[j].trim() && lines[j].includes('|')) {
+        bodyRows.push(splitRow(lines[j]));
+        j++;
+      }
+      const thead = '<tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr>';
+      const tbody = bodyRows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+      out.push(`<table>${thead}${tbody}</table>`);
+      i = j;
+    } else {
+      out.push(line);
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
+function md2html(text) {
+  if (!text) return '';
+  const escaped = text.replace(/\r\n/g, '\n')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return renderMdTables(escaped)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/^#{3} (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^#{2} (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^#{1} (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^[*-] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => '<ul>'+m+'</ul>')
+    .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/<p><\/p>/g,'')
+    .trim();
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -380,7 +449,7 @@ function appendAssistantBubble(id, answer, sqlStatements, errored) {
       <button class="fb-btn" data-dir="-1" onclick="sendFeedback(${id}, -1, this)">👎</button>
     </div>` : '';
 
-  div.innerHTML = `<div class="bubble${errored ? ' error' : ''}">${escapeHtml(answer)}</div>${sqlHtml}${resultHtml}${feedbackHtml}`;
+  div.innerHTML = `<div class="bubble md md-content${errored ? ' error' : ''}">${md2html(answer)}</div>${sqlHtml}${resultHtml}${feedbackHtml}`;
   log.appendChild(div);
   log.scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
@@ -462,7 +531,7 @@ async function loadHistory() {
       <div class="hist-card">
         <div class="hist-meta">${escapeHtml(e.asked_by_email)} · ${new Date(e.asked_at).toLocaleString()}${e.feedback_score ? (e.feedback_score > 0 ? ' · 👍' : ' · 👎') : ''}</div>
         <div class="hist-q">${escapeHtml(e.question)}</div>
-        <div class="hist-a">${escapeHtml(e.final_answer || e.error_message || '')}</div>
+        <div class="hist-a md-content">${md2html(e.final_answer || e.error_message || '')}</div>
       </div>
     `).join('');
   } catch (e) {
