@@ -145,7 +145,7 @@ const WORKSHOP_RESOURCES = [
   { kind: 'workshop', slug: 'usage-stats', name: 'Tool Usage', url: './usage-stats.html',
     description: 'See how often each Workshop tool is being used and by whom — visit counts by tool and user, with a recent activity feed.',
     feedbackGroup: 'Administrative' },
-  { kind: 'workshop', slug: 'bi-chat', name: 'BI Reporting Assistant', url: './bi-chat.html',
+  { kind: 'workshop', slug: 'bi-chat', name: 'Mr. Johnson from Accounts', url: './bi-chat.html',
     description: 'Ask questions about company data in plain English — closings, listing activity, and more — and see the exact SQL and results behind every answer.',
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'leaderboard', name: 'Agent Production Leaderboard', url: './leaderboard.html',
