@@ -293,6 +293,7 @@ header {
       <div class="panel-head">
         <div class="panel-title" id="existingAddress">—</div>
         <div class="panel-sub">This listing already has a saved tour. <a id="viewExistingTourLink" href="#" target="_blank" style="color:var(--gold)">View tour →</a></div>
+        <div class="share-row" id="shareRow-existing" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
       </div>
       <div class="report-stats">
         <div>
@@ -497,6 +498,7 @@ header {
           <button class="btn btn-gold" onclick="copyUrl('brandedTourUrl')">Copy</button>
           <a id="previewBrandedLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
         </div>
+        <div class="share-row" id="shareRow-done" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
         <div id="listingPageRow" style="margin-top:1rem;display:none">
           <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Full listing page (for reference)</label>
           <div class="share-box">
@@ -954,8 +956,13 @@ async function loadListingPhotosAndGoToCurate() {
 const REPORT_COLORS = ['#c9a84c', '#5a5a78', '#2a4a70', '#1a7a42', '#7a5a10', '#8a2020', '#8a8aa8'];
 
 async function showTourReport(tour) {
-  document.getElementById('existingAddress').textContent = STATE.address || tour.address || 'Existing tour';
+  const address = STATE.address || tour.address || 'Existing tour';
+  document.getElementById('existingAddress').textContent = address;
   document.getElementById('viewExistingTourLink').href = `./camerons-stage-view.html?id=${tour.id}&brand=1`;
+  // Absolute URL, unlike the in-page link above — a relative one is
+  // meaningless once shared off the page.
+  const brandedUrl = `https://johnadams.org/camerons-stage-view.html?id=${tour.id}&brand=1`;
+  renderShareRow('shareRow-existing', brandedUrl, address, 'Check out this virtual tour!');
   setStep(2);
   document.getElementById('reportEmptyState').style.display = 'none';
   document.getElementById('reportCharts').style.display = 'block';
@@ -1289,10 +1296,12 @@ async function doSave() {
       id = result.id;
     }
 
+    const brandedUrl = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
     document.getElementById('mlsTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}`;
-    document.getElementById('brandedTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
+    document.getElementById('brandedTourUrl').value = brandedUrl;
     document.getElementById('previewMlsLink').href = `./camerons-stage-view.html?id=${id}`;
     document.getElementById('previewBrandedLink').href = `./camerons-stage-view.html?id=${id}&brand=1`;
+    renderShareRow('shareRow-done', brandedUrl, STATE.address || 'Property tour', 'Check out this virtual tour!');
 
     // Fetch the saved tour back to get the agent's website for the listing-page link
     try {
@@ -1316,6 +1325,45 @@ function copyUrl(id) {
   const input = document.getElementById(id);
   input.select();
   navigator.clipboard.writeText(input.value).then(() => toast('Link copied'));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARE — native Web Share API where supported (one tap → the OS/
+   browser's own share sheet), falling back to direct platform share
+   links (Facebook/X/LinkedIn) on browsers that don't support it, e.g.
+   desktop Firefox. No backend involved — there is no social-posting
+   API integration anywhere in this codebase (see
+   server/docs/social-posting-poc-brief.md, never implemented).
+═══════════════════════════════════════════════════════════════════ */
+let _shareData = null; // only one share row is ever visible at a time (steps are mutually exclusive)
+
+function renderShareRow(containerId, url, title, text) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  _shareData = { url, title, text };
+  if (navigator.share) {
+    el.innerHTML = `<button class="btn btn-gold" onclick="doNativeShare()">📤 Share</button>`;
+  } else {
+    el.innerHTML = `
+      <button class="btn btn-ghost" onclick="openShareWindow('facebook')">Facebook</button>
+      <button class="btn btn-ghost" onclick="openShareWindow('x')">X</button>
+      <button class="btn btn-ghost" onclick="openShareWindow('linkedin')">LinkedIn</button>`;
+  }
+}
+function doNativeShare() {
+  if (!_shareData) return;
+  navigator.share(_shareData).catch(() => {}); // user cancelling the sheet isn't a real error
+}
+function openShareWindow(platform) {
+  if (!_shareData) return;
+  const { url, text } = _shareData;
+  const encUrl = encodeURIComponent(url), encText = encodeURIComponent(text);
+  const map = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encUrl}`,
+    x: `https://twitter.com/intent/tweet?url=${encUrl}&text=${encText}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encUrl}`,
+  };
+  window.open(map[platform], '_blank', 'noopener,width=600,height=500');
 }
 </script>
 
