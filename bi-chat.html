@@ -63,7 +63,8 @@
     .btn-mini:disabled { opacity: .5; cursor: not-allowed; }
 
     /* top tabs */
-    .top-tabs { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+    .top-tabs { display: flex; align-items: center; gap: .5rem; margin-bottom: 1.5rem; }
+    .top-tabs .spacer { flex: 1; }
     .top-tab {
       padding: .45rem 1.1rem; border-radius: 999px; border: 1px solid var(--cream-dark);
       background: var(--card-bg); color: var(--slate); font-size: .85rem; cursor: pointer;
@@ -194,6 +195,8 @@
     <div class="top-tabs">
       <button class="top-tab active" id="tab-chat-btn" onclick="showTab('chat')">Chat</button>
       <button class="top-tab" id="tab-history-btn" onclick="showTab('history')">History</button>
+      <div class="spacer"></div>
+      <button class="btn-mini" onclick="newConversation()" title="Clear the conversation so far — starting a new, unrelated question works better without old context attached">↺ New Conversation</button>
     </div>
 
     <div id="chat-screen">
@@ -469,6 +472,12 @@ function renderResultTable(attempt) {
   </table></div>`;
 }
 
+// Plain {role, content} pairs — the backend is otherwise stateless, so this
+// is the only thing giving the assistant any memory of earlier turns (e.g.
+// answering "the Pierson one" after it asked a clarifying question). Reset
+// by newConversation(); grows for the rest of the session otherwise.
+let chatHistory = [];
+
 async function sendQuestion() {
   const input = document.getElementById('question-input');
   const question = input.value.trim();
@@ -485,21 +494,33 @@ async function sendQuestion() {
   log.appendChild(thinking);
   log.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
+  let answerForHistory = null;
   try {
     const r = await fetch(`${PROXY_BASE}/bi-chat/ask`, {
-      method: 'POST', headers: H(), body: JSON.stringify({ question }),
+      method: 'POST', headers: H(), body: JSON.stringify({ question, history: chatHistory }),
     });
     thinking.remove();
     if (handle403(r)) return;
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || r.statusText);
     appendAssistantBubble(data.id, data.answer, data.sqlStatements, !!data.error);
+    answerForHistory = data.answer;
   } catch (e) {
     thinking.remove();
-    appendAssistantBubble(null, 'Something went wrong: ' + e.message, [], true);
+    const msg = 'Something went wrong: ' + e.message;
+    appendAssistantBubble(null, msg, [], true);
+    answerForHistory = msg;
   } finally {
     sendBtn.disabled = false;
   }
+  // Push both halves together, always — keeps the array strictly alternating
+  // user/assistant, which the backend relies on when it slices the tail.
+  chatHistory.push({ role: 'user', content: question }, { role: 'assistant', content: answerForHistory });
+}
+
+function newConversation() {
+  chatHistory = [];
+  document.getElementById('chat-log').innerHTML = '';
 }
 
 async function sendFeedback(id, dir, btn) {
