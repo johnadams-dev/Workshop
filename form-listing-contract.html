@@ -122,13 +122,23 @@ function row2(l1, v1, l2, v2) {
   </tr>`;
 }
 
+// City (and state/zip) were previously their own row below Mailing
+// Address -- easy to lose track of on the printed form since the street
+// address reads as complete on its own line above. Folded into one
+// "123 Main St, Daytona Beach, FL 32114"-style line instead, so the city
+// is never separated from the rest of the address.
+function fullAddress(c) {
+  if (!c) return '';
+  const cityState = [c?.city, c?.state].filter(Boolean).join(', ');
+  const cityStateZip = [cityState, c?.zip].filter(Boolean).join(' ');
+  return [c?.address, cityStateZip].filter(Boolean).join(', ');
+}
 function customerBlock(label, c) {
   return `
     <div class="section-head">${label}</div>
     <table>
       ${row2('Name', fmt(c?.name), 'Phone', fmt(c?.phone))}
-      ${row2('Email', fmt(c?.email), 'Mailing Address', fmt(c?.address))}
-      ${row2('City', fmt(c?.city), 'Zip', fmt(c?.zip))}
+      ${row2('Email', fmt(c?.email), 'Mailing Address', fullAddress(c))}
     </table>`;
 }
 function customerSections(label, list) {

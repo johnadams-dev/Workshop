@@ -20,10 +20,9 @@
       text-transform: uppercase; letter-spacing: 0.08em;
       border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px;
     }
-    .company-line { text-align: center; font-size: 9pt; color: #444; margin-bottom: 14px; }
 
     table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-    td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; font-size: 9pt; }
+    td, th { border: 1px solid #000; padding: 4px 6px; vertical-align: top; font-size: 9pt; }
     td.label {
       background: #eee; font-weight: bold; font-size: 8pt;
       text-transform: uppercase; letter-spacing: 0.04em;
@@ -40,6 +39,32 @@
     .disbursement-table td { padding: 5px 8px; }
     .disbursement-table td.amt { text-align: right; min-width: 90px; }
     .disbursement-table tr.total-row td { font-weight: bold; border-top: 2px solid #000; }
+
+    /* Commission-split work table -- the office fills in %/$/Ck#/Date/OTT/
+       NSC/ACF by hand for each agent, so those columns stay blank on
+       purpose. Narrow, centered header cells vs. the label/val convention
+       used elsewhere in this form, since this is a real multi-column grid
+       (matching the paper form's own table), not label:value pairs. */
+    .work-table th {
+      background: #eee; font-weight: bold; font-size: 8pt;
+      text-transform: uppercase; letter-spacing: 0.03em; text-align: center;
+    }
+    .work-table td { height: 22px; }
+    .work-table td.subhead {
+      background: #f5f5f5; font-weight: bold; font-size: 8.5pt;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .work-table td.agent-name { white-space: nowrap; }
+
+    /* New: highlights an agent's Foundation contribution level right next
+       to their name, per staff request -- this is new information the
+       form didn't carry before, so it's deliberately called out rather
+       than blending in with the rest of the row. */
+    .foundation-badge {
+      display: inline-block; margin-left: 8px; padding: 1px 6px;
+      background: #fdf3d8; border: 1px solid #c9a84c; border-radius: 3px;
+      font-size: 7.5pt; font-weight: bold; white-space: nowrap;
+    }
 
     .sig-row { display: flex; gap: 24px; margin-top: 20px; }
     .sig-block { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 8pt; }
@@ -74,8 +99,25 @@ async function load() {
 
 function fmt(v) { return v || ''; }
 function fmtMoney(v) { return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; }
-function fmtDate(v) { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
+// close_date comes back as a full ISO timestamp (transaction_events.close_date
+// is timestamptz, not a bare date), not the 'YYYY-MM-DD' string this
+// previously assumed -- appending 'T00:00:00' to an already-full timestamp
+// produced "Invalid Date". Slicing to the date portion first handles both a
+// bare date string and a full timestamp the same way, then reconstructs
+// LOCAL midnight for that calendar date (not UTC midnight) so
+// toLocaleDateString() can't roll it back a day in a negative-UTC-offset
+// timezone.
+function fmtDate(v) { if (!v) return ''; const d = new Date(String(v).slice(0, 10) + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
 function agentName(a) { if (!a) return ''; return [a.first_name, a.last_name].filter(Boolean).join(' '); }
+
+// Full mailing-style address on one line -- same helper as
+// form-listing-contract.html's fullAddress(), applied here to the
+// transaction's own property address instead of a customer's.
+function fullAddress(address, city, state, zip) {
+  const cityState = [city, state].filter(Boolean).join(', ');
+  const cityStateZip = [cityState, zip].filter(Boolean).join(' ');
+  return [address, cityStateZip].filter(Boolean).join(', ');
+}
 
 const FINANCING_LABEL = {
   cash: 'Cash', conventional: 'Conventional', fha: 'FHA', va: 'VA',
@@ -92,6 +134,40 @@ function calcCommission(salePrice, rate, type) {
 function calcCoopCommission(salePrice, rate, type) {
   return calcCommission(salePrice, rate, type);
 }
+function commissionDisplay(rate, type) {
+  if (rate == null) return '';
+  return type === 'fixed' ? fmtMoney(rate) : `${rate}%`;
+}
+
+// A percent-type referral fee is a cut of the GROSS COMMISSION on the
+// referral's own side (r.side), not of the sale price -- a buyer-side
+// referral is a % of the cooperating/buyer-side commission, a listing-side
+// referral is a % of the listing side (total commission minus the
+// cooperating cut). Was computing straight off salePrice instead, which
+// only happened to look right when commission_rate was exactly 100% --
+// same bug already fixed server-side in daily-desk-routes.js's
+// /referral-report; this form builds its own totals client-side and
+// needed the same fix here.
+function sideGrossCommission(side, totalComm, coopComm) {
+  if (side === 'buyer') return coopComm;
+  return (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
+}
+function calcReferralFee(r, totalComm, coopComm) {
+  if (r.fee_type === 'fixed') return Number(r.fee_value);
+  const sideComm = sideGrossCommission(r.side, totalComm, coopComm);
+  if (sideComm == null) return null;
+  return Math.round(Number(sideComm) * (Number(r.fee_value) / 100) * 100) / 100;
+}
+
+// Donation level as recorded in active_donations -- fixed_amount is a flat
+// dollar amount per closing, percentage_rate is a % of commission. Only
+// fixed_amount has been seen live so far, but both are real columns.
+function donationLabel(d) {
+  if (!d) return '';
+  if (d.fixed_amount != null) return `${fmtMoney(d.fixed_amount)}/closing`;
+  if (d.percentage_rate != null) return `${d.percentage_rate}% of commission`;
+  return d.donation_type || '';
+}
 
 function row2(l1, v1, l2, v2) {
   return `<tr>
@@ -99,145 +175,141 @@ function row2(l1, v1, l2, v2) {
     <td class="label">${l2}</td><td class="val">${v2 || '&nbsp;'}</td>
   </tr>`;
 }
-function row(label, ...vals) {
-  const cells = vals.map(([w, v]) => `<td class="val" style="width:${w}">${v || '&nbsp;'}</td>`).join('');
-  return `<tr><td class="label">${label}</td>${cells}</tr>`;
+
+// One blank-work-columns row per agent in the Commission Split table --
+// %/$/Ck#/Date/OTT/NSC/ACF are filled in by hand, never computed, since
+// per-agent splits/checks aren't tracked in the system. Skips agents with
+// no name on file (e.g. no co-listing agent) instead of printing a blank row.
+function agentWorkRow(a, donor) {
+  const name = agentName(a);
+  if (!name) return '';
+  const badge = donor ? `<span class="foundation-badge">🌱 Foundation Donor — ${donationLabel(donor)}</span>` : '';
+  return `<tr>
+    <td class="agent-name">${name}${badge}</td>
+    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+  </tr>`;
 }
 
-function customerBlock(label, c) {
+// One block per side that actually has a referral -- omitted entirely for
+// a side (or both) with none, rather than printing empty rows.
+function referralBlock(sideLabel, sideRefs, totalComm, coopComm) {
+  if (!sideRefs.length) return '';
+  const blocks = sideRefs.map(r => {
+    const name = r.agent_id ? [r.first_name, r.last_name].filter(Boolean).join(' ') : fmt(r.referral_name);
+    const provider = [name, fmt(r.referral_company)].filter(Boolean).join(' — ');
+    const rate = r.fee_type === 'percent' ? `${Number(r.fee_value)}%` : 'Flat Fee';
+    const gciVal = calcReferralFee(r, totalComm, coopComm);
+    const gci = gciVal != null ? fmtMoney(gciVal) : '';
+    return `
+      ${row2('Provider', provider, 'Tax ID', fmt(r.w2))}
+      ${row2('Address', fmt(r.referral_address), 'Percent of Referral', rate)}
+      ${row2('Amount of GCI', gci, 'Chk# / Date', '')}`;
+  }).join('');
   return `
-    <div class="section-head">${label}</div>
-    <table>
-      ${row2('Name', fmt(c?.name), 'Email', fmt(c?.email))}
-      ${row2('Mailing Address', fmt(c?.address), 'City', fmt(c?.city))}
-      ${row2('State', fmt(c?.state), 'Zip', fmt(c?.zip))}
-    </table>`;
-}
-function customerSections(label, list) {
-  if (!list.length) return customerBlock(label, null);
-  return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
+    <div class="section-head">Referral — ${sideLabel}</div>
+    <table>${blocks}</table>`;
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals, customers }) {
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals, foundation_donors }) {
   const ev = closing_event || {};
   const salePrice = ev.sale_price ?? t.current_price;
   const totalComm = calcCommission(salePrice, t.commission_rate, t.commission_type);
   const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission, t.commission_type);
+
+  // Only show/count NSC for a side we actually represent -- a pure
+  // buyer-side contract can still be carrying a stale listing_non_shared_
+  // commission value from before daily-desk-routes.js's POST /contracts fix
+  // (it used to fall through to the table's $250 DEFAULT for the side we
+  // don't represent). Showing that here would be actively misleading, and
+  // accComm below would overstate ACC's actual take from the deal.
+  const listingNsc = t.represents_seller ? t.listing_non_shared_commission : null;
+  const buyerNsc   = t.represents_buyer  ? t.buyer_non_shared_commission   : null;
+
   // Adams, Cameron's true total take: net of the shared commission split
   // plus both non-shared commissions (NSC) -- flat amounts ACC collects
   // and does not split with the cooperating brokerage.
-  const hasAnyComm = totalComm != null || coopComm != null || t.listing_non_shared_commission != null || t.buyer_non_shared_commission != null;
+  const hasAnyComm = totalComm != null || coopComm != null || listingNsc != null || buyerNsc != null;
   const accComm = hasAnyComm
     ? (totalComm != null && coopComm != null ? totalComm - coopComm : 0)
-      + Number(t.listing_non_shared_commission || 0) + Number(t.buyer_non_shared_commission || 0)
+      + Number(listingNsc || 0) + Number(buyerNsc || 0)
     : null;
   const refs = referrals || [];
-  const custs = customers || [];
-  const sellers = custs.filter(c => c.role === 'seller');
-  const buyers  = custs.filter(c => c.role === 'buyer');
+  // side is 'buyer' or 'seller' (transaction_referrals defaults new rows to
+  // 'seller' -- see daily-desk-routes.js's POST /transactions/:id/referrals)
+  const listingRefs = refs.filter(r => r.side !== 'buyer');
+  const buyerRefs   = refs.filter(r => r.side === 'buyer');
 
-  const la = listing_agent;
-  const ba = buyers_agent;
+  const donors = foundation_donors || [];
+  const donorByAgentId = new Map(donors.map(d => [d.agent_id, d]));
 
   document.getElementById('content').innerHTML = `
-    <div class="form-title">Commission Disbursement</div>
-    <div class="company-line">Adams, Cameron &amp; Co. — Internal Record</div>
+    <div class="form-title">Commission Disbursement Form</div>
+
+    <table>
+      <tr><td class="label">Property Address</td><td class="val" colspan="3">${fullAddress(t.property_address, t.city, t.state, t.zip)}</td></tr>
+      ${row2('Sale Price', fmtMoney(salePrice), 'Commission', commissionDisplay(t.commission_rate, t.commission_type))}
+      ${row2('Commission Check Amount', fmtMoney(totalComm), 'Non-Shared Commission', [
+        listingNsc != null ? `${fmtMoney(listingNsc)} (Listing)` : null,
+        buyerNsc != null ? `${fmtMoney(buyerNsc)} (Buyer)` : null,
+      ].filter(Boolean).join(' / '))}
+    </table>
 
     <div class="section-head">Closing Information</div>
     <table>
-      ${row2('Property Address', fmt(t.property_address), 'City', fmt(t.city))}
-      ${row2('MLS Number', fmt(mls_number), 'Close Date', fmtDate(ev.close_date))}
-      ${row2('Sale Price', fmtMoney(salePrice), 'Title Company', fmt(ev.title_company))}
-      ${row2('Mortgage Company', fmt(ev.mortgage_company), 'Office', fmt(t.office_name))}
-      <tr><td class="label">Mortgage Type</td><td colspan="3" class="val">${financingLabel(ev.financing_type) || '&nbsp;'}</td></tr>
+      ${row2('MLS Number', fmt(mls_number), 'Office', fmt(t.office_name))}
+      ${row2('Closing Date', fmtDate(ev.close_date), 'Closing Agent', fmt(ev.title_company))}
+      ${row2('Mortgage Company', fmt(ev.mortgage_company), 'Type of Financing', financingLabel(ev.financing_type))}
     </table>
 
-    ${customerSections('Seller', sellers)}
-
-    ${customerSections('Buyer', buyers)}
-
-    <div class="section-head">Listing Side</div>
-    <table>
-      ${row2('Listing Agent', agentName(la), 'NRDS ID', fmt(la?.nrds_id))}
-      ${co_listing_agent ? row2('Co-Listing Agent', agentName(co_listing_agent), 'NRDS ID', fmt(co_listing_agent?.nrds_id)) : ''}
+    <div class="section-head">Commission Split</div>
+    <table class="work-table">
+      <thead>
+        <tr><th style="width:26%">Agent</th><th>%</th><th>$</th><th>Ck#</th><th>Date</th><th>OTT</th><th>NSC</th><th>ACF</th></tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="8" class="subhead">Listing Agent</td></tr>
+        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id)) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id))}
+        <tr><td colspan="8" class="subhead">Selling Agent</td></tr>
+        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id)) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id))}
+      </tbody>
     </table>
 
-    <div class="section-head">Selling Side</div>
-    <table>
-      ${row2("Buyer's Agent", agentName(ba), 'NRDS ID', fmt(ba?.nrds_id))}
-      ${co_buyers_agent ? row2("Co-Buyer's Agent", agentName(co_buyers_agent), 'NRDS ID', fmt(co_buyers_agent?.nrds_id)) : ''}
-      ${row2('Cooperating Brokerage', fmt(ba?.cooperating_brokerage), "Co-Buyer's Brokerage", fmt(co_buyers_agent?.cooperating_brokerage))}
-    </table>
-
-    <div class="section-head">Referral (if applicable)</div>
-    <table>
-      ${refs.length ? refs.map(r => {
-        const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', realty_referral: 'Realty Referral', other: 'Other' };
-        const sideLabel = r.side === 'buyer' ? 'Contract Side' : 'Listing Side';
-        const name    = r.agent_id ? [r.first_name, r.last_name].filter(Boolean).join(' ') : fmt(r.referral_name);
-        const company = fmt(r.referral_company);
-        const feeLabel = r.fee_type === 'percent' ? `${r.fee_value}%` : fmtMoney(r.fee_value);
-        const feeAmt   = r.fee_type === 'percent' && salePrice
-          ? fmtMoney(Math.round(Number(salePrice) * (Number(r.fee_value) / 100) * 100) / 100)
-          : (r.fee_type === 'fixed' ? fmtMoney(r.fee_value) : '&nbsp;');
-        return `${row2(`Referred By (${sideLabel})`, name || '&nbsp;', 'Fee Rate', feeLabel)}
-                ${row2('Referred To', company || '&nbsp;', 'Fee Amt', feeAmt)}`;
-      }).join('') : `
-      <tr><td class="label">Referred By</td><td class="val">&nbsp;</td><td class="label">Referral %</td><td class="val">&nbsp;</td></tr>
-      <tr><td class="label">Referred To</td><td class="val">&nbsp;</td><td class="label">Referral Amt</td><td class="val">&nbsp;</td></tr>`}
-    </table>
+    ${referralBlock('Listing Side', listingRefs, totalComm, coopComm)}
+    ${referralBlock('Buyer Side', buyerRefs, totalComm, coopComm)}
 
     <div class="section-head">Commission Summary</div>
     <table class="disbursement-table">
       <tr>
-        <td><strong>Sale Price</strong></td>
-        <td class="amt">${fmtMoney(salePrice)}</td>
+        <td>Total Commission (${commissionDisplay(t.commission_rate, t.commission_type) || '&nbsp;'})</td>
+        <td class="amt">${fmtMoney(totalComm)}</td>
         <td style="width:50%">&nbsp;</td>
       </tr>
       <tr>
-        <td>Total Commission (${t.commission_rate != null ? (t.commission_type === 'fixed' ? '$' + t.commission_rate : t.commission_rate + '%') : '&nbsp;&nbsp;&nbsp;%'})</td>
-        <td class="amt">${fmtMoney(totalComm)}</td>
-        <td>&nbsp;</td>
-      </tr>
-      <tr>
-        <td>Co-Op Commission (${t.cooperating_commission != null ? (t.commission_type === 'fixed' ? '$' + t.cooperating_commission : t.cooperating_commission + '%') : '&nbsp;&nbsp;&nbsp;%'})</td>
+        <td>Co-Op Commission (${commissionDisplay(t.cooperating_commission, t.commission_type) || '&nbsp;'})</td>
         <td class="amt">${fmtMoney(coopComm)}</td>
         <td style="font-size:8pt; color:#555;">Paid to buyer's brokerage</td>
       </tr>
-      ${t.listing_non_shared_commission != null ? `<tr>
-        <td>Non-Shared Commission (Listing) — NSC</td>
-        <td class="amt">${fmtMoney(t.listing_non_shared_commission)}</td>
+      ${listingNsc != null ? `<tr>
+        <td>Non-Shared Commission (Listing)</td>
+        <td class="amt">${fmtMoney(listingNsc)}</td>
         <td>&nbsp;</td>
       </tr>` : ''}
-      ${t.buyer_non_shared_commission != null ? `<tr>
-        <td>Non-Shared Commission (Buyer) — NSC</td>
-        <td class="amt">${fmtMoney(t.buyer_non_shared_commission)}</td>
+      ${buyerNsc != null ? `<tr>
+        <td>Non-Shared Commission (Buyer)</td>
+        <td class="amt">${fmtMoney(buyerNsc)}</td>
         <td>&nbsp;</td>
       </tr>` : ''}
-      ${refs.length ? refs.map(r => {
-        const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', realty_referral: 'Realty Referral', other: 'Other' };
-        const sideLabel = r.side === 'buyer' ? 'Contract Side' : 'Listing Side';
-        const label = typeLabel[r.referral_type] || 'Referral';
-        const amt   = r.fee_type === 'fixed' ? fmtMoney(r.fee_value)
-          : (salePrice ? fmtMoney(Math.round(Number(salePrice) * (Number(r.fee_value) / 100) * 100) / 100) : '&nbsp;');
-        return `<tr><td>Referral Fee — ${label} (${sideLabel})</td><td class="amt">${amt}</td><td style="font-size:8pt;color:#555;">${r.fee_type==='percent'?r.fee_value+'%':''}</td></tr>`;
-      }).join('') : `<tr><td>Referral Fee</td><td class="amt">&nbsp;</td><td>&nbsp;</td></tr>`}
       <tr class="total-row">
         <td>Adams, Cameron Net Commission</td>
         <td class="amt">${fmtMoney(accComm)}</td>
         <td>&nbsp;</td>
       </tr>
-      <tr>
-        <td>Agent Commission</td>
-        <td class="amt">&nbsp;</td>
-        <td style="font-size:8pt; color:#555;">Per agent split on file</td>
-      </tr>
     </table>
 
     <div class="sig-row">
       <div class="sig-block">Coordinator Signature</div>
-      <div class="sig-block">Date</div>
-      <div class="sig-block">Manager / Broker Signature</div>
       <div class="sig-block">Date</div>
     </div>
   `;
