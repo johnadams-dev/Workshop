@@ -557,14 +557,47 @@ const S = {
 /* ─────────────────────── INIT ───────────────────────── */
 window.addEventListener('load', () => {
   setWeekLabel();
+  // A texted link (?t=...) always wins over a cached session — this is a
+  // shared-device-safe way to identify who's tapping in from SMS, not just
+  // a shortcut for whoever's Google session already happens to be saved.
+  const smsToken = new URLSearchParams(location.search).get('t');
+  if (smsToken) { loginWithSmsToken(smsToken); return; }
   const saved = loadSession();
   if (saved && PROXY_KEY) { S.email = saved.email; loadAgent(); return; }
+  startGoogleAuthPoll();
+});
+
+function startGoogleAuthPoll() {
   const poll = setInterval(() => {
     if (!window.google?.accounts) return;
     clearInterval(poll);
     initAuth();
   }, 200);
-});
+}
+
+// Auto-login from the link texted by sendAgentReminderSms() server-side
+// (GET /checkin/auth/:token). Produces the exact same session shape as the
+// Google sign-in path (saveSession + PROXY_KEY), so loadAgent() and
+// everything downstream can't tell the two apart. The token is stripped
+// from the address bar immediately, before it's even exchanged, so it
+// can't linger in browser history or be re-shared by copying the visible
+// URL — the link is meant to be used once per tap, not reread.
+async function loginWithSmsToken(token) {
+  history.replaceState(null, '', location.pathname);
+  try {
+    const r = await fetch(`${PROXY_BASE}/checkin/auth/${encodeURIComponent(token)}`);
+    const data = await r.json();
+    if (!r.ok || !data.email) throw new Error(data.error || 'Link expired');
+    PROXY_KEY = data.proxyKey || '';
+    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
+    S.email = data.email;
+    saveSession(data.email, data.name || '', data.picture || '');
+    await loadAgent();
+  } catch (e) {
+    toast('That link has expired — please sign in below.');
+    startGoogleAuthPoll();
+  }
+}
 
 function setWeekLabel() {
   const now = new Date();

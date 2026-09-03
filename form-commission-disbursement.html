@@ -61,9 +61,9 @@
        form didn't carry before, so it's deliberately called out rather
        than blending in with the rest of the row. */
     .foundation-badge {
-      display: inline-block; margin-left: 8px; padding: 1px 6px;
+      display: inline-block; margin-left: 6px; padding: 0px 4px;
       background: #fdf3d8; border: 1px solid #c9a84c; border-radius: 3px;
-      font-size: 7.5pt; font-weight: bold; white-space: nowrap;
+      font-size: 6.5pt; font-weight: bold; white-space: nowrap;
     }
 
     .sig-row { display: flex; gap: 24px; margin-top: 20px; }
@@ -148,24 +148,29 @@ function commissionDisplay(rate, type) {
 // same bug already fixed server-side in daily-desk-routes.js's
 // /referral-report; this form builds its own totals client-side and
 // needed the same fix here.
-function sideGrossCommission(side, totalComm, coopComm) {
-  if (side === 'buyer') return coopComm;
-  return (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
+//
+// Takes the ADJUSTED (post-concession) side commissions, not the raw
+// deal-terms ones -- a referral is a cut of what the side actually split
+// after any closing-time concession, not what the original terms implied.
+function sideGrossCommission(side, listingSideCommAdj, coopCommAdj) {
+  return side === 'buyer' ? coopCommAdj : listingSideCommAdj;
 }
-function calcReferralFee(r, totalComm, coopComm) {
+function calcReferralFee(r, listingSideCommAdj, coopCommAdj) {
   if (r.fee_type === 'fixed') return Number(r.fee_value);
-  const sideComm = sideGrossCommission(r.side, totalComm, coopComm);
+  const sideComm = sideGrossCommission(r.side, listingSideCommAdj, coopCommAdj);
   if (sideComm == null) return null;
   return Math.round(Number(sideComm) * (Number(r.fee_value) / 100) * 100) / 100;
 }
 
 // Donation level as recorded in active_donations -- fixed_amount is a flat
 // dollar amount per closing, percentage_rate is a % of commission. Only
-// fixed_amount has been seen live so far, but both are real columns.
+// fixed_amount has been seen live so far, but both are real columns. Just
+// the number, not "/closing" or "of commission" -- this form is internal
+// and the badge is already labeled "Foundation", so the qualifier is redundant.
 function donationLabel(d) {
   if (!d) return '';
-  if (d.fixed_amount != null) return `${fmtMoney(d.fixed_amount)}/closing`;
-  if (d.percentage_rate != null) return `${d.percentage_rate}% of commission`;
+  if (d.fixed_amount != null) return fmtMoney(d.fixed_amount);
+  if (d.percentage_rate != null) return `${d.percentage_rate}%`;
   return d.donation_type || '';
 }
 
@@ -183,7 +188,7 @@ function row2(l1, v1, l2, v2) {
 function agentWorkRow(a, donor) {
   const name = agentName(a);
   if (!name) return '';
-  const badge = donor ? `<span class="foundation-badge">🌱 Foundation Donor — ${donationLabel(donor)}</span>` : '';
+  const badge = donor ? `<span class="foundation-badge">🌱 Foundation ${donationLabel(donor)}</span>` : '';
   return `<tr>
     <td class="agent-name">${name}${badge}</td>
     <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
@@ -192,13 +197,13 @@ function agentWorkRow(a, donor) {
 
 // One block per side that actually has a referral -- omitted entirely for
 // a side (or both) with none, rather than printing empty rows.
-function referralBlock(sideLabel, sideRefs, totalComm, coopComm) {
+function referralBlock(sideLabel, sideRefs, listingSideCommAdj, coopCommAdj) {
   if (!sideRefs.length) return '';
   const blocks = sideRefs.map(r => {
     const name = r.agent_id ? [r.first_name, r.last_name].filter(Boolean).join(' ') : fmt(r.referral_name);
     const provider = [name, fmt(r.referral_company)].filter(Boolean).join(' — ');
     const rate = r.fee_type === 'percent' ? `${Number(r.fee_value)}%` : 'Flat Fee';
-    const gciVal = calcReferralFee(r, totalComm, coopComm);
+    const gciVal = calcReferralFee(r, listingSideCommAdj, coopCommAdj);
     const gci = gciVal != null ? fmtMoney(gciVal) : '';
     return `
       ${row2('Provider', provider, 'Tax ID', fmt(r.w2))}
@@ -210,29 +215,72 @@ function referralBlock(sideLabel, sideRefs, totalComm, coopComm) {
     <table>${blocks}</table>`;
 }
 
-function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals, foundation_donors }) {
+// One row per concession -- shown individually (not summed per side) so
+// each keeps its own reason visible next to its amount.
+function adjustmentRows(sideAdjustments, sideLabel) {
+  return sideAdjustments.map(a => `
+    <tr>
+      <td>Commission Concession — ${sideLabel}</td>
+      <td class="amt">(${fmtMoney(a.amount)})</td>
+      <td style="font-size:8pt; color:#555;">${fmt(a.reason)}</td>
+    </tr>`).join('');
+}
+
+function render({ transaction: t, mls_number, listing_agent, co_listing_agent, buyers_agent, co_buyers_agent, closing_event, referrals, foundation_donors, commission_adjustments }) {
   const ev = closing_event || {};
   const salePrice = ev.sale_price ?? t.current_price;
   const totalComm = calcCommission(salePrice, t.commission_rate, t.commission_type);
   const coopComm  = calcCoopCommission(salePrice, t.cooperating_commission, t.commission_type);
+  // The listing side's own split, before any concession -- totalComm minus
+  // whatever goes to the cooperating/buyer side. null (not 0) whenever
+  // totalComm itself is unknown (e.g. a pure buyer-side/cooperating deal,
+  // where we never track the full listing-side rate) so it's clearly
+  // distinguished from "we know it and it's zero."
+  const listingSideComm = (totalComm != null && coopComm != null) ? totalComm - coopComm : null;
+
+  // Concessions made at closing -- a flat dollar deduction from one side's
+  // split, entered via the closing modal (transaction_commission_
+  // adjustments). Multiple can exist per side.
+  const adjustments = commission_adjustments || [];
+  const sellerAdjustments = adjustments.filter(a => a.side === 'seller');
+  const buyerAdjustments  = adjustments.filter(a => a.side === 'buyer');
+  const sellerAdjTotal = sellerAdjustments.reduce((sum, a) => sum + Number(a.amount), 0);
+  const buyerAdjTotal  = buyerAdjustments.reduce((sum, a) => sum + Number(a.amount), 0);
+  const listingSideCommAdj = listingSideComm != null ? listingSideComm - sellerAdjTotal : null;
+  const coopCommAdj        = coopComm != null ? coopComm - buyerAdjTotal : null;
 
   // Only show/count NSC for a side we actually represent -- a pure
   // buyer-side contract can still be carrying a stale listing_non_shared_
   // commission value from before daily-desk-routes.js's POST /contracts fix
   // (it used to fall through to the table's $250 DEFAULT for the side we
   // don't represent). Showing that here would be actively misleading, and
-  // accComm below would overstate ACC's actual take from the deal.
+  // gci below would overstate ACC's actual take from the deal.
   const listingNsc = t.represents_seller ? t.listing_non_shared_commission : null;
   const buyerNsc   = t.represents_buyer  ? t.buyer_non_shared_commission   : null;
 
-  // Adams, Cameron's true total take: net of the shared commission split
-  // plus both non-shared commissions (NSC) -- flat amounts ACC collects
-  // and does not split with the cooperating brokerage.
-  const hasAnyComm = totalComm != null || coopComm != null || listingNsc != null || buyerNsc != null;
-  const accComm = hasAnyComm
-    ? (totalComm != null && coopComm != null ? totalComm - coopComm : 0)
-      + Number(listingNsc || 0) + Number(buyerNsc || 0)
-    : null;
+  // Adams, Cameron's Gross Commission Income (GCI): the split(s) ACC
+  // actually keeps -- the listing side's cut ONLY if we represent the
+  // seller, the cooperating side's cut ONLY if we represent the buyer
+  // (both, added together, for a dual-represented/in-house deal) -- plus
+  // both NSCs, net of any concessions on that side. This is NOT Company
+  // Dollar (net commission, after agent splits are paid) -- per-agent
+  // splits/payouts aren't tracked in this system, so there isn't enough
+  // information here to compute that.
+  //
+  // Previously always computed as (totalComm - coopComm), unconditionally
+  // treating coopComm as money that leaves ACC to another brokerage --
+  // silently wrong for a pure buyer-side (cooperating) deal, where
+  // totalComm is unknown (null, so the whole term fell to 0) even though
+  // coopComm *is* ACC's own earned commission in that case. Confirmed live
+  // against a real cooperating-side closing: GCI came out to just the
+  // buyer NSC ($250), completely missing the $13,499.70 the agent actually
+  // earned as buyer's agent.
+  let gci = Number(listingNsc || 0) + Number(buyerNsc || 0);
+  let hasAnyComm = listingNsc != null || buyerNsc != null;
+  if (t.represents_seller && listingSideCommAdj != null) { gci += listingSideCommAdj; hasAnyComm = true; }
+  if (t.represents_buyer && coopCommAdj != null)         { gci += coopCommAdj;        hasAnyComm = true; }
+  if (!hasAnyComm) gci = null;
+
   const refs = referrals || [];
   // side is 'buyer' or 'seller' (transaction_referrals defaults new rows to
   // 'seller' -- see daily-desk-routes.js's POST /transactions/:id/referrals)
@@ -264,7 +312,7 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
     <div class="section-head">Commission Split</div>
     <table class="work-table">
       <thead>
-        <tr><th style="width:26%">Agent</th><th>%</th><th>$</th><th>Ck#</th><th>Date</th><th>OTT</th><th>NSC</th><th>ACF</th></tr>
+        <tr><th style="width:24%">Agent</th><th style="width:6%">%</th><th style="width:16%">$</th><th style="width:11%">Ck#</th><th style="width:11%">Date</th><th style="width:10%">OTT</th><th style="width:11%">NSC</th><th style="width:11%">ACF</th></tr>
       </thead>
       <tbody>
         <tr><td colspan="8" class="subhead">Listing Agent</td></tr>
@@ -276,8 +324,8 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       </tbody>
     </table>
 
-    ${referralBlock('Listing Side', listingRefs, totalComm, coopComm)}
-    ${referralBlock('Buyer Side', buyerRefs, totalComm, coopComm)}
+    ${referralBlock('Listing Side', listingRefs, listingSideCommAdj, coopCommAdj)}
+    ${referralBlock('Buyer Side', buyerRefs, listingSideCommAdj, coopCommAdj)}
 
     <div class="section-head">Commission Summary</div>
     <table class="disbursement-table">
@@ -289,8 +337,10 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       <tr>
         <td>Co-Op Commission (${commissionDisplay(t.cooperating_commission, t.commission_type) || '&nbsp;'})</td>
         <td class="amt">${fmtMoney(coopComm)}</td>
-        <td style="font-size:8pt; color:#555;">Paid to buyer's brokerage</td>
+        <td style="font-size:8pt; color:#555;">${t.represents_buyer ? "Retained — our buyer-side commission" : "Paid to buyer's brokerage"}</td>
       </tr>
+      ${adjustmentRows(sellerAdjustments, 'Listing')}
+      ${adjustmentRows(buyerAdjustments, 'Buyer')}
       ${listingNsc != null ? `<tr>
         <td>Non-Shared Commission (Listing)</td>
         <td class="amt">${fmtMoney(listingNsc)}</td>
@@ -302,8 +352,8 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td>&nbsp;</td>
       </tr>` : ''}
       <tr class="total-row">
-        <td>Adams, Cameron Net Commission</td>
-        <td class="amt">${fmtMoney(accComm)}</td>
+        <td>Gross Commission Income (GCI)</td>
+        <td class="amt">${fmtMoney(gci)}</td>
         <td>&nbsp;</td>
       </tr>
     </table>

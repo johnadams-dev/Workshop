@@ -3499,6 +3499,88 @@ async function _saveReferrals(txnId, ns) {
   }
 }
 
+/* ═══ COMMISSION CONCESSIONS (closing modal only — see AM_KEY 'closing') ═══
+   Deliberately not "Commission Adjustment" — the closing modal already uses
+   that name for correcting the deal's own commission_rate/cooperating_
+   commission/NSC terms. This is a different thing: a flat dollar deduction
+   from one side's split, negotiated at closing, kept as its own auditable
+   row (transaction_commission_adjustments) rather than mutating those
+   terms. Same repeatable-row toggle pattern as referrals above, just a
+   smaller field set (side/amount/reason, no type/fee/agent branching). */
+let _adjustmentRowIdx = 0;
+
+function _buildAdjustmentRow(ns, idx, data = {}) {
+  const lS = 'font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;';
+  const iS = 'padding:7px 10px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;width:100%;box-sizing:border-box;min-width:0;';
+  const side = data.side || 'seller';
+  return `<div class="adjustment-row" data-ns="${ns}" data-aidx="${idx}" style="border:1px solid var(--ink-border);border-radius:var(--r);padding:10px;margin-bottom:8px;background:rgba(255,255,255,.03);min-width:0;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:10px;align-items:end;min-width:0;">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Side</span>
+        <select class="adj-side" style="${iS}">
+          <option value="seller" ${side==='seller'?'selected':''}>Listing</option>
+          <option value="buyer"  ${side==='buyer'?'selected':''}>Buyer</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Amount</span>
+        <input type="text" class="adj-amount" value="${data.amount != null ? data.amount : ''}" placeholder="500" style="${iS}">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <span style="${lS}">Reason</span>
+        <input type="text" class="adj-reason" value="${escapeHtml(data.reason||'')}" placeholder="e.g. Repair credit at closing" style="${iS}">
+      </div>
+      <button type="button" onclick="_removeAdjustmentRow('${ns}',${idx})" style="padding:7px 10px;background:transparent;border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text-muted);cursor:pointer;font-size:13px;white-space:nowrap;">✕</button>
+    </div>
+  </div>`;
+}
+
+function addAdjustmentRow(ns, data = {}) {
+  const idx = _adjustmentRowIdx++;
+  const container = document.getElementById(`${ns}-adjustment-rows`);
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', _buildAdjustmentRow(ns, idx, data));
+}
+
+function _removeAdjustmentRow(ns, idx) {
+  const row = document.querySelector(`.adjustment-row[data-ns="${ns}"][data-aidx="${idx}"]`);
+  if (row) row.remove();
+}
+
+function toggleAdjustmentSection(ns) {
+  const checked = document.getElementById(`${ns}-has-adjustment`).checked;
+  const section = document.getElementById(`${ns}-adjustment-section`);
+  if (!section) return;
+  section.style.display = checked ? 'block' : 'none';
+  if (checked && document.querySelectorAll(`#${ns}-adjustment-rows .adjustment-row`).length === 0) {
+    addAdjustmentRow(ns);
+  }
+}
+
+// Silently skips a row missing amount/reason rather than erroring — same
+// as collectReferrals() skipping a row with no parseable fee, since these
+// rows are meant to be quick and forgiving to fill out for something that
+// only comes up ~5% of the time.
+function collectAdjustments(ns) {
+  const rows = document.querySelectorAll(`#${ns}-adjustment-rows .adjustment-row`);
+  const out = [];
+  for (const row of rows) {
+    const side   = row.querySelector('.adj-side').value;
+    const amount = parseFloat(row.querySelector('.adj-amount').value.replace(/[^0-9.]/g, ''));
+    const reason = row.querySelector('.adj-reason').value.trim();
+    if (isNaN(amount) || amount <= 0 || !reason) continue;
+    out.push({ side, amount, reason });
+  }
+  return out;
+}
+
+async function _saveAdjustments(txnId, ns) {
+  const adjustments = collectAdjustments(ns);
+  for (const a of adjustments) {
+    await POST(`/daily-desk/transactions/${txnId}/commission-adjustments`, a);
+  }
+}
+
 /* ═══ CLOSING PARTY (BUYER/SELLER CONTACT) ROWS ═══ */
 // Independent people, not shares of one pool — no "must total 100%" rule and
 // no "at least one row" requirement (a closing can proceed with no contact
@@ -4211,6 +4293,16 @@ async function amChooseAction(key) {
           </div>
         </div>
       </div>
+      <div class="referral-toggle-row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--ink-border);">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="am-has-adjustment" onchange="toggleAdjustmentSection('am')">
+          Commission concession at closing <span style="font-size:9px;color:var(--text-dim);text-transform:none;letter-spacing:0;">(a deduction from one side's commission — rare)</span>
+        </label>
+        <div id="am-adjustment-section" style="display:none;margin-top:10px;">
+          <div id="am-adjustment-rows"></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addAdjustmentRow('am')" style="margin-top:6px;">+ Add another concession</button>
+        </div>
+      </div>
       `;
   } else if (key === 'under_contract') {
     fieldsHtml = `
@@ -4909,6 +5001,13 @@ async function amSubmit() {
 
   try {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
+    if (key === 'closing') {
+      // Separate try/catch — the closing itself already succeeded at this
+      // point (transaction is closed, event recorded), so a concession
+      // save failure shouldn't read as the whole closing having failed.
+      try { await _saveAdjustments(amState.id, 'am'); }
+      catch (e) { alert('Closing saved, but failed to save commission concession(s): ' + e.message); }
+    }
     await renderAll();
     const printMap = {
       closing:          { page: 'form-commission-disbursement.html', label: 'Commission Disbursement Form' },

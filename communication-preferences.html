@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Communication Preferences — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280;
+  --red:#DC2626; --green:#16A34A; --amber:#D97706;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ── Auth gate ── */
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:40px 48px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25);max-width:380px;width:90%}
+.signin-icon{font-size:36px;margin-bottom:14px}
+.signin-card h2{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.signin-google{display:flex;justify-content:center}
+
+/* ── Topbar ── */
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em}
+.topbar-link:hover{color:rgba(255,255,255,.85)}
+.topbar-user{font-size:12px;color:rgba(255,255,255,.55)}
+
+/* ── Layout ── */
+.main{max-width:680px;margin:32px auto;padding:0 24px 64px}
+.page-intro{margin-bottom:24px}
+.page-intro h1{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:6px}
+.page-intro p{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* ── Admin-view banner (only when editing another agent's prefs) ── */
+.admin-banner{background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:13px}
+
+/* ── Topic cards ── */
+.topic-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:16px}
+.topic-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.topic-desc{font-size:12px;color:var(--muted);margin-bottom:4px;line-height:1.5}
+.topic-notice{font-size:11.5px;color:var(--amber);font-weight:600;margin-bottom:10px}
+
+.pref-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border);gap:1rem}
+.topic-desc + .pref-row, .topic-notice + .pref-row{border-top:none;padding-top:6px}
+.pref-info{}
+.pref-title{font-size:13px;font-weight:500;color:var(--text)}
+.pref-status{font-size:11px;font-weight:500;margin-top:2px}
+.pref-status.on{color:var(--green)}
+.pref-status.off{color:var(--muted)}
+.pref-status.saving{color:var(--blue)}
+.pref-status.err{color:var(--red)}
+
+/* Toggle switch — same mechanics as agent-dashboard.html's .toggle, this
+   page's own palette */
+.toggle{position:relative;width:42px;height:23px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:23px;cursor:pointer;transition:background .2s}
+.toggle-slider::before{content:'';position:absolute;width:17px;height:17px;border-radius:50%;background:#fff;left:3px;top:3px;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.toggle input:checked + .toggle-slider{background:var(--gold)}
+.toggle input:checked + .toggle-slider::before{transform:translateX(19px)}
+.toggle input:disabled + .toggle-slider{opacity:.55;cursor:default}
+
+.loading, .err-banner{font-size:13px;color:var(--muted);padding:20px 0;text-align:center}
+.err-banner{color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- ── Auth gate ── -->
+<div id="auth-gate">
+  <div class="signin-card">
+    <div class="signin-icon">🔔</div>
+    <h2>Communication Preferences</h2>
+    <p>Sign in with your Adams Cameron Google account to manage what you receive by email and text.</p>
+    <div class="signin-google">
+      <div id="g_id_onload"
+        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+        data-callback="handleGoogleSignIn"
+        data-auto_select="true">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">ACC</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">Communication Preferences</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./index.html">← Tools</a>
+      <span class="topbar-user" id="topbar-user"></span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page-intro">
+      <h1>Communication Preferences</h1>
+      <p>Choose what you'd like to receive by email and by text, for each type of communication below. Changes save automatically.</p>
+    </div>
+
+    <div id="admin-banner" class="admin-banner" style="display:none"></div>
+    <div id="topics-wrap"><div class="loading">Loading your preferences…</div></div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────── CONFIG ─────────────────────── */
+const PROXY      = 'https://mls-proxy-975684028597.us-east1.run.app';
+const CLIENT_ID   = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+// Topic metadata lives here, not in the database — see
+// migrations/add_agent_comms_prefs.sql. `wired: true` means a real send
+// path already checks this preference (currently only Pathfinder, via
+// server.js's sendAgentReminderEmail/sendAgentReminderSms); the rest are
+// captured now for when their delivery is built out.
+const TOPICS = [
+  { key: 'pathfinder',           label: 'Pathfinder',            desc: 'Weekly business-planning check-in reminders and coaching notifications.', wired: true },
+  { key: 'company_events',       label: 'Company Events',        desc: 'Company-wide events — annual meetings, awards, celebrations.', wired: false },
+  { key: 'office_events',        label: 'Office Events',         desc: 'Events specific to your office.', wired: false },
+  { key: 'presidents_update',    label: "President's Update",    desc: "Regular updates from the company president.", wired: false },
+  { key: 'office_announcements', label: 'Office Announcements',  desc: 'General announcements from your office.', wired: false },
+];
+const NOT_WIRED_NOTICE = 'Not yet active — currently managed through the office email list. Your choice here will be saved for when this is turned on.';
+
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+
+// Present only when a manager/admin opened this page for a specific agent
+// from agent-master-form.html — everyone else edits their own preferences.
+const targetAgentId = new URLSearchParams(location.search).get('agentId');
+
+let prefsByKey = {}; // "topic:channel" -> enabled
+
+/* ─────────────────────── AUTH ───────────────────────── */
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', init);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID, callback: handleGoogleSignIn,
+    auto_select: true, cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.querySelector('.g_id_signin'),
+    { theme: 'outline', size: 'large', width: 280 }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || '';
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ''; }
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await init();
+  } catch (e) { alert('Authentication error: ' + e.message); }
+}
+
+/* ─────────────────────── INIT ───────────────────────── */
+async function init() {
+  document.getElementById('topbar-user').textContent = userEmail;
+  await loadPreferences();
+  fetch(`${PROXY}/log/visit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool: 'Communication Preferences', email: userEmail }),
+  }).catch(() => {});
+}
+
+async function loadPreferences() {
+  const wrap = document.getElementById('topics-wrap');
+  wrap.innerHTML = `<div class="loading">Loading your preferences…</div>`;
+  try {
+    const qs = targetAgentId ? `?agentId=${encodeURIComponent(targetAgentId)}` : '';
+    const r = await fetch(`${PROXY}/agent-comms/preferences${qs}`, {
+      headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    });
+    const data = await r.json();
+    if (!r.ok || !data.found) throw new Error(data.error || 'Could not load preferences');
+
+    prefsByKey = {};
+    (data.prefs || []).forEach(p => { prefsByKey[`${p.topic}:${p.channel}`] = p.enabled; });
+
+    const banner = document.getElementById('admin-banner');
+    if (targetAgentId) {
+      banner.style.display = 'block';
+      banner.textContent = `Editing preferences for ${data.agentName || data.agentEmail} — admin view.`;
+    } else {
+      banner.style.display = 'none';
+    }
+
+    renderTopics();
+  } catch (e) {
+    wrap.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function renderTopics() {
+  const wrap = document.getElementById('topics-wrap');
+  wrap.innerHTML = TOPICS.map(t => `
+    <div class="topic-card">
+      <div class="topic-title">${esc(t.label)}</div>
+      <div class="topic-desc">${esc(t.desc)}</div>
+      ${t.wired ? '' : `<div class="topic-notice">⏳ ${esc(NOT_WIRED_NOTICE)}</div>`}
+      ${prefRow(t.key, 'email', 'Email')}
+      ${prefRow(t.key, 'sms', 'Text Message')}
+    </div>
+  `).join('');
+}
+
+function prefRow(topic, channel, label) {
+  const enabled = prefsByKey[`${topic}:${channel}`] !== false;
+  const id = `pref-${topic}-${channel}`;
+  return `
+    <div class="pref-row">
+      <div class="pref-info">
+        <div class="pref-title">${esc(label)}</div>
+        <div class="pref-status ${enabled ? 'on' : 'off'}" id="${id}-status">${enabled ? 'On' : 'Off'}</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="${id}" ${enabled ? 'checked' : ''} onchange="togglePref('${topic}','${channel}')">
+        <div class="toggle-slider"></div>
+      </label>
+    </div>`;
+}
+
+/* ─────────────────────── SAVE ───────────────────────── */
+async function togglePref(topic, channel) {
+  const id = `pref-${topic}-${channel}`;
+  const input = document.getElementById(id);
+  const status = document.getElementById(`${id}-status`);
+  const enabled = input.checked;
+  const prevStatusText = status.textContent, prevStatusClass = status.className;
+
+  status.textContent = 'Saving…';
+  status.className = 'pref-status saving';
+
+  try {
+    const body = { topic, channel, enabled };
+    if (targetAgentId) body.agentId = targetAgentId;
+    const r = await fetch(`${PROXY}/agent-comms/preferences`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Save failed');
+
+    prefsByKey[`${topic}:${channel}`] = enabled;
+    status.textContent = enabled ? 'On' : 'Off';
+    status.className = `pref-status ${enabled ? 'on' : 'off'}`;
+  } catch (e) {
+    // Revert the toggle and status on failure — don't leave the UI
+    // claiming a state that isn't actually saved.
+    input.checked = !enabled;
+    status.textContent = prevStatusText;
+    status.className = prevStatusClass;
+    alert('Could not save that change: ' + e.message);
+  }
+}
+
+/* ─────────────────────── UTIL ───────────────────────── */
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+</script>
+
+</body>
+</html>
