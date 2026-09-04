@@ -7236,8 +7236,16 @@ function rptRenderEOMOffice(name, listings, contracts) {
   const totalContractList = contracts.reduce((s,r) => s + (Number(r.current_price)||0), 0);
   const totalSalePrice    = contracts.reduce((s,r) => s + (Number(r.sale_price||r.contract_price)||0), 0);
 
+  // Grouped/sorted by when the record was entered into Daily Desk
+  // (created_at/submitted_at), not by the business date (list_date/
+  // contract_date) — a listing entered a few days after its actual list
+  // date can land in a different month's report than that list date alone
+  // would suggest. The "Entered" column makes that visible rather than
+  // looking like a sorting bug when a "Listed"/"Contract" date falls
+  // outside the report's own month.
   const listingRows = listings.map(r => `
     <tr>
+      <td class="td-mono">${fmtDate(r.created_at)}</td>
       <td class="td-mono">${fmtDate(r.list_date)}</td>
       <td class="td-mono">${fmtDate(r.expiration_date)}</td>
       <td class="td-addr">${escapeHtml(r.property_address)}<div class="td-muted">${escapeHtml(r.city||'')}${r.mls_id ? ' · MLS# '+escapeHtml(r.mls_id) : ''}</div></td>
@@ -7248,6 +7256,7 @@ function rptRenderEOMOffice(name, listings, contracts) {
 
   const contractRows = contracts.map(r => `
     <tr>
+      <td class="td-mono">${fmtDate(r.submitted_at)}</td>
       <td class="td-mono">${fmtDate(r.contract_date)}</td>
       <td class="td-mono">${fmtDate(r.expected_close_date)}</td>
       <td>${escapeHtml(r.listing_agent||'Co-broke')}</td>
@@ -7270,18 +7279,18 @@ function rptRenderEOMOffice(name, listings, contracts) {
     ${listings.length ? `
     <div class="report-section-title">New Listings — ${listings.length}</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Listed</th><th>Expires</th><th>Address</th><th>Agent</th><th>List Price</th><th>Status</th></tr></thead>
+      <thead><tr><th>Entered</th><th>Listed</th><th>Expires</th><th>Address</th><th>Agent</th><th>List Price</th><th>Status</th></tr></thead>
       <tbody>${listingRows}</tbody>
-      <tfoot><tr><td colspan="4" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:6px 10px;">Total</td>
+      <tfoot><tr><td colspan="5" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:6px 10px;">Total</td>
         <td class="td-price" style="font-weight:600;">${fmtMoney(totalListPrice)}</td><td></td></tr></tfoot>
     </table></div>` : ''}
 
     ${contracts.length ? `
     <div class="report-section-title">Contracts — ${contracts.length}</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Contract</th><th>Closing</th><th>Listing Agent</th><th>Selling Agent</th><th>Address</th><th>List Price</th><th>Sale Price</th></tr></thead>
+      <thead><tr><th>Entered</th><th>Contract</th><th>Closing</th><th>Listing Agent</th><th>Selling Agent</th><th>Address</th><th>List Price</th><th>Sale Price</th></tr></thead>
       <tbody>${contractRows}</tbody>
-      <tfoot><tr><td colspan="5" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:6px 10px;">Total</td>
+      <tfoot><tr><td colspan="6" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:6px 10px;">Total</td>
         <td class="td-price" style="font-weight:600;">${fmtMoney(totalContractList)}</td>
         <td class="td-price" style="font-weight:600;">${fmtMoney(totalSalePrice)}</td></tr></tfoot>
     </table></div>` : ''}
