@@ -3875,8 +3875,8 @@ const ACTION_CHECKLIST = {
     'Confirm change reflected in Form Simplicity',
   ],
   contract_change_date: [
-    'Notify cooperating agent of new closing date',
-    'Confirm date extension addendum uploaded to Form Simplicity',
+    'Notify cooperating agent of price/closing date change',
+    'Confirm addendum uploaded to Form Simplicity',
   ],
   contract_change_agent: [
     'Confirm updated agent reflected in Form Simplicity',
@@ -4143,7 +4143,7 @@ async function amChooseAction(key) {
         <div class="field" style="display:flex; flex-direction:column; gap:5px;">
           <span class="field-label" style="${lS}">Change Type</span>
           <select id="am-contract-change-type" onchange="amToggleContractChangeType()" style="${sS}">
-            <option value="date_extension">Date Extension</option>
+            <option value="date_extension">Addendum (Price / Closing Date)</option>
             <option value="agent">Agent Change</option>
           </select>
         </div>
@@ -4151,9 +4151,15 @@ async function amChooseAction(key) {
       <div id="am-contract-date-wrap" style="margin-bottom:14px;">
         <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-            <span class="field-label" style="${lS}">New Close Date</span>
+            <span class="field-label" style="${lS}">New Contract Price (if applicable)</span>
+            <input type="text" id="am-new-price" placeholder="$0" style="${sS}">
+          </div>
+          <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+            <span class="field-label" style="${lS}">New Close Date (if applicable)</span>
             <input type="date" id="am-new-close-date" style="${sS}">
           </div>
+        </div>
+        <div class="form-row" style="margin-top:14px;">
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="${lS}">Note</span>
             <input type="text" id="am-notes" placeholder="Optional" style="${sS}">
@@ -4807,9 +4813,22 @@ async function amSubmit() {
   } else if (key === 'change' && amState.kind === 'contract') {
     const changeType = document.getElementById('am-contract-change-type').value;
     if (changeType === 'date_extension') {
+      // "date_extension" is really the combined price/closing-date addendum
+      // option now (see the dropdown label) — mirrors the listing-side
+      // addendum handling below, where price and close date are independent
+      // fields and either (or both) may be set.
+      const newPrice = amParseMoney(document.getElementById('am-new-price').value);
       const newCloseDate = document.getElementById('am-new-close-date').value;
-      if (!newCloseDate) { alert('Please enter a new close date.'); return; }
-      fields.newCloseDate = newCloseDate;
+      if (newPrice == null && !newCloseDate) {
+        alert('Please enter a new contract price and/or a new close date.');
+        return;
+      }
+      if (newCloseDate) {
+        const closeDateError = dateSanityError(newCloseDate, 'Closing date');
+        if (closeDateError) { alert(closeDateError); return; }
+        fields.newCloseDate = newCloseDate;
+      }
+      if (newPrice != null) fields.newPrice = newPrice;
     } else if (changeType === 'agent') {
       const rows = document.querySelectorAll('.am-agent-row');
       const agents = [];
