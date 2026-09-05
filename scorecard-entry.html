@@ -201,7 +201,7 @@
       <div class="panel">
         <div class="panel-head">
           <div class="panel-title">Marketing Metrics</div>
-          <div class="panel-desc">Entered by the Marketing team · Sources: Accounting, Facebook, DeltaNet</div>
+          <div class="panel-desc">Entered by the Marketing team · Sources: Accounting, DeltaNet</div>
         </div>
         <div class="metric-list" id="fields-marketing"></div>
         <div class="submit-bar">
@@ -340,7 +340,7 @@ async function onSignedIn() {
 // ── Data loading ──────────────────────────────────────────────────────────────
 async function loadMetricsAndHistory() {
   try {
-    const r = await fetch(`${PROXY_BASE}/admin/scorecard-history`, {
+    const r = await fetch(`${PROXY_BASE}/scorecard/manual-entry/history`, {
       headers: { 'x-proxy-key': PROXY_KEY }
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -468,7 +468,7 @@ async function submitTab(tab) {
   btn.disabled = true; btn.textContent = 'Saving…';
 
   try {
-    const r = await fetch(`${PROXY_BASE}/admin/scorecard-entry`, {
+    const r = await fetch(`${PROXY_BASE}/scorecard/manual-entry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
       body: JSON.stringify({ period, metrics, submittedBy: S.email }),

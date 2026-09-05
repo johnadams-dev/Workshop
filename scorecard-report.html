@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scorecard Report · Adams Cameron & Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* Shell (auth gate, topbar, tables, buttons, filters) copied from
+   review-engine.html — same dark manager-dashboard theme, same DI/auth
+   convention, per scorecard-report-plan.md's "modeled on review-engine.html's
+   shell" instruction. Only the content area below is new to this page. */
+:root {
+  --ink:        #0d1117;
+  --ink-mid:    #161b22;
+  --ink-light:  #21262d;
+  --ink-border: #30363d;
+  --amber:      #d29922;
+  --amber-bg:   rgba(210,153,34,.12);
+  --green:      #3fb950;
+  --green-bg:   rgba(63,185,80,.1);
+  --red:        #f85149;
+  --red-bg:     rgba(248,81,73,.1);
+  --blue:       #58a6ff;
+  --blue-bg:    rgba(88,166,255,.1);
+  --text:       #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim:   #484f58;
+  --mono:       'IBM Plex Mono', monospace;
+  --sans:       'IBM Plex Sans', sans-serif;
+  --r:          6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--sans);
+  background: var(--ink);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#auth-gate {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 100vh; gap: 1.5rem;
+}
+#auth-gate h1 { font-size: 1.4rem; color: var(--amber); }
+#auth-gate p  { color: var(--text-muted); font-size: 0.9rem; }
+
+.topbar {
+  background: var(--ink-mid); border-bottom: 1px solid var(--ink-border);
+  padding: 0 1.5rem; height: 48px; display: flex; align-items: center;
+  justify-content: space-between; position: sticky; top: 0; z-index: 50;
+}
+.topbar-title { font-size: 0.85rem; font-weight: 600; letter-spacing: .05em; color: var(--text-muted); }
+.topbar-title span { color: var(--amber); }
+.topbar-back { font-size: 0.8rem; color: var(--text-muted); text-decoration: none; }
+.topbar-back:hover { color: var(--text); }
+
+.content { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+.filters { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.filters input, .filters select {
+  background: var(--ink-light); border: 1px solid var(--ink-border); border-radius: var(--r);
+  padding: 0.4rem 0.75rem; color: var(--text); font: inherit; font-size: 0.82rem;
+}
+.filters-note { font-size: 0.76rem; color: var(--text-dim); }
+
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th {
+  background: var(--ink-light); color: var(--text-muted); font-weight: 500; text-align: left;
+  padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--ink-border); white-space: nowrap;
+}
+td { padding: 0.55rem 0.9rem; border-bottom: 1px solid var(--ink-border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem;
+  border-radius: var(--r); font: inherit; font-size: 0.8rem; font-weight: 500;
+  cursor: pointer; border: none; transition: opacity .15s; background: var(--ink-light);
+  color: var(--text); border: 1px solid var(--ink-border);
+}
+.btn:hover { opacity: .8; }
+.btn-sm { padding: 0.2rem 0.55rem; font-size: 0.72rem; }
+
+.rate-low  { color: var(--amber); }
+.rate-ok   { color: var(--green); }
+.rate-bad  { color: var(--red); }
+
+.loading, .empty-state { color: var(--text-muted); padding: 1rem 0; }
+
+/* ── Metric groups ── */
+.metric-group { margin-bottom: 1.75rem; }
+.metric-group-title {
+  font-size: 0.76rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--amber); margin-bottom: 0.5rem;
+}
+.metric-name { display: flex; align-items: center; gap: 0.5rem; }
+.metric-detail { font-size: 0.74rem; color: var(--text-dim); margin-top: 0.1rem; }
+.breakdown-toggle {
+  background: none; border: none; color: var(--blue); font: inherit; font-size: 0.72rem;
+  cursor: pointer; padding: 0; text-decoration: none;
+}
+.breakdown-toggle:hover { text-decoration: underline; }
+.breakdown-row td { background: rgba(255,255,255,.015); padding: 0; }
+.breakdown-row table { font-size: 0.78rem; }
+.breakdown-row th, .breakdown-row td { padding: 0.4rem 0.9rem 0.4rem 2rem; }
+.is-manual-tag {
+  font-size: 0.62rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-dim); border: 1px solid var(--ink-border); border-radius: 100px;
+  padding: 0.05rem 0.4rem;
+}
+</style>
+</head>
+<body>
+
+<!-- Auth gate -->
+<div id="auth-gate">
+  <h1>Scorecard Report</h1>
+  <p>Sign in with your Adams Cameron account to continue.</p>
+  <div id="g-signin-btn"></div>
+</div>
+
+<!-- App (hidden until auth) -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <span class="topbar-title">Scorecard <span>Report</span></span>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <a href="./feedback.html?tool=scorecard-report" class="topbar-back">Feedback</a>
+      <a href="index.html" class="topbar-back">← Tools</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="filters">
+      <input type="month" id="filter-month" onchange="loadMetrics()">
+      <select id="filter-office" onchange="loadMetrics()">
+        <option value="">All Offices</option>
+      </select>
+      <span class="filters-note">Office filter only affects office-level metrics (Office Productivity) — company-wide metrics (Recruiting &amp; Retention, Marketing, eBusiness) are unaffected.</span>
+    </div>
+
+    <div id="report-output"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<script>
+const PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
+const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+let proxyKey  = localStorage.getItem("ac_proxy_key") || "";
+let userEmail = localStorage.getItem("ac_user_email") || "";
+
+// ── Auth — same pattern as review-engine.html ───────────────────────────────
+if (proxyKey && userEmail && localStorage.getItem("ac_is_manager") === "1") {
+  document.getElementById("auth-gate").style.display = "none";
+  document.getElementById("app").style.display       = "block";
+  window.addEventListener("load", initApp);
+}
+
+window.addEventListener("load", () => {
+  google.accounts.id.initialize({
+    client_id:             GOOGLE_CLIENT_ID,
+    callback:              handleGoogleSignIn,
+    auto_select:           true,
+    cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("g-signin-btn"),
+    { theme: "outline", size: "large", width: 280, text: "signin_with" }
+  );
+  if (!proxyKey || !userEmail || localStorage.getItem("ac_is_manager") !== "1") google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split(".")[1]));
+    userEmail = payload.email || "";
+    localStorage.setItem("ac_user_email", userEmail);
+  } catch { userEmail = ""; }
+
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || "Sign-in failed. Use your @adamscameron.com account."); return; }
+    proxyKey = data.proxyKey || "";
+    localStorage.setItem("ac_proxy_key", proxyKey);
+
+    if (localStorage.getItem("ac_is_manager") !== "1") {
+      const mr = await fetch(`${PROXY}/auth/is-manager`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ idToken: response.credential }),
+      });
+      const md = await mr.json();
+      if (!md.isManager) {
+        alert("This tool requires manager or admin access.");
+        window.location.href = "index.html";
+        return;
+      }
+      localStorage.setItem("ac_is_manager", "1");
+    }
+
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display       = "block";
+    initApp();
+  } catch (e) {
+    alert("Authentication error: " + e.message);
+  }
+}
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "x-proxy-key":  proxyKey,
+    "x-user-email": userEmail,
+    ...(opts.headers || {}),
+  };
+  const res = await fetch(PROXY + path, { ...opts, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+const GET = (path) => api(path);
+
+function esc(str) {
+  if (str == null) return "";
+  return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function initApp() {
+  const now = new Date();
+  document.getElementById("filter-month").value = now.toISOString().slice(0, 7);
+  loadOffices();
+  loadMetrics();
+}
+
+async function loadOffices() {
+  try {
+    const offices = await GET("/offices");
+    const sel = document.getElementById("filter-office");
+    sel.innerHTML = '<option value="">All Offices</option>' +
+      offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join("");
+  } catch (e) { /* non-critical — office filter just stays "All Offices" only */ }
+}
+
+// ── Formatting ───────────────────────────────────────────────────────────────
+function fmtValue(value, unit) {
+  if (value === null || value === undefined) return "—";
+  const n = Number(value);
+  if (unit === "percent") return `${n.toFixed(1)}%`;
+  if (unit === "currency") return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return n.toLocaleString();
+}
+
+// Extends review-engine.html's fmtRate "higher is better" coloring to also
+// handle target_direction: 'below' (lower is better, e.g. Agents
+// Terminated, Virtual Tours Needing Replacement) — plain/uncolored when
+// there's no target_value set yet (true for every Phase 1 seed row; targets
+// can be added later by hand-editing scr_metric_catalog.target_value) or
+// when target_direction is 'none'.
+function rateClass(value, targetValue, targetDirection) {
+  if (value == null || targetValue == null || !targetDirection || targetDirection === "none") return "";
+  const v = Number(value), t = Number(targetValue);
+  if (targetDirection === "above") return v >= t ? "rate-ok" : "rate-low";
+  if (targetDirection === "below") return v <= t ? "rate-ok" : "rate-low";
+  return "";
+}
+
+// ── Main report ──────────────────────────────────────────────────────────────
+const _breakdownCache = {}; // metric_key -> rows, keyed also by month so switching months refetches
+let _breakdownCacheMonth = null;
+
+async function loadMetrics() {
+  const month = document.getElementById("filter-month").value;
+  const officeId = document.getElementById("filter-office").value;
+  const out = document.getElementById("report-output");
+  out.innerHTML = '<div class="loading">Loading…</div>';
+
+  if (_breakdownCacheMonth !== month) {
+    for (const k in _breakdownCache) delete _breakdownCache[k];
+    _breakdownCacheMonth = month;
+  }
+
+  try {
+    const qs = new URLSearchParams({ month });
+    if (officeId) qs.set("office_id", officeId);
+    const data = await GET(`/scorecard/metrics?${qs}`);
+    out.innerHTML = renderReport(data);
+  } catch (e) {
+    out.innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderReport(data) {
+  if (!data.groups.length) return '<div class="empty-state">No metrics configured yet.</div>';
+  return data.groups.map(g => `
+    <div class="metric-group">
+      <div class="metric-group-title">${esc(g.group)}</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Metric</th><th>Value</th><th></th></tr></thead>
+          <tbody>${g.metrics.map(renderMetricRow).join("")}</tbody>
+        </table>
+      </div>
+    </div>`).join("");
+}
+
+function renderMetricRow(m) {
+  const cls = rateClass(m.value, m.target_value, m.target_direction);
+  const manualTag = m.is_manual ? '<span class="is-manual-tag">Manual</span>' : "";
+  const detail = m.detail ? `<div class="metric-detail">${esc(m.detail)}</div>` : "";
+  const breakdownBtn = m.has_breakdown
+    ? `<button class="breakdown-toggle" onclick="toggleBreakdown(this, '${m.metric_key}')">By Office ▾</button>`
+    : "";
+  const rowId = `bd-${m.metric_key}`;
+  return `<tr>
+      <td class="metric-name">${esc(m.display_name)} ${manualTag}</td>
+      <td class="${cls}">${fmtValue(m.value, m.unit)}${detail}</td>
+      <td>${breakdownBtn}</td>
+    </tr>
+    <tr class="breakdown-row" id="${rowId}" style="display:none"><td colspan="3"></td></tr>`;
+}
+
+async function toggleBreakdown(btn, metricKey) {
+  const row = document.getElementById(`bd-${metricKey}`);
+  const isOpen = row.style.display !== "none";
+  if (isOpen) { row.style.display = "none"; btn.textContent = "By Office ▾"; return; }
+
+  document.querySelectorAll(".breakdown-row").forEach(r => r.style.display = "none");
+  document.querySelectorAll(".breakdown-toggle").forEach(b => b.textContent = "By Office ▾");
+  row.style.display = "";
+  btn.textContent = "By Office ▴";
+  row.querySelector("td").innerHTML = '<div class="loading" style="padding:.5rem 2rem">Loading…</div>';
+
+  try {
+    const rows = _breakdownCache[metricKey] || await GET(`/scorecard/metrics/by-office?month=${document.getElementById("filter-month").value}&metric_key=${encodeURIComponent(metricKey)}`);
+    _breakdownCache[metricKey] = rows;
+    row.querySelector("td").innerHTML = rows.length
+      ? `<table><thead><tr><th>Office</th><th>Value</th></tr></thead><tbody>${
+          rows.map(r => `<tr><td>${esc(r.office_name)}</td><td>${r.value != null ? Number(r.value).toLocaleString() : "—"}${r.detail ? `<div class="metric-detail">${esc(r.detail)}</div>` : ""}</td></tr>`).join("")
+        }</tbody></table>`
+      : '<div class="empty-state" style="padding:.5rem 2rem">No office data for this month.</div>';
+  } catch (e) {
+    row.querySelector("td").innerHTML = `<div class="empty-state" style="color:var(--red);padding:.5rem 2rem">Error: ${esc(e.message)}</div>`;
+  }
+}
+</script>
+
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Scorecard Report',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
