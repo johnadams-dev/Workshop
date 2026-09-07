@@ -912,7 +912,7 @@ tbody tr.clickable { cursor: pointer; }
       <span class="tab-icon">⚠</span> Not Yet Tracked <span class="tab-count" id="untracked-count">—</span>
     </div>
     <div class="nav-tab alert" data-page="statusmismatch" onclick="showPage('statusmismatch',this)">
-      <span class="tab-icon">🔄</span> Status Mismatches <span class="tab-count" id="statusmismatch-count">—</span>
+      <span class="tab-icon">🔄</span> Mismatches <span class="tab-count" id="statusmismatch-count">—</span>
     </div>
     <div class="nav-tab" data-page="notices" onclick="showPage('notices',this)">
       <span class="tab-icon">📢</span> Notices <span class="tab-count" id="notices-count">—</span>
@@ -1084,12 +1084,12 @@ tbody tr.clickable { cursor: pointer; }
         <div class="alert-icon">!</div>
         <div class="alert-text">
           <div class="alert-title" id="statusmismatch-banner-title"></div>
-          <div class="alert-sub">DeltaNet reports a different status than what's on file. Click a row to review and correct it — nothing here is changed automatically.</div>
+          <div class="alert-sub">DeltaNet reports a different status or price than what's on file. Click a row to review and correct it — nothing here is changed automatically.</div>
         </div>
       </div>
 
       <div class="section-head">
-        <div class="section-title">Status Mismatches — DeltaNet vs. Our Records</div>
+        <div class="section-title">Mismatches — DeltaNet vs. Daily Desk</div>
       </div>
       <div class="table-wrap">
         <table>
@@ -1097,8 +1097,8 @@ tbody tr.clickable { cursor: pointer; }
             <tr>
               <th data-sort="property_address" onclick="sortMismatchBy('property_address')">Address</th>
               <th data-sort="agent_name" onclick="sortMismatchBy('agent_name')">Agent</th>
-              <th>Our Status</th>
-              <th>DeltaNet Status</th>
+              <th>Daily Desk</th>
+              <th>MLS / DeltaNet</th>
               <th data-sort="cached_at" onclick="sortMismatchBy('cached_at')">Cached</th>
             </tr>
           </thead>
@@ -5638,24 +5638,29 @@ function renderUntrackedTable(rows) {
   }).join('');
 }
 
-/* ── DeltaNet "Status Mismatches" page ── */
+/* ── DeltaNet "Mismatches" page (status mismatches + missed price changes) ── */
 function renderMismatchTable(rows) {
   const tbody  = document.getElementById('statusmismatch-tbody');
   const banner = document.getElementById('statusmismatch-banner');
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty">No status mismatches found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No mismatches found.</td></tr>';
     banner.style.display = 'none';
     return;
   }
 
   banner.style.display = 'flex';
   document.getElementById('statusmismatch-banner-title').textContent =
-    `${rows.length} transaction${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? "doesn't" : "don't"} match DeltaNet's reported status`;
+    `${rows.length} transaction${rows.length === 1 ? '' : 's'} ${rows.length === 1 ? "doesn't" : "don't"} match DeltaNet's records`;
 
   tbody.innerHTML = rows.map(r => {
-    const [chipClass, chipLabel] = statusChip(r.status);
     const sub = [r.city, r.office_name].filter(Boolean).join(' &middot; ');
+    const isPrice = r.mismatch_type === 'price';
+    const ourCell = isPrice ? fmtMoney(r.current_price) : (() => {
+      const [chipClass, chipLabel] = statusChip(r.status);
+      return `<span class="chip ${chipClass}">${chipLabel}</span>`;
+    })();
+    const dnCell = isPrice ? fmtMoney(r.price_asking) : (escapeHtml(r.dn_status) || '—');
     return `
             <tr>
               <td>
@@ -5663,8 +5668,8 @@ function renderMismatchTable(rows) {
                 <div class="addr-sub">${sub || '—'}</div>
               </td>
               <td>${escapeHtml(r.agent_name) || '—'}</td>
-              <td><span class="chip ${chipClass}">${chipLabel}</span></td>
-              <td>${escapeHtml(r.dn_status) || '—'}</td>
+              <td>${ourCell}</td>
+              <td>${dnCell}</td>
               <td>${fmtDate(r.cached_at)}</td>
             </tr>`;
   }).join('');
