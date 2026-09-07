@@ -395,6 +395,7 @@
     <div class="logo">Agent <span class="logo-path">Hub</span></div>
     <div class="header-right">
       <a href="./index.html" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">← Tools</a>
+      <a href="./feedback.html?tool=agent-hub" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">Feedback</a>
       <div id="userChip">
         <img id="userAvatar" src="" alt="">
         <span id="userName"></span>
@@ -963,10 +964,26 @@ function renderPendingSteps() {
 
   document.getElementById('reminderList').innerHTML = Object.entries(byTxn).map(([txnId, items]) => `
     <div class="reminder-group-label">${escapeHtml(addrByTxn[txnId] || 'Untitled listing')}</div>
-    ${items.slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)).map(i => renderChecklistItemRow(i, txnId)).join('')}
+    ${sortChecklistItems(items).map(i => renderChecklistItemRow(i, txnId)).join('')}
   `).join('');
 
   box.style.display = 'block';
+}
+
+// Shared sort — used everywhere a listing's full checklist is shown (the
+// transaction detail modal; harmless no-op here since Pending Steps already
+// pre-filters to pending-only, but kept in sync so this doesn't quietly
+// break if that filter ever changes). Still-outstanding items surface
+// before resolved ones (completed/not_applicable/skipped) so the list reads
+// "what's left" first; sort_order is the tie-break within each group,
+// preserving the authored step order.
+function sortChecklistItems(items) {
+  return items.slice().sort((a, b) => {
+    const aDone = a.progress_status === 'pending' ? 0 : 1;
+    const bDone = b.progress_status === 'pending' ? 0 : 1;
+    if (aDone !== bDone) return aDone - bDone;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
 }
 
 // Shared row renderer — used by both the Pending Steps list above and the
@@ -1303,7 +1320,7 @@ function withTxnParam(url, txnId) {
 function openTxnModal(txnId) {
   const t = S.txnById?.[txnId];
   if (!t) return;
-  const items = (S.checklistByTxn?.[txnId] || []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const items = sortChecklistItems(S.checklistByTxn?.[txnId] || []);
   const tools = toolsForTransaction(t);
 
   document.getElementById('modalAddress').textContent = t.property_address;
