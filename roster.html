@@ -108,6 +108,20 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .detail-row:last-child{border-bottom:none}
 .detail-row .icon{width:20px;text-align:center;font-size:15px;flex-shrink:0}
 .detail-row .label{font-size:13px;word-break:break-word}
+.detail-row-btn{background:none;border:none;font:inherit;width:100%;text-align:left;cursor:pointer;padding-left:0;padding-right:0}
+
+/* ── Send-a-text compose box (roster's PC-side stand-in for the sms: handoff) ── */
+.compose-box{padding:6px 0 2px}
+.compose-box textarea{width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13px;color:var(--text);resize:vertical;box-sizing:border-box}
+.compose-char-count{font-size:11px;color:var(--dim);text-align:right;margin-top:4px}
+.compose-status{font-size:12px;margin-top:8px;min-height:15px}
+.compose-status.ok{color:#16a34a}
+.compose-status.err{color:#dc2626}
+.compose-actions{display:flex;gap:8px;margin-top:10px}
+.compose-actions button{flex:1;padding:9px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.compose-send{background:var(--navy);color:#fff}
+.compose-send:disabled{opacity:.5;cursor:default}
+.compose-cancel{background:var(--bg);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -198,7 +212,7 @@ const PARTNER_TAB_IDS = new Set(['title', 'mortgage', 'association', 'property_m
 let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
 
-let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null };
+let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null, canSendText: false, detailTarget: null };
 
 if (proxyKey && userEmail) {
   document.getElementById('auth-gate').style.display = 'none';
@@ -257,6 +271,16 @@ async function api(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+async function apiPost(path, body) {
+  const r = await fetch(PROXY + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
 function esc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function initials(first, last) { return ((first||'?')[0] + (last||'?')[0]).toUpperCase(); }
 function fmtPhone(e) {
@@ -274,16 +298,23 @@ const agentPhoto = a => a.photo_url || (a.dmg_id ? `https://www.adamscameron.com
 ═══════════════════════════════════════════════════════════════════ */
 async function init() {
   try {
-    const [agents, staff, partners, offices] = await Promise.all([
+    const [agents, staff, partners, offices, me] = await Promise.all([
       api('/roster/agents'),
       api('/roster/staff'),
       api('/roster/partners'),
       api('/offices'),
+      // /lockbox/me collapses staff.role to just "manager" (admin/manager)
+      // or "staff" (everyone else, including coordinator) -- that split is
+      // exactly what's needed here: show Send a message to anyone who isn't
+      // a plain agent. requireStaff re-checks the precise admin/manager/
+      // coordinator set server-side regardless of what this shows.
+      api('/lockbox/me').catch(() => ({ role: 'unknown' })),
     ]);
     STATE.agents = agents;
     STATE.staff = staff;
     STATE.partners = partners;
     STATE.offices = offices;
+    STATE.canSendText = me.role === 'manager' || me.role === 'staff';
     renderOfficeChips();
     renderMainTabs();
     switchTab('agents');
@@ -384,10 +415,12 @@ function openAgentCard(id) {
   const photo = agentPhoto(a);
   const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
   const websiteHref = a.website ? (/^https?:\/\//i.test(a.website) ? a.website : 'https://' + a.website) : null;
+  STATE.detailTarget = { type: 'agent', id: a.id, cellE164: a.cell_e164, name };
 
   const rows = [];
   if (a.cell_e164) rows.push(`<a class="detail-row" href="tel:${esc(a.cell_e164)}"><span class="icon">📞</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Call</span></a>`);
   if (a.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(a.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Text</span></a>`);
+  rows.push(sendMessageRowHtml());
   if (a.email) rows.push(`<a class="detail-row" href="mailto:${esc(a.email)}"><span class="icon">✉️</span><span class="label">${esc(a.email)}</span></a>`);
   if (a.designations) rows.push(`<div class="detail-row"><span class="icon">🏅</span><span class="label">${esc(a.designations)}</span></div>`);
   if (a.languages) rows.push(`<div class="detail-row"><span class="icon">🗣️</span><span class="label">${esc(a.languages)}</span></div>`);
@@ -400,11 +433,81 @@ function openAgentCard(id) {
       <div class="name">${esc(name)}</div>
       ${a.office_name ? `<div class="office">${esc(a.office_name)}</div>` : ''}
     </div>
-    <div class="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
+    <div class="detail-body" id="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
   `;
   document.getElementById('detail-modal').classList.add('open');
 }
-function closeDetailModal() { document.getElementById('detail-modal').classList.remove('open'); }
+function closeDetailModal() { document.getElementById('detail-modal').classList.remove('open'); STATE.detailTarget = null; }
+
+// Only shown to a signed-in office coordinator/manager/admin (requireStaff
+// re-checks the exact same role set server-side on send, regardless of what
+// this shows) -- a plain agent looking up a colleague still only gets the
+// native Call/Text handoff above, not a way to send as the company's Twilio
+// number. This exists because tel:/sms: links only hand off to a local app
+// on a phone; there's no equivalent on a PC without this.
+function sendMessageRowHtml() {
+  if (!STATE.canSendText || !STATE.detailTarget?.cellE164) return '';
+  return `<button type="button" class="detail-row detail-row-btn" onclick="openComposeBox()"><span class="icon">📨</span><span class="label">Send a message</span></button>`;
+}
+
+function openComposeBox() {
+  const t = STATE.detailTarget;
+  if (!t) return;
+  document.getElementById('detail-body').innerHTML = `
+    <div class="compose-box">
+      <div class="detail-row" style="border-bottom:none;padding-bottom:2px"><span class="icon">📨</span><span class="label">Text ${esc(t.name)} at ${esc(fmtPhone(t.cellE164))}</span></div>
+      <textarea id="compose-text" maxlength="1600" placeholder="Type your message…" oninput="updateComposeCount()"></textarea>
+      <div class="compose-char-count" id="compose-count">0 / 1600</div>
+      <div class="compose-status" id="compose-status"></div>
+      <div class="compose-actions">
+        <button type="button" class="compose-cancel" onclick="cancelCompose()">Cancel</button>
+        <button type="button" class="compose-send" id="compose-send-btn" onclick="submitCompose()">Send</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('compose-text').focus();
+}
+
+function updateComposeCount() {
+  const el = document.getElementById('compose-text');
+  const countEl = document.getElementById('compose-count');
+  if (el && countEl) countEl.textContent = `${el.value.length} / 1600`;
+}
+
+// Re-renders the original detail card from scratch rather than tracking a
+// separate "rows html" snapshot -- simplest way to guarantee Cancel matches
+// exactly what was there before Send was clicked.
+function cancelCompose() {
+  const t = STATE.detailTarget;
+  if (!t) { closeDetailModal(); return; }
+  if (t.type === 'agent') openAgentCard(t.id); else openStaffCard(t.id);
+}
+
+async function submitCompose() {
+  const t = STATE.detailTarget;
+  if (!t) return;
+  const textEl = document.getElementById('compose-text');
+  const statusEl = document.getElementById('compose-status');
+  const text = textEl.value.trim();
+  if (!text) { statusEl.textContent = 'Message cannot be empty.'; statusEl.className = 'compose-status err'; return; }
+
+  const btn = document.getElementById('compose-send-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  statusEl.textContent = ''; statusEl.className = 'compose-status';
+
+  try {
+    await apiPost('/roster/send-text', { target_type: t.type, target_id: t.id, message: text });
+    statusEl.textContent = `Sent to ${fmtPhone(t.cellE164)}.`;
+    statusEl.className = 'compose-status ok';
+    textEl.value = '';
+    updateComposeCount();
+  } catch (e) {
+    statusEl.textContent = e.message || 'Failed to send.';
+    statusEl.className = 'compose-status err';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send';
+  }
+}
 
 /* ── Offices tab — pick an office, see its address/phone + management team ── */
 function renderOfficesTab(q) {
@@ -479,10 +582,12 @@ function openStaffCard(id) {
   const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
   const officeNames = (s.offices || []).map(o => o.name).join(', ');
   const websiteHref = s.website ? (/^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website) : null;
+  STATE.detailTarget = { type: 'staff', id: s.id, cellE164: s.cell_e164, name };
 
   const rows = [];
   if (s.cell_e164) rows.push(`<a class="detail-row" href="tel:${esc(s.cell_e164)}"><span class="icon">📞</span><span class="label">${esc(fmtPhone(s.cell_e164))} · Call</span></a>`);
   if (s.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(s.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(s.cell_e164))} · Text</span></a>`);
+  rows.push(sendMessageRowHtml());
   if (s.email) rows.push(`<a class="detail-row" href="mailto:${esc(s.email)}"><span class="icon">✉️</span><span class="label">${esc(s.email)}</span></a>`);
   if (websiteHref) rows.push(`<a class="detail-row" href="${esc(websiteHref)}" target="_blank" rel="noopener"><span class="icon">🌐</span><span class="label">${esc(s.website)}</span></a>`);
 
@@ -494,7 +599,7 @@ function openStaffCard(id) {
       ${(s.title || roleLabel) ? `<div class="office">${esc([s.title, roleLabel].filter(Boolean).join(' · '))}</div>` : ''}
       ${officeNames ? `<div class="office" style="opacity:.8">${esc(officeNames)}</div>` : ''}
     </div>
-    <div class="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
+    <div class="detail-body" id="detail-body">${rows.join('') || '<div class="empty">No contact info on file.</div>'}</div>
   `;
   document.getElementById('detail-modal').classList.add('open');
 }
