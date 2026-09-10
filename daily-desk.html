@@ -2189,6 +2189,15 @@ tbody tr.clickable { cursor: pointer; }
       <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;">
         <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Corrected Value</span>
         <input type="text" id="fc-new-value" style="padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+        <!-- commission_type is a closed set (transactions_commission_type_check
+             allows only 'percent'/'fixed') -- a dropdown here instead of free
+             text prevents the bad-value class of error entirely, rather than
+             just validating it after the fact. Swapped in for fc-new-value
+             by fcPopulateCurrent() when that field is selected. -->
+        <select id="fc-new-value-select" style="display:none;padding:8px 11px;background:var(--ink);border:1px solid var(--ink-border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:13px;">
+          <option value="percent">Percent</option>
+          <option value="fixed">Fixed</option>
+        </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;">Reason <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-dim);">(required)</span></span>
@@ -6915,6 +6924,13 @@ function fcPopulateFieldOptions() {
   fcPopulateCurrent();
 }
 
+// Numeric CORRECTABLE_FIELDS -- validated as a plain non-negative number
+// client-side before submit (see submitFieldCorrection) so a stray "%" or
+// blank value never reaches the server as literal invalid numeric syntax.
+// listing/buyer_non_shared_commission get this same format check PLUS the
+// tighter whole-dollar/$0-2000 check nscValidationError already applies.
+const FC_NUMERIC_FIELDS = ['commission_rate', 'cooperating_commission', 'listing_non_shared_commission', 'buyer_non_shared_commission'];
+
 function fcPopulateCurrent() {
   const customerId = document.getElementById('fc-customer').value;
   const field = document.getElementById('fc-field').value;
@@ -6928,8 +6944,26 @@ function fcPopulateCurrent() {
     }
   }
   document.getElementById('fc-current').textContent = val || '(blank)';
-  document.getElementById('fc-new-value').value = val || '';
-  document.getElementById('fc-new-value').focus();
+
+  const textInput = document.getElementById('fc-new-value');
+  const selectInput = document.getElementById('fc-new-value-select');
+  if (field === 'commission_type') {
+    textInput.style.display = 'none';
+    selectInput.style.display = '';
+    selectInput.value = (val === 'percent' || val === 'fixed') ? val : 'percent';
+  } else {
+    selectInput.style.display = 'none';
+    textInput.style.display = '';
+    textInput.value = val || '';
+    textInput.focus();
+  }
+}
+
+function fcNewValue() {
+  const field = document.getElementById('fc-field').value;
+  return field === 'commission_type'
+    ? document.getElementById('fc-new-value-select').value
+    : document.getElementById('fc-new-value').value.trim();
 }
 
 function closeFieldCorrectionModal() {
@@ -6941,11 +6975,16 @@ function closeFieldCorrectionModal() {
 async function submitFieldCorrection() {
   const customerId = document.getElementById('fc-customer').value;
   const fieldName = document.getElementById('fc-field').value;
-  const newValue  = document.getElementById('fc-new-value').value.trim();
+  const newValue  = fcNewValue();
   const reason    = document.getElementById('fc-reason').value.trim();
 
   if (!fieldName) { alert('Please select a field to correct.'); return; }
   if (!reason)    { alert('A reason is required.'); document.getElementById('fc-reason').focus(); return; }
+  if (FC_NUMERIC_FIELDS.includes(fieldName) && newValue !== '' && !/^\d+(\.\d+)?$/.test(newValue)) {
+    alert(`${FC_FIELD_LABELS[fieldName]} must be a plain number (no "%" or other characters).`);
+    document.getElementById('fc-new-value').focus();
+    return;
+  }
   if (fieldName === 'listing_non_shared_commission' || fieldName === 'buyer_non_shared_commission') {
     const nscError = nscValidationError(
       newValue === '' ? null : Number(newValue),
@@ -6954,11 +6993,20 @@ async function submitFieldCorrection() {
     if (nscError) { alert(nscError); return; }
   }
 
+  // A cleared NUMERIC field must be sent as null, not '' -- the server does
+  // `newValue ?? null`, which only catches null/undefined, so a bare empty
+  // string used to reach Postgres as literal '' and crash with "invalid
+  // input syntax for type numeric: ''". Scoped to numeric fields only --
+  // some CORRECTABLE_FIELDS (e.g. property_address) are NOT NULL, so
+  // blanking those the same way would trade one crash for another; '' was
+  // already their existing, working behavior and isn't touched here.
+  const valueToSend = (FC_NUMERIC_FIELDS.includes(fieldName) && newValue === '') ? null : newValue;
+
   try {
     const url = customerId
       ? `/daily-desk/transactions/${_fcTxnId}/customers/${customerId}/field-correction`
       : `/daily-desk/transactions/${_fcTxnId}/field-correction`;
-    await POST(url, { fieldName, newValue, reason });
+    await POST(url, { fieldName, newValue: valueToSend, reason });
     closeFieldCorrectionModal();
     cvToast('✓', 'Correction saved.');
     // Reached via the Actions modal now, not just the drawer -- only refresh

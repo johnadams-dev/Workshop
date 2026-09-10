@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Broadcast Messaging — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280;
+  --red:#DC2626; --green:#16A34A; --amber:#D97706;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ── Auth gate ── */
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:40px 48px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25);max-width:380px;width:90%}
+.signin-icon{font-size:36px;margin-bottom:14px}
+.signin-card h2{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.signin-google{display:flex;justify-content:center}
+
+/* ── Topbar ── */
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em}
+.topbar-link:hover{color:rgba(255,255,255,.85)}
+.topbar-user{font-size:12px;color:rgba(255,255,255,.55)}
+
+/* ── Layout ── */
+.main{max-width:760px;margin:32px auto;padding:0 24px 64px}
+.page-intro{margin-bottom:20px}
+.page-intro h1{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:6px}
+.page-intro p{font-size:13px;color:var(--muted);line-height:1.6}
+
+.consent-notice{background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:12.5px;line-height:1.5}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.tab{background:none;border:none;font:inherit;font-size:13px;font-weight:600;color:var(--muted);padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--navy);border-bottom-color:var(--gold)}
+.tab-badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:5px}
+
+.panel{display:none}
+.panel.active{display:block}
+
+/* ── Composer ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:16px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--navy);margin-bottom:6px}
+.field select, .field textarea, .field input[type=text]{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13px;color:var(--text)}
+.field textarea{min-height:100px;resize:vertical}
+.char-count{font-size:11px;color:var(--muted);text-align:right;margin-top:3px}
+
+.scope-btns{display:flex;gap:8px}
+.scope-btn{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center}
+.scope-btn.active{background:var(--navy);border-color:var(--navy);color:#fff}
+
+.office-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:6px}
+.office-check{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12.5px;cursor:pointer}
+.office-check.checked{background:#EFF6FF;border-color:var(--blue);color:var(--navy)}
+.office-check input{margin:0}
+
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{display:flex;align-items:center;gap:6px;background:#EFF6FF;border:1px solid var(--blue);color:var(--navy);border-radius:14px;padding:4px 6px 4px 11px;font-size:12px;font-weight:500}
+.chip-x{cursor:pointer;color:var(--muted);font-weight:700;background:none;border:none;font-size:13px;line-height:1;padding:2px}
+.typeahead-wrap{position:relative}
+.typeahead-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:20}
+.typeahead-row{padding:8px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
+.typeahead-row:last-child{border-bottom:none}
+.typeahead-row:hover{background:var(--bg)}
+.typeahead-row small{color:var(--muted);display:block}
+.typeahead-empty{padding:8px 12px;font-size:12px;color:var(--muted)}
+
+.coordinator-banner{background:#EFF6FF;border:1px solid var(--blue);color:var(--navy);border-radius:8px;padding:9px 14px;margin-bottom:16px;font-size:12.5px}
+
+.preview-panel{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12.5px}
+.preview-panel .counts{font-weight:600;color:var(--navy);margin-bottom:4px}
+.preview-panel .names{color:var(--muted);line-height:1.6}
+
+.actions{display:flex;gap:10px}
+.btn{border:none;border-radius:8px;padding:10px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:disabled{opacity:.5;cursor:default}
+.btn-secondary{background:#fff;border:1px solid var(--border);color:var(--text)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px}
+
+.compose-status{font-size:12.5px;margin-top:10px;min-height:15px}
+.compose-status.ok{color:var(--green)}
+.compose-status.err{color:var(--red)}
+
+/* ── Approval queue / history ── */
+.approval-card, .history-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:12px}
+.row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.row-meta{font-size:11.5px;color:var(--muted)}
+.row-category{font-size:13px;font-weight:700;color:var(--navy)}
+.row-message{font-size:12.5px;color:var(--text);margin-top:8px;white-space:pre-wrap;background:var(--bg);border-radius:6px;padding:8px 10px}
+.badge{display:inline-block;font-size:11px;font-weight:700;border-radius:10px;padding:2px 9px}
+.badge-pending{background:#FEF3C7;color:#92400E}
+.badge-sent{background:#DCFCE7;color:#166534}
+.badge-rejected{background:#FEE2E2;color:#991B1B}
+.badge-failed{background:#FEE2E2;color:#991B1B}
+.reject-box{margin-top:10px}
+.reject-box textarea{width:100%;min-height:50px;border:1px solid var(--border);border-radius:6px;padding:7px 9px;font:inherit;font-size:12.5px}
+.expand-detail{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;font-size:12px}
+.recipient-row{display:flex;justify-content:space-between;padding:3px 0}
+.recipient-outcome{font-weight:600}
+.outcome-sent{color:var(--green)}
+.outcome-failed{color:var(--red)}
+.outcome-skipped_opted_out, .outcome-skipped_no_phone{color:var(--muted)}
+
+.loading, .err-banner, .empty{font-size:13px;color:var(--muted);padding:20px 0;text-align:center}
+.err-banner{color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- ── Auth gate ── -->
+<div id="auth-gate">
+  <div class="signin-card">
+    <div class="signin-icon">📣</div>
+    <h2>Broadcast Messaging</h2>
+    <p>Sign in with your Adams Cameron Google account.</p>
+    <div class="signin-google">
+      <div id="g_id_onload"
+        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+        data-callback="handleGoogleSignIn"
+        data-auto_select="true">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">ACC</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">Broadcast Messaging</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./feedback.html?tool=broadcast-messaging">Feedback</a>
+      <a class="topbar-link" href="./index.html">← Tools</a>
+      <span class="topbar-user" id="topbar-user"></span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page-intro">
+      <h1>Broadcast Messaging</h1>
+      <p>Text a selected group of agents — the whole company, one or more offices, or a hand-picked list.</p>
+    </div>
+
+    <div class="consent-notice">SMS consent currently on file only discloses AC Pathfinder Coaching Program messaging — event/announcement/emergency categories are being sent under that same consent record pending a policy decision.</div>
+
+    <div id="denied" style="display:none" class="err-banner">Staff access required — this tool is for admin, manager, and office coordinator accounts.</div>
+
+    <div id="tabbed-app" style="display:none">
+      <div class="tabs">
+        <button class="tab active" id="tab-btn-compose" onclick="switchTab('compose')">Compose</button>
+        <button class="tab" id="tab-btn-approvals" style="display:none" onclick="switchTab('approvals')">Approval Queue<span class="tab-badge" id="approval-count" style="display:none"></span></button>
+        <button class="tab" id="tab-btn-history" onclick="switchTab('history')">History</button>
+      </div>
+
+      <!-- ── Compose ── -->
+      <div class="panel active" id="panel-compose">
+        <div id="coordinator-banner" class="coordinator-banner" style="display:none">Your broadcasts require manager approval before sending.</div>
+
+        <div class="card">
+          <div class="field">
+            <label>Category</label>
+            <select id="category-select"></select>
+          </div>
+
+          <div class="field">
+            <label>Send to</label>
+            <div class="scope-btns" id="scope-btns">
+              <button type="button" class="scope-btn active" id="scope-btn-all" onclick="setScope('all')">All Agents</button>
+              <button type="button" class="scope-btn" id="scope-btn-offices" onclick="setScope('offices')">Office(s)</button>
+              <button type="button" class="scope-btn" id="scope-btn-agents" onclick="setScope('agents')">Hand-picked</button>
+            </div>
+          </div>
+
+          <div class="field" id="offices-field" style="display:none">
+            <label>Offices</label>
+            <div class="office-grid" id="office-grid"><div class="loading">Loading offices…</div></div>
+          </div>
+
+          <div class="field" id="agents-field" style="display:none">
+            <label>Agents</label>
+            <div class="chip-list" id="agent-chips"></div>
+            <div class="typeahead-wrap">
+              <input type="text" id="agent-search" placeholder="Search by name or email…" oninput="filterAgentSearch()" onfocus="filterAgentSearch()">
+              <div class="typeahead-results" id="agent-typeahead" style="display:none"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Message</label>
+            <textarea id="message-text" maxlength="1600" placeholder="Type your message…" oninput="updateCharCount()"></textarea>
+            <div class="char-count" id="char-count">0 / 1600</div>
+            <div class="char-count">"ACC Messaging. Go to communication-preferences.html to control your settings. Reply STOP to unsubscribe." is appended automatically — no need to type it.</div>
+          </div>
+
+          <div id="preview-panel" class="preview-panel" style="display:none"></div>
+
+          <div class="actions">
+            <button class="btn btn-secondary" onclick="previewRecipients()">Preview recipients</button>
+            <button class="btn btn-primary" id="send-btn" onclick="sendBroadcast()">Send</button>
+          </div>
+          <div class="compose-status" id="compose-status"></div>
+        </div>
+      </div>
+
+      <!-- ── Approval Queue ── -->
+      <div class="panel" id="panel-approvals">
+        <div id="approvals-list"><div class="loading">Loading…</div></div>
+      </div>
+
+      <!-- ── History ── -->
+      <div class="panel" id="panel-history">
+        <div id="history-list"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────── CONFIG ─────────────────────── */
+const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
+const CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+const CATEGORIES = [
+  { key: 'company_events',       label: 'Company Events' },
+  { key: 'office_events',        label: 'Office Events' },
+  { key: 'presidents_update',    label: "President's Update" },
+  { key: 'office_announcements', label: 'Office Announcements' },
+  { key: 'emergency',            label: '🚨 Emergency Alert', adminOnly: true },
+];
+const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
+
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let myRole = null; // 'admin' | 'manager' | 'coordinator'
+
+let currentScope = 'all';
+let selectedOfficeIds = new Set();
+let selectedAgents = new Map(); // id -> {id, label}
+let agentsCache = null; // from GET /roster/agents, fetched once
+let historyDetailCache = {}; // campaignId -> detail
+
+/* ─────────────────────── AUTH ───────────────────────── */
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', init);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID, callback: handleGoogleSignIn,
+    auto_select: true, cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.querySelector('.g_id_signin'),
+    { theme: 'outline', size: 'large', width: 280 }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || '';
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ''; }
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await init();
+  } catch (e) { alert('Authentication error: ' + e.message); }
+}
+
+function authHeaders(extra) {
+  return Object.assign({ 'x-proxy-key': proxyKey, 'x-user-email': userEmail }, extra || {});
+}
+
+/* ─────────────────────── INIT ───────────────────────── */
+async function init() {
+  document.getElementById('topbar-user').textContent = userEmail;
+
+  try {
+    const r = await fetch(`${PROXY}/broadcast/me`, { headers: authHeaders() });
+    if (!r.ok) { document.getElementById('denied').style.display = 'block'; return; }
+    const data = await r.json();
+    myRole = data.role;
+  } catch (e) {
+    document.getElementById('denied').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('tabbed-app').style.display = 'block';
+  setupForRole();
+  await loadOffices();
+  switchTab('compose');
+  loadHistory();
+  if (myRole === 'admin' || myRole === 'manager') loadApprovalQueue();
+
+  fetch(`${PROXY}/log/visit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool: 'Broadcast Messaging', email: userEmail }),
+  }).catch(() => {});
+}
+
+function setupForRole() {
+  const sel = document.getElementById('category-select');
+  sel.innerHTML = CATEGORIES
+    .filter(c => !c.adminOnly || myRole === 'admin')
+    .map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('');
+
+  if (myRole === 'coordinator') {
+    document.getElementById('scope-btn-all').style.display = 'none';
+    document.getElementById('coordinator-banner').style.display = 'block';
+    setScope('offices');
+  }
+  if (myRole === 'admin' || myRole === 'manager') {
+    document.getElementById('tab-btn-approvals').style.display = '';
+  }
+}
+
+/* ─────────────────────── TABS ───────────────────────── */
+function switchTab(name) {
+  ['compose', 'approvals', 'history'].forEach(t => {
+    document.getElementById(`panel-${t}`).classList.toggle('active', t === name);
+    document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === name);
+  });
+}
+
+/* ─────────────────────── SCOPE PICKER ───────────────── */
+function setScope(type) {
+  currentScope = type;
+  document.querySelectorAll('.scope-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`scope-btn-${type}`);
+  if (btn) btn.classList.add('active');
+  document.getElementById('offices-field').style.display = type === 'offices' ? 'block' : 'none';
+  document.getElementById('agents-field').style.display = type === 'agents' ? 'block' : 'none';
+  document.getElementById('preview-panel').style.display = 'none';
+}
+
+async function loadOffices() {
+  const grid = document.getElementById('office-grid');
+  try {
+    const r = await fetch(`${PROXY}/broadcast/offices`, { headers: authHeaders() });
+    const offices = await r.json();
+    if (!r.ok) throw new Error(offices.error || 'Could not load offices');
+    if (!offices.length) { grid.innerHTML = '<div class="empty">No offices available.</div>'; return; }
+    grid.innerHTML = offices.map(o => `
+      <label class="office-check" id="office-check-${o.id}">
+        <input type="checkbox" value="${o.id}" onchange="toggleOffice(${o.id})">
+        ${esc(o.name)}
+      </label>`).join('');
+  } catch (e) {
+    grid.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function toggleOffice(id) {
+  if (selectedOfficeIds.has(id)) selectedOfficeIds.delete(id); else selectedOfficeIds.add(id);
+  document.getElementById(`office-check-${id}`).classList.toggle('checked', selectedOfficeIds.has(id));
+  document.getElementById('preview-panel').style.display = 'none';
+}
+
+/* ─────────────────────── AGENT TYPEAHEAD ────────────── */
+async function ensureAgentsCache() {
+  if (agentsCache) return agentsCache;
+  const r = await fetch(`${PROXY}/roster/agents`, { headers: authHeaders() });
+  agentsCache = await r.json();
+  if (!r.ok) { agentsCache = []; throw new Error(agentsCache.error || 'Could not load agents'); }
+  return agentsCache;
+}
+
+async function filterAgentSearch() {
+  const q = document.getElementById('agent-search').value.trim().toLowerCase();
+  const box = document.getElementById('agent-typeahead');
+  try {
+    const agents = await ensureAgentsCache();
+    if (!q) { box.style.display = 'none'; return; }
+    const matches = agents.filter(a =>
+      !selectedAgents.has(a.id) &&
+      (`${a.first_name} ${a.last_name}`.toLowerCase().includes(q) || (a.email || '').toLowerCase().includes(q))
+    ).slice(0, 20);
+    box.innerHTML = matches.length
+      ? matches.map(a => `
+          <div class="typeahead-row" onclick="addAgent(${a.id})">
+            ${esc(a.last_name)}, ${esc(a.first_name)}
+            <small>${esc(a.email || '')}${a.office_name ? ' — ' + esc(a.office_name) : ''}</small>
+          </div>`).join('')
+      : '<div class="typeahead-empty">No matches.</div>';
+    box.style.display = 'block';
+  } catch (e) {
+    box.innerHTML = `<div class="typeahead-empty">${esc(e.message)}</div>`;
+    box.style.display = 'block';
+  }
+}
+
+function addAgent(id) {
+  const agent = (agentsCache || []).find(a => a.id === id);
+  if (!agent) return;
+  selectedAgents.set(id, { id, label: `${agent.first_name} ${agent.last_name}` });
+  document.getElementById('agent-search').value = '';
+  document.getElementById('agent-typeahead').style.display = 'none';
+  renderAgentChips();
+  document.getElementById('preview-panel').style.display = 'none';
+}
+
+function removeAgent(id) {
+  selectedAgents.delete(id);
+  renderAgentChips();
+}
+
+function renderAgentChips() {
+  const wrap = document.getElementById('agent-chips');
+  wrap.innerHTML = [...selectedAgents.values()].map(a => `
+    <span class="chip">${esc(a.label)}<button type="button" class="chip-x" onclick="removeAgent(${a.id})">×</button></span>
+  `).join('');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.typeahead-wrap')) {
+    const box = document.getElementById('agent-typeahead');
+    if (box) box.style.display = 'none';
+  }
+});
+
+/* ─────────────────────── COMPOSE ────────────────────── */
+function updateCharCount() {
+  const len = document.getElementById('message-text').value.length;
+  document.getElementById('char-count').textContent = `${len} / 1600`;
+}
+
+function currentCampaignBody() {
+  const body = {
+    category: document.getElementById('category-select').value,
+    scope_type: currentScope,
+  };
+  if (currentScope === 'offices') body.scope_office_ids = [...selectedOfficeIds];
+  if (currentScope === 'agents') body.scope_agent_ids = [...selectedAgents.keys()];
+  return body;
+}
+
+async function previewRecipients() {
+  const panel = document.getElementById('preview-panel');
+  panel.style.display = 'block';
+  panel.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const body = currentCampaignBody();
+    if (currentScope === 'offices' && !body.scope_office_ids.length) throw new Error('Pick at least one office.');
+    if (currentScope === 'agents' && !body.scope_agent_ids.length) throw new Error('Pick at least one agent.');
+
+    const r = await fetch(`${PROXY}/broadcast/campaigns/preview`, {
+      method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Preview failed');
+
+    let names = data.names.slice(0, 25).join(', ');
+    if (data.names.length > 25) names += `, and ${data.names.length - 25} more`;
+    panel.innerHTML = `
+      <div class="counts">${data.eligible} will receive this text (of ${data.total} in scope)</div>
+      ${data.skippedOptedOut ? `<div>${data.skippedOptedOut} opted out of texts for this topic</div>` : ''}
+      ${data.skippedNoPhone ? `<div>${data.skippedNoPhone} have no phone number on file</div>` : ''}
+      ${names ? `<div class="names">${esc(names)}</div>` : ''}`;
+  } catch (e) {
+    panel.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+async function sendBroadcast() {
+  const statusEl = document.getElementById('compose-status');
+  const btn = document.getElementById('send-btn');
+  const message = document.getElementById('message-text').value.trim();
+  statusEl.textContent = ''; statusEl.className = 'compose-status';
+
+  try {
+    if (!message) throw new Error('Message cannot be empty.');
+    const body = Object.assign(currentCampaignBody(), { message });
+    if (currentScope === 'offices' && !selectedOfficeIds.size) throw new Error('Pick at least one office.');
+    if (currentScope === 'agents' && !selectedAgents.size) throw new Error('Pick at least one agent.');
+
+    btn.disabled = true; btn.textContent = 'Sending…';
+    const r = await fetch(`${PROXY}/broadcast/campaigns`, {
+      method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Send failed');
+
+    statusEl.className = 'compose-status ok';
+    statusEl.textContent = data.status === 'pending_approval'
+      ? 'Submitted — a manager will review before this goes out.'
+      : `Sent to ${data.sentCount} agent(s).${data.failedCount ? ` (${data.failedCount} failed)` : ''}`;
+
+    document.getElementById('message-text').value = '';
+    updateCharCount();
+    selectedOfficeIds.clear();
+    selectedAgents.clear();
+    renderAgentChips();
+    document.querySelectorAll('.office-check').forEach(el => { el.classList.remove('checked'); el.querySelector('input').checked = false; });
+    document.getElementById('preview-panel').style.display = 'none';
+    loadHistory();
+    if (myRole === 'admin' || myRole === 'manager') loadApprovalQueue();
+  } catch (e) {
+    statusEl.className = 'compose-status err';
+    statusEl.textContent = e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send';
+  }
+}
+
+/* ─────────────────────── APPROVAL QUEUE ─────────────── */
+async function loadApprovalQueue() {
+  const list = document.getElementById('approvals-list');
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns?status=pending_approval`, { headers: authHeaders() });
+    const rows = await r.json();
+    if (!r.ok) throw new Error(rows.error || 'Could not load approval queue');
+
+    document.getElementById('approval-count').style.display = rows.length ? '' : 'none';
+    document.getElementById('approval-count').textContent = rows.length;
+
+    list.innerHTML = rows.length ? rows.map(c => `
+      <div class="approval-card" id="approval-${c.id}">
+        <div class="row-top">
+          <div>
+            <div class="row-category">${esc(CATEGORY_LABEL[c.category] || c.category)}</div>
+            <div class="row-meta">${esc(scopeSummary(c))} · from ${esc(c.created_by_email)} · ${formatDate(c.created_at)}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="approveCampaign(${c.id})">Approve &amp; Send</button>
+            <button class="btn btn-danger btn-sm" onclick="showRejectBox(${c.id})">Reject</button>
+          </div>
+        </div>
+        <div class="row-message">${esc(c.message)}</div>
+        <div class="reject-box" id="reject-box-${c.id}" style="display:none">
+          <textarea id="reject-reason-${c.id}" placeholder="Reason (optional)…"></textarea>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn btn-secondary btn-sm" onclick="hideRejectBox(${c.id})">Cancel</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectCampaign(${c.id})">Confirm Reject</button>
+          </div>
+        </div>
+      </div>`).join('') : '<div class="empty">Nothing pending approval.</div>';
+  } catch (e) {
+    list.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function showRejectBox(id) { document.getElementById(`reject-box-${id}`).style.display = 'block'; }
+function hideRejectBox(id) { document.getElementById(`reject-box-${id}`).style.display = 'none'; }
+
+async function approveCampaign(id) {
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}/approve`, { method: 'PATCH', headers: authHeaders() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Approve failed');
+    loadApprovalQueue();
+    loadHistory();
+  } catch (e) { alert('Could not approve: ' + e.message); }
+}
+
+async function rejectCampaign(id) {
+  try {
+    const reason = document.getElementById(`reject-reason-${id}`).value.trim();
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}/reject`, {
+      method: 'PATCH', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ reason }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Reject failed');
+    loadApprovalQueue();
+    loadHistory();
+  } catch (e) { alert('Could not reject: ' + e.message); }
+}
+
+/* ─────────────────────── HISTORY ────────────────────── */
+async function loadHistory() {
+  const list = document.getElementById('history-list');
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns?limit=100`, { headers: authHeaders() });
+    const rows = await r.json();
+    if (!r.ok) throw new Error(rows.error || 'Could not load history');
+
+    list.innerHTML = rows.length ? rows.map(c => `
+      <div class="history-row" id="history-${c.id}">
+        <div class="row-top">
+          <div>
+            <div class="row-category">${esc(CATEGORY_LABEL[c.category] || c.category)}</div>
+            <div class="row-meta">${esc(scopeSummary(c))} · from ${esc(c.created_by_email)} · ${formatDate(c.created_at)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${statusBadge(c)}
+            <button class="btn btn-secondary btn-sm" onclick="toggleHistoryDetail(${c.id})">Details</button>
+          </div>
+        </div>
+        <div class="row-message">${esc(c.message)}</div>
+        <div class="expand-detail" id="detail-${c.id}" style="display:none"></div>
+      </div>`).join('') : '<div class="empty">No broadcasts sent yet.</div>';
+  } catch (e) {
+    list.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+async function toggleHistoryDetail(id) {
+  const el = document.getElementById(`detail-${id}`);
+  if (el.style.display === 'block') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (historyDetailCache[id]) { renderHistoryDetail(el, historyDetailCache[id]); return; }
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}`, { headers: authHeaders() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not load detail');
+    historyDetailCache[id] = data;
+    renderHistoryDetail(el, data);
+  } catch (e) {
+    el.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function renderHistoryDetail(el, data) {
+  if (!data.recipients || !data.recipients.length) {
+    el.innerHTML = '<div class="empty">No recipient log yet.</div>';
+    return;
+  }
+  el.innerHTML = data.recipients.map(r => `
+    <div class="recipient-row">
+      <span>${esc(r.first_name || '')} ${esc(r.last_name || '')}</span>
+      <span class="recipient-outcome outcome-${r.outcome}">${outcomeLabel(r.outcome)}</span>
+    </div>`).join('');
+}
+
+function outcomeLabel(o) {
+  return { sent: 'Sent', failed: 'Failed', skipped_opted_out: 'Opted out', skipped_no_phone: 'No phone' }[o] || o;
+}
+
+function statusBadge(c) {
+  const map = {
+    pending_approval: ['badge-pending', 'Pending approval'],
+    sent: ['badge-sent', `Sent (${c.sent_count ?? 0}${c.failed_count ? `, ${c.failed_count} failed` : ''})`],
+    send_failed: ['badge-failed', 'Send failed'],
+    rejected: ['badge-rejected', 'Rejected'],
+  };
+  const [cls, label] = map[c.status] || ['badge-pending', c.status];
+  return `<span class="badge ${cls}">${esc(label)}</span>`;
+}
+
+function scopeSummary(c) {
+  if (c.scope_type === 'all') return 'All Agents';
+  if (c.scope_type === 'offices') return `${(c.scope_office_ids || []).length} office(s)`;
+  return `${(c.scope_agent_ids || []).length} hand-picked agent(s)`;
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/* ─────────────────────── UTIL ───────────────────────── */
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+</script>
+
+</body>
+</html>
