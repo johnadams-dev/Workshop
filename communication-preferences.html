@@ -50,6 +50,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topic-desc{font-size:12px;color:var(--muted);margin-bottom:4px;line-height:1.5}
 .topic-notice{font-size:11.5px;color:var(--amber);font-weight:600;margin-bottom:10px}
 
+/* Emergency card — informational only, no toggle, deliberately set apart
+   from the preference cards below it so it doesn't read as "just another
+   row you can turn off." */
+.emergency-card{background:var(--surface);border:1px solid var(--navy);border-left:4px solid var(--navy);border-radius:10px;padding:18px 22px;margin-bottom:24px}
+.emergency-always-on{font-size:11.5px;color:var(--navy);font-weight:600;margin-top:6px}
+
 .pref-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border);gap:1rem}
 .topic-desc + .pref-row, .topic-notice + .pref-row{border-top:none;padding-top:6px}
 .pref-info{}
@@ -130,8 +136,8 @@ const CLIENT_ID   = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleus
 // captured now for when their delivery is built out.
 const TOPICS = [
   { key: 'pathfinder',           label: 'Pathfinder',            desc: 'Weekly business-planning check-in reminders and coaching notifications.', wired: true },
-  { key: 'company_events',       label: 'Company Events',        desc: 'Company-wide events — annual meetings, awards, celebrations.', wired: false },
-  { key: 'office_events',        label: 'Office Events',         desc: 'Events specific to your office.', wired: false },
+  { key: 'company_events',       label: 'Company Events',        desc: "Company-wide events and trainings — Annual Meeting, President's Club, Legacy Club, Spring Fling, Christmas Party, and similar.", wired: false },
+  { key: 'office_events',        label: 'Office Events',         desc: 'Events and trainings specific to your office — open houses, charity events, office parties.', wired: false },
   { key: 'presidents_update',    label: "President's Update",    desc: "Regular updates from the company president.", wired: false },
   { key: 'office_announcements', label: 'Office Announcements',  desc: 'General announcements from your office.', wired: false },
 ];
@@ -225,9 +231,20 @@ async function loadPreferences() {
   }
 }
 
+// Emergency alerts aren't a preference — there's no agent_comms_prefs row
+// for this at all (nothing to store: it's the same for every agent, always
+// on). Shown first and set visually apart from the real toggleable topics
+// below it, so it reads as a statement of fact, not one more row to manage.
+const EMERGENCY_CARD_HTML = `
+  <div class="emergency-card">
+    <div class="topic-title">🚨 Emergency Alerts</div>
+    <div class="topic-desc">Hurricane warnings, immediate danger at or around an office, and other safety alerts.</div>
+    <div class="emergency-always-on">Always sent by text — this can't be turned off, regardless of your choices below.</div>
+  </div>`;
+
 function renderTopics() {
   const wrap = document.getElementById('topics-wrap');
-  wrap.innerHTML = TOPICS.map(t => `
+  wrap.innerHTML = EMERGENCY_CARD_HTML + TOPICS.map(t => `
     <div class="topic-card">
       <div class="topic-title">${esc(t.label)}</div>
       <div class="topic-desc">${esc(t.desc)}</div>
