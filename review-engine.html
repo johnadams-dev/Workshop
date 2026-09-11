@@ -1685,16 +1685,22 @@ function renderTestimonials(rows) {
     const suggestedNote = (!t.agent_id && t.suggested_agent_id)
       ? `<div style="font-size:.72rem;color:var(--amber)">suggested: ${esc(t.suggested_agent_first_name)} ${esc(t.suggested_agent_last_name)}</div>` : "";
     const actions = t.status === "pending"
-      ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'approved',${t.agent_id || "null"})">Approve</button>
-         <button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null)">Reject</button>`
+      ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'approved',${t.agent_id || "null"},${t.suggested_agent_id || "null"})">Approve</button>
+         <button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null,null)">Reject</button>`
       : t.status === "approved"
-        ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null)">Reject</button>`
+        ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null,null)">Reject</button>`
         : "";
+    // DeltaNet won't accept a blank rating -- assume 5 stars when none was
+    // captured, same default the export applies; shown greyed out so staff
+    // can tell it's an assumption, not something the customer actually said.
+    const ratingCell = t.rating != null
+      ? "★".repeat(t.rating)
+      : `<span style="color:var(--text-dim)" title="No rating captured -- exports as 5 stars">★★★★★</span>`;
     return `
       <tr>
         <td>${esc(TESTIMONIAL_SOURCE_LABEL[t.source] || t.source)}</td>
         <td>${esc(name)}</td>
-        <td>${t.rating != null ? "★".repeat(t.rating) : "—"}</td>
+        <td>${ratingCell}</td>
         <td>${t.review_date ? esc(String(t.review_date).slice(0, 10)) : "—"}</td>
         <td style="max-width:320px;white-space:normal">${esc((t.content || "").slice(0, 220))}${(t.content || "").length > 220 ? "…" : ""}</td>
         <td>
@@ -1733,13 +1739,22 @@ async function setTestimonialAgent(id, agentId) {
   loadTestimonials();
 }
 
-async function setTestimonialStatus(id, status, currentAgentId) {
-  if (status === "approved" && !currentAgentId) {
-    alert("Pick an agent for this testimonial before approving it.");
-    return;
+async function setTestimonialStatus(id, status, currentAgentId, suggestedAgentId) {
+  const body = { status };
+  if (status === "approved") {
+    // A suggested-but-not-yet-clicked agent shows selected in the dropdown
+    // already, so approving without touching it should just confirm that
+    // suggestion, not block the approval -- adopt it here rather than
+    // requiring a redundant manual re-pick of the same agent.
+    const effectiveAgentId = currentAgentId || suggestedAgentId || null;
+    if (effectiveAgentId) {
+      body.agent_id = effectiveAgentId;
+    } else if (!confirm("No agent was identified for this review. Approve it as a general company review?")) {
+      return;
+    }
   }
   try {
-    await PUT(`/review/testimonials/${id}`, { status });
+    await PUT(`/review/testimonials/${id}`, body);
     loadTestimonials();
   } catch (e) {
     alert("Couldn't update: " + e.message);
