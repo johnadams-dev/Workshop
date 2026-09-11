@@ -1653,7 +1653,12 @@ let FROM_NAME_OPTIONS = [];
 let _agentsCache = null;
 async function getAgentsList() {
   if (_agentsCache) return _agentsCache;
-  _agentsCache = await GET("/roster/agents");
+  const agents = await GET("/roster/agents");
+  // /roster/agents itself orders by last name (a directory convention) --
+  // sorted by first name here instead, scoped to just this dropdown, since
+  // staff matching a testimonial look for the first name mentioned in the
+  // review text, not the last name.
+  _agentsCache = agents.slice().sort((a, b) => (a.first_name || "").localeCompare(b.first_name || ""));
   return _agentsCache;
 }
 
