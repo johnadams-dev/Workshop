@@ -361,6 +361,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
     <button class="tab-btn" onclick="switchTab('recipients')">Recipients</button>
     <button class="tab-btn" onclick="switchTab('variants')">A/B Tests</button>
     <button class="tab-btn" onclick="switchTab('campaigns')">Campaigns</button>
+    <button class="tab-btn" onclick="switchTab('testimonials')">Testimonials</button>
     <button class="tab-btn" onclick="switchTab('settings')">Settings</button>
   </div>
 
@@ -531,6 +532,50 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
     </div>
 
     <!-- ── Settings tab ── -->
+    <!-- ── Testimonials tab ── -->
+    <div id="tab-testimonials" class="tab-panel">
+      <div class="section-header">
+        <h2>Testimonials</h2>
+        <span style="font-size:.75rem;color:var(--text-muted)">Pull reviews from Google/Zillow/email, confirm the agent, approve, then export a CSV in DeltaNet's import format.</span>
+      </div>
+
+      <div class="filters">
+        <button class="btn btn-ghost btn-sm" onclick="pullTestimonials('google')">⬇ Pull Google</button>
+        <button class="btn btn-ghost btn-sm" onclick="pullTestimonials('zillow')">⬇ Pull Zillow</button>
+        <button class="btn btn-ghost btn-sm" onclick="pullTestimonials('email')">⬇ Check Email</button>
+        <button class="btn btn-ghost btn-sm" onclick="runDedupCheck()">🔍 Check for Duplicates</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="openAddTestimonialModal()">+ Add Testimonial</button>
+      </div>
+      <div class="filters" style="margin-bottom:0.75rem">
+        <select id="testimonial-status-filter" onchange="loadTestimonials()">
+          <option value="pending" selected>Pending (needs agent confirmation)</option>
+          <option value="approved">Approved (ready to export)</option>
+          <option value="exported">Exported</option>
+          <option value="rejected">Rejected</option>
+          <option value="">All</option>
+        </select>
+        <span id="testimonial-pull-status" style="font-size:.8rem;color:var(--text-muted)"></span>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="downloadTestimonialsCsv()">⬇ Download DeltaNet CSV</button>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Customer</th>
+              <th>Rating</th>
+              <th>Date</th>
+              <th>Content</th>
+              <th>Agent</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="testimonials-body"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="tab-settings" class="tab-panel">
       <div class="section-header"><h2>Review Link Settings</h2></div>
       <p style="color:var(--muted);margin-bottom:1.5rem;font-size:.93rem">
@@ -551,6 +596,29 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
             <label style="display:block;font-weight:600;margin-bottom:.3rem">Zillow Reviews URL</label>
             <input id="setting-zillow" type="url" class="edit-input" style="width:100%"
                    placeholder="https://www.zillow.com/profile/AdamsCameronandCo#reviews">
+          </div>
+        </div>
+
+        <!-- Testimonials pipeline -->
+        <div>
+          <h3 style="font-size:1rem;margin:0 0 .35rem">Testimonials Pipeline</h3>
+          <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
+            Used by the Testimonials tab's "Pull Google" and "Check Email" buttons.
+          </p>
+          <div style="display:flex;flex-direction:column;gap:.9rem">
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">
+                Google Business Profile Location
+                <span style="font-weight:400;font-size:.85rem;color:var(--muted)">— format accounts/{accountId}/locations/{locationId}</span>
+              </label>
+              <input id="setting-testimonials-gbp-location" type="text" class="edit-input" style="width:100%"
+                     placeholder="accounts/123456789/locations/987654321">
+            </div>
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">Gmail Label for Testimonial Emails</label>
+              <input id="setting-testimonials-gmail-label" type="text" class="edit-input" style="width:100%"
+                     placeholder="Reviews">
+            </div>
           </div>
         </div>
 
@@ -712,6 +780,37 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
   </div>
 </div>
 
+<!-- ── Add Testimonial modal ── -->
+<div id="add-testimonial-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Add Testimonial</h3>
+    <label>Source</label>
+    <select id="new-testimonial-source">
+      <option value="facebook">Facebook</option>
+      <option value="google">Google</option>
+      <option value="zillow">Zillow</option>
+      <option value="manual">Other / Manual</option>
+    </select>
+    <label>Customer First Name</label>
+    <input type="text" id="new-testimonial-first">
+    <label>Customer Last Name</label>
+    <input type="text" id="new-testimonial-last">
+    <label>Rating (1-5, optional)</label>
+    <input type="number" id="new-testimonial-rating" min="1" max="5">
+    <label>Date (optional)</label>
+    <input type="date" id="new-testimonial-date">
+    <label>Agent (pick if known)</label>
+    <select id="new-testimonial-agent"><option value="">— unknown —</option></select>
+    <label>Testimonial Text</label>
+    <textarea id="new-testimonial-content" placeholder="Paste the review text…"></textarea>
+    <span id="add-testimonial-status" style="font-size:.78rem;color:var(--text-muted)"></span>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="closeAddTestimonialModal()">Cancel</button>
+      <button class="btn btn-amber btn-sm" onclick="submitManualTestimonial()">Add</button>
+    </div>
+  </div>
+</div>
+
 <!-- Preview modal -->
 <div id="preview-modal" class="modal-overlay">
   <div class="modal-box" style="width:min(680px, 92vw);max-height:88vh;display:flex;flex-direction:column">
@@ -854,11 +953,12 @@ function fmtMonth(d) {
 // ── Tabs ────────────────────────────────────────────────────────────────────────
 
 const TAB_LOADERS = {
-  funnel:     loadFunnel,
-  recipients: loadRecipientsTab,
-  variants:   loadVariantsTab,
-  campaigns:  loadCampaigns,
-  settings:   loadSettings,
+  funnel:       loadFunnel,
+  recipients:   loadRecipientsTab,
+  variants:     loadVariantsTab,
+  campaigns:    loadCampaigns,
+  testimonials: loadTestimonials,
+  settings:     loadSettings,
 };
 const _loaded = {};
 const _stepTemplates = {}; // step_id -> that step's current templates, cached at render time so
@@ -1543,6 +1643,186 @@ async function sendPreviewTest() {
 // to build each template's "From" dropdown from the same configured list.
 let FROM_NAME_OPTIONS = [];
 
+// ── Testimonials tab ────────────────────────────────────────────────────────
+
+let _agentsCache = null;
+async function getAgentsList() {
+  if (_agentsCache) return _agentsCache;
+  _agentsCache = await GET("/roster/agents");
+  return _agentsCache;
+}
+
+function agentOptionsHtml(selectedId) {
+  return (_agentsCache || []).map(a =>
+    `<option value="${a.id}" ${String(a.id) === String(selectedId) ? "selected" : ""}>${esc(a.first_name)} ${esc(a.last_name)}</option>`
+  ).join("");
+}
+
+const TESTIMONIAL_SOURCE_LABEL = { google: "Google", zillow: "Zillow", facebook: "Facebook", email: "Email", manual: "Manual" };
+
+async function loadTestimonials() {
+  const tbody = document.getElementById("testimonials-body");
+  tbody.innerHTML = `<tr><td colspan="7" class="loading">Loading…</td></tr>`;
+  try {
+    await getAgentsList();
+    const status = document.getElementById("testimonial-status-filter").value;
+    const data = await GET(`/review/testimonials${status ? `?status=${encodeURIComponent(status)}` : ""}`);
+    renderTestimonials(data.testimonials || []);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red)">Failed to load: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderTestimonials(rows) {
+  const tbody = document.getElementById("testimonials-body");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);padding:1rem">Nothing here.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(t => {
+    const name = [t.customer_first_name, t.customer_last_name].filter(Boolean).join(" ") || "—";
+    const selectedAgent = t.agent_id || t.suggested_agent_id || "";
+    const suggestedNote = (!t.agent_id && t.suggested_agent_id)
+      ? `<div style="font-size:.72rem;color:var(--amber)">suggested: ${esc(t.suggested_agent_first_name)} ${esc(t.suggested_agent_last_name)}</div>` : "";
+    const actions = t.status === "pending"
+      ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'approved',${t.agent_id || "null"})">Approve</button>
+         <button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null)">Reject</button>`
+      : t.status === "approved"
+        ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null)">Reject</button>`
+        : "";
+    return `
+      <tr>
+        <td>${esc(TESTIMONIAL_SOURCE_LABEL[t.source] || t.source)}</td>
+        <td>${esc(name)}</td>
+        <td>${t.rating != null ? "★".repeat(t.rating) : "—"}</td>
+        <td>${t.review_date ? esc(String(t.review_date).slice(0, 10)) : "—"}</td>
+        <td style="max-width:320px;white-space:normal">${esc((t.content || "").slice(0, 220))}${(t.content || "").length > 220 ? "…" : ""}</td>
+        <td>
+          <select onchange="setTestimonialAgent(${t.id}, this.value)" style="width:100%">
+            <option value="">— unassigned —</option>
+            ${agentOptionsHtml(selectedAgent)}
+          </select>
+          ${suggestedNote}
+        </td>
+        <td style="white-space:nowrap">${actions}</td>
+      </tr>`;
+  }).join("");
+}
+
+async function pullTestimonials(source) {
+  const status = document.getElementById("testimonial-pull-status");
+  status.textContent = "Pulling…";
+  try {
+    const result = await POST(`/review/testimonials/pull/${source}`, {});
+    status.textContent = `Added ${result.added}, skipped ${result.skipped} (already had ${result.skipped} or not testimonial-shaped).`;
+    loadTestimonials();
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+}
+
+async function setTestimonialAgent(id, agentId) {
+  // Reload after saving (not just on failure) — the Approve button embeds
+  // the row's agent_id at render time, so it needs a fresh render to reflect
+  // whatever was just picked here before it can be trusted.
+  try {
+    await PUT(`/review/testimonials/${id}`, { agent_id: agentId ? parseInt(agentId, 10) : null });
+  } catch (e) {
+    alert("Couldn't save agent: " + e.message);
+  }
+  loadTestimonials();
+}
+
+async function setTestimonialStatus(id, status, currentAgentId) {
+  if (status === "approved" && !currentAgentId) {
+    alert("Pick an agent for this testimonial before approving it.");
+    return;
+  }
+  try {
+    await PUT(`/review/testimonials/${id}`, { status });
+    loadTestimonials();
+  } catch (e) {
+    alert("Couldn't update: " + e.message);
+  }
+}
+
+async function runDedupCheck() {
+  const status = document.getElementById("testimonial-pull-status");
+  status.textContent = "Checking against DeltaNet…";
+  try {
+    const result = await GET("/review/testimonials/dedup-check");
+    status.textContent = result.flagged.length
+      ? `${result.flagged.length} of ${result.checked} may already be in DeltaNet — check the console for ids.`
+      : `Checked ${result.checked} — no likely duplicates found.`;
+    if (result.flagged.length) console.log("Likely-duplicate testimonials:", result.flagged);
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+}
+
+async function downloadTestimonialsCsv() {
+  const status = document.getElementById("testimonial-pull-status");
+  try {
+    const res = await fetch(`${PROXY}/review/testimonials/export.csv`, {
+      headers: { "x-proxy-key": proxyKey, "x-user-email": userEmail },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || res.statusText);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `deltanet-testimonials-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    loadTestimonials();
+  } catch (e) {
+    status.textContent = "Export failed: " + e.message;
+  }
+}
+
+async function openAddTestimonialModal() {
+  await getAgentsList();
+  document.getElementById("new-testimonial-source").value = "facebook";
+  document.getElementById("new-testimonial-first").value = "";
+  document.getElementById("new-testimonial-last").value = "";
+  document.getElementById("new-testimonial-rating").value = "";
+  document.getElementById("new-testimonial-date").value = "";
+  document.getElementById("new-testimonial-content").value = "";
+  document.getElementById("new-testimonial-agent").innerHTML = `<option value="">— unknown —</option>${agentOptionsHtml()}`;
+  document.getElementById("add-testimonial-status").textContent = "";
+  document.getElementById("add-testimonial-modal").classList.add("open");
+}
+function closeAddTestimonialModal() {
+  document.getElementById("add-testimonial-modal").classList.remove("open");
+}
+async function submitManualTestimonial() {
+  const status = document.getElementById("add-testimonial-status");
+  const content = document.getElementById("new-testimonial-content").value.trim();
+  if (!content) { status.textContent = "Testimonial text is required."; return; }
+  const agentVal = document.getElementById("new-testimonial-agent").value;
+  status.textContent = "Saving…";
+  try {
+    await POST("/review/testimonials", {
+      source: document.getElementById("new-testimonial-source").value,
+      customer_first_name: document.getElementById("new-testimonial-first").value.trim() || null,
+      customer_last_name:  document.getElementById("new-testimonial-last").value.trim()  || null,
+      rating:      document.getElementById("new-testimonial-rating").value ? parseInt(document.getElementById("new-testimonial-rating").value, 10) : null,
+      review_date: document.getElementById("new-testimonial-date").value || null,
+      agent_id:    agentVal ? parseInt(agentVal, 10) : null,
+      content,
+    });
+    closeAddTestimonialModal();
+    loadTestimonials();
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+}
+
 async function loadSettings() {
   try {
     const data = await getReviewSettings();
@@ -1553,6 +1833,8 @@ async function loadSettings() {
     document.getElementById("setting-email-tagline").value   = data.email_tagline   || "";
     document.getElementById("setting-email-address").value   = data.email_address   || "";
     document.getElementById("setting-email-phone").value     = data.email_phone     || "";
+    document.getElementById("setting-testimonials-gbp-location").value = data.testimonials_gbp_location || "";
+    document.getElementById("setting-testimonials-gmail-label").value  = data.testimonials_gmail_label  || "";
 
     const tbody = document.getElementById("office-google-body");
     if (!data.offices || !data.offices.length) {
@@ -1653,6 +1935,8 @@ async function saveSettings() {
       email_phone:       document.getElementById("setting-email-phone").value.trim()      || null,
       from_name_options: fromNameOptions,
       officeGoogleUrls,
+      testimonials_gbp_location: document.getElementById("setting-testimonials-gbp-location").value.trim() || null,
+      testimonials_gmail_label:  document.getElementById("setting-testimonials-gmail-label").value.trim()  || null,
     });
     FROM_NAME_OPTIONS = fromNameOptions;
     // Keep the Recipients tab's "check for reviews" links in sync — without
