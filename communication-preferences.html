@@ -132,13 +132,21 @@ const CLIENT_ID   = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleus
 // Topic metadata lives here, not in the database — see
 // migrations/add_agent_comms_prefs.sql. wiredEmail/wiredSms means a real
 // send path already checks that specific channel's preference. Email for
-// company_events/presidents_update/office_events now really is wired
-// (2026-09) — those three map onto Google Groups the company already runs
-// (event-info@, presidentsupdate@, and each office's own onboarding group),
-// synced by agent-comms-routes.js via the Directory API's delivery_settings
-// (flips a member between "Each email" and "No email" — never adds/removes
-// membership on its own). SMS has no such backing for any of these three —
-// Google Groups only ever delivers by email — so it stays unwired.
+// company_events/presidents_update/office_events (2026-09) maps onto Google
+// Groups the company already runs (event-info@, presidentsupdate@, and each
+// office's own onboarding group), synced by agent-comms-routes.js via the
+// Directory API's delivery_settings (flips a member between "Each email"
+// and "No email" — never adds/removes membership on its own).
+//
+// SMS for all four topics (2026-09, broadcast-routes.js) is wired to a
+// DIFFERENT, independent system: Broadcast Messaging, a separate one-off
+// text-campaign tool staff use to send alerts. It reads this same topic+sms
+// preference row to decide whether to include an agent in a given
+// broadcast — Google Groups never sends a text message at all, so an
+// agent's email and SMS toggles for the same topic genuinely control two
+// different message sources, not two paths to the same message. (Emergency
+// broadcasts bypass this preference entirely and always reach every agent
+// with a phone number on file.)
 //
 // office_events and office_announcements are presented as one merged
 // "Office Updates" toggle (mirrorKey) because they turned out to point at
@@ -150,11 +158,13 @@ const CLIENT_ID   = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleus
 // row).
 const TOPICS = [
   { key: 'pathfinder',        label: 'Pathfinder',         desc: 'Weekly business-planning check-in reminders and coaching notifications.', wiredEmail: true, wiredSms: true },
-  { key: 'company_events',    label: 'Company Events',     desc: "Company-wide events and trainings — Annual Meeting, President's Club, Legacy Club, Spring Fling, Christmas Party, and similar.", wiredEmail: true, wiredSms: false },
-  { key: 'office_events', mirrorKey: 'office_announcements', label: 'Office Updates', desc: 'Events, trainings, and general announcements specific to your office.', wiredEmail: true, wiredSms: false },
-  { key: 'presidents_update', label: "President's Update",  desc: "Regular updates from the company president.", wiredEmail: true, wiredSms: false },
+  { key: 'company_events',    label: 'Company Events',     desc: "Company-wide events and trainings — Annual Meeting, President's Club, Legacy Club, Spring Fling, Christmas Party, and similar.", wiredEmail: true, wiredSms: true },
+  { key: 'office_events', mirrorKey: 'office_announcements', label: 'Office Updates', desc: 'Events, trainings, and general announcements specific to your office.', wiredEmail: true, wiredSms: true },
+  { key: 'presidents_update', label: "President's Update",  desc: "Regular updates from the company president.", wiredEmail: true, wiredSms: true },
 ];
-const NOT_WIRED_NOTICE = 'Not yet active for text messages — managed by email only right now.';
+// No topic is currently unwired on either channel, so this never renders —
+// kept for whenever a future topic ships with a channel not wired yet.
+const NOT_WIRED_NOTICE = 'Not yet active for this channel — check back soon.';
 
 let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
