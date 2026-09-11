@@ -613,6 +613,11 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               </label>
               <input id="setting-testimonials-gbp-location" type="text" class="edit-input" style="width:100%"
                      placeholder="accounts/123456789/locations/987654321">
+              <div style="display:flex;align-items:center;gap:.6rem;margin-top:.4rem">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="lookupGbpLocations()">🔍 Look up my locations</button>
+                <span id="gbp-lookup-status" style="font-size:.78rem;color:var(--text-muted)"></span>
+              </div>
+              <div id="gbp-lookup-results"></div>
             </div>
             <div>
               <label style="display:block;font-weight:600;margin-bottom:.3rem">Gmail Label for Testimonial Emails</label>
@@ -1833,6 +1838,29 @@ async function submitManualTestimonial() {
     });
     closeAddTestimonialModal();
     loadTestimonials();
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+}
+
+async function lookupGbpLocations() {
+  const status = document.getElementById("gbp-lookup-status");
+  const results = document.getElementById("gbp-lookup-results");
+  status.textContent = "Looking up…";
+  results.innerHTML = "";
+  try {
+    const data = await GET("/review/testimonials/gbp-locations");
+    if (!data.locations.length) {
+      status.textContent = "No locations found for this Google account.";
+      return;
+    }
+    status.textContent = `Found ${data.locations.length}. Click one to use it:`;
+    results.innerHTML = data.locations.map(l => `
+      <div style="padding:.4rem .6rem;margin-top:.3rem;background:var(--ink-light);border:1px solid var(--ink-border);border-radius:var(--r);cursor:pointer;font-size:.82rem"
+           onclick="document.getElementById('setting-testimonials-gbp-location').value='${l.locationResourceName}'">
+        <strong>${esc(l.title)}</strong><br>
+        <span style="color:var(--text-muted);font-family:var(--mono, monospace)">${esc(l.locationResourceName)}</span>
+      </div>`).join("");
   } catch (e) {
     status.textContent = "Error: " + e.message;
   }
