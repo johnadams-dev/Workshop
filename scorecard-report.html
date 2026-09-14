@@ -442,9 +442,14 @@ function trendDelta(pts, targetDirection) {
 // ── Goal column — inline set/edit, manager-only (page itself is manager-gated) ──
 function renderGoalCell(m) {
   if (m.target_value == null || !m.target_direction || m.target_direction === "none") {
+    if (m.derived) return `<span class="goal-none">No goal</span>`;
     return `<span class="goal-none">No goal</span> <button class="btn btn-sm" onclick="openGoalEdit('${m.metric_key}')">Set</button>`;
   }
   const arrow = m.target_direction === "above" ? "≥" : "≤";
+  // Derived rows (Added/Terminated/Lost %, computed from other metrics —
+  // see the trend endpoint) have no scr_metric_catalog row of their own to
+  // PATCH a goal onto, so their target is fixed and not editable here.
+  if (m.derived) return `<span class="goal-set">${arrow} ${fmtValue(m.target_value, m.unit)}</span>`;
   return `<span class="goal-set">${arrow} ${fmtValue(m.target_value, m.unit)}</span> <button class="btn btn-sm" onclick="openGoalEdit('${m.metric_key}')">Edit</button>`;
 }
 
