@@ -6684,51 +6684,6 @@ async function cvBuildPrintPages(indices) {
   }
 }
 
-// ── Log session ──
-async function cvSaveSession() {
-  if (!cvQueue.length) { cvToast('⚠', 'Add at least one property first.'); return; }
-  const date = document.getElementById('cv-date').value;
-  if (!date) { cvToast('⚠', 'Set a caravan date first.'); return; }
-  const btn    = document.getElementById('cv-save-btn');
-  const status = document.getElementById('cv-save-status');
-  btn.disabled = true;
-  status.style.display = 'block';
-  status.textContent   = 'Logging…';
-  const body = {
-    caravan_date: date,
-    listings: cvQueue.map((item, i) => ({
-      sort_order:         i + 1,
-      mls_id:             item.mlsId             || null,
-      address:            item.addr              || item.fullAddr,
-      city:               item.city              || null,
-      price:              item.price             || null,
-      entry_instructions: item.entryInstructions || null,
-      agent_comments:     item.agentComments     || null,
-    })),
-  };
-  try {
-    const res = await fetch(`${PROXY}/daily-desk/caravan-sessions`, {
-      method:  'POST',
-      headers: { ...cvHeaders(), 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    });
-    if (res.ok) {
-      status.style.color = 'var(--green)';
-      status.textContent = '✓ Caravan logged for ' + (cvCaravanDate() || date) + ' (' + cvQueue.length + ' properties).';
-      cvToast('✓', 'Caravan session logged.');
-    } else {
-      const err = await res.json().catch(() => ({}));
-      status.style.color = 'var(--text-muted)';
-      status.textContent = '⚠ Could not log (server: ' + (err.error || res.status) + '). You can still print.';
-    }
-  } catch (e) {
-    status.style.color = 'var(--text-muted)';
-    status.textContent = '⚠ Network error — session not logged. You can still print.';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 // ── Init: default caravan date to next Tuesday, then load from DB ──
 function cvInitDate() {
   const el = document.getElementById('cv-date');
