@@ -923,7 +923,26 @@ async function loadListingPhotosAndGoToCurate() {
     const { listing } = await GET(`/camerons-stage/listing/${encodeURIComponent(STATE.mlsId)}`);
     if (!listing) { toast('Could not find that listing in DeltaNet.'); return; }
     STATE.deltaListingId = listing._delta_listing_id || null;
-    if (!STATE.address) STATE.address = listing.UnparsedAddress || listing.Address || listing.address || listing.StreetAddress || ('MLS #' + STATE.mlsId);
+    if (!STATE.address) {
+      // Same unit-number fallback chain used server-side for listing_cache.
+      // raw_json (daily-desk-routes.js, camerons-stage-routes.js) -- this
+      // object is the same raw DeltaNet shape, just fetched directly by MLS#
+      // instead of via the cache. DeltaNet's own address field (and RESO's
+      // UnitNumber, in case this ever comes back through an external board)
+      // generally don't include a condo/unit number on their own. Same
+      // three-signal "does this address already show a unit" guard as the
+      // server-side appendUnit() helper (exact substring, a bare "#", or a
+      // trailing token with a digit in it) -- verified live 2026-09-18 that
+      // DeltaNet's unit_number isn't reliable enough alone to tell "no unit
+      // shown yet" from "unit shown, just differently than DeltaNet's raw
+      // value" (a trailing-zero-style quirk, or a wholly different code).
+      const rawAddr = listing.UnparsedAddress || listing.Address || listing.address || listing.StreetAddress || ('MLS #' + STATE.mlsId);
+      const unit = listing.unit_number || listing.unit || listing.address2 || listing.apt_number || listing.apt || listing.UnitNumber || '';
+      const rawAddrTrimmed = (rawAddr || '').trim();
+      const lastToken = rawAddrTrimmed.split(/\s+/).pop() || '';
+      const alreadyShowsUnit = rawAddrTrimmed.includes(unit) || rawAddrTrimmed.includes('#') || /\d/.test(lastToken);
+      STATE.address = (unit && rawAddr && !alreadyShowsUnit) ? `${rawAddr} #${unit}` : rawAddr;
+    }
     if (!STATE.city) STATE.city = listing.city_cleaned || listing.City || listing.city || '';
     document.getElementById('curateAddress').textContent = STATE.address;
     STATE.photos = (listing.photo_data || []).map((p, i) => ({
