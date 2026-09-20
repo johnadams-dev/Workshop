@@ -117,12 +117,13 @@ tr:last-child td{border-bottom:none}
 .design-thumb img{display:block;width:100%;height:auto}
 .design-thumb.active{border-color:var(--blue)}
 
-/* The certificate preview mirrors the printed bill's own 945x408 proportions;
-   overlay fields are positioned in % so they scale with the container at
-   any print size instead of needing separate pixel math per output size. */
-.cert-preview{position:relative;width:100%;aspect-ratio:945/408;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+/* aspect-ratio is set per-design in JS (renderCertPreview) since each
+   blank certificate image has its own native dimensions — overlay fields
+   are positioned in % so they scale with the container regardless. */
+.cert-preview{position:relative;width:100%;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.15)}
 .cert-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .cert-field{position:absolute;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cert-field.cert-sig{border-bottom:1.5px solid #1a1a1a;padding-bottom:.3em;font-size:1.6cqw;font-weight:400;color:#4a4a4a;font-style:italic}
 .cert-footer{margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px 18px}
 .cert-footer b{color:var(--navy)}
 .print-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
@@ -306,10 +307,11 @@ tr:last-child td{border-bottom:none}
       <div class="design-picker" id="design-picker"></div>
       <div class="cert-preview" id="cert-preview">
         <img id="cert-bg" src="" alt="Marketing Bucks certificate">
-        <div class="cert-field" id="cert-field-1"></div>
-        <div class="cert-field" id="cert-field-2"></div>
+        <div class="cert-field" id="cert-field-agent"></div>
+        <div class="cert-field" id="cert-field-reason"></div>
+        <div class="cert-field" id="cert-field-amount"></div>
         <div class="cert-field" id="cert-field-date"></div>
-        <div class="cert-field" id="cert-field-idamt" style="font-size:1.8cqw"></div>
+        <div class="cert-field cert-sig" id="cert-field-sig">Manager Signature</div>
       </div>
       <div class="cert-footer">
         <span><b>Certificate #</b><span id="cert-footer-id"></span></span>
@@ -376,38 +378,36 @@ function statusChip(status, isOverdue, isExpiringSoon) {
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
 // ── Print Certificate ─────────────────────────────────────────────────────────
-// Three real designs from the original paper "$50 bill" voucher, extracted
-// from the source artwork so the printed certificate looks like what
-// managers already recognize. Field positions are calibrated in % of the
-// 945x408 source image so they land on the pre-printed lines regardless of
-// print size. Each design differs slightly in layout:
-//  - certificate-1 / certificate-3: one combined "Agent Name & Property
-//    Address" line — only the agent's name goes there (the property/reason
-//    detail is spelled out in full in the footer below the image instead).
-//  - certificate-2: separate "Agent" and "Property Address" lines — the
-//    second line gets the reason/property text directly.
-// Manager Signature is deliberately left blank on all three for a real pen
-// signature.
-// Positions re-measured directly against the source artwork (2026-09-20 —
-// the old values landed agent/reason inside the printed labels themselves
-// and put the date down in the "FIFTY DOLLARS" banner). idAmt is new: the
-// certificate # and amount now print directly on the certificate face
-// (in the open parchment area above the banner) instead of only in the
-// on-screen footer below the image, which doesn't reliably survive print.
+// Three blank designs (2026-09-20) — the pre-printed "Agent Name &
+// Property Address" / "Manager Signature" / "Issue Date" labels and lines
+// were removed from the artwork itself (they never lined up reliably
+// across print sizes), leaving an open area to the right of the photo. We
+// lay out every field — including our own labels — as overlay text there,
+// so nothing depends on matching a pre-printed line's exact position.
+// Each image has its own native crop/size (measured directly, not a
+// shared canvas), so aspect-ratio is set per-design in renderCertPreview.
+// The open area sits at the same relative vertical position (~top border
+// to ~top of the FIFTY DOLLARS banner) on all three, so top/height are
+// shared; horizontal position isn't shared since each photo is framed at
+// a different width — see d.pos per design below.
+const CERT_FIELD_POS = {
+  agent:  { top: 20, left: 55.5, width: 35 },
+  reason: { top: 32, left: 55.5, width: 35 },
+  amount: { top: 44, left: 55.5, width: 35 },
+  date:   { top: 56, left: 55.5, width: 35 },
+  sig:    { top: 68, left: 55.5, width: 35 }, // blank line only — a real pen signature goes here
+};
+// Same relative top spacing for every design, but Helen's photo is framed
+// wider than Bob's/John's — her shoulder reaches ~57-60% across, colliding
+// with "Manager Signature" against the dark blazer — so her design shifts
+// the whole column right instead of overriding just one field.
+const CERT_FIELD_POS_HELEN = Object.fromEntries(
+  Object.entries(CERT_FIELD_POS).map(([k, p]) => [k, { ...p, left: 60.5, width: 32 }])
+);
 const CERT_DESIGNS = [
-  { file: 'assets/marketing-bucks/certificate-1.jpg', combined: true,
-    agent: { top: 32.0, left: 66.5, width: 28.5 },
-    date:  { top: 60.0, left: 83.6, width: 12.5 },
-    idAmt: { top: 71.5, left: 66.5, width: 26.0 } },
-  { file: 'assets/marketing-bucks/certificate-2.jpg', combined: false,
-    agent:   { top: 23.0, left: 66.5, width: 28.5 },
-    address: { top: 36.5, left: 66.5, width: 28.5 },
-    date:    { top: 60.0, left: 83.6, width: 12.5 },
-    idAmt:   { top: 76.0, left: 66.5, width: 26.0 } },
-  { file: 'assets/marketing-bucks/certificate-3.jpg', combined: true,
-    agent: { top: 34.0, left: 66.5, width: 28.5 },
-    date:  { top: 62.0, left: 83.6, width: 12.5 },
-    idAmt: { top: 71.5, left: 66.5, width: 26.0 } },
+  { file: 'assets/marketing-bucks/marketing_buck_bob_adams.jpg', w: 945, h: 408, pos: CERT_FIELD_POS },
+  { file: 'assets/marketing-bucks/marketing_buck_john.jpg', w: 2145, h: 785, pos: CERT_FIELD_POS },
+  { file: 'assets/marketing-bucks/marketing_buck_helen_adams.jpg', w: 2182, h: 873, pos: CERT_FIELD_POS_HELEN },
 ];
 let _certState = null; // { agentName, reason, amount, issuedAt, id, designIdx }
 
@@ -432,29 +432,29 @@ function renderCertPreview() {
   const { agentName, reason, amount, issuedAt, id, designIdx } = _certState;
   const d = CERT_DESIGNS[designIdx];
   document.getElementById('cert-bg').src = d.file;
+  document.getElementById('cert-preview').style.aspectRatio = `${d.w} / ${d.h}`;
 
-  const field1 = document.getElementById('cert-field-1');
-  const field2 = document.getElementById('cert-field-2');
-  const fieldDate = document.getElementById('cert-field-date');
-  const styleFor = (pos) => `top:${pos.top}%;left:${pos.left}%;width:${pos.width}%;font-size:2.6cqw`;
+  const styleFor = (pos) => `top:${pos.top}%;left:${pos.left}%;width:${pos.width}%;font-size:2.2cqw`;
+  const posOnly = (pos) => `top:${pos.top}%;left:${pos.left}%;width:${pos.width}%`;
 
-  field1.style.cssText = styleFor(d.agent);
-  field1.textContent = agentName;
+  const fAgent = document.getElementById('cert-field-agent');
+  fAgent.style.cssText = styleFor(d.pos.agent);
+  fAgent.textContent = `Agent: ${agentName}`;
 
-  if (d.combined) {
-    field2.style.display = 'none';
-  } else {
-    field2.style.cssText = styleFor(d.address);
-    field2.textContent = reason;
-    field2.style.display = '';
-  }
+  const fReason = document.getElementById('cert-field-reason');
+  fReason.style.cssText = styleFor(d.pos.reason);
+  fReason.textContent = `For: ${reason}`;
 
-  fieldDate.style.cssText = styleFor(d.date);
-  fieldDate.textContent = fmtDate(issuedAt);
+  const fAmount = document.getElementById('cert-field-amount');
+  fAmount.style.cssText = styleFor(d.pos.amount);
+  fAmount.textContent = `Amount: ${fmtMoney(amount)}   ·   Certificate #${id}`;
 
-  const fieldIdAmt = document.getElementById('cert-field-idamt');
-  fieldIdAmt.style.cssText = styleFor(d.idAmt) + ';font-size:1.8cqw';
-  fieldIdAmt.textContent = `Certificate #${id}  —  Amount: ${fmtMoney(amount)}`;
+  const fDate = document.getElementById('cert-field-date');
+  fDate.style.cssText = styleFor(d.pos.date);
+  fDate.textContent = `Issue Date: ${fmtDate(issuedAt)}`;
+
+  const fSig = document.getElementById('cert-field-sig');
+  fSig.style.cssText = posOnly(d.pos.sig);
 
   document.getElementById('cert-footer-id').textContent = '#' + id;
   document.getElementById('cert-footer-amount').textContent = fmtMoney(amount);
