@@ -163,8 +163,8 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="overflow-x">
           <table id="eligible-table">
-            <thead><tr><th>Agent</th><th>Office</th><th>For</th><th>Event Date</th><th>Request Deadline</th><th></th></tr></thead>
-            <tbody><tr><td colspan="6" class="empty-state">Loading&hellip;</td></tr></tbody>
+            <thead><tr><th>ID</th><th>Agent</th><th>Office</th><th>For</th><th>Event Date</th><th>Request Deadline</th><th></th></tr></thead>
+            <tbody><tr><td colspan="7" class="empty-state">Loading&hellip;</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -218,8 +218,8 @@ tr:last-child td{border-bottom:none}
         </div>
         <div class="overflow-x">
           <table id="outstanding-table">
-            <thead><tr><th>Agent</th><th>Office</th><th>Amount</th><th>Source</th><th>Issued</th><th>Expires</th><th></th></tr></thead>
-            <tbody><tr><td colspan="7" class="empty-state">Loading&hellip;</td></tr></tbody>
+            <thead><tr><th>ID</th><th>Agent</th><th>Office</th><th>Amount</th><th>Source</th><th>Issued</th><th>Expires</th><th></th></tr></thead>
+            <tbody><tr><td colspan="8" class="empty-state">Loading&hellip;</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -401,11 +401,12 @@ async function loadEligible() {
     const rows = await fetch(`${PROXY_URL}/marketing-bucks/eligible?${currentFilters()}`, { headers: H() }).then(r => r.json());
     document.getElementById('eligible-count').textContent = rows.length ? `${rows.length} awaiting issuance` : '';
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nothing awaiting issuance.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nothing awaiting issuance.</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(r => `
       <tr>
+        <td style="font-variant-numeric:tabular-nums;font-weight:600">#${r.id}</td>
         <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
         <td>${esc(r.office_name || '—')}</td>
         <td>${esc(r.reason || (r.property_address ? 'Closing at ' + r.property_address : '—'))}</td>
@@ -417,7 +418,7 @@ async function loadEligible() {
         </td>
       </tr>`).join('');
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -428,8 +429,8 @@ async function issueFromEligible(id) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
-    toast('Credit issued.', 'ok');
     loadAll();
+    alert(`Credit issued — ID #${data.id}.\n\nWrite this number on the paper voucher so it's easy to match up during reconciliation.`);
   } catch (e) {
     toast('Could not issue: ' + e.message, 'err');
   }
@@ -478,10 +479,11 @@ async function submitManualIssue() {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
-    msgEl.textContent = 'Issued.';
+    msgEl.textContent = `Issued — ID #${data.id}.`;
     msgEl.style.color = 'var(--ok-t)';
     document.getElementById('manual-reason').value = '';
-    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+    setTimeout(() => { msgEl.textContent = ''; }, 6000);
+    alert(`Credit issued — ID #${data.id}.\n\nWrite this number on the paper voucher so it's easy to match up during reconciliation.`);
     loadAll();
   } catch (e) {
     msgEl.textContent = 'Error: ' + e.message;
@@ -497,12 +499,12 @@ async function loadOutstanding() {
     const rows = await fetch(`${PROXY_URL}/marketing-bucks/outstanding?${currentFilters()}`, { headers: H() }).then(r => r.json());
     document.getElementById('outstanding-count').textContent = rows.length ? `${rows.length} outstanding` : '';
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No outstanding credits.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No outstanding credits.</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(r => renderOutstandingRow(r)).join('');
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -511,6 +513,7 @@ function renderOutstandingRow(r) {
   const expireNote = r.is_expired ? ' (expired)' : (r.is_expiring_soon ? ' (soon)' : '');
   return `
     <tr id="mb-row-${r.id}">
+      <td style="font-variant-numeric:tabular-nums;font-weight:600">#${r.id}</td>
       <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
       <td>${esc(r.office_name || '—')}</td>
       <td>${fmtMoney(r.amount)}</td>
@@ -522,7 +525,7 @@ function renderOutstandingRow(r) {
         <button class="btn-danger-text" onclick="voidCredit(${r.id})">Void</button>
       </td>
     </tr>
-    <tr class="inline-form-row" id="mb-redeem-${r.id}" style="display:none"><td colspan="7"></td></tr>`;
+    <tr class="inline-form-row" id="mb-redeem-${r.id}" style="display:none"><td colspan="8"></td></tr>`;
 }
 
 function openRedeemForm(id) {
@@ -646,8 +649,9 @@ function toggleAgentBreakdown(btn, agentId) {
   const agentRow = (_reportAgentCache || []).find(a => a.agent_id === agentId);
   const credits = agentRow ? agentRow.credits : [];
   row.querySelector('td').innerHTML = credits.length
-    ? `<table><thead><tr><th>Source</th><th>Status</th><th>Amount</th><th>Reason</th><th>Event Date</th><th>Issued</th><th>Redeemed</th><th>Method</th></tr></thead>
+    ? `<table><thead><tr><th>ID</th><th>Source</th><th>Status</th><th>Amount</th><th>Reason</th><th>Event Date</th><th>Issued</th><th>Redeemed</th><th>Method</th></tr></thead>
         <tbody>${credits.map(c => `<tr>
+          <td style="font-variant-numeric:tabular-nums;font-weight:600">#${c.id}</td>
           <td>${esc(c.source_type)}</td>
           <td>${statusChip(c.status)}</td>
           <td>${fmtMoney(c.amount)}</td>
