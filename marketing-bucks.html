@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marketing Bucks</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --red:#C0392B; --red-lt:#FBEAE8; --green:#1A7A4C; --amber:#B7791F; --amber-lt:#FEF3E2;
+  --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  --ok:#D1FAE5; --ok-t:#059669;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* ── Topbar ── */
+.topbar{background:var(--navy);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:50px;border-bottom:3px solid var(--gold)}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-title{color:#fff;font-size:15px;font-weight:600;margin-left:12px;padding-left:12px;border-left:1px solid rgba(255,255,255,.2)}
+
+/* ── Content ── */
+.content{max-width:960px;margin:0 auto;padding:24px 20px 60px}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;overflow:hidden}
+.card-head{padding:13px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg)}
+.card-body{padding:16px 18px}
+
+/* ── Tabs ── */
+.tab-nav{display:flex;gap:4px;background:#E7EAF0;border-radius:12px;padding:4px;margin-bottom:20px;max-width:520px}
+.tab-btn{flex:1;padding:9px 14px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:background .15s,color .15s}
+.tab-btn:hover{background:rgba(255,255,255,.6)}
+.tab-btn.active{background:#fff;color:var(--navy);box-shadow:0 1px 6px rgba(0,0,0,.1)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Filter bar ── */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filter-bar select{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:#fff;color:var(--text);min-width:180px}
+.filter-bar .clear-link{font-size:12px;color:var(--blue);cursor:pointer;text-decoration:none}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;border:none;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.88}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover:not(:disabled){background:var(--bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-danger-text{background:none;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0;text-decoration:underline}
+
+/* ── Form fields ── */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.3px;text-transform:uppercase}
+.field select,.field input,.field textarea{padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);outline:none;width:100%;font-family:inherit}
+.field select:focus,.field input:focus,.field textarea:focus{border-color:var(--blue)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.source-toggle{display:flex;gap:8px;margin-bottom:14px}
+.source-toggle button{flex:1;padding:9px;border:1px solid var(--border);border-radius:7px;background:#fff;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.source-toggle button.active{border-color:var(--blue);background:#EAF2FB;color:var(--blue)}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.empty-state{padding:24px;color:var(--muted);text-align:center;font-size:13px}
+.overflow-x{overflow-x:auto}
+
+/* ── Chips ── */
+.chip{display:inline-block;padding:2px 8px;border-radius:9px;font-size:11px;font-weight:600;white-space:nowrap}
+.chip-eligible{background:var(--gold-lt);color:#8A6D1F}
+.chip-issued{background:#E9F1FB;color:var(--blue)}
+.chip-redeemed{background:var(--ok);color:var(--ok-t)}
+.chip-expired{background:var(--red-lt);color:var(--red)}
+.chip-void{background:#E5E7EB;color:var(--muted)}
+.flag-overdue{color:var(--red);font-weight:600}
+.flag-soon{color:var(--amber);font-weight:600}
+
+/* ── Inline action row (redeem form) ── */
+.inline-form-row td{background:var(--bg)}
+.inline-form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:10px 0}
+.inline-form .field{min-width:160px}
+.row-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ── Breakdown (by-agent drill-down) ── */
+.breakdown-toggle{background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;padding:0}
+.breakdown-row td{padding:0}
+
+/* ── Toasts ── */
+.toasts{position:fixed;top:60px;right:16px;display:flex;flex-direction:column;gap:6px;z-index:999;pointer-events:none}
+.toast{padding:9px 14px;border-radius:7px;background:var(--navy);color:#fff;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.2);animation:fadeIn .2s}
+.toast.err{background:var(--red)}
+.toast.ok{background:var(--green)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Sign-in modal ── */
+#signinModal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;align-items:center;justify-content:center}
+.signin-box{background:var(--surface);border-radius:14px;padding:36px 40px;text-align:center;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.signin-box h2{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.signin-box p{font-size:13px;color:var(--muted);margin-bottom:22px}
+#g-signin-btn{display:flex;justify-content:center}
+</style>
+</head>
+<body>
+
+<!-- Google Sign-in modal -->
+<div id="signinModal">
+  <div class="signin-box">
+    <h2>Marketing Bucks</h2>
+    <p>Sign in with your Adams Cameron Google account to continue.</p>
+    <div id="g-signin-btn"></div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:14px">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Marketing Bucks</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./feedback.html?tool=marketing-bucks" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none;letter-spacing:.03em">Feedback</a>
+    <a href="./index.html" style="font-size:12px;color:rgba(255,255,255,.55);text-decoration:none">&#8592; Tools</a>
+  </div>
+</div>
+
+<div class="content">
+  <div id="loading-msg" style="text-align:center;padding:60px;color:var(--muted)">Loading&hellip;</div>
+
+  <div id="denied-msg" style="display:none;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:13px">
+    This tool is for Adams Cameron staff only. If you believe you should have access, contact your office manager.
+  </div>
+
+  <div id="main" style="display:none">
+
+    <div class="tab-nav" role="tablist">
+      <button class="tab-btn active" data-tab="issue" onclick="switchTab('issue')">Issue a Credit</button>
+      <button class="tab-btn" data-tab="outstanding" onclick="switchTab('outstanding')">Outstanding</button>
+      <button class="tab-btn" data-tab="reporting" onclick="switchTab('reporting')">Reporting</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="filter-office" onchange="onFilterChange()">
+        <option value="">All Offices</option>
+      </select>
+      <select id="filter-agent" onchange="onFilterChange()">
+        <option value="">All Agents</option>
+      </select>
+      <a class="clear-link" onclick="clearFilters()">Clear filters</a>
+    </div>
+
+    <!-- ═══ TAB: Issue a Credit ═══ -->
+    <div id="panel-issue" class="tab-panel active">
+
+      <div class="card">
+        <div class="card-head">
+          <span>Awaiting Issuance</span>
+          <span id="eligible-count" style="font-size:12px;font-weight:500;color:var(--muted)"></span>
+        </div>
+        <div class="overflow-x">
+          <table id="eligible-table">
+            <thead><tr><th>Agent</th><th>Office</th><th>For</th><th>Event Date</th><th>Request Deadline</th><th></th></tr></thead>
+            <tbody><tr><td colspan="6" class="empty-state">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>Manual Entry</span></div>
+        <div class="card-body">
+          <div class="source-toggle">
+            <button type="button" class="active" data-src="training" onclick="setManualSource('training')">Training Completion</button>
+            <button type="button" data-src="other" onclick="setManualSource('other')">Other</button>
+          </div>
+          <div class="form-row cols-3">
+            <div class="field">
+              <label>Agent</label>
+              <select id="manual-agent" onchange="onManualAgentChange()"></select>
+            </div>
+            <div class="field">
+              <label>Office</label>
+              <select id="manual-office"></select>
+            </div>
+            <div class="field">
+              <label>Event / Completion Date</label>
+              <input type="date" id="manual-date">
+            </div>
+          </div>
+          <div class="form-row cols-3">
+            <div class="field" style="grid-column:1 / span 2">
+              <label id="manual-reason-lbl">Reason (e.g. "Completed Q3 sales training")</label>
+              <input type="text" id="manual-reason" placeholder="Required">
+            </div>
+            <div class="field">
+              <label>Amount ($)</label>
+              <input type="number" id="manual-amount" value="50" min="0" step="1">
+            </div>
+          </div>
+          <div style="margin-top:14px">
+            <button class="btn btn-primary btn-sm" onclick="submitManualIssue()">Issue Credit</button>
+          </div>
+          <div id="manual-msg" style="font-size:12px;margin-top:8px;min-height:16px"></div>
+        </div>
+      </div>
+
+    </div><!-- /panel-issue -->
+
+    <!-- ═══ TAB: Outstanding ═══ -->
+    <div id="panel-outstanding" class="tab-panel">
+      <div class="card">
+        <div class="card-head">
+          <span>Outstanding Credits</span>
+          <span id="outstanding-count" style="font-size:12px;font-weight:500;color:var(--muted)"></span>
+        </div>
+        <div class="overflow-x">
+          <table id="outstanding-table">
+            <thead><tr><th>Agent</th><th>Office</th><th>Amount</th><th>Source</th><th>Issued</th><th>Expires</th><th></th></tr></thead>
+            <tbody><tr><td colspan="7" class="empty-state">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-outstanding -->
+
+    <!-- ═══ TAB: Reporting ═══ -->
+    <div id="panel-reporting" class="tab-panel">
+
+      <div class="card">
+        <div class="card-head"><span>By Office</span></div>
+        <div class="overflow-x">
+          <table id="report-office-table">
+            <thead><tr><th>Office</th><th>Eligible</th><th>Issued</th><th>Redeemed</th><th>Expired</th><th>Void</th><th>Outstanding $</th><th>Redeemed $</th></tr></thead>
+            <tbody><tr><td colspan="8" class="empty-state">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>By Agent</span></div>
+        <div class="overflow-x">
+          <table id="report-agent-table">
+            <thead><tr><th>Agent</th><th>Eligible</th><th>Issued</th><th>Redeemed</th><th>Expired</th><th>Void</th><th>Outstanding $</th><th>Redeemed $</th><th></th></tr></thead>
+            <tbody><tr><td colspan="9" class="empty-state">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /panel-reporting -->
+
+  </div><!-- /main -->
+</div><!-- /content -->
+
+<div class="toasts" id="toasts"></div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const PROXY_URL = 'https://mls-proxy-975684028597.us-east1.run.app';
+const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let PROXY_KEY  = localStorage.getItem('ac_proxy_key')  || '';
+let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+
+const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
+
+let AGENTS = [];     // [{id, first_name, last_name, office_id}]
+let OFFICES = [];    // [{id, name}]
+let activeTab = 'issue';
+let _reportAgentCache = null; // last /reporting/by-agent response, for the drill-down toggle
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function toast(msg, type) {
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  const d = new Date(String(v).slice(0,10) + 'T00:00:00');
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+function fmtMoney(v) {
+  const n = Number(v || 0);
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function agentName(first, last) { return esc((last || '') + ', ' + (first || '')); }
+function statusChip(status, isOverdue, isExpiringSoon) {
+  const label = { eligible:'Eligible', issued:'Issued', redeemed:'Redeemed', expired:'Expired', void:'Void' }[status] || status;
+  return `<span class="chip chip-${status}">${label}</span>`;
+}
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+// ── Auth / role gate ──────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const me = await fetch(PROXY_URL + '/lockbox/me', { headers: H() }).then(r => r.json());
+    // /lockbox/me collapses staff.role down to 'manager' (admin/manager) or
+    // 'staff' (any other active staff row, i.e. coordinator) — both are
+    // allowed here; the backend's requireStaff on every route is the real
+    // enforcement either way.
+    if (me.role !== 'manager' && me.role !== 'staff') {
+      document.getElementById('loading-msg').style.display = 'none';
+      document.getElementById('denied-msg').style.display = 'block';
+      return;
+    }
+  } catch (e) {
+    document.getElementById('loading-msg').textContent = 'Error: ' + e.message;
+    return;
+  }
+
+  try {
+    [AGENTS, OFFICES] = await Promise.all([
+      fetch(PROXY_URL + '/marketing-bucks/agents', { headers: H() }).then(r => r.json()),
+      fetch(PROXY_URL + '/offices', { headers: H() }).then(r => r.json()),
+    ]);
+  } catch (e) {
+    document.getElementById('loading-msg').textContent = 'Error loading agents/offices: ' + e.message;
+    return;
+  }
+
+  populatePickers();
+  document.getElementById('manual-date').value = todayStr();
+
+  document.getElementById('loading-msg').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+
+  loadAll();
+}
+
+function populatePickers() {
+  const officeOpts = OFFICES.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+  document.getElementById('filter-office').insertAdjacentHTML('beforeend', officeOpts);
+  document.getElementById('manual-office').innerHTML = officeOpts;
+
+  const agentOpts = AGENTS.map(a => `<option value="${a.id}" data-office="${a.office_id || ''}">${agentName(a.first_name, a.last_name)}</option>`).join('');
+  document.getElementById('filter-agent').insertAdjacentHTML('beforeend', agentOpts);
+  document.getElementById('manual-agent').innerHTML = agentOpts;
+  onManualAgentChange();
+}
+
+function onManualAgentChange() {
+  const sel = document.getElementById('manual-agent');
+  const opt = sel.options[sel.selectedIndex];
+  const officeId = opt ? opt.dataset.office : '';
+  if (officeId) document.getElementById('manual-office').value = officeId;
+}
+
+// ── Tabs & filters ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+}
+function currentFilters() {
+  const officeId = document.getElementById('filter-office').value;
+  const agentId  = document.getElementById('filter-agent').value;
+  const qs = new URLSearchParams();
+  if (officeId) qs.set('office_id', officeId);
+  if (agentId)  qs.set('agent_id', agentId);
+  return qs;
+}
+function onFilterChange() { loadAll(); }
+function clearFilters() {
+  document.getElementById('filter-office').value = '';
+  document.getElementById('filter-agent').value = '';
+  loadAll();
+}
+function loadAll() {
+  loadEligible();
+  loadOutstanding();
+  loadReporting();
+}
+
+// ── Manual entry source toggle ───────────────────────────────────────────────
+function setManualSource(src) {
+  document.querySelectorAll('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.src === src));
+  const lbl = document.getElementById('manual-reason-lbl');
+  lbl.textContent = src === 'training'
+    ? 'Reason (e.g. "Completed Q3 sales training")'
+    : 'Reason (e.g. "Attended [meeting]", "Award for [task]")';
+}
+function getManualSource() {
+  const active = document.querySelector('.source-toggle button.active');
+  return active ? active.dataset.src : 'training';
+}
+
+// ── Eligible / awaiting issuance ──────────────────────────────────────────────
+async function loadEligible() {
+  const tbody = document.querySelector('#eligible-table tbody');
+  try {
+    const rows = await fetch(`${PROXY_URL}/marketing-bucks/eligible?${currentFilters()}`, { headers: H() }).then(r => r.json());
+    document.getElementById('eligible-count').textContent = rows.length ? `${rows.length} awaiting issuance` : '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nothing awaiting issuance.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
+        <td>${esc(r.office_name || '—')}</td>
+        <td>${esc(r.reason || (r.property_address ? 'Closing at ' + r.property_address : '—'))}</td>
+        <td>${fmtDate(r.qualifying_event_date)}</td>
+        <td class="${r.is_overdue ? 'flag-overdue' : ''}">${fmtDate(r.request_deadline)}${r.is_overdue ? ' (overdue)' : ''}</td>
+        <td class="row-actions">
+          <button class="btn btn-primary btn-sm" onclick="issueFromEligible(${r.id})">Issue</button>
+          <button class="btn-danger-text" onclick="voidCredit(${r.id})">Void</button>
+        </td>
+      </tr>`).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function issueFromEligible(id) {
+  try {
+    const r = await fetch(`${PROXY_URL}/marketing-bucks/issue`, {
+      method: 'POST', headers: H(), body: JSON.stringify({ marketingBuckId: id }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    toast('Credit issued.', 'ok');
+    loadAll();
+  } catch (e) {
+    toast('Could not issue: ' + e.message, 'err');
+  }
+}
+
+async function voidCredit(id) {
+  const reason = prompt('Reason for voiding this credit?');
+  if (reason == null) return; // cancelled
+  if (!reason.trim()) { toast('A reason is required to void a credit.', 'err'); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/marketing-bucks/${id}/void`, {
+      method: 'POST', headers: H(), body: JSON.stringify({ reason: reason.trim() }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    toast('Credit voided.', 'ok');
+    loadAll();
+  } catch (e) {
+    toast('Could not void: ' + e.message, 'err');
+  }
+}
+
+// ── Manual issuance ───────────────────────────────────────────────────────────
+async function submitManualIssue() {
+  const msgEl = document.getElementById('manual-msg');
+  const agentId = document.getElementById('manual-agent').value;
+  const officeId = document.getElementById('manual-office').value;
+  const sourceType = getManualSource();
+  const reason = document.getElementById('manual-reason').value.trim();
+  const qualifyingEventDate = document.getElementById('manual-date').value;
+  const amountRaw = document.getElementById('manual-amount').value;
+  const amount = amountRaw !== '' ? Number(amountRaw) : undefined;
+
+  if (!agentId || !officeId || !reason || !qualifyingEventDate) {
+    msgEl.textContent = 'Agent, office, reason, and date are all required.';
+    msgEl.style.color = 'var(--red)';
+    return;
+  }
+
+  msgEl.textContent = 'Saving…';
+  msgEl.style.color = 'var(--muted)';
+  try {
+    const r = await fetch(`${PROXY_URL}/marketing-bucks/issue`, {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({ agentId: Number(agentId), officeId: Number(officeId), sourceType, reason, qualifyingEventDate, amount }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    msgEl.textContent = 'Issued.';
+    msgEl.style.color = 'var(--ok-t)';
+    document.getElementById('manual-reason').value = '';
+    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+    loadAll();
+  } catch (e) {
+    msgEl.textContent = 'Error: ' + e.message;
+    msgEl.style.color = 'var(--red)';
+    toast('Could not issue: ' + e.message, 'err');
+  }
+}
+
+// ── Outstanding ────────────────────────────────────────────────────────────────
+async function loadOutstanding() {
+  const tbody = document.querySelector('#outstanding-table tbody');
+  try {
+    const rows = await fetch(`${PROXY_URL}/marketing-bucks/outstanding?${currentFilters()}`, { headers: H() }).then(r => r.json());
+    document.getElementById('outstanding-count').textContent = rows.length ? `${rows.length} outstanding` : '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No outstanding credits.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => renderOutstandingRow(r)).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderOutstandingRow(r) {
+  const expireCls = r.is_expired ? 'flag-overdue' : (r.is_expiring_soon ? 'flag-soon' : '');
+  const expireNote = r.is_expired ? ' (expired)' : (r.is_expiring_soon ? ' (soon)' : '');
+  return `
+    <tr id="mb-row-${r.id}">
+      <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
+      <td>${esc(r.office_name || '—')}</td>
+      <td>${fmtMoney(r.amount)}</td>
+      <td>${esc(r.reason || (r.property_address ? 'Closing at ' + r.property_address : r.source_type))}</td>
+      <td>${fmtDate(r.issued_at)}</td>
+      <td class="${expireCls}">${fmtDate(r.expires_at)}${expireNote}</td>
+      <td class="row-actions">
+        <button class="btn btn-primary btn-sm" onclick="openRedeemForm(${r.id})">Mark Redeemed</button>
+        <button class="btn-danger-text" onclick="voidCredit(${r.id})">Void</button>
+      </td>
+    </tr>
+    <tr class="inline-form-row" id="mb-redeem-${r.id}" style="display:none"><td colspan="7"></td></tr>`;
+}
+
+function openRedeemForm(id) {
+  document.querySelectorAll('.inline-form-row').forEach(row => { row.style.display = 'none'; row.querySelector('td').innerHTML = ''; });
+  const row = document.getElementById(`mb-redeem-${id}`);
+  row.style.display = '';
+  row.querySelector('td').innerHTML = `
+    <div class="inline-form">
+      <div class="field">
+        <label>Redeemed Date</label>
+        <input type="date" id="redeem-date-${id}" value="${todayStr()}">
+      </div>
+      <div class="field" style="min-width:240px">
+        <label>How was it used? (required)</label>
+        <input type="text" id="redeem-method-${id}" placeholder="e.g. Vistaprint order, applied to invoice #1234">
+      </div>
+      <div class="field" style="min-width:240px">
+        <label>Notes (optional)</label>
+        <input type="text" id="redeem-notes-${id}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="submitRedeem(${id})">Save</button>
+      <button class="btn btn-ghost btn-sm" onclick="cancelRedeemForm(${id})">Cancel</button>
+    </div>`;
+}
+function cancelRedeemForm(id) {
+  const row = document.getElementById(`mb-redeem-${id}`);
+  row.style.display = 'none';
+  row.querySelector('td').innerHTML = '';
+}
+async function submitRedeem(id) {
+  const redeemedAt = document.getElementById(`redeem-date-${id}`).value;
+  const redemptionMethod = document.getElementById(`redeem-method-${id}`).value.trim();
+  const redemptionNotes = document.getElementById(`redeem-notes-${id}`).value.trim();
+  if (!redemptionMethod) { toast('How the credit was used is required.', 'err'); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/marketing-bucks/${id}/redeem`, {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({ redeemedAt, redemptionMethod, redemptionNotes: redemptionNotes || undefined }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    toast('Marked redeemed.', 'ok');
+    loadAll();
+  } catch (e) {
+    toast('Could not redeem: ' + e.message, 'err');
+  }
+}
+
+// ── Reporting ──────────────────────────────────────────────────────────────────
+async function loadReporting() {
+  await Promise.all([loadReportByOffice(), loadReportByAgent()]);
+}
+
+async function loadReportByOffice() {
+  const tbody = document.querySelector('#report-office-table tbody');
+  try {
+    const qs = currentFilters(); // agent_id is honored server-side; office_id filtering a by-office report just narrows to one row
+    const rows = await fetch(`${PROXY_URL}/marketing-bucks/reporting/by-office?${qs}`, { headers: H() }).then(r => r.json());
+    const filtered = document.getElementById('filter-office').value
+      ? rows.filter(r => String(r.office_id) === document.getElementById('filter-office').value)
+      : rows;
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No data yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(r => `
+      <tr>
+        <td>${esc(r.office_name || 'Unassigned')}</td>
+        <td>${r.eligible_count}</td>
+        <td>${r.issued_count}</td>
+        <td>${r.redeemed_count}</td>
+        <td>${r.expired_count}</td>
+        <td>${r.void_count}</td>
+        <td>${fmtMoney(r.total_outstanding_amount)}</td>
+        <td>${fmtMoney(r.total_redeemed_amount)}</td>
+      </tr>`).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function loadReportByAgent() {
+  const tbody = document.querySelector('#report-agent-table tbody');
+  try {
+    const qs = currentFilters();
+    const rows = await fetch(`${PROXY_URL}/marketing-bucks/reporting/by-agent?${qs}`, { headers: H() }).then(r => r.json());
+    _reportAgentCache = rows;
+    const filtered = document.getElementById('filter-agent').value
+      ? rows.filter(r => String(r.agent_id) === document.getElementById('filter-agent').value)
+      : rows;
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No data yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(r => `
+      <tr>
+        <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
+        <td>${r.eligible_count}</td>
+        <td>${r.issued_count}</td>
+        <td>${r.redeemed_count}</td>
+        <td>${r.expired_count}</td>
+        <td>${r.void_count}</td>
+        <td>${fmtMoney(r.total_outstanding_amount)}</td>
+        <td>${fmtMoney(r.total_redeemed_amount)}</td>
+        <td><button class="breakdown-toggle" onclick="toggleAgentBreakdown(this, ${r.agent_id})">Details &#9662;</button></td>
+      </tr>
+      <tr class="breakdown-row" id="bd-agent-${r.agent_id}" style="display:none"><td colspan="9"></td></tr>`).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function toggleAgentBreakdown(btn, agentId) {
+  const row = document.getElementById(`bd-agent-${agentId}`);
+  const isOpen = row.style.display !== 'none';
+  if (isOpen) { row.style.display = 'none'; btn.innerHTML = 'Details &#9662;'; return; }
+  document.querySelectorAll('.breakdown-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.breakdown-toggle').forEach(b => b.innerHTML = 'Details &#9662;');
+  row.style.display = '';
+  btn.innerHTML = 'Details &#9652;';
+  const agentRow = (_reportAgentCache || []).find(a => a.agent_id === agentId);
+  const credits = agentRow ? agentRow.credits : [];
+  row.querySelector('td').innerHTML = credits.length
+    ? `<table><thead><tr><th>Source</th><th>Status</th><th>Amount</th><th>Reason</th><th>Event Date</th><th>Issued</th><th>Redeemed</th><th>Method</th></tr></thead>
+        <tbody>${credits.map(c => `<tr>
+          <td>${esc(c.source_type)}</td>
+          <td>${statusChip(c.status)}</td>
+          <td>${fmtMoney(c.amount)}</td>
+          <td>${esc(c.reason || '—')}</td>
+          <td>${fmtDate(c.qualifying_event_date)}</td>
+          <td>${fmtDate(c.issued_at)}</td>
+          <td>${fmtDate(c.redeemed_at)}</td>
+          <td>${esc(c.redemption_method || '—')}</td>
+        </tr>`).join('')}</tbody></table>`
+    : '<div class="empty-state">No credits for this agent yet.</div>';
+}
+
+// ── Google auth ────────────────────────────────────────────────────────────────
+async function handleCredential(cred) {
+  try {
+    const r = await fetch(`${PROXY_URL}/config/init`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: cred.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
+    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
+    USER_EMAIL = payload.email || '';
+    PROXY_KEY  = data.proxyKey || '';
+    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
+    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
+  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
+  document.getElementById('signinModal').style.display = 'none';
+  if (USER_EMAIL && PROXY_KEY) init(); else toast('Sign-in failed', 'err');
+}
+
+function initGoogleSignIn() {
+  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
+  google.accounts.id.prompt(n => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) {
+      google.accounts.id.renderButton(document.getElementById('g-signin-btn'),
+        { theme:'outline', size:'large', text:'signin_with', shape:'rectangular' });
+      document.getElementById('signinModal').style.display = 'flex';
+    }
+  });
+}
+
+if (USER_EMAIL && PROXY_KEY) {
+  init();
+} else if (window.google?.accounts?.id) {
+  initGoogleSignIn();
+} else {
+  const t = setInterval(() => {
+    if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); }
+  }, 100);
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Marketing Bucks',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
