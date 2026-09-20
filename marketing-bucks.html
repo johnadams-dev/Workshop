@@ -104,6 +104,37 @@ tr:last-child td{border-bottom:none}
 .signin-box h2{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px}
 .signin-box p{font-size:13px;color:var(--muted);margin-bottom:22px}
 #g-signin-btn{display:flex;justify-content:center}
+
+/* ── Print Certificate modal ── */
+#printModal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;display:none;align-items:center;justify-content:center;padding:20px}
+.print-modal-box{background:var(--surface);border-radius:12px;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+.print-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.print-modal-head strong{font-size:15px}
+.print-modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1}
+.print-modal-body{padding:18px}
+.design-picker{display:flex;gap:10px;margin-bottom:16px}
+.design-thumb{flex:1;border:2px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;padding:0;background:none}
+.design-thumb img{display:block;width:100%;height:auto}
+.design-thumb.active{border-color:var(--blue)}
+
+/* The certificate preview mirrors the printed bill's own 945x408 proportions;
+   overlay fields are positioned in % so they scale with the container at
+   any print size instead of needing separate pixel math per output size. */
+.cert-preview{position:relative;width:100%;aspect-ratio:945/408;border-radius:4px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.cert-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.cert-field{position:absolute;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cert-footer{margin-top:14px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px 18px}
+.cert-footer b{color:var(--navy)}
+.print-modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+
+@media print {
+  body > *:not(#printModal){display:none !important}
+  #printModal{position:static;background:none;display:block !important;padding:0}
+  .print-modal-box{max-width:none;max-height:none;overflow:visible;box-shadow:none;border-radius:0}
+  .print-modal-head, .design-picker, .print-modal-actions{display:none !important}
+  .print-modal-body{padding:0}
+  .cert-preview{box-shadow:none}
+}
 </style>
 </head>
 <body>
@@ -141,6 +172,11 @@ tr:last-child td{border-bottom:none}
       <button class="tab-btn active" data-tab="issue" onclick="switchTab('issue')">Issue a Credit</button>
       <button class="tab-btn" data-tab="outstanding" onclick="switchTab('outstanding')">Outstanding</button>
       <button class="tab-btn" data-tab="reporting" onclick="switchTab('reporting')">Reporting</button>
+    </div>
+
+    <div id="deeplink-banner" style="display:none;background:var(--gold-lt);border:1px solid #EDD898;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;align-items:center;justify-content:space-between;gap:10px">
+      <span>Showing only this closing's credit(s), linked from Daily Desk.</span>
+      <a class="clear-link" onclick="clearFilters()">Show everything</a>
     </div>
 
     <div class="filter-bar">
@@ -192,7 +228,7 @@ tr:last-child td{border-bottom:none}
           </div>
           <div class="form-row cols-3">
             <div class="field" style="grid-column:1 / span 2">
-              <label id="manual-reason-lbl">Reason (e.g. "Completed Q3 sales training")</label>
+              <label id="manual-reason-lbl">Reason (e.g. "Completed Fundamentals Training")</label>
               <input type="text" id="manual-reason" placeholder="Required">
             </div>
             <div class="field">
@@ -255,6 +291,34 @@ tr:last-child td{border-bottom:none}
 
 <div class="toasts" id="toasts"></div>
 
+<!-- Print Certificate modal -->
+<div id="printModal">
+  <div class="print-modal-box">
+    <div class="print-modal-head">
+      <strong>Print Certificate</strong>
+      <button class="print-modal-close" onclick="closePrintCert()">&times;</button>
+    </div>
+    <div class="print-modal-body">
+      <div class="design-picker" id="design-picker"></div>
+      <div class="cert-preview" id="cert-preview">
+        <img id="cert-bg" src="" alt="Marketing Bucks certificate">
+        <div class="cert-field" id="cert-field-1"></div>
+        <div class="cert-field" id="cert-field-2"></div>
+        <div class="cert-field" id="cert-field-date"></div>
+      </div>
+      <div class="cert-footer">
+        <span><b>Certificate #</b><span id="cert-footer-id"></span></span>
+        <span><b>Amount:</b> <span id="cert-footer-amount"></span></span>
+        <span><b>For:</b> <span id="cert-footer-reason"></span></span>
+      </div>
+      <div class="print-modal-actions">
+        <button class="btn btn-ghost btn-sm" onclick="closePrintCert()">Close</button>
+        <button class="btn btn-primary btn-sm" onclick="window.print()">Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script>
 const PROXY_URL = 'https://mls-proxy-975684028597.us-east1.run.app';
@@ -268,6 +332,12 @@ let AGENTS = [];     // [{id, first_name, last_name, office_id}]
 let OFFICES = [];    // [{id, name}]
 let activeTab = 'issue';
 let _reportAgentCache = null; // last /reporting/by-agent response, for the drill-down toggle
+
+// A Daily Desk checklist task can link here as
+// marketing-bucks.html?transaction_id=<uuid> (see daily-desk.html's
+// {transactionId} placeholder substitution) so a coordinator lands
+// straight on that closing's credit(s) instead of a generic full list.
+let _deepLinkTransactionId = new URLSearchParams(window.location.search).get('transaction_id') || '';
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
@@ -300,6 +370,88 @@ function statusChip(status, isOverdue, isExpiringSoon) {
 }
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
+// ── Print Certificate ─────────────────────────────────────────────────────────
+// Three real designs from the original paper "$50 bill" voucher, extracted
+// from the source artwork so the printed certificate looks like what
+// managers already recognize. Field positions are calibrated in % of the
+// 945x408 source image so they land on the pre-printed lines regardless of
+// print size. Each design differs slightly in layout:
+//  - certificate-1 / certificate-3: one combined "Agent Name & Property
+//    Address" line — only the agent's name goes there (the property/reason
+//    detail is spelled out in full in the footer below the image instead).
+//  - certificate-2: separate "Agent" and "Property Address" lines — the
+//    second line gets the reason/property text directly.
+// Manager Signature is deliberately left blank on all three for a real pen
+// signature.
+const CERT_DESIGNS = [
+  { file: 'assets/marketing-bucks/certificate-1.jpg', combined: true,
+    agent: { top: 38.7, left: 69.3, width: 23.3 },
+    date:  { top: 80.4, left: 69.3, width: 16.4 } },
+  { file: 'assets/marketing-bucks/certificate-2.jpg', combined: false,
+    agent:   { top: 30.9, left: 69.3, width: 23.3 },
+    address: { top: 48.5, left: 69.3, width: 23.3 },
+    date:    { top: 80.4, left: 69.3, width: 16.4 } },
+  { file: 'assets/marketing-bucks/certificate-3.jpg', combined: true,
+    agent: { top: 40.0, left: 69.3, width: 23.3 },
+    date:  { top: 80.4, left: 69.3, width: 16.4 } },
+];
+let _certState = null; // { agentName, reason, amount, issuedAt, id, designIdx }
+
+function openPrintCert(id, agentName, reason, amount, issuedAt) {
+  _certState = { id, agentName, reason: reason || '—', amount, issuedAt, designIdx: 0 };
+  const picker = document.getElementById('design-picker');
+  picker.innerHTML = CERT_DESIGNS.map((d, i) =>
+    `<button type="button" class="design-thumb ${i === 0 ? 'active' : ''}" onclick="selectCertDesign(${i})">
+       <img src="${d.file}" alt="Design ${i + 1}">
+     </button>`).join('');
+  renderCertPreview();
+  document.getElementById('printModal').style.display = 'flex';
+}
+
+function selectCertDesign(idx) {
+  _certState.designIdx = idx;
+  document.querySelectorAll('.design-thumb').forEach((b, i) => b.classList.toggle('active', i === idx));
+  renderCertPreview();
+}
+
+function renderCertPreview() {
+  const { agentName, reason, amount, issuedAt, id, designIdx } = _certState;
+  const d = CERT_DESIGNS[designIdx];
+  document.getElementById('cert-bg').src = d.file;
+
+  const field1 = document.getElementById('cert-field-1');
+  const field2 = document.getElementById('cert-field-2');
+  const fieldDate = document.getElementById('cert-field-date');
+  const styleFor = (pos) => `top:${pos.top}%;left:${pos.left}%;width:${pos.width}%;font-size:2.6cqw`;
+
+  field1.style.cssText = styleFor(d.agent);
+  field1.textContent = agentName;
+
+  if (d.combined) {
+    field2.style.display = 'none';
+  } else {
+    field2.style.cssText = styleFor(d.address);
+    field2.textContent = reason;
+    field2.style.display = '';
+  }
+
+  fieldDate.style.cssText = styleFor(d.date);
+  fieldDate.textContent = fmtDate(issuedAt);
+
+  document.getElementById('cert-footer-id').textContent = '#' + id;
+  document.getElementById('cert-footer-amount').textContent = fmtMoney(amount);
+  document.getElementById('cert-footer-reason').textContent = reason;
+
+  // container-query units (cqw) need the ancestor marked as a container;
+  // font-size falls back fine without it, just slightly less responsive
+  document.getElementById('cert-preview').style.containerType = 'inline-size';
+}
+
+function closePrintCert() {
+  document.getElementById('printModal').style.display = 'none';
+  _certState = null;
+}
+
 // ── Auth / role gate ──────────────────────────────────────────────────────────
 async function init() {
   try {
@@ -330,6 +482,11 @@ async function init() {
 
   populatePickers();
   document.getElementById('manual-date').value = todayStr();
+
+  if (_deepLinkTransactionId) {
+    document.getElementById('deeplink-banner').style.display = 'flex';
+    switchTab('issue');
+  }
 
   document.getElementById('loading-msg').style.display = 'none';
   document.getElementById('main').style.display = 'block';
@@ -367,12 +524,18 @@ function currentFilters() {
   const qs = new URLSearchParams();
   if (officeId) qs.set('office_id', officeId);
   if (agentId)  qs.set('agent_id', agentId);
+  if (_deepLinkTransactionId) qs.set('transaction_id', _deepLinkTransactionId);
   return qs;
 }
 function onFilterChange() { loadAll(); }
 function clearFilters() {
   document.getElementById('filter-office').value = '';
   document.getElementById('filter-agent').value = '';
+  if (_deepLinkTransactionId) {
+    _deepLinkTransactionId = '';
+    document.getElementById('deeplink-banner').style.display = 'none';
+    history.replaceState(null, '', window.location.pathname);
+  }
   loadAll();
 }
 function loadAll() {
@@ -386,7 +549,7 @@ function setManualSource(src) {
   document.querySelectorAll('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.src === src));
   const lbl = document.getElementById('manual-reason-lbl');
   lbl.textContent = src === 'training'
-    ? 'Reason (e.g. "Completed Q3 sales training")'
+    ? 'Reason (e.g. "Completed Fundamentals Training")'
     : 'Reason (e.g. "Attended [meeting]", "Award for [task]")';
 }
 function getManualSource() {
@@ -493,10 +656,13 @@ async function submitManualIssue() {
 }
 
 // ── Outstanding ────────────────────────────────────────────────────────────────
+let _outstandingCache = []; // by id, for the Print Certificate lookup (avoids passing raw names/apostrophes through onclick attributes)
+
 async function loadOutstanding() {
   const tbody = document.querySelector('#outstanding-table tbody');
   try {
     const rows = await fetch(`${PROXY_URL}/marketing-bucks/outstanding?${currentFilters()}`, { headers: H() }).then(r => r.json());
+    _outstandingCache = rows;
     document.getElementById('outstanding-count').textContent = rows.length ? `${rows.length} outstanding` : '';
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No outstanding credits.</td></tr>';
@@ -506,6 +672,12 @@ async function loadOutstanding() {
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
   }
+}
+
+function printFromOutstanding(id) {
+  const r = _outstandingCache.find(x => x.id === id);
+  if (!r) return;
+  openPrintCert(id, r.agent_first_name + ' ' + r.agent_last_name, r.reason || r.property_address, r.amount, r.issued_at);
 }
 
 function renderOutstandingRow(r) {
@@ -522,6 +694,7 @@ function renderOutstandingRow(r) {
       <td class="${expireCls}">${fmtDate(r.expires_at)}${expireNote}</td>
       <td class="row-actions">
         <button class="btn btn-primary btn-sm" onclick="openRedeemForm(${r.id})">Mark Redeemed</button>
+        <button class="btn btn-ghost btn-sm" onclick="printFromOutstanding(${r.id})">Print</button>
         <button class="btn-danger-text" onclick="voidCredit(${r.id})">Void</button>
       </td>
     </tr>
@@ -649,7 +822,7 @@ function toggleAgentBreakdown(btn, agentId) {
   const agentRow = (_reportAgentCache || []).find(a => a.agent_id === agentId);
   const credits = agentRow ? agentRow.credits : [];
   row.querySelector('td').innerHTML = credits.length
-    ? `<table><thead><tr><th>ID</th><th>Source</th><th>Status</th><th>Amount</th><th>Reason</th><th>Event Date</th><th>Issued</th><th>Redeemed</th><th>Method</th></tr></thead>
+    ? `<table><thead><tr><th>ID</th><th>Source</th><th>Status</th><th>Amount</th><th>Reason</th><th>Event Date</th><th>Issued</th><th>Redeemed</th><th>Method</th><th></th></tr></thead>
         <tbody>${credits.map(c => `<tr>
           <td style="font-variant-numeric:tabular-nums;font-weight:600">#${c.id}</td>
           <td>${esc(c.source_type)}</td>
@@ -660,8 +833,17 @@ function toggleAgentBreakdown(btn, agentId) {
           <td>${fmtDate(c.issued_at)}</td>
           <td>${fmtDate(c.redeemed_at)}</td>
           <td>${esc(c.redemption_method || '—')}</td>
+          <td>${c.issued_at ? `<button class="btn btn-ghost btn-sm" onclick="printFromDrilldown(${agentId}, ${c.id})">Print</button>` : ''}</td>
         </tr>`).join('')}</tbody></table>`
     : '<div class="empty-state">No credits for this agent yet.</div>';
+}
+
+function printFromDrilldown(agentId, creditId) {
+  const agentRow = (_reportAgentCache || []).find(a => a.agent_id === agentId);
+  if (!agentRow) return;
+  const c = agentRow.credits.find(x => x.id === creditId);
+  if (!c) return;
+  openPrintCert(c.id, agentRow.agent_first_name + ' ' + agentRow.agent_last_name, c.reason, c.amount, c.issued_at);
 }
 
 // ── Google auth ────────────────────────────────────────────────────────────────

@@ -2842,8 +2842,15 @@ function renderTodayTable(rows) {
     const [chipClass, chipLabel] = statusChip(item.transaction_status);
     const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000));
     const ageLabel = ageDays === 0 ? 'Today' : (ageDays === 1 ? '1 day' : `${ageDays} days`);
-    const linkCell = item.resource_url
-      ? `<a href="${escapeHtml(item.resource_url)}" target="_blank" rel="noopener" class="tbl-link" style="font-size:12px;">${escapeHtml(item.resource_label || 'Open')}</a>`
+    // {transactionId} in a checklist item's resource_url is substituted with
+    // the real transaction id before linking out — lets a task's link jump
+    // straight to "this closing's" record in another tool (e.g. Marketing
+    // Bucks) instead of a generic, un-filtered landing page.
+    const resolvedUrl = item.resource_url
+      ? item.resource_url.replace(/\{transactionId\}/g, encodeURIComponent(item.transaction_id))
+      : null;
+    const linkCell = resolvedUrl
+      ? `<a href="${escapeHtml(resolvedUrl)}" target="_blank" rel="noopener" class="tbl-link" style="font-size:12px;">${escapeHtml(item.resource_label || 'Open')}</a>`
       : '—';
     html += `
             <tr class="today-row" data-age="${ageDays}" data-type="${escapeHtml(item.title)}" data-addr="${escapeHtml(item.property_address)}" data-progress-id="${item.progress_id}" data-office="${escapeHtml(office)}">
