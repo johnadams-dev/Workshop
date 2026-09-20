@@ -134,6 +134,10 @@ tr:last-child td{border-bottom:none}
   .print-modal-head, .design-picker, .print-modal-actions{display:none !important}
   .print-modal-body{padding:0}
   .cert-preview{box-shadow:none}
+  /* Certificate #/amount now print on the certificate face itself (see
+     #cert-field-idamt) — the footer below the image is screen-only so it
+     can't push the printed certificate past a single page/sheet. */
+  .cert-footer{display:none !important}
 }
 </style>
 </head>
@@ -305,6 +309,7 @@ tr:last-child td{border-bottom:none}
         <div class="cert-field" id="cert-field-1"></div>
         <div class="cert-field" id="cert-field-2"></div>
         <div class="cert-field" id="cert-field-date"></div>
+        <div class="cert-field" id="cert-field-idamt" style="font-size:1.8cqw"></div>
       </div>
       <div class="cert-footer">
         <span><b>Certificate #</b><span id="cert-footer-id"></span></span>
@@ -383,17 +388,26 @@ function todayStr() { return new Date().toISOString().slice(0,10); }
 //    second line gets the reason/property text directly.
 // Manager Signature is deliberately left blank on all three for a real pen
 // signature.
+// Positions re-measured directly against the source artwork (2026-09-20 —
+// the old values landed agent/reason inside the printed labels themselves
+// and put the date down in the "FIFTY DOLLARS" banner). idAmt is new: the
+// certificate # and amount now print directly on the certificate face
+// (in the open parchment area above the banner) instead of only in the
+// on-screen footer below the image, which doesn't reliably survive print.
 const CERT_DESIGNS = [
   { file: 'assets/marketing-bucks/certificate-1.jpg', combined: true,
-    agent: { top: 38.7, left: 69.3, width: 23.3 },
-    date:  { top: 80.4, left: 69.3, width: 16.4 } },
+    agent: { top: 32.0, left: 66.5, width: 28.5 },
+    date:  { top: 60.0, left: 83.6, width: 12.5 },
+    idAmt: { top: 71.5, left: 66.5, width: 26.0 } },
   { file: 'assets/marketing-bucks/certificate-2.jpg', combined: false,
-    agent:   { top: 30.9, left: 69.3, width: 23.3 },
-    address: { top: 48.5, left: 69.3, width: 23.3 },
-    date:    { top: 80.4, left: 69.3, width: 16.4 } },
+    agent:   { top: 23.0, left: 66.5, width: 28.5 },
+    address: { top: 36.5, left: 66.5, width: 28.5 },
+    date:    { top: 60.0, left: 83.6, width: 12.5 },
+    idAmt:   { top: 76.0, left: 66.5, width: 26.0 } },
   { file: 'assets/marketing-bucks/certificate-3.jpg', combined: true,
-    agent: { top: 40.0, left: 69.3, width: 23.3 },
-    date:  { top: 80.4, left: 69.3, width: 16.4 } },
+    agent: { top: 34.0, left: 66.5, width: 28.5 },
+    date:  { top: 62.0, left: 83.6, width: 12.5 },
+    idAmt: { top: 71.5, left: 66.5, width: 26.0 } },
 ];
 let _certState = null; // { agentName, reason, amount, issuedAt, id, designIdx }
 
@@ -437,6 +451,10 @@ function renderCertPreview() {
 
   fieldDate.style.cssText = styleFor(d.date);
   fieldDate.textContent = fmtDate(issuedAt);
+
+  const fieldIdAmt = document.getElementById('cert-field-idamt');
+  fieldIdAmt.style.cssText = styleFor(d.idAmt) + ';font-size:1.8cqw';
+  fieldIdAmt.textContent = `Certificate #${id}  —  Amount: ${fmtMoney(amount)}`;
 
   document.getElementById('cert-footer-id').textContent = '#' + id;
   document.getElementById('cert-footer-amount').textContent = fmtMoney(amount);
@@ -558,10 +576,12 @@ function getManualSource() {
 }
 
 // ── Eligible / awaiting issuance ──────────────────────────────────────────────
+let _eligibleCache = []; // by id, so issueFromEligible can open Print Certificate immediately without a round-trip
 async function loadEligible() {
   const tbody = document.querySelector('#eligible-table tbody');
   try {
     const rows = await fetch(`${PROXY_URL}/marketing-bucks/eligible?${currentFilters()}`, { headers: H() }).then(r => r.json());
+    _eligibleCache = rows;
     document.getElementById('eligible-count').textContent = rows.length ? `${rows.length} awaiting issuance` : '';
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nothing awaiting issuance.</td></tr>';
@@ -586,14 +606,19 @@ async function loadEligible() {
 }
 
 async function issueFromEligible(id) {
+  const row = _eligibleCache.find(x => x.id === id);
   try {
     const r = await fetch(`${PROXY_URL}/marketing-bucks/issue`, {
       method: 'POST', headers: H(), body: JSON.stringify({ marketingBuckId: id }),
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    toast(`Credit issued — ID #${data.id}.`, 'ok');
     loadAll();
-    alert(`Credit issued — ID #${data.id}.\n\nWrite this number on the paper voucher so it's easy to match up during reconciliation.`);
+    if (row) {
+      openPrintCert(data.id, row.agent_first_name + ' ' + row.agent_last_name,
+        row.reason || row.property_address, row.amount, todayStr());
+    }
   } catch (e) {
     toast('Could not issue: ' + e.message, 'err');
   }
@@ -646,8 +671,11 @@ async function submitManualIssue() {
     msgEl.style.color = 'var(--ok-t)';
     document.getElementById('manual-reason').value = '';
     setTimeout(() => { msgEl.textContent = ''; }, 6000);
-    alert(`Credit issued — ID #${data.id}.\n\nWrite this number on the paper voucher so it's easy to match up during reconciliation.`);
     loadAll();
+
+    const agentOpt = document.getElementById('manual-agent').selectedOptions[0];
+    openPrintCert(data.id, agentOpt ? agentOpt.textContent : '', reason,
+      amount != null ? amount : 50, todayStr());
   } catch (e) {
     msgEl.textContent = 'Error: ' + e.message;
     msgEl.style.color = 'var(--red)';
