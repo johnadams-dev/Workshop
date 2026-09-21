@@ -7694,7 +7694,16 @@ async function foundationGeneratePDFs() {
       </style><div id="fl-letter-root">${letterHtml}</div>`;
       document.body.appendChild(snapshot);
 
-      const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false });
+      // foreignObjectRendering:true routes the capture through an SVG
+      // <foreignObject> so the browser lays the text out itself, instead of
+      // html2canvas's own manual DOM-to-canvas text engine — which is what
+      // was producing the doubled spaces and space-before-punctuation seen
+      // in generated letters (its glyph-width measurements don't exactly
+      // match how -apple-system/Segoe UI actually render, so it was
+      // inserting compensating gaps between words and punctuation it
+      // treated as separate runs). The template text in the database was
+      // confirmed clean — this was purely a rendering-path bug.
+      const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false, foreignObjectRendering:true });
       document.body.removeChild(snapshot);
 
       if (i > 0) pdf.addPage();
