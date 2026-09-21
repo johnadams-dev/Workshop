@@ -5961,12 +5961,17 @@ async function openDrawer(id) {
 function renderDrawer(t) {
   document.getElementById('drawerAddr').textContent = t.property_address || '—';
 
-  const mlsLink = (t.id_links || []).find(l => l.system && l.system.startsWith('mls_') && l.id_type === 'listing');
-  const fsLink  = (t.id_links || []).find(l => l.system === 'form_simplicity');
+  // A property cross-listed on two MLS boards has two matching id_links rows
+  // — show both (joined by " / "), not just whichever linked_at sorts first,
+  // so this doesn't disagree with the list view (which now also shows both).
+  const mlsLinks = (t.id_links || []).filter(l => l.system && l.system.startsWith('mls_') && l.id_type === 'listing')
+    .sort((a, b) => a.system.localeCompare(b.system));
+  const mlsLabel = mlsLinks.length ? mlsLinks.map(l => l.external_id).join(' / ') : null;
+  const fsLink   = (t.id_links || []).find(l => l.system === 'form_simplicity');
 
   const cityLine = [t.city, [t.state, t.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   document.getElementById('drawerSub').textContent =
-    [cityLine || null, mlsLink ? mlsLink.external_id : null].filter(Boolean).join(' · ');
+    [cityLine || null, mlsLabel].filter(Boolean).join(' · ');
 
   const [chipClass, chipLabel] = statusChip(t.status);
   const chip = document.getElementById('drawer-status-chip');
@@ -6001,7 +6006,7 @@ function renderDrawer(t) {
     document.getElementById('drawer-listdate').textContent = fmtDate(t.list_date);
   }
 
-  document.getElementById('drawer-mlsid').textContent = mlsLink ? mlsLink.external_id : '—';
+  document.getElementById('drawer-mlsid').textContent = mlsLabel || '—';
 
   document.getElementById('drawer-fs').innerHTML = fsLink ? '<span class="tbl-link">View file →</span>' : '—';
 
@@ -7184,16 +7189,34 @@ function vtRenderTable() {
         <th>Current Tour</th><th>Cameron's Stage Link</th><th>MLS#</th>
       </tr></thead>
       <tbody>
-        ${rows.map(r => `
+        ${rows.map(r => {
+          // Sibling boards for the same property (same address+city, case-
+          // insensitive) — used only to show what the OTHER board currently
+          // links to when this row is flagged tour_mismatch, so staff can
+          // tell at a glance which tour is which without opening both.
+          const siblings = r.tour_mismatch
+            ? vtData.rows.filter(o => o !== r
+                && (o.address || '').trim().toLowerCase() === (r.address || '').trim().toLowerCase()
+                && (o.city || '').trim().toLowerCase() === (r.city || '').trim().toLowerCase())
+            : [];
+          const mismatchNote = r.tour_mismatch
+            ? `<div class="td-muted" style="color:var(--red);margin-top:2px;">⚠ Boards disagree${
+                siblings.length ? ' — other board: ' + siblings.map(s => s.cs_tour_url
+                  ? `<a href="${escapeHtml(s.cs_tour_url)}" target="_blank" rel="noopener">#${escapeHtml(String(s.cs_tour_id))}</a>`
+                  : escapeHtml(s.provider_label)).join(', ') : ''
+              }</div>`
+            : '';
+          return `
           <tr>
             <td class="td-addr">${escapeHtml(r.address || '')}<div class="td-muted">${escapeHtml(r.city || '')}</div></td>
             <td>${escapeHtml(r.office_name || '')}</td>
             <td>${escapeHtml(r.agent_name || '')}</td>
             <td>${escapeHtml(r.status || '')}</td>
-            <td>${r.vtour_url ? `<a href="${escapeHtml(r.vtour_url)}" target="_blank" rel="noopener">${escapeHtml(r.provider_label)}</a>` : escapeHtml(r.provider_label)}</td>
+            <td>${r.vtour_url ? `<a href="${escapeHtml(r.vtour_url)}" target="_blank" rel="noopener">${escapeHtml(r.provider_label)}</a>` : escapeHtml(r.provider_label)}${mismatchNote}</td>
             <td>${r.cs_tour_url ? `<a href="${escapeHtml(r.cs_tour_url)}" target="_blank" rel="noopener">Copy link →</a>` : (r.needs_new_tour ? '<span class="td-muted">Needs new tour</span>' : '')}</td>
             <td>${escapeHtml(r.mls_id || '')}</td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table></div>`;
 
@@ -7203,10 +7226,10 @@ function vtRenderTable() {
 function vtExportCsv() {
   const rows = vtFilteredRows();
   if (!rows.length) return;
-  const header = ['Address', 'City', 'Office', 'Agent', 'Status', 'Provider', 'Current Tour URL', "Cameron's Stage Link", 'MLS#'];
+  const header = ['Address', 'City', 'Office', 'Agent', 'Status', 'Provider', 'Current Tour URL', "Cameron's Stage Link", 'MLS#', 'Tour Mismatch'];
   const csvRows = rows.map(r => [
     r.address || '', r.city || '', r.office_name || '', r.agent_name || '', r.status || '',
-    r.provider_label || '', r.vtour_url || '', r.cs_tour_url || '', r.mls_id || '',
+    r.provider_label || '', r.vtour_url || '', r.cs_tour_url || '', r.mls_id || '', r.tour_mismatch ? 'Yes' : '',
   ]);
   const csv = [header, ...csvRows]
     .map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))
