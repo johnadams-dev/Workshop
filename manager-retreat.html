@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Task Priority Rating — Adams Cameron &amp; Co.</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#0089B7;
+    --blue-deep:#046488;
+    --gray:#BBC4D6;
+    --pink:#D6326A;
+    --yellow:#F7DC40;
+    --ink:#172433;
+    --ink-soft:#586B7D;
+    --paper:#FBFCFD;
+    --line:#DFE5EC;
+    --card:#FFFFFF;
+    --danger:#B4275A;
+    --good:#1E8A5F;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#EAF0F5; --ink-soft:#93A5B8; --paper:#0D1420; --line:#223040; --card:#121B27; --gray:#3B4A5C;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#EAF0F5; --ink-soft:#93A5B8; --paper:#0D1420; --line:#223040; --card:#121B27; --gray:#3B4A5C;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:720px;margin:0 auto;padding:32px 20px 100px;}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.7rem;line-height:1.2;margin:0 0 8px;letter-spacing:-.01em;}
+  h2{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.3rem;margin:0 0 6px;}
+  p.lede{color:var(--ink-soft);font-size:.95rem;line-height:1.55;margin:0 0 22px;max-width:56ch;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:26px;padding-bottom:2px;}
+  .tab{border:none;background:none;cursor:pointer;font-size:.86rem;font-weight:500;color:var(--ink-soft);padding:9px 12px;border-radius:8px 8px 0 0;border-bottom:2px solid transparent;white-space:nowrap;}
+  .tab.active{color:var(--blue-deep);border-bottom-color:var(--blue);background:rgba(0,137,183,.06);}
+  .tab .tab-check{margin-left:5px;color:var(--good);}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;}
+  .progress-wrap{margin-bottom:20px;}
+  .progress-track{height:6px;background:var(--line);border-radius:99px;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--pink),var(--yellow));border-radius:99px;transition:width .25s;}
+  .progress-label{font-size:.8rem;color:var(--ink-soft);margin-top:7px;}
+  .item-path{font-size:.78rem;color:var(--ink-soft);margin-bottom:4px;}
+  .item-text{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:1.35rem;line-height:1.3;margin:0 0 22px;}
+  .scale-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .scale-btn{flex:1;min-width:52px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:14px 8px;font-size:1.15rem;font-weight:600;cursor:pointer;transition:border-color .12s, background .12s, transform .08s;}
+  .scale-btn:hover{border-color:var(--blue);}
+  .scale-btn:active{transform:scale(.97);}
+  .scale-caption{display:flex;justify-content:space-between;font-size:.74rem;color:var(--ink-soft);margin-top:8px;}
+  .nav-row{display:flex;justify-content:space-between;align-items:center;margin-top:24px;}
+  .ghost-btn{border:none;background:none;cursor:pointer;color:var(--ink-soft);font-size:.85rem;padding:8px 4px;}
+  .ghost-btn:hover{color:var(--ink);}
+  .ghost-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .done-state{text-align:center;padding:20px 10px;}
+  .done-check{width:52px;height:52px;border-radius:50%;background:rgba(30,138,95,.12);color:var(--good);display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 16px;}
+  .compare-item{border:1.5px solid var(--line);border-radius:12px;padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;}
+  .compare-item-text{flex:1;font-size:1rem;line-height:1.4;}
+  .compare-item-path{font-size:.74rem;color:var(--ink-soft);display:block;margin-bottom:2px;}
+  .pick-btn{border:1.5px solid var(--line);background:var(--paper);border-radius:8px;padding:8px 12px;font-size:.8rem;font-weight:600;cursor:pointer;color:var(--ink-soft);flex:none;}
+  .pick-btn.best{color:var(--good);}
+  .pick-btn.best.selected{background:rgba(30,138,95,.12);border-color:var(--good);}
+  .pick-btn.worst{color:var(--danger);}
+  .pick-btn.worst.selected{background:rgba(180,39,90,.12);border-color:var(--danger);}
+  .pick-hint{font-size:.82rem;color:var(--ink-soft);margin-bottom:4px;}
+  .primary-btn{border:none;cursor:pointer;font-weight:600;font-size:.92rem;color:#fff;padding:11px 22px;border-radius:99px;background:linear-gradient(90deg,var(--pink),var(--yellow));box-shadow:0 1px 2px rgba(0,0,0,.12);}
+  .primary-btn:disabled{opacity:.4;cursor:not-allowed;}
+  .waiting{text-align:center;color:var(--ink-soft);padding:60px 20px;font-size:.95rem;}
+  .admin-bar{border:1px dashed var(--blue);border-radius:12px;padding:14px 16px;margin-bottom:24px;font-size:.84rem;}
+  .admin-title{font-weight:600;color:var(--blue-deep);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .admin-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .admin-chip{border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:.78rem;display:flex;align-items:center;gap:8px;background:var(--paper);}
+  .admin-chip button{border:none;background:none;cursor:pointer;font-size:.78rem;font-weight:600;padding:2px 6px;border-radius:6px;}
+  .admin-chip button.open{color:var(--good);}
+  .admin-chip button.close{color:var(--danger);}
+  .admin-count{color:var(--ink-soft);}
+  table.results-table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:14px;}
+  table.results-table th, table.results-table td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);}
+  table.results-table th{cursor:pointer;color:var(--ink-soft);font-weight:600;font-size:.74rem;user-select:none;white-space:nowrap;}
+  table.results-table th:hover{color:var(--blue-deep);}
+  table.results-table td.num{font-variant-numeric:tabular-nums;}
+  .chart-select{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
+  .chart-select button{border:1px solid var(--line);background:var(--paper);color:var(--ink-soft);border-radius:99px;padding:7px 14px;font-size:.78rem;font-weight:500;cursor:pointer;}
+  .chart-select button.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .scroll-x{overflow-x:auto;}
+  .quad-label{font-size:.68rem;fill:var(--ink-soft);}
+  .quad-point{fill:var(--blue);stroke:var(--card);stroke-width:1.5;}
+  .quad-point:hover{fill:var(--pink);}
+  .axis-line{stroke:var(--line);stroke-width:1;}
+  .mid-line{stroke:var(--gray);stroke-width:1;stroke-dasharray:3,3;}
+  .footer-link{text-align:center;margin-top:40px;}
+  .footer-link button{border:none;background:none;color:var(--ink-soft);font-size:.76rem;cursor:pointer;text-decoration:underline;}
+  ::selection{background:rgba(0,137,183,.25);}
+
+  /* ── Facilitator sign-in overlay — only ever shown after an explicit click,
+     never on load, never for an ordinary rater ── */
+  .fac-overlay{position:fixed;inset:0;background:rgba(15,20,26,.5);display:none;align-items:center;justify-content:center;z-index:500;padding:20px;}
+  .fac-overlay.open{display:flex;}
+  .fac-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .fac-card h2{font-size:1.1rem;margin-bottom:6px;}
+  .fac-card p{font-size:.85rem;color:var(--ink-soft);margin-bottom:18px;line-height:1.5;}
+  .fac-signin-btn{display:flex;justify-content:center;min-height:40px;}
+  .fac-close{margin-top:14px;border:none;background:none;color:var(--ink-soft);font-size:.8rem;cursor:pointer;text-decoration:underline;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="fac-overlay" id="fac-overlay">
+  <div class="fac-card">
+    <h2>Facilitator sign-in</h2>
+    <p>Admin accounts only. This is separate from rating — ratings themselves never record who submitted them.</p>
+    <div class="fac-signin-btn" id="fac-signin-btn"></div>
+    <button type="button" class="fac-close" onclick="closeFacilitatorOverlay()">Cancel</button>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+
+  var appEl = document.getElementById("app");
+
+  var PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
+  var GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+
+  var items = [];
+  var itemsById = {};
+  var phaseState = { open_success:false, open_time:false, open_mission:false, open_revenue:false, results_open:false };
+  var counts = { success:0, time:0, mission:0, revenue:0 };
+
+  // Set only once an explicit facilitator sign-in has been confirmed admin
+  // server-side (GET /retreat/admin/whoami) — never populated automatically,
+  // never read from localStorage until the facilitator clicks the footer
+  // link. Ordinary raters never trigger any of this.
+  var isAdmin = false;
+  var facilitator = null; // { proxyKey, email }
+  var gsiLoaded = false;
+
+  var activeTab = null;
+  var resultsData = null;
+  var resultsChart = "mv_success";
+  var tableSort = { key:"path", dir:"asc" };
+
+  var ROUNDS_PER_COMPARE = 16;
+  var GROUP_SIZE = 4;
+
+  var LOCAL_KEY = "retreatRatingV1";
+  var localData = null;
+
+  var POLL_MS = 4000;
+
+  // ---------------- helpers ----------------
+
+  function el(tag, className, text){
+    var e = document.createElement(tag);
+    if (className) e.className = className;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function shuffle(arr){
+    for (var i = arr.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function loadLocalFlags(){
+    try {
+      var raw = window.localStorage.getItem(LOCAL_KEY);
+      localData = raw ? JSON.parse(raw) : {};
+    } catch (e){ localData = {}; }
+    if (!localData.success) localData.success = { submitted:false, values:{}, index:0, order:null };
+    if (!localData.time) localData.time = { submitted:false, values:{}, index:0, order:null };
+    if (!localData.mission) localData.mission = { submitted:false, rounds:null, roundIndex:0 };
+    if (!localData.revenue) localData.revenue = { submitted:false, rounds:null, roundIndex:0 };
+  }
+
+  function saveLocal(){
+    try { window.localStorage.setItem(LOCAL_KEY, JSON.stringify(localData)); } catch (e){}
+  }
+
+  function getPhaseSession(key){ return localData[key]; }
+
+  function phaseLabel(key){
+    var map = { success:"Current Success", time:"Time Spent", mission:"Mission/Vision", revenue:"Revenue" };
+    return map[key] || key;
+  }
+
+  function phaseIntro(key){
+    var map = {
+      success: "For each task, rate how well we're currently doing it — 1 is not at all, 5 is excellent.",
+      time: "For each task, rate how much time it takes relative to everything else on the list — 1 is very little, 5 is a great deal.",
+      mission: "You'll see small groups of tasks. Pick the one that most supports our mission and vision, and the one that supports it least.",
+      revenue: "You'll see small groups of tasks. Pick the one that contributes most to Company Dollar — the brokerage's retained share, short and long term, not gross sales or agent GCI — and the one that contributes least."
+    };
+    return map[key] || "";
+  }
+
+  function apiFetch(path, opts){
+    opts = opts || {};
+    var headers = opts.headers || {};
+    if (opts.admin && facilitator) {
+      headers["x-proxy-key"] = facilitator.proxyKey;
+      headers["x-user-email"] = facilitator.email;
+    }
+    return fetch(PROXY + path, {
+      method: opts.method || "GET",
+      headers: opts.body ? Object.assign({ "Content-Type": "application/json" }, headers) : headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function(r){
+      return r.json().then(function(data){ return { ok: r.ok, status: r.status, data: data }; });
+    });
+  }
+
+  // ---------------- boot ----------------
+  // No auth, no sign-in prompt, no identifying network call of any kind for
+  // an ordinary rater — GET /state and POST /submit/* (below) are the only
+  // requests this page makes until a facilitator deliberately opts in via
+  // the footer link.
+
+  function boot(){
+    loadLocalFlags();
+    render();
+    refreshState();
+    setInterval(refreshState, POLL_MS);
+  }
+
+  function refreshState(){
+    return apiFetch("/retreat/state").then(function(res){
+      if (!res.ok) return;
+      items = res.data.items || [];
+      itemsById = {};
+      items.forEach(function(it){ itemsById[it.id] = it; });
+      phaseState = res.data.phase || phaseState;
+      counts = res.data.counts || counts;
+      if (activeTab === "results") loadResults();
+      render();
+    }).catch(function(){});
+  }
+
+  // ---------------- facilitator sign-in (opt-in only) ----------------
+
+  function openFacilitatorFlow(){
+    var cachedKey = null, cachedEmail = null;
+    try {
+      cachedKey = window.localStorage.getItem("ac_proxy_key");
+      cachedEmail = window.localStorage.getItem("ac_user_email");
+    } catch (e){}
+    if (cachedKey && cachedEmail) {
+      checkAdminWhoami(cachedKey, cachedEmail);
+      return;
+    }
+    document.getElementById("fac-overlay").classList.add("open");
+    loadGsi();
+  }
+
+  function closeFacilitatorOverlay(){
+    document.getElementById("fac-overlay").classList.remove("open");
+  }
+
+  function loadGsi(){
+    if (gsiLoaded) {
+      renderGsiButton();
+      return;
+    }
+    var s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.defer = true;
+    s.onload = function(){ gsiLoaded = true; renderGsiButton(); };
+    document.head.appendChild(s);
+  }
+
+  function renderGsiButton(){
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn });
+    google.accounts.id.renderButton(
+      document.getElementById("fac-signin-btn"),
+      { theme: "outline", size: "large", width: 240, text: "signin_with" }
+    );
+  }
+
+  function handleGoogleSignIn(response){
+    var email = "";
+    try { email = JSON.parse(atob(response.credential.split(".")[1])).email || ""; } catch (e){}
+    fetch(PROXY + "/config/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: response.credential })
+    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
+      .then(function(res){
+        if (!res.ok || !res.data.proxyKey) { window.alert("Sign-in failed."); return; }
+        try {
+          window.localStorage.setItem("ac_proxy_key", res.data.proxyKey);
+          window.localStorage.setItem("ac_user_email", email);
+        } catch (e){}
+        checkAdminWhoami(res.data.proxyKey, email);
+      }).catch(function(){ window.alert("Sign-in failed."); });
+  }
+
+  function checkAdminWhoami(proxyKey, email){
+    apiFetch("/retreat/admin/whoami", { headers: { "x-proxy-key": proxyKey, "x-user-email": email } }).then(function(res){
+      closeFacilitatorOverlay();
+      if (res.ok && res.data.isAdmin){
+        facilitator = { proxyKey: proxyKey, email: email };
+        isAdmin = true;
+        render();
+      } else {
+        window.alert("That account isn't an admin — facilitator controls require an admin account.");
+      }
+    }).catch(function(){
+      closeFacilitatorOverlay();
+      window.alert("Could not verify facilitator access.");
+    });
+  }
+
+  // ---------------- admin actions ----------------
+
+  function togglePhaseOpen(key, value){
+    apiFetch("/retreat/admin/phase", { method:"POST", admin:true, body:{ key:key, value:value } }).then(function(){
+      refreshState();
+    });
+  }
+  function toggleResults(value){ togglePhaseOpen("results", value); }
+
+  // ---------------- submissions ----------------
+
+  function submitScalePhase(phaseKey, sess){
+    apiFetch("/retreat/submit/" + phaseKey, { method:"POST", body:{ values: sess.values } }).then(function(res){
+      if (res.ok){
+        sess.submitted = true;
+        saveLocal();
+      }
+      render();
+    }).catch(function(){ render(); });
+  }
+
+  function submitComparePhase(phaseKey, sess){
+    var payload = { rounds: sess.rounds.map(function(r){ return { group:r.group, best:r.best, worst:r.worst }; }) };
+    apiFetch("/retreat/submit/" + phaseKey, { method:"POST", body: payload }).then(function(res){
+      if (res.ok){
+        sess.submitted = true;
+        saveLocal();
+      }
+      render();
+    }).catch(function(){ render(); });
+  }
+
+  function loadResults(){
+    apiFetch("/retreat/results", { admin: isAdmin }).then(function(res){
+      if (res.ok) resultsData = res.data;
+      render();
+    }).catch(function(){});
+  }
+
+  // ---------------- rendering: shell ----------------
+
+  function render(){
+    appEl.innerHTML = "";
+
+    appEl.appendChild(buildHeader());
+
+    if (isAdmin) appEl.appendChild(buildAdminBar());
+
+    var tabDefs = getOpenTabDefs();
+    if (tabDefs.length === 0){
+      appEl.appendChild(el("div", "waiting", "Nothing's open for rating yet. Your facilitator will open a section shortly."));
+      appEl.appendChild(buildFooterLink());
+      return;
+    }
+    if (!activeTab || !tabDefs.some(function(t){ return t.key === activeTab; })){
+      activeTab = tabDefs[0].key;
+    }
+
+    appEl.appendChild(buildTabs(tabDefs));
+
+    if (activeTab === "results"){
+      if (!resultsData) loadResults();
+      appEl.appendChild(buildResults());
+    } else {
+      appEl.appendChild(el("p", "lede", phaseIntro(activeTab)));
+      if (activeTab === "success" || activeTab === "time"){
+        appEl.appendChild(buildScalePhase(activeTab));
+      } else {
+        appEl.appendChild(buildComparePhase(activeTab));
+      }
+    }
+
+    appEl.appendChild(buildFooterLink());
+  }
+
+  function buildFooterLink(){
+    var wrap = el("div", "footer-link");
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = isAdmin ? "Facilitator mode is on" : "Facilitator sign-in";
+    if (!isAdmin) btn.addEventListener("click", openFacilitatorFlow);
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function buildHeader(){
+    var header = document.createElement("header");
+    header.appendChild(el("h1", null, "Task Priority Rating"));
+    header.appendChild(el("p", "lede", "Anonymous — your answers are combined with every manager's. Nobody sees who rated what."));
+    return header;
+  }
+
+  function getOpenTabDefs(){
+    var defs = [];
+    if (phaseState.open_success) defs.push({ key:"success", label:"Current Success" });
+    if (phaseState.open_time) defs.push({ key:"time", label:"Time Spent" });
+    if (phaseState.open_mission) defs.push({ key:"mission", label:"Mission/Vision" });
+    if (phaseState.open_revenue) defs.push({ key:"revenue", label:"Revenue" });
+    if (phaseState.results_open) defs.push({ key:"results", label:"Results" });
+    return defs;
+  }
+
+  function buildTabs(tabDefs){
+    var wrap = el("div", "tabs");
+    tabDefs.forEach(function(t){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab" + (activeTab === t.key ? " active" : "");
+      b.textContent = t.label;
+      var sess = t.key !== "results" ? localData[t.key] : null;
+      if (sess && sess.submitted){
+        b.appendChild(el("span", "tab-check", "✓"));
+      }
+      b.addEventListener("click", function(){
+        activeTab = t.key;
+        if (t.key === "results") loadResults();
+        render();
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  function buildAdminBar(){
+    var wrap = el("div", "admin-bar");
+    wrap.appendChild(el("div", "admin-title", "Facilitator controls"));
+    var grid = el("div", "admin-grid");
+
+    var phaseDefs = [
+      { key:"success", label:"Current success" },
+      { key:"time", label:"Time spent" },
+      { key:"mission", label:"Mission/vision" },
+      { key:"revenue", label:"Revenue" }
+    ];
+    phaseDefs.forEach(function(pd){
+      var chip = el("div", "admin-chip");
+      var isOpen = !!phaseState["open_" + pd.key];
+      chip.appendChild(document.createTextNode(pd.label + " "));
+      chip.appendChild(el("span", "admin-count", "(" + counts[pd.key] + ")"));
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = isOpen ? "close" : "open";
+      btn.textContent = isOpen ? "Close" : "Open";
+      btn.addEventListener("click", function(){ togglePhaseOpen(pd.key, !isOpen); });
+      chip.appendChild(btn);
+      grid.appendChild(chip);
+    });
+
+    var resChip = el("div", "admin-chip");
+    resChip.appendChild(document.createTextNode("Results "));
+    var resBtn = document.createElement("button");
+    resBtn.type = "button";
+    resBtn.className = phaseState.results_open ? "close" : "open";
+    resBtn.textContent = phaseState.results_open ? "Hide" : "Show";
+    resBtn.addEventListener("click", function(){ toggleResults(!phaseState.results_open); });
+    resChip.appendChild(resBtn);
+    grid.appendChild(resChip);
+
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  // ---------------- scale phase (1-5) ----------------
+
+  function buildScalePhase(phaseKey){
+    var wrap = document.createElement("div");
+    if (items.length === 0){
+      wrap.appendChild(el("p", "lede", "Loading tasks…"));
+      return wrap;
+    }
+    var sess = getPhaseSession(phaseKey);
+    if (sess.submitted){
+      wrap.appendChild(buildDoneCard(phaseLabel(phaseKey)));
+      return wrap;
+    }
+    if (!sess.order || !sess.order.length){
+      sess.order = shuffle(items.map(function(it){ return it.id; }));
+      saveLocal();
+    }
+    var order = sess.order.filter(function(id){ return itemsById[id]; });
+    if (order.length === 0){
+      wrap.appendChild(el("p", "lede", "No items to rate."));
+      return wrap;
+    }
+    var idx = Math.min(sess.index, order.length - 1);
+    var item = itemsById[order[idx]];
+
+    var card = el("div", "card");
+    card.appendChild(buildProgress(idx, order.length));
+    card.appendChild(el("div", "item-path", item.path));
+    card.appendChild(el("div", "item-text", item.text));
+
+    var scaleRow = el("div", "scale-row");
+    for (var v = 1; v <= 5; v++){
+      (function(v){
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "scale-btn";
+        btn.textContent = String(v);
+        btn.addEventListener("click", function(){
+          sess.values[item.id] = v;
+          sess.index = idx + 1;
+          saveLocal();
+          if (sess.index >= order.length){
+            submitScalePhase(phaseKey, sess);
+          } else {
+            render();
+          }
+        });
+        scaleRow.appendChild(btn);
+      })(v);
+    }
+    card.appendChild(scaleRow);
+
+    var caption = el("div", "scale-caption");
+    caption.appendChild(el("span", null, phaseKey === "success" ? "Not at all" : "Very little time"));
+    caption.appendChild(el("span", null, phaseKey === "success" ? "Excellent" : "A great deal of time"));
+    card.appendChild(caption);
+
+    var nav = el("div", "nav-row");
+    var backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "ghost-btn";
+    backBtn.textContent = "← Back";
+    backBtn.disabled = idx === 0;
+    backBtn.addEventListener("click", function(){ sess.index = Math.max(0, idx - 1); saveLocal(); render(); });
+    nav.appendChild(backBtn);
+    card.appendChild(nav);
+
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  function buildProgress(idx, total){
+    var wrap = el("div", "progress-wrap");
+    var track = el("div", "progress-track");
+    var fill = el("div", "progress-fill");
+    fill.style.width = Math.round((idx / total) * 100) + "%";
+    track.appendChild(fill);
+    wrap.appendChild(track);
+    wrap.appendChild(el("div", "progress-label", (idx + 1) + " of " + total));
+    return wrap;
+  }
+
+  function buildDoneCard(label){
+    var card = el("div", "card done-state");
+    card.appendChild(el("div", "done-check", "✓"));
+    card.appendChild(el("h2", null, "Thanks — you're done with " + label + "."));
+    card.appendChild(el("p", "lede", "Your answers are in. Switch tabs if another section is open."));
+    return card;
+  }
+
+  // ---------------- compare phase (best-worst) ----------------
+
+  function generateRounds(itemList, roundsNeeded, groupSize){
+    var rounds = [];
+    var pool = [];
+    var guard = 0;
+    while (rounds.length < roundsNeeded && guard < 500){
+      guard++;
+      if (pool.length < groupSize) pool = pool.concat(shuffle(itemList.slice()));
+      var group = pool.splice(0, groupSize).map(function(it){ return it.id; });
+      if (group.length === groupSize) rounds.push({ group:group, best:null, worst:null });
+    }
+    return rounds;
+  }
+
+  function buildComparePhase(phaseKey){
+    var wrap = document.createElement("div");
+    if (items.length === 0){
+      wrap.appendChild(el("p", "lede", "Loading tasks…"));
+      return wrap;
+    }
+    var groupSize = Math.min(GROUP_SIZE, items.length);
+    if (items.length < 2){
+      wrap.appendChild(el("p", "lede", "Need at least two items to compare."));
+      return wrap;
+    }
+    var sess = getPhaseSession(phaseKey);
+    if (sess.submitted){
+      wrap.appendChild(buildDoneCard(phaseLabel(phaseKey)));
+      return wrap;
+    }
+    if (!sess.rounds || !sess.rounds.length){
+      sess.rounds = generateRounds(items, ROUNDS_PER_COMPARE, groupSize);
+      sess.roundIndex = 0;
+      saveLocal();
+    }
+    var idx = Math.min(sess.roundIndex, sess.rounds.length - 1);
+    var round = sess.rounds[idx];
+
+    var card = el("div", "card");
+    card.appendChild(buildProgress(idx, sess.rounds.length));
+    card.appendChild(el("div", "pick-hint", "Tap “Most” for one, “Least” for one."));
+
+    round.group.forEach(function(itemId){
+      var it = itemsById[itemId];
+      if (!it) return;
+      var row = el("div", "compare-item");
+
+      var textWrap = el("div", "compare-item-text");
+      textWrap.appendChild(el("span", "compare-item-path", it.path));
+      textWrap.appendChild(document.createTextNode(it.text));
+      row.appendChild(textWrap);
+
+      var bestBtn = document.createElement("button");
+      bestBtn.type = "button";
+      bestBtn.className = "pick-btn best" + (round.best === itemId ? " selected" : "");
+      bestBtn.textContent = "Most";
+      bestBtn.addEventListener("click", function(){
+        round.best = (round.best === itemId) ? null : itemId;
+        if (round.worst === itemId) round.worst = null;
+        saveLocal();
+        render();
+      });
+      row.appendChild(bestBtn);
+
+      var worstBtn = document.createElement("button");
+      worstBtn.type = "button";
+      worstBtn.className = "pick-btn worst" + (round.worst === itemId ? " selected" : "");
+      worstBtn.textContent = "Least";
+      worstBtn.addEventListener("click", function(){
+        round.worst = (round.worst === itemId) ? null : itemId;
+        if (round.best === itemId) round.best = null;
+        saveLocal();
+        render();
+      });
+      row.appendChild(worstBtn);
+
+      card.appendChild(row);
+    });
+
+    var nav = el("div", "nav-row");
+    var backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "ghost-btn";
+    backBtn.textContent = "← Back";
+    backBtn.disabled = idx === 0;
+    backBtn.addEventListener("click", function(){ sess.roundIndex = Math.max(0, idx - 1); saveLocal(); render(); });
+    nav.appendChild(backBtn);
+
+    var nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "primary-btn";
+    nextBtn.textContent = (idx === sess.rounds.length - 1) ? "Finish" : "Next →";
+    nextBtn.disabled = !(round.best && round.worst);
+    nextBtn.addEventListener("click", function(){
+      sess.roundIndex = idx + 1;
+      saveLocal();
+      if (sess.roundIndex >= sess.rounds.length){
+        submitComparePhase(phaseKey, sess);
+      } else {
+        render();
+      }
+    });
+    nav.appendChild(nextBtn);
+    card.appendChild(nav);
+
+    wrap.appendChild(card);
+    return wrap;
+  }
+
+  // ---------------- results ----------------
+
+  var CHART_CONFIGS = [
+    { key:"mv_success", label:"Mission × Success", xKey:"missionScore", yKey:"success", xLabel:"Mission/vision importance", yLabel:"Current success", kind:"success" },
+    { key:"mv_time", label:"Mission × Time", xKey:"missionScore", yKey:"time", xLabel:"Mission/vision importance", yLabel:"Time spent", kind:"time" },
+    { key:"rev_success", label:"Revenue × Success", xKey:"revenueScore", yKey:"success", xLabel:"Revenue importance (Company Dollar)", yLabel:"Current success", kind:"success" },
+    { key:"rev_time", label:"Revenue × Time", xKey:"revenueScore", yKey:"time", xLabel:"Revenue importance (Company Dollar)", yLabel:"Time spent", kind:"time" },
+    { key:"mv_rev", label:"Mission × Revenue", xKey:"missionScore", yKey:"revenueScore", xLabel:"Mission/vision importance", yLabel:"Revenue importance (Company Dollar)", kind:"combo" }
+  ];
+
+  function buildResults(){
+    var wrap = document.createElement("div");
+
+    if (!resultsData){
+      wrap.appendChild(el("p", "lede", "Loading results…"));
+      return wrap;
+    }
+    var scoreList = resultsData.scores || [];
+    var c = resultsData.counts || counts;
+
+    wrap.appendChild(el("p", "lede",
+      "Submissions so far — Success: " + c.success + ", Time: " + c.time +
+      ", Mission/vision: " + c.mission + ", Revenue: " + c.revenue + "."));
+
+    var selectRow = el("div", "chart-select");
+    CHART_CONFIGS.forEach(function(cfg){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = cfg.label;
+      b.className = (resultsChart === cfg.key) ? "active" : "";
+      b.addEventListener("click", function(){ resultsChart = cfg.key; render(); });
+      selectRow.appendChild(b);
+    });
+    wrap.appendChild(selectRow);
+
+    var cfg = CHART_CONFIGS.filter(function(cc){ return cc.key === resultsChart; })[0] || CHART_CONFIGS[0];
+
+    var chartCard = el("div", "card scroll-x");
+    chartCard.appendChild(renderQuadrantChart(scoreList, cfg));
+    wrap.appendChild(chartCard);
+
+    wrap.appendChild(renderResultsTable(scoreList));
+    wrap.appendChild(buildDisagreement(scoreList));
+
+    return wrap;
+  }
+
+  function buildDisagreement(scoreList){
+    var wrap = el("div", "card");
+    wrap.style.marginTop = "18px";
+    wrap.appendChild(el("h2", null, "Biggest splits"));
+    wrap.appendChild(el("p", "lede", "Where managers disagreed most — worth raising directly in the discussion. Needs at least 3 responses on an item to show up here."));
+
+    var sections = [
+      {
+        title: "Current success",
+        items: scoreList.filter(function(s){ return s.successN >= 3; })
+          .sort(function(a, b){ return (b.successRawRange || 0) - (a.successRawRange || 0); }).slice(0, 5),
+        render: function(s){ return "ranged " + s.successRawMin + "–" + s.successRawMax + " (n=" + s.successN + ")"; }
+      },
+      {
+        title: "Time spent",
+        items: scoreList.filter(function(s){ return s.timeN >= 3; })
+          .sort(function(a, b){ return (b.timeRawRange || 0) - (a.timeRawRange || 0); }).slice(0, 5),
+        render: function(s){ return "ranged " + s.timeRawMin + "–" + s.timeRawMax + " (n=" + s.timeN + ")"; }
+      },
+      {
+        title: "Mission/vision",
+        items: scoreList.filter(function(s){ return s.missionShown >= 3; })
+          .sort(function(a, b){ return (b.missionContested || 0) - (a.missionContested || 0); }).slice(0, 5),
+        render: function(s){ return "picked most " + s.missionBest + "×, least " + s.missionWorst + "× (seen " + s.missionShown + "×)"; }
+      },
+      {
+        title: "Revenue",
+        items: scoreList.filter(function(s){ return s.revenueShown >= 3; })
+          .sort(function(a, b){ return (b.revenueContested || 0) - (a.revenueContested || 0); }).slice(0, 5),
+        render: function(s){ return "picked most " + s.revenueBest + "×, least " + s.revenueWorst + "× (seen " + s.revenueShown + "×)"; }
+      }
+    ];
+
+    sections.forEach(function(sec){
+      var subTitle = el("div", null, sec.title);
+      subTitle.style.fontWeight = "600";
+      subTitle.style.fontSize = ".82rem";
+      subTitle.style.color = "var(--blue-deep)";
+      subTitle.style.margin = "16px 0 6px";
+      wrap.appendChild(subTitle);
+      if (sec.items.length === 0){
+        wrap.appendChild(el("div", "lede", "Not enough data yet."));
+        return;
+      }
+      sec.items.forEach(function(s){
+        var row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.justifyContent = "space-between";
+        row.style.gap = "12px";
+        row.style.padding = "6px 0";
+        row.style.borderBottom = "1px solid var(--line)";
+        row.style.fontSize = ".85rem";
+        var left = document.createElement("span");
+        left.textContent = s.text;
+        var right = document.createElement("span");
+        right.style.color = "var(--ink-soft)";
+        right.style.flex = "none";
+        right.textContent = sec.render(s);
+        row.appendChild(left);
+        row.appendChild(right);
+        wrap.appendChild(row);
+      });
+    });
+
+    return wrap;
+  }
+
+  function quadrantLabels(kind){
+    if (kind === "success"){
+      return { hh:"On track", lh:"Doing well, lower priority", hl:"Fix first", ll:"Low priority" };
+    }
+    if (kind === "time"){
+      return { hh:"Worth the investment", lh:"Time sink — reduce", hl:"Underinvested", ll:"Low priority, low time" };
+    }
+    return { hh:"Core priorities", lh:"Revenue driver, low mission fit", hl:"Mission-critical, not revenue", ll:"Cut or automate" };
+  }
+
+  function addSvgText(svg, x, y, str, anchor, transform){
+    var t = document.createElementNS(svg.namespaceURI, "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("text-anchor", anchor || "start");
+    if (transform) t.setAttribute("transform", transform);
+    t.setAttribute("class", "quad-label");
+    t.textContent = str;
+    svg.appendChild(t);
+  }
+
+  function renderQuadrantChart(scoreList, cfg){
+    var w = 640, h = 420, pad = 46;
+    var pts = scoreList.filter(function(s){ return s[cfg.xKey] != null && s[cfg.yKey] != null; });
+
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svg.setAttribute("width", "100%");
+    svg.style.minWidth = "560px";
+    svg.style.display = "block";
+
+    function sx(v){ return pad + (v - 1) / 4 * (w - 2 * pad); }
+    function sy(v){ return h - pad - (v - 1) / 4 * (h - 2 * pad); }
+
+    var rect = document.createElementNS(svg.namespaceURI, "rect");
+    rect.setAttribute("x", pad); rect.setAttribute("y", pad);
+    rect.setAttribute("width", w - 2 * pad); rect.setAttribute("height", h - 2 * pad);
+    rect.setAttribute("fill", "none"); rect.setAttribute("class", "axis-line");
+    svg.appendChild(rect);
+
+    var vline = document.createElementNS(svg.namespaceURI, "line");
+    vline.setAttribute("x1", sx(3)); vline.setAttribute("x2", sx(3));
+    vline.setAttribute("y1", pad); vline.setAttribute("y2", h - pad);
+    vline.setAttribute("class", "mid-line");
+    svg.appendChild(vline);
+
+    var hline = document.createElementNS(svg.namespaceURI, "line");
+    hline.setAttribute("y1", sy(3)); hline.setAttribute("y2", sy(3));
+    hline.setAttribute("x1", pad); hline.setAttribute("x2", w - pad);
+    hline.setAttribute("class", "mid-line");
+    svg.appendChild(hline);
+
+    addSvgText(svg, w / 2, h - 10, cfg.xLabel, "middle");
+    addSvgText(svg, 14, h / 2, cfg.yLabel, "middle", "rotate(-90 14 " + (h / 2) + ")");
+
+    var ql = quadrantLabels(cfg.kind);
+    addSvgText(svg, sx(4.5), sy(4.5) - 6, ql.hh, "end");
+    addSvgText(svg, sx(1.5), sy(4.5) - 6, ql.lh, "start");
+    addSvgText(svg, sx(4.5), sy(1.5) + 16, ql.hl, "end");
+    addSvgText(svg, sx(1.5), sy(1.5) + 16, ql.ll, "start");
+
+    pts.forEach(function(p){
+      var c = document.createElementNS(svg.namespaceURI, "circle");
+      c.setAttribute("cx", sx(p[cfg.xKey]));
+      c.setAttribute("cy", sy(p[cfg.yKey]));
+      c.setAttribute("r", 5);
+      c.setAttribute("class", "quad-point");
+      var title = document.createElementNS(svg.namespaceURI, "title");
+      title.textContent = p.text + " (" + p[cfg.xKey].toFixed(1) + ", " + p[cfg.yKey].toFixed(1) + ")";
+      c.appendChild(title);
+      svg.appendChild(c);
+    });
+
+    if (pts.length === 0){
+      addSvgText(svg, w / 2, h / 2, "No data yet for this pair.", "middle");
+    }
+
+    return svg;
+  }
+
+  function renderResultsTable(scoreList){
+    var wrap = el("div", "card scroll-x");
+    wrap.style.marginTop = "18px";
+    wrap.appendChild(el("h2", null, "All items"));
+
+    var cols = [
+      { key:"path", label:"Category" },
+      { key:"text", label:"Task" },
+      { key:"owner", label:"Owner" },
+      { key:"missionScore", label:"Mission" },
+      { key:"revenueScore", label:"Revenue" },
+      { key:"success", label:"Success" },
+      { key:"time", label:"Time" }
+    ];
+
+    var sorted = scoreList.slice().sort(function(a, b){
+      var av = a[tableSort.key], bv = b[tableSort.key];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "string"){ av = av.toLowerCase(); bv = (bv || "").toLowerCase(); }
+      if (av < bv) return tableSort.dir === "asc" ? -1 : 1;
+      if (av > bv) return tableSort.dir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    var table = document.createElement("table");
+    table.className = "results-table";
+    var thead = document.createElement("thead");
+    var htr = document.createElement("tr");
+    cols.forEach(function(c){
+      var th = document.createElement("th");
+      th.textContent = c.label + (tableSort.key === c.key ? (tableSort.dir === "asc" ? " ↑" : " ↓") : "");
+      th.addEventListener("click", function(){
+        if (tableSort.key === c.key) tableSort.dir = tableSort.dir === "asc" ? "desc" : "asc";
+        else { tableSort.key = c.key; tableSort.dir = "desc"; }
+        render();
+      });
+      htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    sorted.forEach(function(row){
+      var tr = document.createElement("tr");
+      cols.forEach(function(c){
+        var td = document.createElement("td");
+        var v = row[c.key];
+        if (c.key === "path" || c.key === "text" || c.key === "owner"){
+          td.textContent = v || (c.key === "owner" ? "—" : "");
+        } else {
+          td.className = "num";
+          td.textContent = (v == null) ? "—" : v.toFixed(1);
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  window.closeFacilitatorOverlay = closeFacilitatorOverlay;
+
+  boot();
+})();
+</script>
+</body>
+</html>
