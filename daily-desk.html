@@ -1502,9 +1502,12 @@ tbody tr.clickable { cursor: pointer; }
         <div>
           <!-- Pending Letters -->
           <div class="panel" style="margin-bottom:16px;">
-            <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <div class="panel-title">Pending Letters</div>
-              <button class="btn btn-primary btn-sm" id="fl-generate-btn" onclick="foundationGeneratePDFs()">Generate PDFs</button>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm" id="fl-mailing-csv-btn" onclick="foundationMailingListCsv()">Mailing List (CSV)</button>
+                <button class="btn btn-primary btn-sm" id="fl-generate-btn" onclick="foundationGeneratePDFs()">Generate PDFs</button>
+              </div>
             </div>
             <div class="panel-body" style="padding:0;">
               <div id="fl-pending"><div class="empty" style="padding:20px;">Loading…</div></div>
@@ -1546,6 +1549,10 @@ tbody tr.clickable { cursor: pointer; }
             <div style="margin-bottom:12px;">
               <div style="font-family:var(--mono); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--text-muted); margin-bottom:8px;">Merge Tags</div>
               <code style="display:block; font-size:11px; color:var(--text); line-height:2;">{{customer_name}}<br>{{customer_address}}<br>{{donor_names}}<br>{{closing_date}}</code>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.5;">
+                {{customer_address}} now expands to the full block — street on one line, City, ST Zip on the next.<br>
+                Write this like a normal letter: a blank line starts a new paragraph; a single line break (e.g. between bulleted items) stays a line break. No HTML needed for either.
+              </div>
             </div>
             <textarea id="fl-template-body" rows="18" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:12px; resize:vertical; box-sizing:border-box; line-height:1.5;"></textarea>
             <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -7433,13 +7440,16 @@ async function foundationLoadPending() {
     el.innerHTML = '<div class="empty" style="padding:20px;">Failed to load.</div>';
     return;
   }
-  const btn = document.getElementById('fl-generate-btn');
+  const btn    = document.getElementById('fl-generate-btn');
+  const csvBtn = document.getElementById('fl-mailing-csv-btn');
   if (!foundationPending.length) {
     el.innerHTML = '<div class="empty" style="padding:20px;">No pending letters.</div>';
     btn.disabled = true;
+    csvBtn.disabled = true;
     return;
   }
   btn.disabled = false;
+  csvBtn.disabled = false;
   el.innerHTML = `<table class="data-table">
     <thead><tr>
       <th>Property</th><th>Side</th><th>Customer</th><th>Donor(s)</th><th>Close Date</th>
@@ -7447,11 +7457,41 @@ async function foundationLoadPending() {
     <tbody>${foundationPending.map(r => `<tr>
       <td style="font-size:12px;">${escapeHtml(r.property_address || '—')}</td>
       <td><span class="chip ${r.side === 'seller' ? 'chip-amber' : 'chip-blue'}">${r.side}</span></td>
-      <td>${escapeHtml(r.customer_name)}${r.customer_address ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${escapeHtml(r.customer_address)}</div>` : ''}</td>
+      <td>${escapeHtml(r.customer_name)}${r.customer_address ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${escapeHtml(r.customer_address).replace(/\n/g, '<br>')}</div>` : ''}</td>
       <td style="font-size:12px;">${escapeHtml(r.donor_names)}</td>
       <td style="font-family:var(--mono);font-size:12px;">${fmtDate(r.closing_date)}</td>
     </tr>`).join('')}</tbody>
   </table>`;
+}
+
+// Name/address export for a mail-merge into envelopes (Word, Avery, etc.) —
+// the alternative to the "Print Envelopes" PDF route we don't build here,
+// since envelope window/margin placement varies by stock and needs
+// calibration against the office's actual envelopes. customer_address is
+// stored as "street\ncity, state zip" (see formatMailingAddress server-side),
+// so splitting on the newline gives clean Address Line 1/2 columns.
+function foundationMailingListCsv() {
+  if (!foundationPending.length) return;
+  const headers = ['Customer Name', 'Address Line 1', 'Address Line 2', 'Property', 'Side', 'Donor(s)', 'Closing Date'];
+  const rows = foundationPending.map(r => {
+    const [line1, line2] = (r.customer_address || '').split('\n');
+    return [
+      r.customer_name || '',
+      line1 || '',
+      line2 || '',
+      r.property_address || '',
+      r.side || '',
+      r.donor_names || '',
+      r.closing_date || '',
+    ];
+  });
+  const csv = [headers, ...rows].map(row =>
+    row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')
+  ).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'foundation-mailing-list-' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
 }
 
 async function foundationLoadSent() {
@@ -7579,6 +7619,21 @@ function foundationEnsureLibs() {
   return Promise.all(tasks);
 }
 
+// The template editor (fl-template-body) is a plain <textarea> — staff type
+// it like a normal letter, with a blank line between paragraphs. Raw HTML
+// collapses that whitespace (a lone "\n" renders as nothing), which is why
+// unconverted templates come out as one dense run-on block. A blank line
+// becomes a new <p> (so paragraphs get real vertical spacing); a single
+// line break within a block becomes <br> (so a manually-broken bullet list
+// stays on separate lines) — the same treatment already applied to
+// {{customer_address}} below, just extended to the whole letter body.
+function foundationTemplateToHtml(text) {
+  return text
+    .split(/\n{2,}/)
+    .map(block => `<p style="margin:0 0 1em;">${block.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
 async function foundationGeneratePDFs() {
   if (!foundationPending.length) return;
   const template = document.getElementById('fl-template-body').value;
@@ -7595,6 +7650,18 @@ async function foundationGeneratePDFs() {
     const pageH = pdf.internal.pageSize.getHeight();
     const allGiftIds = [];
 
+    // Letters print onto pre-printed letterhead stock, so every physical
+    // page — not just the first — needs blank space reserved at the top for
+    // the letterhead's header. That reservation happens here, in the PDF
+    // placement math, rather than as padding baked into the captured image:
+    // padding baked into one tall flowing canvas only ever appears once, at
+    // the very top of page 1, leaving continuation pages with text running
+    // straight into the header. marginTopMm/marginBottomMm apply per slice
+    // instead, so a second sheet gets the same clearance as the first.
+    const marginTopMm    = 38;  // ~1.5in — adjust to match the letterhead's actual header height
+    const marginBottomMm = 15;
+    const contentHmm     = pageH - marginTopMm - marginBottomMm;
+
     for (let i = 0; i < foundationPending.length; i++) {
       const row = foundationPending[i];
       allGiftIds.push(...row.gift_ids);
@@ -7602,15 +7669,29 @@ async function foundationGeneratePDFs() {
       const closingDateStr = row.closing_date
         ? new Date(row.closing_date + 'T00:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' })
         : '';
-      const letterHtml = template
+      const mergedHtml = template
         .replace(/\{\{customer_name\}\}/g,    escapeHtml(row.customer_name))
         .replace(/\{\{customer_address\}\}/g, (row.customer_address || '').replace(/\n/g, '<br>'))
         .replace(/\{\{donor_names\}\}/g,      escapeHtml(row.donor_names))
         .replace(/\{\{closing_date\}\}/g,     closingDateStr);
+      const letterHtml = foundationTemplateToHtml(mergedHtml);
 
       const snapshot = document.createElement('div');
-      snapshot.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;padding:72px;box-sizing:border-box;';
-      snapshot.innerHTML = letterHtml;
+      // Horizontal-only padding: vertical clearance for the letterhead is
+      // handled per-page below, not baked into the image (see marginTopMm).
+      snapshot.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:#fff;color:#000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:14px;padding:0 72px;box-sizing:border-box;';
+      // text-align left is forced with !important so a template pasted from
+      // Word (which defaults new paragraphs to justified) can't reintroduce
+      // the justified/centered look; list margins are likewise reset so a
+      // bullet's marker can't render to the left of the container's own
+      // padding (a zero-margin <ul> combined with the browser's default
+      // outside marker position pushes the bullet glyph past the text
+      // column otherwise).
+      snapshot.innerHTML = `<style>
+        #fl-letter-root, #fl-letter-root * { text-align:left !important; }
+        #fl-letter-root ul, #fl-letter-root ol { margin:.5em 0 .5em 1.4em !important; padding:0 !important; list-style-position:outside !important; }
+        #fl-letter-root li { margin:0 0 .4em !important; }
+      </style><div id="fl-letter-root">${letterHtml}</div>`;
       document.body.appendChild(snapshot);
 
       const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false });
@@ -7626,14 +7707,14 @@ async function foundationGeneratePDFs() {
       while (remaining > 0) {
         if (!firstSlice) pdf.addPage();
         firstSlice = false;
-        const sliceH  = Math.min(remaining, pageH);
+        const sliceH  = Math.min(remaining, contentHmm);
         const slicePx = Math.round((sliceH / imgH) * canvas.height);
         const slice   = document.createElement('canvas');
         slice.width   = canvas.width;
         slice.height  = slicePx;
         slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
-        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, sliceH);
-        remaining -= pageH;
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, marginTopMm, pageW, sliceH);
+        remaining -= contentHmm;
         srcY      += slicePx;
       }
     }
