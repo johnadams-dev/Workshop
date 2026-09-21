@@ -864,6 +864,7 @@ async function loadAgentProfile(email) {
     const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
     const nameField = document.getElementById('f_name'); if (nameField && !nameField.value && name) nameField.value = name;
     const officeField = document.getElementById('f_office'); if (officeField && !officeField.value && profile.office) officeField.value = profile.office;
+    if (profile.plan_id) prefillFromExistingPlan(profile);
     if (profile.dmg_id) {
       try {
         const bioRes = await fetch(`${PROXY_BASE}/agent/deltanet-bio?dmg_id=${encodeURIComponent(profile.dmg_id)}`, { headers: { 'x-proxy-key': PROXY_KEY } });
@@ -875,6 +876,57 @@ async function loadAgentProfile(email) {
       } catch(e) { console.warn('[Bio]', e.message); }
     }
   } catch(e) { console.warn('[Profile]', e.message); }
+}
+
+// Pre-fills the whole 3-step form from an agent's most recent plan
+// (GET /agent/profile's `p.*` columns, p.is_active = true — always their
+// single latest plan regardless of enrollment status) so returning to
+// refine a plan doesn't mean re-typing everything from scratch. Submitting
+// still goes through the existing POST /agent/enroll flow unchanged, which
+// already versions correctly (deactivates the old plan, inserts a new one
+// with version = MAX(version)+1) -- this only had to fix the frontend side,
+// which was fetching all this data already and just never using it for
+// anything but name/office/bio.
+//
+// Guarded with `!field.value` per field, matching the existing name/office
+// pre-fill pattern above, in case this ever runs more than once.
+function prefillFromExistingPlan(p) {
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && !el.value && val != null) el.value = val;
+  };
+  // Range-slider fields (hidden value input + visible range input + label
+  // span) -- setting .value on the range input doesn't fire its oninput
+  // handler, so the label has to be updated manually here too.
+  const setRange = (hiddenId, rangeId, labelId, val, formatLabel) => {
+    if (val == null) return;
+    const hidden = document.getElementById(hiddenId);
+    if (!hidden) return;
+    const range = document.getElementById(rangeId), label = document.getElementById(labelId);
+    hidden.value = val;
+    if (range) range.value = val;
+    if (label) label.textContent = formatLabel(val);
+  };
+
+  setText('f_market', p.market_focus);
+  setText('f_desc', p.description_text);
+  setText('f_why', p.why_text);
+  setText('f_goals', p.goals_text);
+  setText('f_time_note', p.time_notes);
+  setText('f_budget_note', p.budget_notes);
+  setText('f_soi_note', p.soi_notes);
+  setText('f_exp_note', p.exp_notes);
+  setText('f_earn', p.earning_goal);
+  setText('f_price', p.avg_sale_price);
+
+  setRange('f_time',   'f_timeR',   'f_timeV',   p.time_commitment_hrs, v => `${v} hrs/wk`);
+  setRange('f_budget', 'f_budgetR', 'f_budgetV', p.budget_score,        v => `${v}`);
+  setRange('f_soi',    'f_soiR',    'f_soiV',    p.soi_contacts,        v => `${Number(v).toLocaleString()} contacts`);
+  setRange('f_exp',    'f_expR',    'f_expV',    p.experience_yrs,      v => `${v} yrs`);
+  setRange('f_list',   'f_listR',   'f_listV',   p.listing_pct,         v => `${v}% Sellers`);
+
+  const when = p.plan_created_at ? new Date(p.plan_created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  toast(`Welcome back — pre-filled from your${when ? ` ${when}` : ''} plan. Update anything that's changed.`);
 }
 
 /* ── COACHES ──────────────────────────────────────────────────────── */
