@@ -171,6 +171,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button class="tab active" id="tab-btn-compose" onclick="switchTab('compose')">Compose</button>
         <button class="tab" id="tab-btn-approvals" style="display:none" onclick="switchTab('approvals')">Approval Queue<span class="tab-badge" id="approval-count" style="display:none"></span></button>
         <button class="tab" id="tab-btn-history" onclick="switchTab('history')">History</button>
+        <button class="tab" id="tab-btn-replies" onclick="switchTab('replies')">Replies<span class="tab-badge" id="replies-count" style="display:none"></span></button>
       </div>
 
       <!-- ── Compose ── -->
@@ -231,6 +232,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <!-- ── History ── -->
       <div class="panel" id="panel-history">
         <div id="history-list"><div class="loading">Loading…</div></div>
+      </div>
+
+      <!-- ── Replies ── -->
+      <div class="panel" id="panel-replies">
+        <div id="replies-list"><div class="loading">Loading…</div></div>
       </div>
     </div>
   </div>
@@ -325,6 +331,8 @@ async function init() {
   switchTab('compose');
   loadHistory();
   if (myRole === 'admin' || myRole === 'manager') loadApprovalQueue();
+  loadReplies();
+  setInterval(loadReplies, 45000);
 
   fetch(`${PROXY}/log/visit`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -350,7 +358,7 @@ function setupForRole() {
 
 /* ─────────────────────── TABS ───────────────────────── */
 function switchTab(name) {
-  ['compose', 'approvals', 'history'].forEach(t => {
+  ['compose', 'approvals', 'history', 'replies'].forEach(t => {
     document.getElementById(`panel-${t}`).classList.toggle('active', t === name);
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === name);
   });
@@ -571,6 +579,58 @@ async function loadApprovalQueue() {
   } catch (e) {
     list.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
   }
+}
+
+/* ─────────────────────── REPLIES ────────────────────── */
+// Unread replies to texts sent from Compose (this page's own campaigns) or
+// from roster.html's "Send a message" box — see POST /sms/inbound's
+// reply-window routing and GET/PATCH /replies/* (reply-routes.js).
+async function loadReplies() {
+  const list = document.getElementById('replies-list');
+  try {
+    const r = await fetch(`${PROXY}/replies/pending`, { headers: authHeaders() });
+    const rows = await r.json();
+    if (!r.ok) throw new Error(rows.error || 'Could not load replies');
+
+    document.getElementById('replies-count').style.display = rows.length ? '' : 'none';
+    document.getElementById('replies-count').textContent = rows.length;
+
+    if (!rows.length) { list.innerHTML = '<div class="empty">No pending replies.</div>'; return; }
+
+    await ensureAgentsCache().catch(() => {});
+    list.innerHTML = rows.map(rep => `
+      <div class="history-row" id="reply-${rep.id}">
+        <div class="row-top">
+          <div>
+            <div class="row-category">${esc(replySenderName(rep))}</div>
+            <div class="row-meta">${esc(rep.source_type === 'broadcast' ? 'Broadcast campaign' : 'Roster text')} · ${formatDate(rep.received_at)}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="dismissReply(${rep.id})">Dismiss</button>
+        </div>
+        <div class="row-message">${esc(rep.reply_text)}</div>
+        ${rep.message_snippet ? `<div class="row-meta" style="margin-top:6px">Your message: "${esc(rep.message_snippet)}"</div>` : ''}
+      </div>`).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="err-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function replySenderName(rep) {
+  if (rep.target_type === 'agent' && agentsCache) {
+    const a = agentsCache.find(x => x.id === rep.target_id);
+    if (a) return `${a.first_name} ${a.last_name}`;
+  }
+  return rep.phone;
+}
+
+async function dismissReply(id) {
+  try {
+    const r = await fetch(`${PROXY}/replies/${id}/read`, { method: 'PATCH', headers: authHeaders() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not dismiss reply');
+    document.getElementById(`reply-${id}`)?.remove();
+    loadReplies();
+  } catch (e) { alert('Could not dismiss: ' + e.message); }
 }
 
 function showRejectBox(id) { document.getElementById(`reject-box-${id}`).style.display = 'block'; }

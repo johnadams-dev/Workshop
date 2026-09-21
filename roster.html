@@ -122,6 +122,17 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .compose-send{background:var(--navy);color:#fff}
 .compose-send:disabled{opacity:.5;cursor:default}
 .compose-cancel{background:var(--bg);color:var(--muted)}
+
+/* ── Reply inbox (unread replies to texts sent from this page) ──────────── */
+.reply-bell{position:relative;background:rgba(255,255,255,.12);border:none;border-radius:8px;color:#fff;font-size:15px;width:34px;height:34px;cursor:pointer;flex-shrink:0}
+.reply-badge-count{position:absolute;top:-4px;right:-4px;background:var(--gold);color:var(--navy);font-size:10px;font-weight:700;border-radius:10px;min-width:16px;height:16px;line-height:16px;text-align:center;padding:0 3px}
+.reply-item{padding:12px 0;border-bottom:1px solid var(--border)}
+.reply-item:last-child{border-bottom:none}
+.reply-item-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.reply-item-time{font-size:11px;color:var(--dim);white-space:nowrap}
+.reply-item-body{font-size:13px;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.reply-item-context{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic}
+.reply-item-dismiss{margin-top:8px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -142,6 +153,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 <div id="app">
   <div class="topbar">
     <div class="topbar-title"><small>Adams Cameron &amp; Co.</small>Agent Roster</div>
+    <button type="button" class="reply-bell" id="reply-bell" style="display:none" onclick="openRepliesModal()" title="Replies">🔔<span class="reply-badge-count" id="reply-badge-count"></span></button>
     <a href="./feedback.html?tool=roster" class="tools-link">Feedback</a>
     <a href="./index.html" class="tools-link">← Tools</a>
   </div>
@@ -186,6 +198,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   <div class="detail-card" id="detail-modal-content"></div>
 </div>
 
+<!-- Replies inbox -->
+<div class="modal-overlay" id="replies-modal" onclick="if(event.target===this) closeRepliesModal()">
+  <div class="detail-card" id="replies-modal-content"></div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
@@ -212,7 +229,7 @@ const PARTNER_TAB_IDS = new Set(['title', 'mortgage', 'association', 'property_m
 let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
 
-let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null, canSendText: false, detailTarget: null };
+let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null, canSendText: false, detailTarget: null, pendingReplies: [] };
 
 if (proxyKey && userEmail) {
   document.getElementById('auth-gate').style.display = 'none';
@@ -281,6 +298,15 @@ async function apiPost(path, body) {
   if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
   return data;
 }
+async function apiPatch(path) {
+  const r = await fetch(PROXY + path, {
+    method: 'PATCH',
+    headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
 function esc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function initials(first, last) { return ((first||'?')[0] + (last||'?')[0]).toUpperCase(); }
 function fmtPhone(e) {
@@ -318,8 +344,73 @@ async function init() {
     renderOfficeChips();
     renderMainTabs();
     switchTab('agents');
+    if (STATE.canSendText) {
+      pollReplies();
+      setInterval(pollReplies, 45000);
+    }
   } catch (e) {
     document.getElementById('agents-list').innerHTML = `<div class="empty">Failed to load roster: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REPLIES INBOX — unread replies to texts sent from this page's
+   "Send a message" compose box (see POST /roster/send-text, POST
+   /sms/inbound's reply-window routing, and GET/PATCH /replies/*)
+═══════════════════════════════════════════════════════════════════ */
+async function pollReplies() {
+  try {
+    STATE.pendingReplies = await api('/replies/pending');
+    renderReplyBadge();
+  } catch (e) { /* non-critical — silently retry on the next poll */ }
+}
+
+function renderReplyBadge() {
+  const bell = document.getElementById('reply-bell');
+  const count = document.getElementById('reply-badge-count');
+  const n = STATE.pendingReplies.length;
+  bell.style.display = n > 0 ? '' : 'none';
+  count.textContent = n > 9 ? '9+' : String(n);
+}
+
+function nameForReply(r) {
+  const list = r.target_type === 'agent' ? STATE.agents : STATE.staff;
+  const person = list.find(p => p.id === r.target_id);
+  return person ? `${person.first_name} ${person.last_name}` : fmtPhone(r.phone);
+}
+
+function openRepliesModal() {
+  renderRepliesModal();
+  document.getElementById('replies-modal').classList.add('open');
+}
+function closeRepliesModal() { document.getElementById('replies-modal').classList.remove('open'); }
+
+function renderRepliesModal() {
+  const items = STATE.pendingReplies.map(r => `
+    <div class="reply-item">
+      <div class="reply-item-head"><strong>${esc(nameForReply(r))}</strong><span class="reply-item-time">${new Date(r.received_at).toLocaleString()}</span></div>
+      <div class="reply-item-body">${esc(r.reply_text)}</div>
+      ${r.message_snippet ? `<div class="reply-item-context">Your message: "${esc(r.message_snippet)}"</div>` : ''}
+      <button type="button" class="reply-item-dismiss" onclick="dismissReply(${r.id})">Dismiss</button>
+    </div>
+  `).join('');
+  document.getElementById('replies-modal-content').innerHTML = `
+    <div class="detail-head">
+      <button class="detail-close" onclick="closeRepliesModal()">✕</button>
+      <div class="name">Replies</div>
+    </div>
+    <div class="detail-body">${items || '<div class="empty">No pending replies.</div>'}</div>
+  `;
+}
+
+async function dismissReply(id) {
+  try {
+    await apiPatch(`/replies/${id}/read`);
+    STATE.pendingReplies = STATE.pendingReplies.filter(r => r.id !== id);
+    renderReplyBadge();
+    renderRepliesModal();
+  } catch (e) {
+    alert('Failed to mark as read: ' + e.message);
   }
 }
 
