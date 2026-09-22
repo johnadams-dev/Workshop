@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Miscellaneous Sale — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280;
+  --red:#DC2626; --green:#16A34A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:40px 48px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25);max-width:380px;width:90%}
+.signin-icon{font-size:36px;margin-bottom:14px}
+.signin-card h2{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.signin-google{display:flex;justify-content:center}
+
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em}
+.topbar-link:hover{color:rgba(255,255,255,.85)}
+.topbar-user{font-size:12px;color:rgba(255,255,255,.55)}
+
+.main{max-width:720px;margin:32px auto;padding:0 24px 64px}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px}
+.card h3{font-size:15px;color:var(--navy);margin-bottom:4px}
+.card .sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+
+.field{margin-bottom:18px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg)}
+.field textarea{min-height:80px;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.field-row{display:flex;gap:14px}
+.field-row .field{flex:1}
+
+.btn-primary{background:var(--navy);color:#fff;border:none;border-radius:6px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn-primary:hover{background:#264d78}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-secondary{background:none;color:var(--navy);border:1px solid var(--border);border-radius:6px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}
+.btn-secondary:hover{border-color:var(--navy)}
+.err-msg{color:var(--red);font-size:13px;margin-top:12px;display:none}
+
+.success-box{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px 18px;margin-bottom:24px;display:none}
+.success-box .title{font-size:14px;font-weight:700;color:#166534;margin-bottom:4px}
+.success-box .detail{font-size:13px;color:#166534;margin-bottom:12px}
+
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;font-size:13px;border-bottom:1px solid var(--border)}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+td.amt{text-align:right;font-weight:600;white-space:nowrap}
+.cat-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:#F3E8FF;color:#6D28D9}
+.empty{color:var(--muted);text-align:center;padding:30px 0;font-size:13px}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="signin-card">
+    <div class="signin-icon">💵</div>
+    <h2>Miscellaneous Sale</h2>
+    <p>Sign in with your Adams Cameron Google account to record a commission disbursement.</p>
+    <div class="signin-google">
+      <div id="g_id_onload"
+        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
+        data-callback="handleGoogleSignIn"
+        data-auto_select="true">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">ACC</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">Miscellaneous Sale</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./daily-desk.html">← Daily Desk</a>
+      <a class="topbar-link" href="./index.html">Tools</a>
+      <span class="topbar-user" id="topbar-user"></span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="card">
+      <h3>New Miscellaneous Sale</h3>
+      <div class="sub">For commission earned that isn't tied to a transaction in the system — a referral fee, a listing-cancellation fee, a BPO or consultation fee. No sale price, no title/mortgage company, no buyer/seller. No Foundation contribution is generated for these.</div>
+
+      <div class="field">
+        <label>Agent <span style="color:var(--red)">*</span></label>
+        <select id="f-agent"><option value="">Loading agents…</option></select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Category <span style="color:var(--red)">*</span></label>
+          <select id="f-category">
+            <option value="referral">Referral Fee</option>
+            <option value="cancellation_fee">Listing Cancellation Fee</option>
+            <option value="bpo_consultation">BPO / Consultation Fee</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Amount <span style="color:var(--red)">*</span></label>
+          <input type="number" id="f-amount" min="0.01" step="0.01" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <div class="field">
+        <label>Description <span style="color:var(--red)">*</span></label>
+        <textarea id="f-description" placeholder="e.g. Referral to XYZ Realty for 123 Main St, referred out 9/1 — 25% referral fee"></textarea>
+      </div>
+
+      <button class="btn-primary" id="submit-btn" onclick="submitMiscCommission()">Create Disbursement</button>
+      <div class="err-msg" id="err-msg"></div>
+    </div>
+
+    <div class="success-box" id="success-box">
+      <div class="title">✓ Commission disbursement created</div>
+      <div class="detail" id="success-detail"></div>
+      <a class="btn-secondary" id="success-print-link" href="#" target="_blank">🖨 Open Disbursement Form</a>
+      <button class="btn-secondary" style="margin-left:8px" onclick="resetForm()">+ Enter Another</button>
+    </div>
+
+    <div class="card">
+      <h3>Recent Entries</h3>
+      <div class="sub">Last 500, most recent first.</div>
+      <div id="recent-table"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
+const CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const CATEGORY_LABELS = {
+  referral: 'Referral Fee',
+  cancellation_fee: 'Cancellation Fee',
+  bpo_consultation: 'BPO / Consultation',
+  other: 'Other',
+};
+
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let agentsById = {};
+
+if (proxyKey && userEmail) {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('load', init);
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID, callback: handleGoogleSignIn,
+    auto_select: true, cancel_on_tap_outside: false,
+  });
+  google.accounts.id.renderButton(
+    document.querySelector('.g_id_signin'),
+    { theme: 'outline', size: 'large', width: 280 }
+  );
+  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+});
+
+async function handleGoogleSignIn(response) {
+  try {
+    const payload = JSON.parse(atob(response.credential.split('.')[1]));
+    userEmail = payload.email || '';
+    localStorage.setItem('ac_user_email', userEmail);
+  } catch { userEmail = ''; }
+  try {
+    const r = await fetch(`${PROXY}/config/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await r.json();
+    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
+    proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await init();
+  } catch (e) { alert('Authentication error: ' + e.message); }
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(PROXY + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-proxy-key':  proxyKey,
+      'x-user-email': userEmail,
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  return res.json();
+}
+const GET  = path      => api(path);
+const POST = (path, b) => api(path, { method: 'POST', body: JSON.stringify(b) });
+
+async function init() {
+  document.getElementById('topbar-user').textContent = userEmail;
+  document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
+  await loadAgents();
+  loadRecent();
+}
+
+async function loadAgents() {
+  const sel = document.getElementById('f-agent');
+  try {
+    const agents = await GET('/roster/agents');
+    agentsById = Object.fromEntries(agents.map(a => [a.id, a]));
+    sel.innerHTML = '<option value="">Select an agent…</option>' +
+      agents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}${a.office_name ? ' — ' + esc(a.office_name) : ''}</option>`).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Could not load agents</option>';
+  }
+}
+
+async function submitMiscCommission() {
+  const errEl = document.getElementById('err-msg');
+  errEl.style.display = 'none';
+
+  const agent_id    = document.getElementById('f-agent').value;
+  const category    = document.getElementById('f-category').value;
+  const amount      = document.getElementById('f-amount').value;
+  const description = document.getElementById('f-description').value.trim();
+  const sale_date   = document.getElementById('f-date').value;
+
+  if (!agent_id) return showErr('Please select an agent.');
+  if (!amount || Number(amount) <= 0) return showErr('Please enter a valid amount.');
+  if (!description) return showErr('Please enter a description.');
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  try {
+    const result = await POST('/daily-desk/misc-commissions', { agent_id, category, amount, description, sale_date });
+    const agent = agentsById[agent_id];
+    document.getElementById('success-detail').textContent =
+      `${CATEGORY_LABELS[category]} — $${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} for ${agent ? agent.first_name + ' ' + agent.last_name : 'agent'}`;
+    document.getElementById('success-print-link').href = `./form-misc-commission-disbursement.html?id=${result.id}`;
+    document.getElementById('success-box').style.display = 'block';
+    document.querySelector('.card').style.display = 'none';
+    loadRecent();
+    window.open(`./form-misc-commission-disbursement.html?id=${result.id}`, '_blank');
+  } catch (e) {
+    showErr('Failed to create: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Disbursement';
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function resetForm() {
+  document.getElementById('f-agent').value = '';
+  document.getElementById('f-category').value = 'referral';
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-description').value = '';
+  document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('success-box').style.display = 'none';
+  document.querySelector('.card').style.display = 'block';
+}
+
+async function loadRecent() {
+  const out = document.getElementById('recent-table');
+  try {
+    const rows = await GET('/daily-desk/misc-commissions');
+    if (!rows.length) { out.innerHTML = '<div class="empty">No miscellaneous sales recorded yet.</div>'; return; }
+    out.innerHTML = `<table>
+      <thead><tr><th>Date</th><th>Agent</th><th>Category</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td>${fmtDate(r.sale_date)}</td>
+          <td>${esc(r.first_name)} ${esc(r.last_name)}</td>
+          <td><span class="cat-badge">${CATEGORY_LABELS[r.category] || r.category}</span></td>
+          <td>${esc(r.description)}</td>
+          <td class="amt">${fmtMoney(r.amount)}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+  } catch (e) {
+    out.innerHTML = `<div class="empty">Could not load recent entries: ${esc(e.message)}</div>`;
+  }
+}
+
+function esc(s) {
+  return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtMoney(v) { return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDate(v) { if (!v) return ''; const d = new Date(String(v).slice(0, 10) + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Misc Commission',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
