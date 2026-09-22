@@ -1373,6 +1373,19 @@ tbody tr.clickable { cursor: pointer; }
             </div>
           </div>
         </div>
+
+        <!-- Manager-only (requireManager on the backend, same as the original
+             admin.html "Corrections" tab this replaces) — revealed by JS
+             alongside "Checklists", not shown to plain staff role. -->
+        <div class="report-card report-index-item" id="report-index-corrections" style="display:none" onclick="showPage('report-corrections')">
+          <div class="report-card-head">
+            <div class="report-card-icon">📝</div>
+            <div>
+              <div class="report-card-title">Transaction Field Corrections</div>
+              <div class="report-card-desc">Non-contractual data corrections made by staff. Not included in the hotsheet report.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div><!-- /page-reports -->
@@ -1486,6 +1499,40 @@ tbody tr.clickable { cursor: pointer; }
         </div>
       </div>
     </div><!-- /page-report-virtual-tours -->
+
+    <div class="page page-report" id="page-report-corrections">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
+      <div class="report-card">
+        <div class="report-card-head">
+          <div class="report-card-icon">📝</div>
+          <div>
+            <div class="report-card-title">Transaction Field Corrections</div>
+            <div class="report-card-desc">Non-contractual data corrections made by staff. Not included in the hotsheet report.</div>
+          </div>
+          <button class="btn btn-ghost" style="margin-left:auto" onclick="rptLoadCorrections()">↻ Refresh</button>
+        </div>
+        <div class="report-card-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Property</th>
+                  <th>Field</th>
+                  <th>Old Value</th>
+                  <th>New Value</th>
+                  <th>Reason</th>
+                  <th>Corrected By</th>
+                </tr>
+              </thead>
+              <tbody id="corrections-body">
+                <tr><td colspan="7" class="report-loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /page-report-corrections -->
 
     <!-- ═══ FOUNDATION PAGE ═══ -->
     <div class="page" id="page-foundation">
@@ -2681,6 +2728,8 @@ async function init() {
   if (STATE.userRole === 'manager') {
     moreItems.push({ page: 'admin',      icon: '⚙',  label: 'Checklists' });
     adminLoadTemplates();
+    const correctionsCard = document.getElementById('report-index-corrections');
+    if (correctionsCard) correctionsCard.style.display = '';
   }
   if (moreItems.length) {
     document.getElementById('nav-more').style.display = 'flex';
@@ -2704,7 +2753,7 @@ function toggleTheme() {
   }
 }
 
-const MORE_PAGES = ['caravan', 'reports', 'report-hotsheet', 'report-eom', 'report-expiring', 'report-virtual-tours', 'foundation', 'referrals', 'admin'];
+const MORE_PAGES = ['caravan', 'reports', 'report-hotsheet', 'report-eom', 'report-expiring', 'report-virtual-tours', 'report-corrections', 'foundation', 'referrals', 'admin'];
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2722,6 +2771,7 @@ function showPage(name, el) {
     if (name === 'referrals')  loadReferralReport();
     if (name === 'report-expiring') rptLoadExpiring();
     if (name === 'report-virtual-tours' && !vtData) rptLoadVirtualTours();
+    if (name === 'report-corrections') rptLoadCorrections();
   } else {
     if (el) el.classList.add('active');
     btn.style.display = '';
@@ -7359,6 +7409,44 @@ function rptRenderEOMOffice(name, listings, contracts) {
         <td class="td-price" style="font-weight:600;">${fmtMoney(totalSalePrice)}</td></tr></tfoot>
     </table></div>` : ''}
   </div>`;
+}
+
+// ── Corrections report — relocated from admin.html's "Corrections" tab
+// (GET /admin/corrections there, now GET /daily-desk/report/corrections).
+// Reuses this same page's own FC_FIELD_LABELS/FC_CUSTOMER_FIELD_LABELS
+// (defined above, for the correction-entry form) rather than admin.html's
+// copy of them, which had drifted stale — missing property_type and the
+// commission fields this page's own labels already cover.
+const FC_ROLE_LABELS = { seller: 'Seller', buyer: 'Buyer' };
+
+async function rptLoadCorrections() {
+  const tbody = document.getElementById('corrections-body');
+  tbody.innerHTML = `<tr><td colspan="7" class="report-loading">Loading…</td></tr>`;
+  try {
+    const rows = await GET('/daily-desk/report/corrections');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No corrections recorded yet.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      let c = {};
+      try { c = JSON.parse(r.notes || '{}'); } catch(_) {}
+      const prop = [r.property_address, r.city].filter(Boolean).join(', ') || '—';
+      const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
+      const field = c.role ? `${FC_ROLE_LABELS[c.role] || c.role} — ${escapeHtml(fieldLabel)}` : (escapeHtml(fieldLabel) || '—');
+      return `<tr>
+        <td class="td-mono">${fmtDate(r.event_date)}</td>
+        <td class="td-addr">${escapeHtml(prop)}</td>
+        <td>${field}</td>
+        <td class="td-muted">${escapeHtml(c.old ?? '—')}</td>
+        <td>${escapeHtml(c.new ?? '—')}</td>
+        <td>${escapeHtml(c.reason || '—')}</td>
+        <td>${escapeHtml(r.staff_name || '—')}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="report-error">Error: ${escapeHtml(e.message)}</td></tr>`;
+  }
 }
 
 async function rptLoadExpiring() {
