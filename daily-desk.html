@@ -3836,14 +3836,25 @@ function refInitFilters() {
 function _fmtMoney(v) {
   return v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
 }
+// At most 1 decimal place, and only when the value actually needs it —
+// fee_value was being interpolated raw (e.g. "25.0000%" for a NUMERIC
+// column with 4 decimal places of scale). Math.round(...*10)/10 rounds to
+// 1 decimal, and letting the rounded number (not a fixed string) print
+// naturally drops a trailing .0 for whole numbers (25 -> "25%", not
+// "25.0%") while still showing the one decimal when it matters (22.5%).
+function _fmtPercent(v) {
+  return (Math.round(Number(v) * 10) / 10) + '%';
+}
 function _fmtDate(v) {
   if (!v) return '—';
   const d = new Date(v + 'T00:00:00');
   return d.toLocaleDateString('en-US');
 }
 
-function _renderReferralReport({ summary, records }, summaryEl, outputEl) {
-  const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', other: 'Other' };
+function _renderReferralReport({ summary, records, received }, summaryEl, outputEl) {
+  // realty_referral was missing here entirely -- fell through to showing
+  // the raw DB value ("realty_referral") instead of a real label.
+  const typeLabel = { acc_agent: 'AC&Co Agent', referral_dept: 'Referral Dept', realty_referral: 'Realty Referral', other: 'Other' };
 
   summaryEl.style.display = 'grid';
   summaryEl.innerHTML = summary.map(s => `
@@ -3853,12 +3864,9 @@ function _renderReferralReport({ summary, records }, summaryEl, outputEl) {
       <div style="font-size:11px;color:var(--text-dim);">${s.count} closed deal${s.count!==1?'s':''}</div>
     </div>`).join('');
 
-  if (!records.length) {
-    outputEl.innerHTML = '<div class="empty" style="padding:20px;">No referrals found for the selected filters.</div>';
-    return;
-  }
-
-  outputEl.innerHTML = `
+  const paidOutTable = !records.length
+    ? '<div class="empty" style="padding:20px;">No referral fees paid out for the selected filters.</div>'
+    : `
     <div class="data-table-wrap" style="margin-top:8px;">
       <table class="data-table">
         <thead>
@@ -3871,7 +3879,7 @@ function _renderReferralReport({ summary, records }, summaryEl, outputEl) {
         <tbody>
           ${records.map(r => {
             const name = r.agent_id ? `${escapeHtml(r.first_name||'')} ${escapeHtml(r.last_name||'')}` : escapeHtml(r.referral_name||'—');
-            const fee  = r.fee_type === 'percent' ? `${r.fee_value}%` : _fmtMoney(r.fee_value);
+            const fee  = r.fee_type === 'percent' ? _fmtPercent(r.fee_value) : _fmtMoney(r.fee_value);
             return `<tr>
               <td>${_fmtDate(r.close_date)}</td>
               <td>${escapeHtml(r.property_address||'')}</td>
@@ -3887,6 +3895,39 @@ function _renderReferralReport({ summary, records }, summaryEl, outputEl) {
         </tbody>
       </table>
     </div>`;
+
+  // Fees ACC RECEIVES -- the opposite direction from everything above.
+  // Sourced from Misc. Sale entries (misc_commissions, category='referral'),
+  // never from transaction_referrals -- those deals aren't in this system
+  // at all, by definition, so there's no transaction/close date/office
+  // breakdown the way the paid-out side has.
+  const receivedTotal = (received || []).reduce((sum, r) => sum + Number(r.amount), 0);
+  const receivedTable = !received || !received.length
+    ? '<div class="empty" style="padding:20px;">No referral fees received for the selected filters.</div>'
+    : `
+    <div class="data-table-wrap" style="margin-top:8px;">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Agent</th><th>Office</th><th>Description</th><th>Amount</th></tr></thead>
+        <tbody>
+          ${received.map(r => `
+            <tr>
+              <td>${_fmtDate(r.sale_date)}</td>
+              <td>${escapeHtml(r.first_name||'')} ${escapeHtml(r.last_name||'')}</td>
+              <td>${escapeHtml(r.office_name||'')}</td>
+              <td>${escapeHtml(r.description||'')}</td>
+              <td>${_fmtMoney(r.amount)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  outputEl.innerHTML = `
+    <div class="report-section-title" style="margin-top:0">Fees Paid Out — real transactions, from transaction_referrals</div>
+    ${paidOutTable}
+
+    <div class="report-section-title">Fees Received — Miscellaneous Sale referrals, deal closed outside this system (${_fmtMoney(receivedTotal)} total)</div>
+    ${receivedTable}
+  `;
 }
 
 /* ═══ ROW ACTION MODAL — Change/Expired/Withdrawn/Close ═══ */
