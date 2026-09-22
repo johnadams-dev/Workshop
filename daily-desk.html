@@ -1387,17 +1387,12 @@ tbody tr.clickable { cursor: pointer; }
           </div>
         </div>
 
-        <!-- Opens a separate standalone page (misc-commission.html), not an
-             internal showPage() view — a commission earned outside any
-             transaction (referral/cancellation/BPO fee) has nothing to do
-             with this page's own transaction data. Staff-gated on the
-             backend (requireStaff), same as this Reports tab itself. -->
-        <div class="report-card report-index-item" onclick="window.open('./misc-commission.html', '_blank')">
+        <div class="report-card report-index-item" onclick="showPage('report-referrals')">
           <div class="report-card-head">
-            <div class="report-card-icon">💵</div>
+            <div class="report-card-icon">🤝</div>
             <div>
-              <div class="report-card-title">Miscellaneous Sale</div>
-              <div class="report-card-desc">Record a commission not tied to a transaction — a referral, listing-cancellation, or BPO/consultation fee.</div>
+              <div class="report-card-title">Referral Report</div>
+              <div class="report-card-desc">All referral fees across transactions, filterable by year and office.</div>
             </div>
           </div>
         </div>
@@ -1627,16 +1622,9 @@ tbody tr.clickable { cursor: pointer; }
       </div>
     </div><!-- /page-foundation -->
 
-    <!-- ═══ REFERRALS PAGE ═══ -->
-    <div class="page" id="page-referrals">
-
-      <div class="section-head" style="margin-bottom:20px;">
-        <div>
-          <div style="font-size:18px; font-weight:600; margin-bottom:3px;">Referral Fees</div>
-          <div style="font-size:12px; color:var(--text-muted);">Track referral fees due and earned by the referral department.</div>
-        </div>
-      </div>
-
+    <!-- ═══ REFERRAL REPORT (moved into Reports, out of its own top-level nav item) ═══ -->
+    <div class="page page-report" id="page-report-referrals">
+      <button class="btn btn-ghost btn-sm" onclick="showPage('reports')" style="margin-bottom:14px;">← Back to Reports</button>
       <div class="report-card">
         <div class="report-card-head">
           <div class="report-card-icon">🤝</div>
@@ -1662,8 +1650,7 @@ tbody tr.clickable { cursor: pointer; }
           <div id="ref-output"></div>
         </div>
       </div>
-
-    </div><!-- /page-referrals -->
+    </div><!-- /page-report-referrals -->
 
   </div>
 </div>
@@ -2734,9 +2721,13 @@ async function init() {
     cvInitDate();
   }
   if (['manager', 'staff'].includes(STATE.userRole)) {
+    // Not an internal showPage() view — a separate standalone page
+    // (misc-commission.html), same reasoning as its Reports-index card
+    // used to carry before it moved here. Between Caravan and Reports
+    // per the user, not grouped with the actual reports below it.
+    moreItems.push({ page: 'misc-commission', icon: '💵', label: 'Misc. Sale', external: 'misc-commission.html' });
     moreItems.push({ page: 'reports',    icon: '📊', label: 'Reports' });
     moreItems.push({ page: 'foundation', icon: '🏛', label: 'Foundation' });
-    moreItems.push({ page: 'referrals',  icon: '🤝', label: 'Referrals' });
     rptInit();
     refInitFilters();
   }
@@ -2749,7 +2740,9 @@ async function init() {
   if (moreItems.length) {
     document.getElementById('nav-more').style.display = 'flex';
     document.getElementById('nav-more-menu').innerHTML = moreItems
-      .map(i => `<div class="nav-more-item" id="nav-more-item-${i.page}" onclick="navMoreSelect('${i.page}')">${i.icon} ${i.label}</div>`)
+      .map(i => i.external
+        ? `<div class="nav-more-item" onclick="document.getElementById('nav-more-menu').classList.remove('open'); window.open('./${i.external}', '_blank')">${i.icon} ${i.label}</div>`
+        : `<div class="nav-more-item" id="nav-more-item-${i.page}" onclick="navMoreSelect('${i.page}')">${i.icon} ${i.label}</div>`)
       .join('');
   }
 
@@ -2768,7 +2761,7 @@ function toggleTheme() {
   }
 }
 
-const MORE_PAGES = ['caravan', 'reports', 'report-hotsheet', 'report-eom', 'report-expiring', 'report-virtual-tours', 'report-corrections', 'foundation', 'referrals', 'admin'];
+const MORE_PAGES = ['caravan', 'reports', 'report-hotsheet', 'report-eom', 'report-expiring', 'report-virtual-tours', 'report-corrections', 'report-referrals', 'foundation', 'admin'];
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2783,7 +2776,7 @@ function showPage(name, el) {
     document.getElementById('nav-more-item-' + name)?.classList.add('active');
     btn.style.display = 'none';
     if (name === 'foundation') foundationInit();
-    if (name === 'referrals')  loadReferralReport();
+    if (name === 'report-referrals') loadReferralReport();
     if (name === 'report-expiring') rptLoadExpiring();
     if (name === 'report-virtual-tours' && !vtData) rptLoadVirtualTours();
     if (name === 'report-corrections') rptLoadCorrections();
