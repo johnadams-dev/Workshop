@@ -1322,7 +1322,7 @@ function closeOnboardResult() {
   document.getElementById('onboard-result-modal').classList.remove('open');
 }
 
-async function createAgent() {
+async function createAgent(force) {
   const email           = document.getElementById('na-email').value.trim().toLowerCase();
   const first           = document.getElementById('na-first').value.trim();
   const last            = document.getElementById('na-last').value.trim();
@@ -1361,10 +1361,30 @@ async function createAgent() {
         provisionGoogle,
         foundationDonationType:   foundationType,
         foundationDonationAmount: foundationAmount,
+        force: !!force,
       }),
     });
     const data = await r.json();
-    if (!r.ok) { toast('Onboarding failed: ' + (data.error || r.status), 'err'); return; }
+    if (!r.ok) {
+      // Server found this email already onboarded (see Step 0 in
+      // POST /admin/agent/onboard) — confirm before re-running the whole
+      // thing rather than just failing, since re-running re-appends a
+      // roster row and re-attempts every provisioning step.
+      if (r.status === 409 && data.existing_agent && !force) {
+        const a = data.existing_agent;
+        const when = a.created_at ? new Date(a.created_at).toLocaleString() : 'an earlier date';
+        const proceed = confirm(
+          `${a.first_name} ${a.last_name} (${email}) already exists — onboarded ${when}, `
+          + `${a.active ? 'active' : 'inactive'} (agent id ${a.id}).\n\n`
+          + `If a previous attempt only failed partway through, it's usually safer to fix that specific `
+          + `step by hand than to re-run the whole onboarding.\n\nRe-run onboarding anyway?`
+        );
+        if (proceed) { await createAgent(true); }
+        return;
+      }
+      toast('Onboarding failed: ' + (data.error || r.status), 'err');
+      return;
+    }
 
     closeNewAgent();
     await load();
@@ -1644,7 +1664,8 @@ async function submitRCModal() {
       method: 'POST', headers: H(), body: JSON.stringify(body),
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
-    toast('Roster change logged', 'ok');
+    const rcResult = await r.json().catch(() => ({}));
+    toast(rcResult.inserted === false ? 'Existing roster change updated' : 'Roster change logged', 'ok');
     closeRCModal();
     if (action?.type === 'deactivate') {
       const rcData = {
