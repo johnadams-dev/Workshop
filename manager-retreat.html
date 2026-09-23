@@ -115,6 +115,27 @@
   .fac-card p{font-size:.85rem;color:var(--ink-soft);margin-bottom:18px;line-height:1.5;}
   .fac-signin-btn{display:flex;justify-content:center;min-height:40px;}
   .fac-close{margin-top:14px;border:none;background:none;color:var(--ink-soft);font-size:.8rem;cursor:pointer;text-decoration:underline;}
+
+  /* ── Manage Tasks overlay — facilitator only, opened from the admin bar.
+     A fixed overlay rather than part of render()'s tree so the ~4s state
+     poll (which rebuilds #app from scratch) can't wipe out in-progress
+     edits or steal focus out from under a facilitator mid-typing. ── */
+  .task-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;max-width:640px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .task-card h2{font-size:1.1rem;margin-bottom:4px;}
+  .task-card p.lede{margin-bottom:16px;}
+  .task-list{overflow-y:auto;flex:1;margin-bottom:14px;border-top:1px solid var(--line);}
+  .task-row{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start;}
+  .task-row.new-row{background:rgba(0,137,183,.05);border-radius:8px;padding:10px 8px;margin-top:10px;border-bottom:none;}
+  .task-field{display:flex;flex-direction:column;gap:3px;}
+  .task-field label{font-size:.66rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
+  .task-field input{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:7px;padding:6px 8px;font-size:.82rem;font-family:inherit;width:100%;}
+  .task-field input:focus{outline:none;border-color:var(--blue);}
+  .task-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .task-status{font-size:.78rem;color:var(--good);min-height:1.1em;}
+  .task-status.err{color:var(--danger);}
+  .task-btn-row{display:flex;gap:8px;justify-content:flex-end;}
+  .task-add-btn{border:1px solid var(--blue);background:none;color:var(--blue-deep);border-radius:8px;padding:8px 14px;font-size:.8rem;font-weight:600;cursor:pointer;}
+  .task-close-btn{border:none;background:none;color:var(--ink-soft);font-size:.8rem;cursor:pointer;text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -125,6 +146,27 @@
     <p>Admin accounts only. This is separate from rating — ratings themselves never record who submitted them.</p>
     <div class="fac-signin-btn" id="fac-signin-btn"></div>
     <button type="button" class="fac-close" onclick="closeFacilitatorOverlay()">Cancel</button>
+  </div>
+</div>
+<div class="fac-overlay" id="task-overlay">
+  <div class="task-card">
+    <h2>Manage Tasks</h2>
+    <p class="lede">Add or edit tasks below, then Save. Changes reach everyone rating within a few seconds. Existing tasks are never deleted here — ratings already collected for a task stay tied to it.</p>
+    <div class="task-list" id="task-list-body"></div>
+    <div class="task-row new-row" id="task-new-row">
+      <div class="task-field"><label>Category</label><input type="text" id="task-new-category"></div>
+      <div class="task-field"><label>Path (optional)</label><input type="text" id="task-new-path"></div>
+      <div class="task-field"><label>Task text</label><input type="text" id="task-new-text"></div>
+      <div class="task-field"><label>Owner</label><input type="text" id="task-new-owner"></div>
+    </div>
+    <div class="task-actions">
+      <div class="task-status" id="task-status"></div>
+      <div class="task-btn-row">
+        <button type="button" class="task-close-btn" onclick="closeTaskManager()">Close</button>
+        <button type="button" class="task-add-btn" onclick="addTaskItem()">Add task</button>
+        <button type="button" class="primary-btn" onclick="saveAllTaskItems()">Save changes</button>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -486,8 +528,131 @@
     resChip.appendChild(resBtn);
     grid.appendChild(resChip);
 
+    var tasksChip = el("div", "admin-chip");
+    tasksChip.appendChild(document.createTextNode("Tasks "));
+    tasksChip.appendChild(el("span", "admin-count", "(" + items.length + ")"));
+    var tasksBtn = document.createElement("button");
+    tasksBtn.type = "button";
+    tasksBtn.className = "open";
+    tasksBtn.textContent = "Manage";
+    tasksBtn.addEventListener("click", openTaskManager);
+    tasksChip.appendChild(tasksBtn);
+    grid.appendChild(tasksChip);
+
     wrap.appendChild(grid);
     return wrap;
+  }
+
+  // ---------------- Manage Tasks overlay ----------------
+  // Deliberately outside render()'s tree (see the CSS comment above
+  // .task-card) — populated once on open, not rebuilt by the ~4s state
+  // poll, so editing in progress here survives refreshState() ticks.
+
+  function openTaskManager(){
+    document.getElementById("task-status").textContent = "";
+    ["task-new-category","task-new-path","task-new-text","task-new-owner"].forEach(function(id){
+      document.getElementById(id).value = "";
+    });
+    renderTaskManagerList();
+    document.getElementById("task-overlay").classList.add("open");
+  }
+
+  function closeTaskManager(){
+    document.getElementById("task-overlay").classList.remove("open");
+  }
+
+  function buildTaskRow(item){
+    var row = el("div", "task-row");
+    row.dataset.id = item.id;
+    var fields = [
+      { key:"category", label:"Category" },
+      { key:"path", label:"Path" },
+      { key:"text", label:"Task text" },
+      { key:"owner", label:"Owner" }
+    ];
+    fields.forEach(function(f){
+      var wrap = el("div", "task-field");
+      wrap.appendChild(el("label", null, f.label));
+      var input = document.createElement("input");
+      input.type = "text";
+      input.dataset.field = f.key;
+      input.value = item[f.key] || "";
+      wrap.appendChild(input);
+      row.appendChild(wrap);
+    });
+    return row;
+  }
+
+  function renderTaskManagerList(){
+    var body = document.getElementById("task-list-body");
+    body.innerHTML = "";
+    items.forEach(function(item){ body.appendChild(buildTaskRow(item)); });
+  }
+
+  function setTaskStatus(msg, isErr){
+    var el2 = document.getElementById("task-status");
+    el2.textContent = msg;
+    el2.className = "task-status" + (isErr ? " err" : "");
+  }
+
+  function postTaskItems(payloadItems){
+    return apiFetch("/retreat/admin/items", { method:"POST", admin:true, body:{ items: payloadItems } });
+  }
+
+  function mergeSavedItems(savedItems){
+    savedItems.forEach(function(saved){
+      var existing = itemsById[saved.id];
+      if (existing){
+        existing.text = saved.text; existing.category = saved.category;
+        existing.path = saved.path; existing.owner = saved.owner;
+      } else {
+        items.push(saved);
+        itemsById[saved.id] = saved;
+      }
+    });
+  }
+
+  function addTaskItem(){
+    var text = document.getElementById("task-new-text").value.trim();
+    if (!text){ setTaskStatus("Task text is required.", true); return; }
+    var payload = {
+      text: text,
+      category: document.getElementById("task-new-category").value.trim(),
+      path: document.getElementById("task-new-path").value.trim(),
+      owner: document.getElementById("task-new-owner").value.trim()
+    };
+    setTaskStatus("Adding…");
+    postTaskItems([payload]).then(function(res){
+      if (!res.ok){ setTaskStatus("Could not add task.", true); return; }
+      mergeSavedItems(res.data.items || []);
+      ["task-new-category","task-new-path","task-new-text","task-new-owner"].forEach(function(id){
+        document.getElementById(id).value = "";
+      });
+      renderTaskManagerList();
+      setTaskStatus("Task added.");
+      render();
+    }).catch(function(){ setTaskStatus("Could not add task.", true); });
+  }
+
+  function saveAllTaskItems(){
+    var rows = document.querySelectorAll("#task-list-body .task-row");
+    var payload = [];
+    rows.forEach(function(row){
+      var it = { id: row.dataset.id };
+      row.querySelectorAll("input[data-field]").forEach(function(input){
+        it[input.dataset.field] = input.value.trim();
+      });
+      if (!it.text){ return; } // skip a row someone blanked out rather than silently erroring
+      payload.push(it);
+    });
+    if (!payload.length){ setTaskStatus("Nothing to save.", true); return; }
+    setTaskStatus("Saving…");
+    postTaskItems(payload).then(function(res){
+      if (!res.ok){ setTaskStatus("Could not save changes.", true); return; }
+      mergeSavedItems(res.data.items || []);
+      setTaskStatus("Saved " + payload.length + " task" + (payload.length === 1 ? "" : "s") + ".");
+      render();
+    }).catch(function(){ setTaskStatus("Could not save changes.", true); });
   }
 
   // ---------------- scale phase (1-5) ----------------
@@ -948,6 +1113,9 @@
   }
 
   window.closeFacilitatorOverlay = closeFacilitatorOverlay;
+  window.closeTaskManager = closeTaskManager;
+  window.addTaskItem = addTaskItem;
+  window.saveAllTaskItems = saveAllTaskItems;
 
   boot();
 })();
