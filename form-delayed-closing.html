@@ -116,7 +116,7 @@ function customerSections(label, list) {
   return list.map((c, i) => customerBlock(list.length > 1 ? `${label} ${i + 1}` : label, c)).join('');
 }
 
-function render({ transaction: t, mls_number, listing_agent, buyers_agent, closing_event, customers }) {
+function render({ transaction: t, mls_number, listing_agent, buyers_agent, closing_event, contract_event, customers }) {
   const la = listing_agent;
   const ba = buyers_agent;
   const statusLabel = STATUS_LABEL[t.status] || fmt(t.status);
@@ -163,7 +163,7 @@ function render({ transaction: t, mls_number, listing_agent, buyers_agent, closi
     <div class="section-head">Extension / Cancellation Details</div>
     <table>
       <tr><td class="label">Reason</td><td colspan="3" class="val">&nbsp;</td></tr>
-      <tr><td class="label">New Close Date (if extension)</td><td class="val">&nbsp;</td><td class="label">Extension #</td><td class="val">&nbsp;</td></tr>
+      <tr><td class="label">New Close Date (if extension)</td><td class="val">${fmtDate(contract_event?.close_date)}</td><td class="label">Extension #</td><td class="val">&nbsp;</td></tr>
       <tr><td class="label">Cancellation Date</td><td colspan="3" class="val">&nbsp;</td></tr>
       <tr><td class="label">Title Company</td><td class="val">${fmt(closing_event?.title_company)}</td><td class="label">Mortgage Company</td><td class="val">${fmt(closing_event?.mortgage_company)}</td></tr>
     </table>

@@ -7830,6 +7830,12 @@ async function foundationGeneratePDFs() {
       // actually frozen (helpful for telling a real hang apart from "just
       // slow" when a batch this size takes a while).
       btn.textContent = `⏳ Generating… (${i + 1}/${foundationPending.length})`;
+      // Setting textContent doesn't itself force a repaint -- without an
+      // actual yield here, the browser can go straight from this DOM write
+      // into the heavy synchronous work below without ever painting the
+      // update, which is exactly why the button looked stuck on the
+      // original static text even once per-letter progress was added.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const row = foundationPending[i];
       allGiftIds.push(...row.gift_ids);
 
@@ -7861,16 +7867,21 @@ async function foundationGeneratePDFs() {
       </style><div id="fl-letter-root">${letterHtml}</div>`;
       document.body.appendChild(snapshot);
 
-      // foreignObjectRendering:true routes the capture through an SVG
+      // foreignObjectRendering was true (routes the capture through an SVG
       // <foreignObject> so the browser lays the text out itself, instead of
-      // html2canvas's own manual DOM-to-canvas text engine — which is what
-      // was producing the doubled spaces and space-before-punctuation seen
-      // in generated letters (its glyph-width measurements don't exactly
-      // match how -apple-system/Segoe UI actually render, so it was
-      // inserting compensating gaps between words and punctuation it
-      // treated as separate runs). The template text in the database was
-      // confirmed clean — this was purely a rendering-path bug.
-      const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false, foreignObjectRendering:true });
+      // html2canvas's own manual DOM-to-canvas text engine) to fix doubled
+      // spaces / space-before-punctuation the manual engine was producing.
+      // Turned back OFF here as the leading suspect for the complete-tab-
+      // freeze reported after that change: foreignObjectRendering is
+      // html2canvas's least battle-tested capture path and has known real
+      // hangs (not just slowness) in some browser/security-policy
+      // combinations, especially combined with the injected <style>
+      // block's !important overrides above. Trades back in the minor
+      // spacing artifact in exchange for the feature actually completing --
+      // a real regression if the freeze turns out to have a different
+      // cause, but "doubled spaces" is a far smaller problem than "cannot
+      // generate letters at all". Revisit if this doesn't fix it either.
+      const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false });
       document.body.removeChild(snapshot);
       snapshot.innerHTML = ''; // drop the cloned DOM subtree html2canvas walked, not just the container
 
