@@ -7823,6 +7823,13 @@ async function foundationGeneratePDFs() {
     const contentHmm     = pageH - marginTopMm - marginBottomMm;
 
     for (let i = 0; i < foundationPending.length; i++) {
+      // Real progress text, not just a static "Generating…" — each
+      // html2canvas call below is heavy synchronous work, and this only
+      // actually paints once the yield at the bottom of the loop hands
+      // control back to the browser, so if it's updating, the tab is not
+      // actually frozen (helpful for telling a real hang apart from "just
+      // slow" when a batch this size takes a while).
+      btn.textContent = `⏳ Generating… (${i + 1}/${foundationPending.length})`;
       const row = foundationPending[i];
       allGiftIds.push(...row.gift_ids);
 
@@ -7865,6 +7872,7 @@ async function foundationGeneratePDFs() {
       // confirmed clean — this was purely a rendering-path bug.
       const canvas = await html2canvas(snapshot, { scale:2, backgroundColor:'#ffffff', useCORS:true, allowTaint:true, logging:false, foreignObjectRendering:true });
       document.body.removeChild(snapshot);
+      snapshot.innerHTML = ''; // drop the cloned DOM subtree html2canvas walked, not just the container
 
       if (i > 0) pdf.addPage();
 
@@ -7885,7 +7893,21 @@ async function foundationGeneratePDFs() {
         pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, marginTopMm, pageW, sliceH);
         remaining -= contentHmm;
         srcY      += slicePx;
+        // Zeroing a canvas's dimensions releases its backing pixel buffer
+        // immediately rather than waiting on GC -- at scale:2 each of these
+        // is several megapixels, and 30 letters' worth accumulating before
+        // GC gets around to them is a plausible way this locks the tab up.
+        slice.width = 0; slice.height = 0;
       }
+      canvas.width = 0; canvas.height = 0;
+
+      // Explicit yield -- html2canvas's own work above is heavy enough that
+      // relying on the implicit microtask break from `await` isn't reliably
+      // enough to let the browser repaint/GC between 30 back-to-back
+      // renders at scale:2. A real (macrotask) yield here is what makes the
+      // progress text above actually visible between letters instead of
+      // painting once at the very end.
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     const today = new Date().toISOString().slice(0, 10);
