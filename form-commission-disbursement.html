@@ -174,6 +174,20 @@ function donationLabel(d) {
   return d.donation_type || '';
 }
 
+// Turns a donation commitment into an actual dollar figure for this
+// closing — fixed_amount is already one (flat per closing, independent of
+// the deal size); percentage_rate is a cut of the WHOLE closing's GCI (not
+// that agent's own split of it — a donor pledges against the deal's total,
+// same base regardless of which side(s) they're on), per the user. null
+// when there's nothing to compute (no donor, or a percentage pledge on a
+// closing where GCI itself is unknown).
+function donationAmount(donor, gci) {
+  if (!donor) return null;
+  if (donor.fixed_amount != null) return Number(donor.fixed_amount);
+  if (donor.percentage_rate != null && gci != null) return Math.round(Number(donor.percentage_rate) / 100 * gci * 100) / 100;
+  return null;
+}
+
 function row2(l1, v1, l2, v2) {
   return `<tr>
     <td class="label">${l1}</td><td class="val">${v1 || '&nbsp;'}</td>
@@ -185,13 +199,18 @@ function row2(l1, v1, l2, v2) {
 // %/$/Ck#/Date/OTT/NSC/ACF are filled in by hand, never computed, since
 // per-agent splits/checks aren't tracked in the system. Skips agents with
 // no name on file (e.g. no co-listing agent) instead of printing a blank row.
-function agentWorkRow(a, donor) {
+function agentWorkRow(a, donor, gci) {
   const name = agentName(a);
   if (!name) return '';
   const badge = donor ? `<span class="foundation-badge">🌱 Foundation ${donationLabel(donor)}</span>` : '';
+  // ACF ("Adams Cameron Foundation") is the one work-table column this form
+  // can actually fill in rather than leave for the office to hand-write --
+  // the donation commitment (badge) plus the calculated dollar amount are
+  // both already known at print time.
+  const acf = donationAmount(donor, gci);
   return `<tr>
     <td class="agent-name">${name}${badge}</td>
-    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>${acf != null ? fmtMoney(acf) : '&nbsp;'}</td>
   </tr>`;
 }
 
@@ -290,6 +309,17 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   const donors = foundation_donors || [];
   const donorByAgentId = new Map(donors.map(d => [d.agent_id, d]));
 
+  // Total Foundation contribution pledged against THIS closing, across
+  // however many of the four participant slots are donors (a listing agent
+  // and a buyer's agent can each independently be donors on the same deal —
+  // that's two separate pledges, not a conflict, so they're summed here).
+  const foundationParticipants = [listing_agent, co_listing_agent, buyers_agent, co_buyers_agent]
+    .filter(a => a && donorByAgentId.has(a.agent_id));
+  const foundationTotal = foundationParticipants.reduce((sum, a) => {
+    const amt = donationAmount(donorByAgentId.get(a.agent_id), gci);
+    return sum + (amt || 0);
+  }, 0);
+
   document.getElementById('content').innerHTML = `
     <div class="form-title">Commission Disbursement Form</div>
 
@@ -316,11 +346,11 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       </thead>
       <tbody>
         <tr><td colspan="8" class="subhead">Listing Agent</td></tr>
-        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id)) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id))}
+        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id), gci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id), gci)}
         <tr><td colspan="8" class="subhead">Selling Agent</td></tr>
-        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id)) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id))}
+        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id), gci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id), gci)}
       </tbody>
     </table>
 
@@ -356,6 +386,11 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td class="amt">${fmtMoney(gci)}</td>
         <td>&nbsp;</td>
       </tr>
+      ${foundationTotal > 0 ? `<tr style="background:#fdf3d8">
+        <td>🌱 Foundation Contribution — ${foundationParticipants.map(a => agentName(a)).join(', ')}</td>
+        <td class="amt">${fmtMoney(foundationTotal)}</td>
+        <td style="font-size:8pt; color:#555;">Pledged per agent (flat, or % of GCI above) — informational, not deducted from GCI</td>
+      </tr>` : ''}
     </table>
 
     <div class="sig-row">
