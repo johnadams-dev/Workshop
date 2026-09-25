@@ -175,16 +175,20 @@ function donationLabel(d) {
 }
 
 // Turns a donation commitment into an actual dollar figure for this
-// closing — fixed_amount is already one (flat per closing, independent of
-// the deal size); percentage_rate is a cut of the WHOLE closing's GCI (not
-// that agent's own split of it — a donor pledges against the deal's total,
-// same base regardless of which side(s) they're on), per the user. null
-// when there's nothing to compute (no donor, or a percentage pledge on a
-// closing where GCI itself is unknown).
-function donationAmount(donor, gci) {
+// closing — fixed_amount is already one (flat per closing, regardless of
+// deal size or side). percentage_rate is a cut of the PLEDGING AGENT'S OWN
+// SIDE of GCI, not the whole closing's combined total — pass listingSideGci
+// for a listing-side agent, buyerSideGci for a buyer-side agent (see
+// render()). Per the user: a donor on one side with a non-donor on the
+// other should only pull from their own side's commission, and two donors
+// on the same deal are computed independently off their own sides, so they
+// can land on different dollar amounts even at an identical percentage.
+// null when there's nothing to compute (no donor, or a percentage pledge on
+// a side whose GCI contribution is itself unknown).
+function donationAmount(donor, sideGci) {
   if (!donor) return null;
   if (donor.fixed_amount != null) return Number(donor.fixed_amount);
-  if (donor.percentage_rate != null && gci != null) return Math.round(Number(donor.percentage_rate) / 100 * gci * 100) / 100;
+  if (donor.percentage_rate != null && sideGci != null) return Math.round(Number(donor.percentage_rate) / 100 * sideGci * 100) / 100;
   return null;
 }
 
@@ -199,15 +203,17 @@ function row2(l1, v1, l2, v2) {
 // %/$/Ck#/Date/OTT/NSC/ACF are filled in by hand, never computed, since
 // per-agent splits/checks aren't tracked in the system. Skips agents with
 // no name on file (e.g. no co-listing agent) instead of printing a blank row.
-function agentWorkRow(a, donor, gci) {
+function agentWorkRow(a, donor, sideGci) {
   const name = agentName(a);
   if (!name) return '';
   const badge = donor ? `<span class="foundation-badge">🌱 Foundation ${donationLabel(donor)}</span>` : '';
   // ACF ("Adams Cameron Foundation") is the one work-table column this form
   // can actually fill in rather than leave for the office to hand-write --
   // the donation commitment (badge) plus the calculated dollar amount are
-  // both already known at print time.
-  const acf = donationAmount(donor, gci);
+  // both already known at print time. sideGci is THIS agent's own side
+  // (listingSideGci or buyerSideGci from render()), not the deal's combined
+  // GCI -- see donationAmount()'s own comment for why.
+  const acf = donationAmount(donor, sideGci);
   return `<tr>
     <td class="agent-name">${name}${badge}</td>
     <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>${acf != null ? fmtMoney(acf) : '&nbsp;'}</td>
@@ -300,6 +306,23 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   if (t.represents_buyer && coopCommAdj != null)         { gci += coopCommAdj;        hasAnyComm = true; }
   if (!hasAnyComm) gci = null;
 
+  // Each side's OWN contribution to GCI above, split out for Foundation
+  // pledges -- per the user, a percentage pledge is a cut of the pledging
+  // agent's OWN side, not the whole deal's combined GCI. A listing-side
+  // donor with a non-donor buyer's agent (or vice versa) should only see
+  // their own side's commission in the calculation; two donors on the same
+  // deal are computed independently off their own side and can land on
+  // different dollar amounts even at the same percentage.
+  let listingSideGci = Number(listingNsc || 0);
+  let hasListingComm = listingNsc != null;
+  if (t.represents_seller && listingSideCommAdj != null) { listingSideGci += listingSideCommAdj; hasListingComm = true; }
+  if (!hasListingComm) listingSideGci = null;
+
+  let buyerSideGci = Number(buyerNsc || 0);
+  let hasBuyerComm = buyerNsc != null;
+  if (t.represents_buyer && coopCommAdj != null) { buyerSideGci += coopCommAdj; hasBuyerComm = true; }
+  if (!hasBuyerComm) buyerSideGci = null;
+
   const refs = referrals || [];
   // side is 'buyer' or 'seller' (transaction_referrals defaults new rows to
   // 'seller' -- see daily-desk-routes.js's POST /transactions/:id/referrals)
@@ -313,10 +336,16 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   // however many of the four participant slots are donors (a listing agent
   // and a buyer's agent can each independently be donors on the same deal —
   // that's two separate pledges, not a conflict, so they're summed here).
-  const foundationParticipants = [listing_agent, co_listing_agent, buyers_agent, co_buyers_agent]
-    .filter(a => a && donorByAgentId.has(a.agent_id));
-  const foundationTotal = foundationParticipants.reduce((sum, a) => {
-    const amt = donationAmount(donorByAgentId.get(a.agent_id), gci);
+  // Paired with each agent's OWN side's GCI, same as the work-table rows
+  // below — a listing-side donor's percentage never touches buyerSideGci
+  // and vice versa, so two donors on the same deal can land on different
+  // dollar amounts even at an identical rate.
+  const foundationParticipants = [
+    [listing_agent, listingSideGci], [co_listing_agent, listingSideGci],
+    [buyers_agent, buyerSideGci], [co_buyers_agent, buyerSideGci],
+  ].filter(([a]) => a && donorByAgentId.has(a.agent_id));
+  const foundationTotal = foundationParticipants.reduce((sum, [a, sideGci]) => {
+    const amt = donationAmount(donorByAgentId.get(a.agent_id), sideGci);
     return sum + (amt || 0);
   }, 0);
 
@@ -346,11 +375,11 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       </thead>
       <tbody>
         <tr><td colspan="8" class="subhead">Listing Agent</td></tr>
-        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id), gci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id), gci)}
+        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id), listingSideGci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id), listingSideGci)}
         <tr><td colspan="8" class="subhead">Selling Agent</td></tr>
-        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id), gci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id), gci)}
+        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id), buyerSideGci) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id), buyerSideGci)}
       </tbody>
     </table>
 
@@ -387,7 +416,7 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td>&nbsp;</td>
       </tr>
       ${foundationTotal > 0 ? `<tr style="background:#fdf3d8">
-        <td>🌱 Foundation Contribution — ${foundationParticipants.map(a => agentName(a)).join(', ')}</td>
+        <td>🌱 Foundation Contribution — ${foundationParticipants.map(([a]) => agentName(a)).join(', ')}</td>
         <td class="amt">${fmtMoney(foundationTotal)}</td>
         <td style="font-size:8pt; color:#555;">Pledged per agent (flat, or % of GCI above) — informational, not deducted from GCI</td>
       </tr>` : ''}
