@@ -172,6 +172,10 @@
       text-decoration: none; color: inherit;
     }
     .resource-result:last-child { border-bottom: none; }
+    .resource-results-label {
+      padding: .6rem 1.2rem .3rem; font-size: .68rem; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase; color: var(--slate);
+    }
     a.resource-result:hover { background: var(--cream-dark); }
     .resource-result-name { font-size: .88rem; font-weight: 500; color: var(--ink); }
     .resource-result-name .ext-arrow { color: var(--gold); font-weight: 400; margin-left: .3rem; }
@@ -1023,17 +1027,15 @@ function filterTools() {
     alwaysWrap.style.display = visible ? '' : 'none';
   }
 
+  // Dropdown panel — every matching Workshop tool (not just the ones in the
+  // sidebar/More Tools), then matching ACC resources. Manager-only tools
+  // follow the same S.isManager gate as the sidebar's `gated` items.
+  const toolMatches = resources.filter(t => t.kind === 'workshop' && t.url && (!t.managerOnly || S.isManager) && matches(resourceMatchText(t)));
   const resourceMatches = resources.filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
-  if (resourceMatches.length) {
-    resultsEl.innerHTML = resourceMatches.map(r => {
-      const tag = r.url ? 'a' : 'div';
-      const attrs = r.url ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : '';
-      const arrow = r.url ? '<span class="ext-arrow">↗</span>' : '';
-      return `<${tag} class="resource-result" ${attrs}>
-        <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
-        <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
-      </${tag}>`;
-    }).join('');
+  if (toolMatches.length || resourceMatches.length) {
+    resultsEl.innerHTML =
+      (toolMatches.length ? `<div class="resource-results-label">Workshop tools</div>${toolMatches.map(searchResultHtml).join('')}` : '') +
+      (resourceMatches.length ? `<div class="resource-results-label">ACC resources</div>${resourceMatches.map(searchResultHtml).join('')}` : '');
     resultsEl.style.display = 'block';
     anyVisible = true;
   } else {
@@ -1041,6 +1043,19 @@ function filterTools() {
   }
 
   emptyEl.style.display = anyVisible ? 'none' : '';
+}
+
+// Relative (Workshop) URLs open in place; absolute ones — ACC resources and
+// externally hosted tools like MLS Magic — open in a new tab with the ↗ marker.
+function searchResultHtml(r) {
+  const external = /^(https?:|mailto:)/.test(r.url || '');
+  const tag = r.url ? 'a' : 'div';
+  const attrs = !r.url ? '' : external ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : `href="${escapeHtml(r.url)}"`;
+  const arrow = external ? '<span class="ext-arrow">↗</span>' : '';
+  return `<${tag} class="resource-result" ${attrs}>
+    <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
+    <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
+  </${tag}>`;
 }
 
 document.addEventListener('click', (e) => {

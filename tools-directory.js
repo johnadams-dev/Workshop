@@ -26,6 +26,10 @@
 //   Guide, Agent Roster, Cameron's Stage — Outside Listings) — left that
 //   way deliberately rather than expanding feedback.html's picker beyond
 //   the verified drift this file was built to fix.
+//   `managerOnly: true` mirrors index.html's `manager-card` set — the search
+//   results lists on index.html and agent-hub.html leave these out for
+//   anyone not signed in as a manager/admin. It only hides the link; each
+//   tool's own page/route still enforces access server-side.
 //
 //   kind: 'resource' — an ACC company-wide resource, NOT one of the
 //   Workshop's own tools. First-pass transcription from a PDF ("ACC
@@ -93,6 +97,7 @@ const WORKSHOP_RESOURCES = [
     feedbackGroup: 'Day to Day' },
   { kind: 'workshop', slug: 'camerons-stage-external', name: "Cameron's Stage — Outside Listings", url: './camerons-stage-external.html',
     description: 'Build a branded virtual tour for any MLS listing, not just ours — pulls from Stellar or Daytona MLS instead of DeltaNet.',
+    managerOnly: true,
     feedbackGroup: null },
   { kind: 'workshop', slug: 'lockbox', name: 'Lockbox Manager', url: './lockbox-app.html',
     description: 'Check lockboxes in and out across all offices. Track inventory by serial number, agent, and property. Look up listings by MLS ID to auto-fill checkout details.',
@@ -108,6 +113,7 @@ const WORKSHOP_RESOURCES = [
     feedbackGroup: 'Day to Day' },
   { kind: 'workshop', slug: 'review-engine', name: 'Review Engine', url: './review-engine.html',
     description: 'Track the post-closing review request funnel — sent, clicked, and confirmed — with A/B test results by template variant and monthly targets.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'foundation', name: 'Adams Cameron Foundation', url: './foundation.html',
     description: 'View office participation stats, learn about our partner charities, and manage your own donation pledge — enroll, update your amount, or opt out at any time.',
@@ -129,36 +135,50 @@ const WORKSHOP_RESOURCES = [
     feedbackGroup: null },
   { kind: 'workshop', slug: 'staff-guide', name: 'Staff Reference Guide', url: './staff-guide.html',
     description: 'How-to guide for internal staff covering the Daily Desk, Market Notices, Floor Time, and Lockbox Manager — with step-by-step instructions for each tool.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'roster', name: 'Agent Roster', url: './roster.html',
     description: 'Look up agents, office management teams, and featured Title/Mortgage/Association/Property Management partners — installable to your home screen like an app.',
     feedbackGroup: null },
   { kind: 'workshop', slug: 'agent-master-form', name: 'Agent Records', url: './agent-master-form.html',
     description: 'View and edit agent contact info, external IDs (DeltaNet, Profit Power, NRDS), and notification settings — with reconciliation against DeltaNet and Google Workspace.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'daily-desk', name: 'Daily Desk', url: './daily-desk.html',
     description: "Office-scoped view of active listings, contracts, and today's action items — pulls live data from DeltaNet, Form Simplicity, and the transaction database.",
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'scorecard-entry', name: 'Scorecard Data Entry', url: './scorecard-entry.html',
     description: 'Enter monthly manual metrics for the company scorecard — advertising spend, social advocacy data, and eBusiness statistics.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'scorecard-report', name: 'Scorecard Report', url: './scorecard-report.html',
     description: 'Company scorecard by month and office — recruiting/retention, reviews, virtual tours, title/mortgage capture, and files handled, backed by live transaction data.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'marketing-bucks', name: 'Marketing Bucks', url: './marketing-bucks.html',
     description: 'Issue and track $50 Marketing Bucks credits — see what\'s outstanding and redeemed, and report by office and agent.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'broadcast-messaging', name: 'Broadcast Messaging', url: './broadcast-messaging.html',
     description: 'Text a selected group of agents — company-wide, one or more offices, or a hand-picked list — for event invites, office notices, and admin-only emergency alerts.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'usage-stats', name: 'Tool Usage', url: './usage-stats.html',
     description: 'See how often each Workshop tool is being used and by whom — visit counts by tool and user, with a recent activity feed.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'bi-chat', name: 'Mr. Johnson from Accounts', url: './bi-chat.html',
     description: 'Ask questions about company data in plain English — closings, listing activity, and more — and see the exact SQL and results behind every answer.',
+    managerOnly: true,
     feedbackGroup: 'Administrative' },
   { kind: 'workshop', slug: 'leaderboard', name: 'Agent Production Leaderboard', url: './leaderboard.html',
     description: "Sales Leader, Listing Leader, and President's Club GCI rankings — company-wide or by office, with your own production against the field.",
+    feedbackGroup: 'Building Business' },
+  // The agent SMS service as a whole (enrollment, coaching texts, replies to
+  // the SMS assistant) — url points at the enrollment page, its only UI.
+  { kind: 'workshop', slug: 'text-messaging', name: 'Text Messaging', url: './sms-enrollment.html',
+    description: 'Enroll in or opt out of automated text messages from Adams Cameron — coaching check-ins, business-plan reminders, appointment prep, and replies from the SMS assistant.',
     feedbackGroup: 'Building Business' },
   // Standalone catch-all — no real URL/section. `name` here feeds TOOL_NAMES
   // (the compact badge label shown on an already-submitted feedback item in

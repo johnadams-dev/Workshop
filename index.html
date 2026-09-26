@@ -357,6 +357,14 @@
       color: inherit;
     }
     .resource-result:last-child { border-bottom: none; }
+    .resource-results-label {
+      padding: 0.6rem 1.2rem 0.3rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--slate);
+    }
     a.resource-result:hover { background: var(--cream-dark); }
     .resource-result-name {
       font-size: 0.88rem;
@@ -1304,9 +1312,9 @@ else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInt
 
 // ── Tool + resource search ──────────────────────────────────────────────────
 // Reads WORKSHOP_RESOURCES (tools-directory.js). Workshop tools filter the
-// existing static .card grid in place; ACC resources (no permanent card on
-// this page) surface in a typeahead-style dropdown under the search box,
-// same convention as agent-hub.html's #agentSearchResults picker.
+// existing static .card grid in place, and also list — alongside matching
+// ACC resources — in a typeahead-style dropdown under the search box, same
+// convention as agent-hub.html's #agentSearchResults picker.
 function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -1360,26 +1368,38 @@ function filterTools() {
     if (pill) pill.style.display = visible ? '' : 'none';
   });
 
-  // ACC resources — dropdown panel, not part of the static grid.
-  const resourceMatches = (typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [])
-    .filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
+  // Dropdown panel — every matching Workshop tool (including ones with no
+  // card on this page, e.g. Text Messaging), then matching ACC resources.
+  // Manager-only tools are left out unless the last known role is manager,
+  // same as the manager-card grid gating above.
+  const isManager = localStorage.getItem('ac_is_manager') === '1';
+  const all = typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [];
+  const toolMatches = all.filter(t => t.kind === 'workshop' && t.url && (!t.managerOnly || isManager) && matches(resourceMatchText(t)));
+  const resourceMatches = all.filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
 
-  if (resourceMatches.length) {
-    resultsEl.innerHTML = resourceMatches.map(r => {
-      const tag = r.url ? 'a' : 'div';
-      const attrs = r.url ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : '';
-      const arrow = r.url ? '<span class="ext-arrow">↗</span>' : '';
-      return `<${tag} class="resource-result" ${attrs}>
-        <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
-        <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
-      </${tag}>`;
-    }).join('');
+  if (toolMatches.length || resourceMatches.length) {
+    resultsEl.innerHTML =
+      (toolMatches.length ? `<div class="resource-results-label">Workshop tools</div>${toolMatches.map(searchResultHtml).join('')}` : '') +
+      (resourceMatches.length ? `<div class="resource-results-label">ACC resources</div>${resourceMatches.map(searchResultHtml).join('')}` : '');
     resultsEl.style.display = 'block';
   } else {
     resultsEl.style.display = 'none';
   }
 
-  emptyEl.style.display = (!anyCardVisible && !resourceMatches.length) ? '' : 'none';
+  emptyEl.style.display = (!anyCardVisible && !toolMatches.length && !resourceMatches.length) ? '' : 'none';
+}
+
+// Relative (Workshop) URLs open in place; absolute ones — ACC resources and
+// externally hosted tools like MLS Magic — open in a new tab with the ↗ marker.
+function searchResultHtml(r) {
+  const external = /^(https?:|mailto:)/.test(r.url || '');
+  const tag = r.url ? 'a' : 'div';
+  const attrs = !r.url ? '' : external ? `href="${escapeHtml(r.url)}" target="_blank" rel="noopener"` : `href="${escapeHtml(r.url)}"`;
+  const arrow = external ? '<span class="ext-arrow">↗</span>' : '';
+  return `<${tag} class="resource-result" ${attrs}>
+    <div class="resource-result-name">${escapeHtml(r.name)}${arrow}</div>
+    <div class="resource-result-desc">${escapeHtml(r.description || '')}</div>
+  </${tag}>`;
 }
 
 document.addEventListener('click', (e) => {
