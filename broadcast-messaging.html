@@ -258,7 +258,7 @@ const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]))
 
 let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
-let myRole = null; // 'admin' | 'manager' | 'coordinator'
+let myRole = null; // 'admin' | 'sales_manager' | 'office_coordinator'
 
 let currentScope = 'all';
 let selectedOfficeIds = new Set();
@@ -330,7 +330,7 @@ async function init() {
   await loadOffices();
   switchTab('compose');
   loadHistory();
-  if (myRole === 'admin' || myRole === 'manager') loadApprovalQueue();
+  if (myRole === 'admin' || myRole === 'sales_manager') loadApprovalQueue();
   loadReplies();
   setInterval(loadReplies, 45000);
 
@@ -346,12 +346,12 @@ function setupForRole() {
     .filter(c => !c.adminOnly || myRole === 'admin')
     .map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('');
 
-  if (myRole === 'coordinator') {
+  if (myRole === 'office_coordinator') {
     document.getElementById('scope-btn-all').style.display = 'none';
     document.getElementById('coordinator-banner').style.display = 'block';
     setScope('offices');
   }
-  if (myRole === 'admin' || myRole === 'manager') {
+  if (myRole === 'admin' || myRole === 'sales_manager') {
     document.getElementById('tab-btn-approvals').style.display = '';
   }
 }
@@ -535,7 +535,7 @@ async function sendBroadcast() {
     document.querySelectorAll('.office-check').forEach(el => { el.classList.remove('checked'); el.querySelector('input').checked = false; });
     document.getElementById('preview-panel').style.display = 'none';
     loadHistory();
-    if (myRole === 'admin' || myRole === 'manager') loadApprovalQueue();
+    if (myRole === 'admin' || myRole === 'sales_manager') loadApprovalQueue();
   } catch (e) {
     statusEl.className = 'compose-status err';
     statusEl.textContent = e.message;

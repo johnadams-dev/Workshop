@@ -73,8 +73,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .row-badges{margin-top:3px;display:flex;gap:5px;flex-wrap:wrap}
 .badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:#eef2f6;color:var(--muted)}
 .badge-role-admin{background:#fef2f2;color:#dc2626}
-.badge-role-manager{background:#eff6ff;color:#2563eb}
-.badge-role-coordinator{background:#f0fdf4;color:#16a34a}
+.badge-role-sales_manager{background:#eff6ff;color:#2563eb}
+.badge-role-office_coordinator{background:#f0fdf4;color:#16a34a}
 .row-actions{display:flex;gap:6px;flex-shrink:0}
 .row-actions a{width:34px;height:34px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:15px}
 
@@ -329,7 +329,7 @@ async function init() {
       api('/roster/staff'),
       api('/roster/partners'),
       api('/offices'),
-      // /lockbox/me collapses staff.role to just "manager" (admin/manager)
+      // /lockbox/me collapses staff.role to just "manager" (admin/sales_manager)
       // or "staff" (everyone else, including coordinator) -- that split is
       // exactly what's needed here: show Send a message to anyone who isn't
       // a plain agent. requireStaff re-checks the precise admin/manager/
@@ -646,9 +646,11 @@ function renderOfficeDetail() {
   `;
 }
 
+const ROLE_LABELS = { admin: 'Admin', sales_manager: 'Sales Manager', office_coordinator: 'Office Coordinator' };
+
 function staffRow(s) {
   const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email;
-  const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
+  const roleLabel = s.role ? (ROLE_LABELS[s.role] || s.role) : '';
   const websiteHref = s.website ? (/^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website) : null;
   return `
     <div class="row-card clickable" onclick="openStaffCard(${s.id})">
@@ -670,7 +672,7 @@ function openStaffCard(id) {
   const s = STATE.staff.find(x => x.id === id);
   if (!s) return;
   const name = [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email;
-  const roleLabel = s.role ? s.role.charAt(0).toUpperCase() + s.role.slice(1) : '';
+  const roleLabel = s.role ? (ROLE_LABELS[s.role] || s.role) : '';
   const officeNames = (s.offices || []).map(o => o.name).join(', ');
   const websiteHref = s.website ? (/^https?:\/\//i.test(s.website) ? s.website : 'https://' + s.website) : null;
   STATE.detailTarget = { type: 'staff', id: s.id, cellE164: s.cell_e164, name };

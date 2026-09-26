@@ -1189,14 +1189,12 @@ tbody tr.clickable { cursor: pointer; }
       </div>
 
       <div id="admin-new-template" style="display:none; border:1px solid var(--ink-border); border-radius:var(--r); padding:14px; margin-bottom:20px;">
-        <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:14px; align-items:end; margin-bottom:10px;">
+        <div class="form-row" style="display:grid; grid-template-columns:2fr 3fr; gap:14px; align-items:end; margin-bottom:10px;">
           <div class="field" style="display:flex; flex-direction:column; gap:5px;">
             <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Name</span>
             <input type="text" id="admin-tpl-name" placeholder="e.g. Seller Listing Checklist" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
           </div>
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-seller"> Seller</label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-buyer"> Buyer</label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" id="admin-tpl-closing"> Closing</label>
+          <div id="admin-tpl-scopes" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
         </div>
         <div class="btn-row">
           <button class="btn btn-primary btn-sm" onclick="adminCreateTemplate()">Create</button>
@@ -6245,9 +6243,10 @@ function adminItemFieldsHtml(item) {
       <div class="field" style="display:flex; flex-direction:column; gap:4px;">
         ${adminFieldLabel('Responsible Party')}
         <select class="ai-responsible-party" style="padding:6px 8px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
-          <option value="coordinator" ${(item.responsible_party || 'coordinator') === 'coordinator' ? 'selected' : ''}>Coordinator</option>
+          <option value="office_coordinator" ${['', 'coordinator', 'office_coordinator'].includes(item.responsible_party || '') ? 'selected' : ''}>Office Coordinator</option>
           <option value="agent" ${item.responsible_party === 'agent' ? 'selected' : ''}>Agent</option>
           <option value="sales_manager" ${item.responsible_party === 'sales_manager' ? 'selected' : ''}>Sales Manager</option>
+          <option value="admin" ${item.responsible_party === 'admin' ? 'selected' : ''}>Admin</option>
           <option value="broker" ${item.responsible_party === 'broker' ? 'selected' : ''}>Broker</option>
           <option value="compliance_manager" ${item.responsible_party === 'compliance_manager' ? 'selected' : ''}>Compliance Manager</option>
         </select>
@@ -6298,6 +6297,17 @@ async function adminLoadTemplates() {
   adminRenderTemplates();
 }
 
+// Scopes a template can be tagged with from this screen. Any other applies_to
+// value a template already carries (e.g. 'seller_under_contract' on Contract
+// Written) has no checkbox and is carried through untouched on save — before
+// this, saving rebuilt applies_to from only the checkboxes and silently
+// dropped those.
+const ADMIN_TEMPLATE_SCOPES = [
+  ['seller', 'Seller'], ['buyer', 'Buyer'], ['closing', 'Closing'],
+  ['agent_onboarding', 'Agent Onboarding'], ['agent_offboarding', 'Agent Offboarding'],
+];
+const ADMIN_SCOPE_KEYS = ADMIN_TEMPLATE_SCOPES.map(([k]) => k);
+
 function adminRenderTemplates() {
   const container = document.getElementById('admin-templates');
   if (!adminTemplates.length) {
@@ -6307,13 +6317,11 @@ function adminRenderTemplates() {
   container.innerHTML = adminTemplates.map(t => {
     const appliesTo = t.applies_to || [];
     return `
-      <div class="admin-template" data-template-id="${t.id}" style="margin-bottom:28px;">
+      <div class="admin-template" data-template-id="${t.id}" data-extra-scopes="${escapeHtml(JSON.stringify(appliesTo.filter(s => !ADMIN_SCOPE_KEYS.includes(s))))}" style="margin-bottom:28px;">
         <div class="section-head">
           <input type="text" class="at-name" value="${escapeHtml(t.name)}" style="background:transparent; border:none; border-bottom:1px solid var(--ink-border); color:var(--text); font-size:15px; font-weight:600; padding:4px 0; min-width:240px;">
           <div style="display:flex; align-items:center; gap:14px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-seller" ${appliesTo.includes('seller') ? 'checked' : ''}> Seller</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-buyer" ${appliesTo.includes('buyer') ? 'checked' : ''}> Buyer</label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-closing" ${appliesTo.includes('closing') ? 'checked' : ''}> Closing</label>
+            ${ADMIN_TEMPLATE_SCOPES.map(([key, label]) => `<label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-scope" value="${key}" ${appliesTo.includes(key) ? 'checked' : ''}> ${label}</label>`).join('')}
             <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" class="at-active" ${t.is_active ? 'checked' : ''}> Active</label>
             <button class="btn btn-ghost btn-sm" onclick="adminSaveTemplate(${t.id}, this)">Save</button>
           </div>
@@ -6322,7 +6330,7 @@ function adminRenderTemplates() {
           ${(t.items || []).map(item => adminItemBlockHtml(item)).join('') || '<div class="empty">No items yet.</div>'}
         </div>
         <div class="admin-new-item" id="admin-new-item-${t.id}" style="display:none; margin-top:10px;">
-          ${adminItemFieldsHtml({ sort_order: (t.items || []).length, title: '', description: '', requirement_type: 'always', tool_key: '', resource_url: '', resource_label: '', responsible_party: 'coordinator', is_active: true })}
+          ${adminItemFieldsHtml({ sort_order: (t.items || []).length, title: '', description: '', requirement_type: 'always', tool_key: '', resource_url: '', resource_label: '', responsible_party: 'office_coordinator', is_active: true })}
           <div class="btn-row" style="margin-top:10px;">
             <button class="btn btn-primary btn-sm" onclick="adminCreateItem(${t.id}, this)">Add Item</button>
             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('admin-new-item-${t.id}').style.display='none'">Cancel</button>
@@ -6375,10 +6383,10 @@ async function adminSaveTemplate(templateId, btn) {
   const container = btn.closest('.admin-template');
   const name = container.querySelector('.at-name').value.trim();
   if (!name) { alert('Name is required.'); return; }
-  const appliesTo = [];
-  if (container.querySelector('.at-seller').checked) appliesTo.push('seller');
-  if (container.querySelector('.at-buyer').checked) appliesTo.push('buyer');
-  if (container.querySelector('.at-closing').checked) appliesTo.push('closing');
+  const appliesTo = [
+    ...[...container.querySelectorAll('.at-scope:checked')].map(cb => cb.value),
+    ...JSON.parse(container.dataset.extraScopes || '[]'),
+  ];
   const isActive = container.querySelector('.at-active').checked;
 
   try {
@@ -7174,22 +7182,19 @@ function confirmNoticeCaravan() {
 /* ─────────────────────────────────────────────────────────────────── */
 
 function adminShowNewTemplateForm() {
+  document.getElementById('admin-tpl-scopes').innerHTML = ADMIN_TEMPLATE_SCOPES.map(([key, label]) =>
+    `<label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><input type="checkbox" value="${key}"> ${label}</label>`).join('');
   document.getElementById('admin-new-template').style.display = 'block';
 }
 function adminHideNewTemplateForm() {
   document.getElementById('admin-new-template').style.display = 'none';
   document.getElementById('admin-tpl-name').value = '';
-  document.getElementById('admin-tpl-seller').checked = false;
-  document.getElementById('admin-tpl-buyer').checked = false;
-  document.getElementById('admin-tpl-closing').checked = false;
+  document.querySelectorAll('#admin-tpl-scopes input').forEach(cb => { cb.checked = false; });
 }
 async function adminCreateTemplate() {
   const name = document.getElementById('admin-tpl-name').value.trim();
   if (!name) { alert('Name is required.'); return; }
-  const appliesTo = [];
-  if (document.getElementById('admin-tpl-seller').checked) appliesTo.push('seller');
-  if (document.getElementById('admin-tpl-buyer').checked) appliesTo.push('buyer');
-  if (document.getElementById('admin-tpl-closing').checked) appliesTo.push('closing');
+  const appliesTo = [...document.querySelectorAll('#admin-tpl-scopes input:checked')].map(cb => cb.value);
   if (!appliesTo.length) { alert('Select at least one "Applies To" option.'); return; }
 
   try {
