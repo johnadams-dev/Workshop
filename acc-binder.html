@@ -516,8 +516,22 @@ async function startAnalysis() {
       rawFileMap[fd.name] = uint8ToBase64(new Uint8Array(bytes));
       pageCounts[fd.name] = fd.totalPages;
     }
-    const payloadFiles = filesData.map((f) => ({ name: f.name, richText: f.richText, labeledText: f.labeledText, totalPages: f.totalPages, base64: rawFileMap[f.name] }));
-    const result = await api('/acc-binder/analyze', { method: "POST", body: JSON.stringify({ files: payloadFiles }) });
+    // The server only reads the raw PDF bytes when text extraction came up
+    // empty (a scanned / Form-Simplicity-flattened PDF) — same rule as
+    // isScanned in acc-binder-routes.js /analyze. Sending them for every
+    // upload pushed large text PDFs past the server's 25 MB body limit for
+    // nothing. rawFileMap is still kept locally for splitting in step 2.
+    const totalPages     = filesData.reduce((s, f) => s + (f.totalPages || 0), 0);
+    const totalExtracted = filesData.reduce((s, f) => s + (f.richText || "").trim().length, 0);
+    const needsPdfBytes  = totalPages > 0 && (totalExtracted / totalPages) < 20;
+    const payloadFiles = filesData.map((f) => ({ name: f.name, richText: f.richText, labeledText: f.labeledText, totalPages: f.totalPages, ...(needsPdfBytes ? { base64: rawFileMap[f.name] } : {}) }));
+    const body = JSON.stringify({ files: payloadFiles });
+    const MAX_MB = 24; // server.js express.json limit is 25 MB
+    const sizeMb = body.length / 1024 / 1024;
+    if (sizeMb > MAX_MB) {
+      throw new Error(`these documents are too large to analyze in one upload (${sizeMb.toFixed(1)} MB; the limit is ${MAX_MB} MB)${needsPdfBytes ? ". They're scanned images, so the whole PDF has to be sent. Try uploading fewer or smaller PDFs at a time" : ". Try uploading fewer PDFs at a time"}.`);
+    }
+    const result = await api('/acc-binder/analyze', { method: "POST", body });
     result._rawFileMap = rawFileMap;
     result._pageCounts = pageCounts;
 
