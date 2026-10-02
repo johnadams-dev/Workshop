@@ -124,7 +124,7 @@
   .task-card h2{font-size:1.1rem;margin-bottom:4px;}
   .task-card p.lede{margin-bottom:16px;}
   .task-list{overflow-y:auto;flex:1;margin-bottom:14px;border-top:1px solid var(--line);}
-  .task-row{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start;}
+  .task-row{display:grid;grid-template-columns:1fr 1fr 1.6fr 1fr auto;gap:6px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start;}
   .task-row.new-row{background:rgba(0,137,183,.05);border-radius:8px;padding:10px 8px;margin-top:10px;border-bottom:none;}
   .task-field{display:flex;flex-direction:column;gap:3px;}
   .task-field label{font-size:.66rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;}
@@ -136,6 +136,9 @@
   .task-btn-row{display:flex;gap:8px;justify-content:flex-end;}
   .task-add-btn{border:1px solid var(--blue);background:none;color:var(--blue-deep);border-radius:8px;padding:8px 14px;font-size:.8rem;font-weight:600;cursor:pointer;}
   .task-close-btn{border:none;background:none;color:var(--ink-soft);font-size:.8rem;cursor:pointer;text-decoration:underline;}
+  .task-remove-btn{align-self:end;border:1px solid var(--line);background:none;color:var(--danger);border-radius:7px;padding:6px 10px;font-size:.78rem;cursor:pointer;}
+  .task-remove-btn:hover{border-color:var(--danger);}
+  .task-remove-btn:disabled{opacity:.5;cursor:default;}
 </style>
 </head>
 <body>
@@ -151,7 +154,7 @@
 <div class="fac-overlay" id="task-overlay">
   <div class="task-card">
     <h2>Manage Tasks</h2>
-    <p class="lede">Add or edit tasks below, then Save. Changes reach everyone rating within a few seconds. Existing tasks are never deleted here — ratings already collected for a task stay tied to it.</p>
+    <p class="lede">Add or edit tasks below, then Save. Changes reach everyone rating within a few seconds. Remove takes a task off everyone's list and out of the results; it can't be undone.</p>
     <div class="task-list" id="task-list-body"></div>
     <div class="task-row new-row" id="task-new-row">
       <div class="task-field"><label>Category</label><input type="text" id="task-new-category"></div>
@@ -580,7 +583,31 @@
       wrap.appendChild(input);
       row.appendChild(wrap);
     });
+    var removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "task-remove-btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", function(){ removeTaskItem(item, removeBtn); });
+    row.appendChild(removeBtn);
     return row;
+  }
+
+  // Deletes the task server-side; everyone else's page drops it on the next
+  // ~4s state poll. Ratings already given for it stop counting in the results
+  // (computeScores() skips ids no longer in retreat_items).
+  function removeTaskItem(item, btn){
+    var label = item.text || "this task";
+    if (!window.confirm("Remove \"" + label + "\"?\n\nIt disappears from everyone's rating list, and any ratings it already has stop counting in the results. This can't be undone.")) return;
+    btn.disabled = true;
+    setTaskStatus("Removing…");
+    apiFetch("/retreat/admin/items/" + encodeURIComponent(item.id), { method:"DELETE", admin:true }).then(function(res){
+      if (!res.ok && res.status !== 404){ btn.disabled = false; setTaskStatus("Could not remove task.", true); return; }
+      items = items.filter(function(it){ return it.id !== item.id; });
+      delete itemsById[item.id];
+      renderTaskManagerList();
+      setTaskStatus("Removed \"" + label + "\".");
+      render();
+    }).catch(function(){ btn.disabled = false; setTaskStatus("Could not remove task.", true); });
   }
 
   function renderTaskManagerList(){
@@ -783,6 +810,12 @@
     }
     var idx = Math.min(sess.roundIndex, sess.rounds.length - 1);
     var round = sess.rounds[idx];
+    // A facilitator can remove a task mid-session: drop a pick that points
+    // at a removed task, and don't strand someone on a round that no longer
+    // has two tasks left to choose between.
+    if (round.best && !itemsById[round.best]) round.best = null;
+    if (round.worst && !itemsById[round.worst]) round.worst = null;
+    var liveInRound = round.group.filter(function(id){ return itemsById[id]; }).length;
 
     var card = el("div", "card");
     card.appendChild(buildProgress(idx, sess.rounds.length));
@@ -838,7 +871,7 @@
     nextBtn.type = "button";
     nextBtn.className = "primary-btn";
     nextBtn.textContent = (idx === sess.rounds.length - 1) ? "Finish" : "Next →";
-    nextBtn.disabled = !(round.best && round.worst);
+    nextBtn.disabled = liveInRound >= 2 && !(round.best && round.worst);
     nextBtn.addEventListener("click", function(){
       sess.roundIndex = idx + 1;
       saveLocal();
