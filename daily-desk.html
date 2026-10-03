@@ -687,6 +687,16 @@ tbody tr.clickable { cursor: pointer; }
 }
 .cl-action:hover { color: var(--amber); }
 
+/* Linked MLS listings in the transaction drawer */
+.ll-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ink-border); font-size: 12px; }
+.ll-row:last-child { border-bottom: none; }
+.ll-main { flex: 1; min-width: 0; }
+.ll-addr { color: var(--text); }
+.ll-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.ll-unlink { font-size: 10px; font-family: var(--mono); color: var(--text-dim); background: none; border: 1px solid var(--ink-border); border-radius: 4px; padding: 3px 7px; cursor: pointer; white-space: nowrap; }
+.ll-unlink:hover { color: var(--red); border-color: rgba(248,81,73,.4); }
+.ll-unlink:disabled { opacity: .5; cursor: default; }
+
 .divider {
   display: flex; align-items: center; gap: 10px;
   font-family: var(--mono); font-size: 10px; color: var(--text-dim);
@@ -2470,6 +2480,9 @@ tbody tr.clickable { cursor: pointer; }
         <div class="dfield-val" id="drawer-source">—</div>
       </div>
     </div>
+
+    <div class="divider">Linked MLS Listings</div>
+    <div id="drawer-linked-listings"><div class="empty">Loading…</div></div>
 
     <div class="divider">Checklist</div>
     <div class="checklist" id="drawer-checklist">
@@ -5787,7 +5800,14 @@ function renderMismatchTable(rows) {
       const [chipClass, chipLabel] = statusChip(r.status);
       return `<span class="chip ${chipClass}">${chipLabel}</span>`;
     })();
-    const dnCell = isPrice ? fmtMoney(r.price_asking) : (escapeHtml(r.dn_status) || '—');
+    // Which DeltaNet listing this was compared against — address with unit
+    // plus MLS#, so a condo building's other units (or a listing linked to
+    // the wrong unit) are visible at a glance instead of looking like a
+    // mismatch on this unit.
+    const compared = r.dn_address || r.dn_mls_id
+      ? `<div class="addr-sub">vs ${escapeHtml(r.dn_address || 'listing')}${r.dn_mls_id ? ` &middot; MLS ${escapeHtml(r.dn_mls_id)}` : ''}</div>`
+      : '';
+    const dnCell = (isPrice ? fmtMoney(r.price_asking) : (escapeHtml(r.dn_status) || '—')) + compared;
     return `
             <tr>
               <td>
@@ -6050,6 +6070,7 @@ async function openDrawer(id) {
   document.getElementById('drawerAddr').textContent = 'Loading…';
   document.getElementById('drawerSub').textContent  = '';
   document.getElementById('drawer-checklist').innerHTML = '<div class="empty">Loading…</div>';
+  document.getElementById('drawer-linked-listings').innerHTML = '<div class="empty">Loading…</div>';
   document.getElementById('drawer-activity').innerHTML  = '';
 
   try {
@@ -6059,6 +6080,49 @@ async function openDrawer(id) {
   } catch (e) {
     document.getElementById('drawerAddr').textContent = 'Error loading transaction';
     document.getElementById('drawer-checklist').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// Every DeltaNet listing tied to this transaction, by any kind of link —
+// what the Mismatches check compares against. In a condo building another
+// unit's listing can end up matched here; Unlink takes it off (and it shows
+// up as Untracked again, to be matched to the right transaction).
+function renderLinkedListings(t) {
+  const el = document.getElementById('drawer-linked-listings');
+  const rows = t.linked_listings || [];
+  if (!rows.length) { el.innerHTML = '<div class="empty">No DeltaNet listings linked.</div>'; return; }
+  el.innerHTML = rows.map(l => {
+    const addr = l.is_placeholder
+      ? '<span style="color:var(--text-dim)">Off-market copy (no details from DeltaNet)</span>'
+      : escapeHtml([l.address, l.city].filter(Boolean).join(', ') || 'No address');
+    const meta = [
+      escapeHtml(l.status || '—'),
+      l.price_asking != null ? fmtMoney(l.price_asking) : null,
+      l.mls_ids.length ? 'MLS ' + l.mls_ids.map(escapeHtml).join(' / ') : null,
+      'linked by ' + escapeHtml(l.linked_by.join(', ')),
+    ].filter(Boolean).join(' &middot; ');
+    return `<div class="ll-row">
+      <div class="ll-main"><div class="ll-addr">${addr}</div><div class="ll-meta">${meta}</div></div>
+      <button class="ll-unlink" onclick="unlinkListing('${escapeJs(t.id)}', '${escapeJs(l.delta_listing_id)}', this)">Unlink</button>
+    </div>`;
+  }).join('');
+}
+
+async function unlinkListing(txnId, deltaListingId, btn) {
+  const t = _currentDrawerTxnData;
+  const l = (t && t.linked_listings || []).find(x => x.delta_listing_id === deltaListingId);
+  const label = l ? (l.address || ('MLS ' + (l.mls_ids[0] || deltaListingId))) : deltaListingId;
+  if (!confirm(`Unlink ${label} from this transaction?
+
+It will stop being compared in Mismatches and will show up under Untracked again, where it can be matched to the right transaction.`)) return;
+  btn.disabled = true;
+  try {
+    await DELETE(`/daily-desk/transactions/${encodeURIComponent(txnId)}/listings/${encodeURIComponent(deltaListingId)}`);
+    await openDrawer(txnId);
+    renderAll();
+  } catch (e) {
+    btn.disabled = false;
+    alert('Could not unlink: ' + e.message);
   }
 }
 
@@ -6171,6 +6235,8 @@ function renderDrawer(t) {
   } else {
     sourceRow.style.display = 'none';
   }
+
+  renderLinkedListings(t);
 
   const clEl = document.getElementById('drawer-checklist');
   const items = t.checklist || [];
