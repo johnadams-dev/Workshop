@@ -427,6 +427,8 @@
     <div class="logo">Agent <span class="logo-path">Hub</span></div>
     <div class="header-right">
       <a href="./index.html" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">← Tools</a>
+      <!-- Agents only; filled in by loadHomePageChoice() -->
+      <button id="homePageBtn" onclick="toggleHomePage()" style="display:none;font-size:12px;color:#c9a84c;background:none;border:none;cursor:pointer;margin-right:16px;letter-spacing:.03em;padding:0"></button>
       <button id="helpAgainBtn" onclick="openWelcomeModal()">How this works</button>
       <a href="./feedback.html?tool=agent-hub" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">Feedback</a>
       <div id="userChip">
@@ -784,6 +786,7 @@ function signOut() {
   // this page's own session, leaving every other tool still "signed in").
   localStorage.removeItem('ac_proxy_key');
   localStorage.removeItem('ac_user_email');
+  localStorage.removeItem('ac_home_page');
   PROXY_KEY = '';
   S.user = null;
   S.isManager = false;
@@ -796,6 +799,58 @@ function signOut() {
   document.getElementById('loadingState').style.display = 'none';
   document.getElementById('preAuth').style.opacity = '1';
   document.querySelector('.hero').style.display = '';
+}
+
+// ── Home page choice ─────────────────────────────────────────────────────────
+// Lets an agent make this page (or the Tools page) what johnadams.org opens
+// to — agents.home_page via /agent-comms/home-page; index.html does the
+// redirect and the first-time question. ac_home_page is the local copy
+// index.html reads before the server answers.
+let homePageChoice = null;
+
+function renderHomePageBtn() {
+  const btn = document.getElementById('homePageBtn');
+  btn.textContent = homePageChoice === 'agent_hub' ? 'Use Tools as my home page' : 'Make this my home page';
+  btn.title = homePageChoice === 'agent_hub'
+    ? 'johnadams.org opens to Agent Hub for you. Click to open the Tools page instead.'
+    : 'Open Agent Hub whenever you go to johnadams.org';
+  btn.style.display = '';
+}
+
+async function loadHomePageChoice() {
+  try {
+    const r = await fetch(`${PROXY_BASE}/agent-comms/home-page`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.eligible) return;
+    homePageChoice = data.homePage;
+    try { data.homePage ? localStorage.setItem('ac_home_page', data.homePage) : localStorage.removeItem('ac_home_page'); } catch (_) {}
+    renderHomePageBtn();
+  } catch (_) {}
+}
+
+async function toggleHomePage() {
+  const next = homePageChoice === 'agent_hub' ? 'tools' : 'agent_hub';
+  const btn = document.getElementById('homePageBtn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${PROXY_BASE}/agent-comms/home-page`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      body: JSON.stringify({ homePage: next }),
+    });
+    if (!r.ok) throw new Error();
+    homePageChoice = next;
+    try { localStorage.setItem('ac_home_page', next); } catch (_) {}
+    renderHomePageBtn();
+    btn.textContent = next === 'agent_hub' ? 'Saved — Agent Hub is your home page' : 'Saved — Tools is your home page';
+    setTimeout(renderHomePageBtn, 2500);
+  } catch (_) {
+    btn.textContent = "Couldn't save — try again";
+    setTimeout(renderHomePageBtn, 2500);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Post sign-in ─────────────────────────────────────────────────────────────
@@ -819,6 +874,7 @@ async function onSignedIn() {
     S.isManager = me.role === 'manager';
     S.ownAgentId = me.agent_id || null;
     renderSidebar();
+    if (me.role === 'agent') loadHomePageChoice(); // fire-and-forget
 
     if (S.isManager) {
       document.getElementById('managerBar').style.display = 'block';

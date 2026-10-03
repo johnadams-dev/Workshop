@@ -13,6 +13,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>John Adams | Adams Cameron &amp; Co. Real Estate Tools</title>
+  <script>
+    // Agents who made Agent Hub their home page go straight there when they
+    // arrive at the site (bookmark, phone app, typed address). Moving here from
+    // another Workshop page -- e.g. Agent Hub's "← Tools" -- stays on Tools.
+    // ac_home_page is a local copy of agents.home_page; the server check in
+    // checkHomePage() below keeps it current.
+    (function () {
+      try {
+        var fromSite = document.referrer && document.referrer.indexOf(location.origin) === 0;
+        if (!fromSite && localStorage.getItem('ac_user_email') && localStorage.getItem('ac_home_page') === 'agent_hub') {
+          location.replace('./agent-hub.html');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="description" content="AI-powered real estate tools built for Adams Cameron &amp; Co. agents — from contract timelines and listing enhancements to daily activity reporting, all in one place. Built by John Adams, President.">
   <meta name="author" content="John Adams">
   <meta name="robots" content="index, follow">
@@ -1201,6 +1216,21 @@
   </div>
 </div>
 
+<!-- Home page prompt — asked once per visit of agents who haven't chosen yet; see checkHomePage() -->
+<div id="homePageModal" role="dialog" aria-modal="true" aria-labelledby="homePageTitle" style="display:none; position:fixed; inset:0; background:rgba(26,26,46,0.6); z-index:1000; align-items:center; justify-content:center; padding:16px;">
+  <div style="background:#fff; border-radius:12px; padding:2.2rem 2rem; text-align:center; max-width:380px; width:100%; box-shadow:var(--shadow-hover);">
+    <h3 id="homePageTitle" style="font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:var(--ink); margin-bottom:0.5rem;">Make Agent Hub your home page?</h3>
+    <p style="font-size:0.88rem; color:var(--slate); margin-bottom:1.4rem; line-height:1.6;">Agent Hub shows your listings and contracts, what's already been done for you, and what to do next. Choose it as your home page and johnadams.org will open there every time.</p>
+    <div style="display:flex; flex-direction:column; gap:0.6rem;">
+      <button id="homeHubBtn" onclick="chooseHomePage('agent_hub')" style="background:var(--gold); color:#1a1a2e; border:none; border-radius:8px; padding:0.75rem 1rem; font-size:0.9rem; font-weight:600; cursor:pointer;">Make Agent Hub my home page</button>
+      <button onclick="visitHubOnce()" style="background:#fff; color:var(--ink); border:1px solid #d9d6cc; border-radius:8px; padding:0.7rem 1rem; font-size:0.88rem; cursor:pointer;">Just take a look for now</button>
+      <button onclick="chooseHomePage('tools')" style="background:none; border:none; color:var(--muted); font-size:0.8rem; cursor:pointer; text-decoration:underline; margin-top:0.3rem;">No thanks, keep this Tools page</button>
+    </div>
+    <p id="homePageError" style="display:none; font-size:0.8rem; color:#a33a2c; margin-top:0.9rem;"></p>
+    <p style="font-size:0.75rem; color:var(--muted); margin-top:1rem;">You can change this any time from the top of Agent Hub.</p>
+  </div>
+</div>
+
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
@@ -1252,6 +1282,83 @@ async function handleCredential(cred) {
     localStorage.setItem('ac_is_manager', data.isManager ? '1' : '0');
     document.querySelectorAll('.manager-card').forEach(el => el.style.display = data.isManager ? '' : 'none');
   } catch (_) {}
+
+  // Shared proxy key, same /config/init exchange every tool page does — this
+  // page never needed one until the home-page check below.
+  try {
+    const r = await fetch(PROXY_BASE + '/config/init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken: cred.credential }),
+    });
+    if (r.ok) {
+      const { proxyKey } = await r.json();
+      if (proxyKey) localStorage.setItem('ac_proxy_key', proxyKey);
+    }
+  } catch (_) {}
+  checkHomePage();
+}
+
+// ── Home page choice ─────────────────────────────────────────────────────────
+// Agents (not staff) who haven't chosen are asked once per visit whether to
+// make Agent Hub their home page; the choice is saved on their agent record
+// (agents.home_page via /agent-comms/home-page) so it follows them to every
+// device. ac_home_page is the local copy the redirect at the top of the page
+// reads.
+function cameFromSite() {
+  return !!document.referrer && document.referrer.indexOf(location.origin) === 0;
+}
+
+async function checkHomePage() {
+  const email = localStorage.getItem('ac_user_email');
+  const key = localStorage.getItem('ac_proxy_key');
+  if (!email || !key) return;
+  let data;
+  try {
+    const r = await fetch(PROXY_BASE + '/agent-comms/home-page', { headers: { 'x-proxy-key': key, 'x-user-email': email } });
+    if (!r.ok) return;
+    data = await r.json();
+  } catch (_) { return; }
+
+  if (!data.eligible) { localStorage.removeItem('ac_home_page'); return; }
+  if (data.homePage) localStorage.setItem('ac_home_page', data.homePage);
+  else localStorage.removeItem('ac_home_page');
+
+  if (data.homePage === 'agent_hub' && !cameFromSite()) { location.replace('./agent-hub.html'); return; }
+  if (!data.homePage && !sessionStorage.getItem('ac_home_prompted')) {
+    document.getElementById('homePageModal').style.display = 'flex';
+    document.getElementById('homeHubBtn').focus();
+  }
+}
+
+async function chooseHomePage(homePage) {
+  const errEl = document.getElementById('homePageError');
+  errEl.style.display = 'none';
+  try {
+    const r = await fetch(PROXY_BASE + '/agent-comms/home-page', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-proxy-key': localStorage.getItem('ac_proxy_key') || '',
+        'x-user-email': localStorage.getItem('ac_user_email') || '',
+      },
+      body: JSON.stringify({ homePage }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Request failed');
+  } catch (e) {
+    errEl.textContent = "Your choice couldn't be saved. Try again in a moment.";
+    errEl.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('ac_home_page', homePage);
+  sessionStorage.setItem('ac_home_prompted', '1');
+  document.getElementById('homePageModal').style.display = 'none';
+  if (homePage === 'agent_hub') location.href = './agent-hub.html';
+}
+
+function visitHubOnce() {
+  sessionStorage.setItem('ac_home_prompted', '1');
+  location.href = './agent-hub.html';
 }
 
 // Renders the header's sign-in state from localStorage — built with DOM calls
@@ -1285,6 +1392,7 @@ function signOut() {
   localStorage.removeItem('ac_user_email');
   localStorage.removeItem('ac_user_name');
   localStorage.removeItem('ac_is_manager');
+  localStorage.removeItem('ac_home_page');
   sessionStorage.removeItem('ac_user_email');
   document.querySelectorAll('.manager-card').forEach(el => el.style.display = 'none');
   if (window.google?.accounts?.id) { google.accounts.id.disableAutoSelect(); }
@@ -1317,6 +1425,7 @@ renderAuthStatus();
 if (localStorage.getItem('ac_is_manager') === '1') {
   document.querySelectorAll('.manager-card').forEach(el => el.style.display = '');
 }
+checkHomePage();
 
 // Initialize as soon as the Google SDK loads
 if (window.google?.accounts?.id) { initGoogleSignIn(); }
