@@ -1804,7 +1804,7 @@ tbody tr.clickable { cursor: pointer; }
               <input type="number" id="nl-bathrooms" placeholder="e.g. 2" min="0" step="0.5">
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
               <select id="nl-property-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
                 <option value="">—</option>
                 <optgroup label="Residential">
@@ -2078,7 +2078,7 @@ tbody tr.clickable { cursor: pointer; }
               <input type="number" id="nc-ext-bathrooms" placeholder="e.g. 2" min="0" step="0.5">
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
-              <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
+              <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
               <select id="nc-ext-property-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-family:var(--sans); font-size:13px;">
                 <option value="">—</option>
                 <optgroup label="Residential">
@@ -3357,6 +3357,12 @@ async function nlSaveListing() {
     alert('Property address is required.');
     return;
   }
+  // Required: the scorecard's capture rates leave out manufactured homes,
+  // land and commercial by property type (docs/business-rules.md).
+  if (!document.getElementById('nl-property-type').value) {
+    alert('Please select the property type.');
+    return;
+  }
 
   const officeId = document.getElementById('officeSelect').value;
   const agentId = document.getElementById('nl-agent').value;
@@ -4410,17 +4416,26 @@ async function amChooseAction(key) {
           <input type="text" id="am-mortgage-company" list="dl-mortgage-companies" placeholder="Optional">
         </div>
       </div>
-      <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
-        <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Financing Type</span>
-        <select id="am-financing-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
-          <option value="">— Select —</option>
-          <option value="cash">Cash</option>
-          <option value="conventional">Conventional</option>
-          <option value="fha">FHA</option>
-          <option value="va">VA</option>
-          <option value="owner_financing">Owner Financing</option>
-          <option value="other">Other</option>
-        </select>
+      <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Financing Type</span>
+          <select id="am-financing-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+            <option value="">— Select —</option>
+            <option value="cash">Cash</option>
+            <option value="conventional">Conventional</option>
+            <option value="fha">FHA</option>
+            <option value="va">VA</option>
+            <option value="owner_financing">Owner Financing</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; flex-direction:column; gap:5px;">
+          <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Type</span>
+          <!-- Same options as New Listing's dropdown, copied in so there's one list to maintain -->
+          <select id="am-property-type" style="padding:8px 11px; background:var(--ink); border:1px solid var(--ink-border); border-radius:var(--r); color:var(--text); font-size:13px;">
+            ${document.getElementById('nl-property-type').innerHTML}
+          </select>
+        </div>
       </div>
       <div style="border-top:1px solid var(--ink-border); padding-top:14px; margin-bottom:14px;">
         <div style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px;">Commission Adjustment <span style="font-size:9px; text-transform:none; letter-spacing:0;">(leave blank to keep current)</span></div>
@@ -4512,6 +4527,15 @@ async function amChooseAction(key) {
       if (nscEl) {
         const currentNsc = amState.kind === 'contract' ? txn.buyer_non_shared_commission : txn.listing_non_shared_commission;
         nscEl.placeholder = currentNsc != null ? String(currentNsc) : 'e.g. 250';
+      }
+      const ptEl = document.getElementById('am-property-type');
+      if (ptEl && txn.property_type) {
+        // Keep a stored value that isn't one of the dropdown's options (e.g.
+        // an older free-text entry) rather than silently blanking it.
+        if (![...ptEl.options].some(o => o.value === txn.property_type)) {
+          ptEl.add(new Option(txn.property_type, txn.property_type));
+        }
+        ptEl.value = txn.property_type;
       }
       // Prefill with whichever side is closing here (buyer for a contract
       // closing, seller for a listing closing) — previously left blank
@@ -5068,6 +5092,10 @@ async function amSubmit() {
     fields.titleCompany    = document.getElementById('am-title-company').value || null;
     fields.mortgageCompany = document.getElementById('am-mortgage-company').value || null;
     fields.financingType   = document.getElementById('am-financing-type').value || null;
+    // Required: the scorecard's capture rates leave out manufactured homes,
+    // land and commercial by property type (docs/business-rules.md).
+    fields.propertyType    = document.getElementById('am-property-type').value || null;
+    if (!fields.propertyType) { alert('Please select the property type.'); return; }
     const commRate = amParseMoney(document.getElementById('am-commission-rate').value);
     const commCoop = amParseMoney(document.getElementById('am-cooperating-commission').value);
     if (!confirmCommissionAmount([commRate, commCoop], amState.commission_type || 'percent', ['Total Commission', 'Co-Broke Commission'])) return;
@@ -5489,6 +5517,7 @@ async function ncSaveExternalContract() {
   const agentId = document.getElementById('nc-ext-agent').value;
   if (!addr)    { alert('Property address is required.'); return; }
   if (!agentId) { alert("Please select the buyer's agent."); return; }
+  if (!document.getElementById('nc-ext-property-type').value) { alert('Please select the property type.'); return; }
 
   const { split_pct: extSplitPct, co_agents: extCoAgents, splitError: extSplitErr } = collectCoAgent('nc-ext-coagent-area', 'nc-ext-coagent-sel', 'nc-ext-split-primary', 'nc-ext-split-co');
   if (extSplitErr) { alert(extSplitErr); return; }
