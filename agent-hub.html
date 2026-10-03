@@ -647,7 +647,9 @@ const INTRANET_LINKS = [
 // most associated with, rather than repeated per index.html's cross-listing
 // convention — a persistent sidebar benefits more from one entry per item
 // than a long scrolling page does. `gated: true` items only render for
-// S.isManager, same as index.html's managerSection cards.
+// S.isManager (admin/sales manager); `staffOnly: true` items render for any
+// staff level, office coordinators included — match each to the access its
+// own page and routes enforce (requireManager vs requireStaff).
 const SIDEBAR_CATEGORIES = [
   { label: 'Find New Prospects', items: [
     { title: 'Floor Time', url: './floor-time.html', icon: '📅' },
@@ -683,7 +685,7 @@ const SIDEBAR_CATEGORIES = [
     { title: 'Agent Records', url: './agent-master-form.html', icon: '🗂️', gated: true },
     { title: 'Daily Desk', url: './daily-desk.html', icon: '📋', gated: true },
     { title: 'Agent Onboarding & Offboarding', url: './agent-checklists.html', icon: '🗂️', gated: true },
-    { title: 'Marketing Bucks', url: './marketing-bucks.html', icon: '💰', gated: true },
+    { title: 'Marketing Bucks', url: './marketing-bucks.html', icon: '💰', staffOnly: true },
     { title: 'Scorecard Report', url: './scorecard-report.html', icon: '📈', gated: true },
     { title: 'Broadcast Messaging', url: './broadcast-messaging.html', icon: '📣', gated: true },
     { title: 'Scorecard Data Entry', url: './scorecard-entry.html', icon: '📊', gated: true },
@@ -703,7 +705,7 @@ const PINNED_LINKS = [
 function renderSidebar() {
   const el = document.getElementById('sidebar');
   const categoriesHtml = SIDEBAR_CATEGORIES.map(cat => {
-    const items = cat.items.filter(i => !i.gated || S.isManager);
+    const items = cat.items.filter(i => (!i.gated || S.isManager) && (!i.staffOnly || S.isStaff));
     if (!items.length) return '';
     return `<div class="nav-cat">
       <div class="nav-cat-label">${escapeHtml(cat.label)}</div>
@@ -722,7 +724,8 @@ function navLinkHtml(item) {
   // glance, which of the items they're seeing aren't available to the
   // agents they support, not to gate anything itself (the route/page
   // they link to enforces that server-side regardless).
-  const badge = item.gated ? `<span class="nav-badge badge-slate">Manager Only</span>` : '';
+  const badge = item.gated ? `<span class="nav-badge badge-slate">Manager Only</span>`
+    : item.staffOnly ? `<span class="nav-badge badge-slate">Staff</span>` : '';
   return `<a class="nav-link" href="${escapeHtml(item.url)}"${item.external ? ' target="_blank" rel="noopener"' : ''}>
     <span class="nav-icon">${item.icon}</span><span>${escapeHtml(item.title)}</span>${badge}
   </a>`;
@@ -731,6 +734,7 @@ function navLinkHtml(item) {
 const S = {
   user: null,
   isManager: false,
+  isStaff: false,      // any staff level (office coordinator, sales manager, admin)
   ownAgentId: null,    // the signed-in caller's own agent record, if any
   viewedAgentId: null, // whichever agent's hub is currently displayed
   allAgents: null,     // roster, lazily loaded for managers' "View as" search
@@ -880,6 +884,7 @@ async function onSignedIn() {
       document.getElementById('userName').textContent = me.name;
     }
     S.isManager = me.role === 'manager';
+    S.isStaff = me.role === 'manager' || me.role === 'staff';
     S.ownAgentId = me.agent_id || null;
     renderSidebar();
     if (me.role === 'agent') loadHomePageChoice(); // fire-and-forget
@@ -1094,7 +1099,9 @@ function filterTools() {
   // Dropdown panel — every matching Workshop tool (not just the ones in the
   // sidebar/More Tools), then matching ACC resources. Manager-only tools
   // follow the same S.isManager gate as the sidebar's `gated` items.
-  const toolMatches = resources.filter(t => t.kind === 'workshop' && t.url && (!t.managerOnly || S.isManager) && matches(resourceMatchText(t)));
+  // managerOnly mirrors index.html's manager-card set, which index.html shows
+  // to any staff level -- so S.isStaff here, not S.isManager.
+  const toolMatches = resources.filter(t => t.kind === 'workshop' && t.url && (!t.managerOnly || S.isStaff) && matches(resourceMatchText(t)));
   const resourceMatches = resources.filter(t => t.kind === 'resource' && matches(resourceMatchText(t)));
   if (toolMatches.length || resourceMatches.length) {
     resultsEl.innerHTML =
