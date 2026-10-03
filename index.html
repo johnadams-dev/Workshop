@@ -14,15 +14,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>John Adams | Adams Cameron &amp; Co. Real Estate Tools</title>
   <script>
-    // Agents who made Agent Hub their home page go straight there when they
-    // arrive at the site (bookmark, phone app, typed address). Moving here from
-    // another Workshop page -- e.g. Agent Hub's "← Tools" -- stays on Tools.
+    // Agents who made Agent Hub their home page go there whenever they land
+    // here -- bookmark, phone app, typed address, or any tool's "← Tools"
+    // link (user, 2026-10-03). The one way to see this page is Agent Hub's own
+    // "← Tools" link, which asks for it with ?view=tools.
     // ac_home_page is a local copy of agents.home_page; the server check in
     // checkHomePage() below keeps it current.
     (function () {
       try {
-        var fromSite = document.referrer && document.referrer.indexOf(location.origin) === 0;
-        if (!fromSite && localStorage.getItem('ac_user_email') && localStorage.getItem('ac_home_page') === 'agent_hub') {
+        var wantsTools = new URLSearchParams(location.search).get('view') === 'tools';
+        if (!wantsTools && localStorage.getItem('ac_user_email') && localStorage.getItem('ac_home_page') === 'agent_hub') {
           location.replace('./agent-hub.html');
         }
       } catch (e) {}
@@ -1304,9 +1305,9 @@ async function handleCredential(cred) {
 // make Agent Hub their home page; the choice is saved on their agent record
 // (agents.home_page via /agent-comms/home-page) so it follows them to every
 // device. ac_home_page is the local copy the redirect at the top of the page
-// reads.
-function cameFromSite() {
-  return !!document.referrer && document.referrer.indexOf(location.origin) === 0;
+// reads. ?view=tools (Agent Hub's "← Tools" link) shows this page regardless.
+function wantsToolsPage() {
+  return new URLSearchParams(location.search).get('view') === 'tools';
 }
 
 async function checkHomePage() {
@@ -1324,7 +1325,7 @@ async function checkHomePage() {
   if (data.homePage) localStorage.setItem('ac_home_page', data.homePage);
   else localStorage.removeItem('ac_home_page');
 
-  if (data.homePage === 'agent_hub' && !cameFromSite()) { location.replace('./agent-hub.html'); return; }
+  if (data.homePage === 'agent_hub' && !wantsToolsPage()) { location.replace('./agent-hub.html'); return; }
   if (!data.homePage && !sessionStorage.getItem('ac_home_prompted')) {
     document.getElementById('homePageModal').style.display = 'flex';
     document.getElementById('homeHubBtn').focus();
