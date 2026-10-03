@@ -484,6 +484,10 @@ function statusHtml(value, goal, unit) {
     : `<span class="status low">✗ ${goal.direction === "above" ? "Below goal" : "Over limit"}</span>`;
 }
 
+// Listing Tours: points carried over from the legacy Listing Videos count
+// (see GET /metrics/trend's legacy_months) are labelled wherever they show.
+function isLegacy(m, periodDate) { return !!(m.legacy_months && m.legacy_months.includes(periodDate)); }
+
 function lastIndex(series) {
   for (let i = series.length - 1; i >= 0; i--) if (series[i].value != null) return i;
   return -1;
@@ -678,7 +682,7 @@ function renderCard(cfg) {
   return `<a class="kpi-card" href="#m=${encodeURIComponent(cfg.key)}" aria-label="${esc(cfg.label)} — open detail">
     <div class="kpi-head"><span class="kpi-label">${esc(cfg.label)}</span><span class="kpi-month">${i >= 0 ? monthLabel(m.series[i].period_date) : ""}</span></div>
     <div class="kpi-value-row"><span class="kpi-value">${fmtValue(value, m.unit, { compact: true })}</span>${statusHtml(value, goal, m.unit)}</div>
-    <div class="kpi-goal">${esc(goalText(goal, m.unit))}${m.grain === "office" && !document.getElementById("filter-office").value ? " · all offices" : ""}</div>
+    <div class="kpi-goal">${esc(goalText(goal, m.unit))}${m.grain === "office" && !document.getElementById("filter-office").value ? " · all offices" : ""}${i >= 0 && isLegacy(m, m.series[i].period_date) ? " · legacy count" : ""}</div>
     <div class="kpi-delta">${delta || "No year-earlier month to compare"}</div>
     <div class="kpi-chart">${chart}</div>
   </a>`;
@@ -716,6 +720,7 @@ function renderDetail(key) {
         <div class="detail-sub">${esc(goalText(goal, m.unit))}${goal && goal.source === "scorecard" ? " (scorecard target)" : ""}${m.grain === "office" ? ` · ${document.getElementById("filter-office").value ? esc(officeName()) : "all offices"}` : " · company-wide"}${m.derived ? " · calculated from the supporting numbers below" : ""}
           ${editable ? ` · <button class="breakdown-toggle" onclick="openGoalEdit('${esc(m.metric_key)}')">Edit goal</button>` : ""}</div>
         <div id="goal-edit"></div>
+        ${(m.legacy_months || []).length ? `<div class="detail-sub">Months marked “legacy” use the old Listing Videos count — every listing, any video link — so the step to the live Daily Desk measure isn’t a like-for-like change.</div>` : ""}
       </div>
       <div class="detail-stats">
         <div class="stat"><div class="stat-label">${i >= 0 ? monthLabel(m.series[i].period_date) : "Latest"}</div><div class="stat-value">${fmtValue(value, m.unit)} ${statusHtml(value, goal, m.unit)}</div></div>
@@ -795,7 +800,7 @@ function renderMonthTable(m, cfg, label, goal, range) {
       <thead><tr><th>Month</th><th class="num">${esc(label)}</th>${goal ? "<th>Goal</th>" : ""}${support.map(s => `<th class="num">${esc((SCORECARD_BY_KEY[s.metric_key] && SCORECARD_BY_KEY[s.metric_key].label) || s.display_name)}</th>`).join("")}</tr></thead>
       <tbody>${rows.map(({ p }) => {
         const meets = meetsGoal(p.value, goal);
-        return `<tr><td>${monthLabel(p.period_date)}</td><td class="num">${fmtValue(p.value, m.unit)}</td>${goal ? `<td>${meets == null ? "" : meets ? '<span class="status ok">✓ On goal</span>' : `<span class="status low">✗ ${goal.direction === "above" ? "Below" : "Over"}</span>`}</td>` : ""}${support.map(s => {
+        return `<tr><td>${monthLabel(p.period_date)}${isLegacy(m, p.period_date) ? ' <span class="goal-none">· legacy</span>' : ""}</td><td class="num">${fmtValue(p.value, m.unit)}</td>${goal ? `<td>${meets == null ? "" : meets ? '<span class="status ok">✓ On goal</span>' : `<span class="status low">✗ ${goal.direction === "above" ? "Below" : "Over"}</span>`}</td>` : ""}${support.map(s => {
           const sp = s.series.find(x => x.period_date === p.period_date);
           return `<td class="num">${fmtValue(sp ? sp.value : null, s.unit)}</td>`;
         }).join("")}</tr>`;
