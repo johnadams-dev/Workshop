@@ -676,6 +676,7 @@ const SIDEBAR_CATEGORIES = [
   { label: 'Maintain Relationships', items: [
     { title: 'Review Engine', url: './review-engine.html', icon: '⭐', gated: true },
     { title: 'AC Foundation', url: './foundation.html', icon: '🏛' },
+    { title: 'Customer Portal', url: './portal-share.html', icon: '🏡' },
   ]},
   { label: 'Learn and Find Help', items: [
     { title: 'AC Pathfinder', url: './pathfinder.html', icon: '🧭' },
@@ -1534,9 +1535,11 @@ function openTxnModal(txnId) {
   const tools = toolsForTransaction(t);
 
   document.getElementById('modalAddress').textContent = t.property_address;
-  // Customer Portal: one shareable link per customer we represent (portal.html).
-  const portalButtons = (t.portal_customers || []).map(c =>
-    `<button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
+  // Customer Portal: preview and a shareable link per customer we represent (portal.html).
+  const portalButtons = (t.portal_customers || []).map(c => `
+    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
+       onclick="previewPortal(this)">👁 Preview ${escapeHtml(c.name || c.email)}'s portal</button>
+    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
        onclick="copyPortalLink(this)">🔗 Copy portal link for ${escapeHtml(c.name || c.email)}</button>`).join('');
   document.getElementById('modalTools').innerHTML = tools
     .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('') + portalButtons;
@@ -1549,6 +1552,26 @@ function openTxnModal(txnId) {
 
 function closeTxnModal() {
   document.getElementById('txnModal').classList.remove('open');
+}
+
+// Opens the customer's portal as a preview (&preview=1 — not remembered in
+// the agent's browser). The tab opens before the request so it isn't blocked
+// as a pop-up.
+async function previewPortal(btn) {
+  const win = window.open('', '_blank');
+  try {
+    const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      body: JSON.stringify({ email: btn.dataset.email }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    if (win) win.location = data.url + '&preview=1'; else location.href = data.url + '&preview=1';
+  } catch (e) {
+    if (win) win.close();
+    btn.textContent = "Couldn't open a preview: " + e.message;
+  }
 }
 
 // The customer's stable portal link (same link each time until revoked in

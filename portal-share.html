@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Portal — Adams Cameron Workshop</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* Agent-facing companion to portal.html: every customer an agent can share a
+   portal with (closed deals too), with Preview / Copy link / Revoke. Backed by
+   customer-portal-routes.js (GET /portal/my-customers, POST /portal/agent-link). */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr nav { display: flex; gap: 16px; font-size: .85rem; }
+.hdr nav a { color: #d6e2ef; text-decoration: none; }
+main { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.intro p { margin: 0 0 6px; }
+.intro p:last-child { margin: 0; color: var(--muted); font-size: .9rem; }
+.search { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; margin-bottom: 14px; }
+.count { color: var(--muted); font-size: .85rem; margin: -6px 0 10px; }
+.cust { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+        display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: start; }
+.cust-name { font-weight: 700; }
+.cust-email { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.deals { margin: 6px 0 0; padding: 0; list-style: none; font-size: .88rem; }
+.deals li { margin-top: 2px; }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #E8F1FA; color: var(--blue); margin-left: 4px; }
+.pill.closed { background: #E3F5EC; color: var(--green); }
+.opened { font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.opened.yes { color: var(--green); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--navy); color: #fff; }
+.btn.link { border: none; background: none; color: var(--muted); text-decoration: underline; padding: 7px 4px; }
+.btn:focus-visible, .search:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.empty, .msg { text-align: center; color: var(--muted); padding: 28px 12px; }
+#gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
+@media (max-width: 600px) { .cust { grid-template-columns: 1fr; } .actions { justify-content: flex-start; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Customer Portal</h1>
+    <nav>
+      <a href="./feedback.html?tool=portal-share">Feedback</a>
+      <a href="./index.html">← Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div id="gate" hidden>
+  <p>Sign in with your Adams Cameron Google account.</p>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+</div>
+
+<main id="app" hidden>
+  <div class="intro">
+    <p>Every customer you've represented gets a personal page about their home: you front and centre, where their deal stands, listing links and tour views, contract dates, and after closing, review and referral buttons.</p>
+    <p><strong>Preview</strong> shows you exactly what they see. <strong>Copy link</strong> copies their personal link to text or email them — it's the same link every time. Customers can also request their own link at johnadams.org/portal.html with the email on their deal.</p>
+  </div>
+  <input class="search" id="q" type="search" placeholder="Search by name, email or address" aria-label="Search customers">
+  <div class="count" id="count"></div>
+  <div id="list"><div class="msg">Loading…</div></div>
+</main>
+
+<script>
+const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let isStaff = false;
+let customers = [];
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
+const fmtDate = d => { if (!d) return ''; const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); const dt = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(d); return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+const STATUS = { under_contract: 'Under contract', active_listing: 'Active', coming_soon: 'Coming soon', temporarily_off_market: 'Off market', closed: 'Closed' };
+
+// ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
+if (proxyKey && userEmail) start();
+window.addEventListener('load', () => {
+  if (!window.google?.accounts?.id) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
+  if (!proxyKey || !userEmail) { document.getElementById('gate').hidden = false; google.accounts.id.prompt(); }
+});
+async function handleGoogleSignIn(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const r = await fetch(`${PROXY_BASE}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
+    userEmail = (payload.email || '').toLowerCase(); proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_user_email', userEmail);
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('gate').hidden = true;
+    start();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Customers ───────────────────────────────────────────────────────────────
+function start() {
+  document.getElementById('app').hidden = false;
+  load('');
+  let timer = null;
+  document.getElementById('q').addEventListener('input', e => {
+    clearTimeout(timer);
+    const q = e.target.value.trim();
+    // Agents filter their own list here; staff search everyone on the server.
+    timer = setTimeout(() => isStaff ? load(q.length >= 3 ? q : '') : render(q), isStaff ? 350 : 0);
+  });
+}
+
+async function load(q) {
+  const list = document.getElementById('list');
+  try {
+    const r = await fetch(`${PROXY_BASE}/portal/my-customers?q=${encodeURIComponent(q)}`, { headers: H() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    isStaff = data.isStaff; customers = data.customers;
+    if (isStaff) document.getElementById('q').placeholder = 'Search all customers by name, email or address (3+ letters)';
+    render('');
+  } catch (e) {
+    list.innerHTML = `<div class="msg">Couldn't load customers: ${esc(e.message)}</div>`;
+  }
+}
+
+function render(filter) {
+  const f = filter.toLowerCase();
+  const rows = customers.filter(c => !f || [c.name, c.email, ...c.deals.map(d => d.address)].some(v => String(v || '').toLowerCase().includes(f)));
+  document.getElementById('count').textContent = rows.length ? `${rows.length} customer${rows.length === 1 ? '' : 's'}` : '';
+  document.getElementById('list').innerHTML = rows.length ? rows.map(c => `
+    <div class="cust">
+      <div style="min-width:0">
+        <div class="cust-name">${esc(c.name || c.email)}</div>
+        <div class="cust-email">${esc(c.email)}</div>
+        <ul class="deals">${c.deals.map(d => `<li>${d.role === 'seller' ? 'Selling' : 'Buying'} ${esc(d.address)}
+          <span class="pill ${d.status === 'closed' ? 'closed' : ''}">${esc(STATUS[d.status] || d.status)}${d.status === 'closed' && d.closedOn ? ' ' + esc(fmtDate(d.closedOn)) : ''}</span></li>`).join('')}</ul>
+        <div class="opened ${c.lastOpened ? 'yes' : ''}">${c.lastOpened ? 'Last opened their portal ' + esc(fmtDate(c.lastOpened)) : 'Hasn\'t opened their portal yet'}</div>
+      </div>
+      <div class="actions">
+        <button class="btn" data-email="${esc(c.email)}" onclick="preview(this)">Preview</button>
+        <button class="btn primary" data-email="${esc(c.email)}" onclick="copyLink(this)">Copy link</button>
+        ${c.hasLink ? `<button class="btn link" data-email="${esc(c.email)}" onclick="revoke(this)" title="Stop the current link working if it went to the wrong person">Revoke</button>` : ''}
+      </div>
+    </div>`).join('')
+    : `<div class="empty">${isStaff
+        ? (document.getElementById('q').value.trim().length < 3 ? 'Search for a customer by name, email or address.' : 'No customers match that search.')
+        : (f ? 'No customers match that search.' : 'No customers with an email on file yet. Their email needs to be on the deal in Daily Desk.')}</div>`;
+}
+
+async function agentLink(email) {
+  const r = await fetch(`${PROXY_BASE}/portal/agent-link`, { method: 'POST', headers: H(), body: JSON.stringify({ email }) });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+  const c = customers.find(x => x.email === email); if (c) c.hasLink = true;
+  return data.url;
+}
+
+// Opens the customer's page as a preview: the link isn't remembered in your
+// browser (portal.html?preview=1), so you don't stay "signed in" as them.
+async function preview(btn) {
+  const win = window.open('', '_blank'); // open now, before the await, so it isn't blocked as a pop-up
+  try {
+    const url = await agentLink(btn.dataset.email);
+    if (win) win.location = url + '&preview=1'; else location.href = url + '&preview=1';
+  } catch (e) { if (win) win.close(); alert("Couldn't open a preview: " + e.message); }
+}
+
+async function copyLink(btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  try {
+    const url = await agentLink(btn.dataset.email);
+    try { await navigator.clipboard.writeText(url); btn.textContent = 'Copied ✓'; }
+    catch (_) { prompt('Copy this link:', url); }
+  } catch (e) { alert("Couldn't get a link: " + e.message); }
+  setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 1800);
+}
+
+async function revoke(btn) {
+  if (!confirm(`Stop ${btn.dataset.email}'s current portal link from working?\n\nThe next "Copy link" makes a new one.`)) return;
+  try {
+    const r = await fetch(`${PROXY_BASE}/portal/agent-link/revoke`, { method: 'POST', headers: H(), body: JSON.stringify({ email: btn.dataset.email }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
+    const c = customers.find(x => x.email === btn.dataset.email); if (c) c.hasLink = false;
+    render(document.getElementById('q').value.trim());
+  } catch (e) { alert("Couldn't revoke: " + e.message); }
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Customer Portal',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>

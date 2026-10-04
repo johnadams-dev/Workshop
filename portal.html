@@ -150,11 +150,16 @@ function storedToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } c
 function storeToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
 
 // A link opens portal.html?t=… (emailed) or ?id=… (shared by the agent).
-// Keep it in this browser and clean the address bar.
+// Keep it in this browser and clean the address bar — except an agent's
+// preview (&preview=1, from portal-share.html / Agent Hub), which is shown
+// once without being remembered, so the agent doesn't stay "signed in" as
+// their customer.
+let previewToken = '';
 (function takeTokenFromUrl() {
   const p = new URLSearchParams(location.search);
   const t = p.get('t') || p.get('id');
-  if (t) { storeToken(t); history.replaceState(null, '', location.pathname); }
+  if (t && p.get('preview') === '1') previewToken = t;
+  else if (t) { storeToken(t); history.replaceState(null, '', location.pathname); }
 })();
 
 function app(html) { document.getElementById('app').innerHTML = html; }
@@ -200,14 +205,19 @@ function signOut() { storeToken(''); showSignIn(); }
 
 // ── Portal ───────────────────────────────────────────────────────────────────
 async function load() {
-  const token = storedToken();
+  const token = previewToken || storedToken();
   if (!token) return showSignIn();
   try {
     const r = await fetch(`${PROXY}/portal/me`, { headers: { 'x-portal-token': token } });
     const data = await r.json().catch(() => ({}));
-    if (r.status === 401) { storeToken(''); return showSignIn(data.error); }
+    if (r.status === 401) { if (!previewToken) storeToken(''); return showSignIn(data.error); }
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
     render(data);
+    if (previewToken) {
+      document.getElementById('signout').hidden = true;
+      document.getElementById('app').insertAdjacentHTML('afterbegin',
+        '<div class="msg" role="status"><strong>Preview</strong> — this is exactly what your customer sees. It isn\'t saved in your browser.</div>');
+    }
   } catch (e) {
     app(`<div class="msg err" role="alert">${esc(e.message)}</div>`);
   }
