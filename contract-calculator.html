@@ -513,6 +513,16 @@
             <h2>Important Dates</h2>
             <p class="property-info">Property: <strong id="resultPropertyId"></strong></p>
             <div id="datesList"></div>
+            <!-- Link these dates to a Daily Desk deal, so they show on the
+                 customer's portal (portal.html). Optional. -->
+            <div id="linkTxnBox" style="display:none;margin:18px 0 6px;padding:14px 16px;background:var(--gold-lt);border:1px solid var(--border);border-radius:10px;">
+                <label for="linkTxnSel" style="display:block;font-weight:600;color:var(--navy);margin-bottom:4px;">Link to a transaction <span style="font-weight:400;color:var(--muted);font-size:13px;">— optional; shows these dates on your client's portal</span></label>
+                <input type="text" id="linkTxnSearch" placeholder="Search by address" style="display:none;width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin:6px 0;" oninput="linkTxnSearchChanged()">
+                <select id="linkTxnSel" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);" onchange="linkTxnChosen()">
+                    <option value="">Don't link</option>
+                </select>
+                <div id="linkTxnNote" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
+            </div>
             <div class="button-group">
                 <button class="action-btn btn-pdf"      onclick="generatePDF()">📄 PDF / Print</button>
                 <button class="action-btn btn-copy"     onclick="copyToClipboard()">📋 Copy Dates</button>
@@ -698,6 +708,8 @@
         document.getElementById('fsFileWrap').style.display = 'none';
         fsClearStatus();
         fsLoadTransactions();
+        // Results already on screen: list the newly picked agent's deals to link to.
+        if (document.getElementById('results').classList.contains('active')) loadLinkableTransactions();
     }
 
     function fsSetStatus(msg, type) {
@@ -1235,6 +1247,83 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
         });
         document.getElementById('results').classList.add('active');
         document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        loadLinkableTransactions();
+    }
+
+    // ── Link to a transaction ───────────────────────────────────────
+    // Lists the open Daily Desk deals these dates can belong to, so the
+    // Customer Portal shows them (GET /contract-dates/linkable-transactions).
+    // Agents see their own deals (team leaders: their team's); staff see the
+    // agent picked in the Form Simplicity section, or search by address.
+    // A deal matching the MLS# or street address is picked automatically.
+    let linkTxns = [];
+    let linkIsStaff = false;
+    let linkSearchTimer = null;
+
+    async function loadLinkableTransactions(q = '') {
+        const box = document.getElementById('linkTxnBox');
+        if (!PROXY_CONFIG.proxyKey || !(localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email'))) {
+            box.style.display = 'none';
+            return;
+        }
+        try {
+            if (!q) {
+                const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: fsHeaders() }).then(r => r.ok ? r.json() : {});
+                linkIsStaff = me.role === 'manager' || me.role === 'staff';
+            }
+            const params = new URLSearchParams();
+            const pickedAgent = document.getElementById('fsEmail')?.value || '';
+            if (linkIsStaff && pickedAgent) params.set('agent_email', pickedAgent);
+            if (q) params.set('q', q);
+            const r = await fetch(`${PROXY_BASE}/contract-dates/linkable-transactions?${params}`, { headers: fsHeaders() });
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            linkTxns = (await r.json()).transactions || [];
+        } catch (e) {
+            console.warn('linkable transactions:', e.message);
+            linkTxns = [];
+        }
+        box.style.display = 'block';
+        document.getElementById('linkTxnSearch').style.display = linkIsStaff ? 'block' : 'none';
+        const statusLabel = { under_contract: 'Under contract', active_listing: 'Active', coming_soon: 'Coming soon' };
+        const sel = document.getElementById('linkTxnSel');
+        const keep = sel.value;
+        sel.innerHTML = '<option value="">Don\'t link</option>' + linkTxns.map(t =>
+            `<option value="${t.id}">${escapeAttr(t.property_address)}${t.city ? ', ' + escapeAttr(t.city) : ''} — ${statusLabel[t.status] || t.status}${t.mls_id ? ' · MLS# ' + escapeAttr(t.mls_id) : ''}</option>`).join('');
+        // Keep a previous choice, else pick the deal matching the MLS# or street address.
+        if (keep && linkTxns.some(t => t.id === keep)) sel.value = keep;
+        else {
+            const mls = document.getElementById('mlsId').value.trim();
+            const street = streetKey(document.getElementById('propertyId').value);
+            const match = linkTxns.find(t => mls && t.mls_id === mls) || linkTxns.find(t => street && streetKey(t.property_address) === street);
+            if (match) sel.value = match.id;
+        }
+        document.getElementById('linkTxnNote').textContent = linkTxns.length
+            ? (sel.value ? 'Matched to this deal automatically — change it if that\'s wrong.' : '')
+            : (linkIsStaff ? 'Pick an agent in the Form Simplicity section, or search by address.' : 'No open deals found for you in Daily Desk.');
+        linkTxnChosen(false);
+    }
+
+    function linkTxnSearchChanged() {
+        clearTimeout(linkSearchTimer);
+        const q = document.getElementById('linkTxnSearch').value.trim();
+        linkSearchTimer = setTimeout(() => loadLinkableTransactions(q.length >= 3 ? q : ''), 350);
+    }
+
+    // Choosing a deal fills in its MLS# when the form doesn't have one yet,
+    // so the shared page links to the listing too.
+    function linkTxnChosen(fromUser = true) {
+        const t = linkTxns.find(x => x.id === document.getElementById('linkTxnSel').value);
+        if (fromUser) document.getElementById('linkTxnNote').textContent = t ? 'These dates will show on this deal\'s customer portal.' : '';
+        if (t && t.mls_id && !document.getElementById('mlsId').value.trim()) document.getElementById('mlsId').value = t.mls_id;
+    }
+
+    // "123 Main St, City" → "123 main" (house number + first street word).
+    function streetKey(addr) {
+        const m = String(addr || '').toLowerCase().match(/^\s*(\d+)\s+([a-z0-9]+)/);
+        return m ? m[1] + ' ' + m[2] : '';
+    }
+    function escapeAttr(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
     // ── PDF EXPORT ──────────────────────────────────────────────────
@@ -1523,6 +1612,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
         const isCash = document.getElementById('cashRadio').checked;
         const body = {
+            transaction_id:          document.getElementById('linkTxnSel')?.value || null,
             property_address:        document.getElementById('propertyId').value.trim() || null,
             mls_id:                  document.getElementById('mlsId').value.trim() || null,
             transaction_type:        isCash ? 'cash' : 'financed',
