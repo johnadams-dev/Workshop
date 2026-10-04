@@ -85,8 +85,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .header-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
 
 /* save bar */
-.save-bar{display:none;background:var(--navy);color:#fff;padding:9px 16px;border-radius:8px;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:13px;gap:10px}
-.save-bar.on{display:flex}
 
 /* reconciliation panel */
 .recon-panel{background:var(--surface);border-radius:10px;border:1px solid var(--border);margin-bottom:14px;overflow:hidden}
@@ -574,7 +572,7 @@ function loadGoogleUsers() {
 const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let allAgents = [], offices = [], currentId = null, pending = {}, currentFilter = 'all';
+let allAgents = [], offices = [], currentId = null, currentFilter = 'all';
 // offices: [{ id, name, deltanet_office_id }] — fetched from /offices
 
 // ── Issue detection (DB-only, runs on every agent in the list) ───────────────
@@ -676,7 +674,7 @@ function filterList() {
 
 // ── Detail ────────────────────────────────────────────────────────────────────
 async function selectAgent(id) {
-  currentId = id; pending = {};
+  currentId = id;
   filterList();
   document.getElementById('detail-empty').style.display = 'none';
   const c = document.getElementById('detail-content');
@@ -700,13 +698,6 @@ function renderDetail(a) {
   const goog = googleSnap[a.email?.toLowerCase()] || null;
 
   document.getElementById('detail-content').innerHTML = `
-    <div class="save-bar" id="save-bar"><span>Unsaved changes</span>
-      <div style="display:flex;gap:7px">
-        <button class="btn btn-secondary btn-sm" onclick="discard()">Discard</button>
-        <button class="btn btn-primary btn-sm" id="save-btn" onclick="save()">Save</button>
-      </div>
-    </div>
-
     <!-- Header -->
     <div class="agent-header">
       <div class="photo-wrap">
@@ -715,13 +706,7 @@ function renderDetail(a) {
       <div class="header-info">
         <div class="header-name">${a.first_name} ${a.last_name}</div>
         <div class="header-email">${a.email}</div>
-        <div class="header-badges">
-          <span class="badge ${a.active?'badge-active':'badge-inactive'}">${a.active?'Active':'Inactive'}</span>
-          ${a.office?`<span class="badge badge-office">${a.office}</span>`:''}
-          ${a.sms_opted_in?`<span class="badge badge-sms">SMS on</span>`:''}
-          ${a.enrollment_id?`<span class="badge" style="background:#F5F3FF;color:#5B21B6;border-color:#C4B5FD">Pathfinder</span>`:''}
-          ${ii.length?`<span class="badge badge-issue">${ii.length} issue${ii.length>1?'s':''}</span>`:'<span class="badge badge-active">✓ Complete</span>'}
-        </div>
+        <div class="header-badges">${headerBadgesHtml(a)}</div>
       </div>
       <div class="header-actions">
         ${USER_ROLE === 'admin'
@@ -785,29 +770,29 @@ function renderDetail(a) {
       <div class="card-head">Contact &amp; identity</div>
       <div class="card-body">
         <div class="fg">
-          <div class="field"><label>First name</label><input type="text" value="${esc(a.first_name)}" onchange="chg('firstName',this.value)"></div>
-          <div class="field"><label>Last name</label><input type="text" value="${esc(a.last_name)}" onchange="chg('lastName',this.value)"></div>
+          <div class="field"><label>First name</label><input type="text" value="${esc(a.first_name)}" onchange="saveField(${a.id},'firstName',this.value,this)"></div>
+          <div class="field"><label>Last name</label><input type="text" value="${esc(a.last_name)}" onchange="saveField(${a.id},'lastName',this.value,this)"></div>
           <div class="field">
             <label>Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(Google primary — auth key)</span></label>
-            <input type="email" value="${esc(a.email)}" onchange="chgEmail(this)">
+            <input type="email" value="${esc(a.email)}" onchange="chgEmail(${a.id},this)">
             <span class="field-hint h-warn">Editing this only updates our record — it does not rename the Google Workspace account. Use this to fix a record after the address was already changed in Google (or before requesting the change), not as a way to rename the Workspace account itself. Sign-in, DeltaNet sync, and Google reconciliation will all break until the Workspace account's email matches.</span>
           </div>
           <div class="field">
             <label>Office</label>
-            <select onchange="chg('office_id', this.value ? +this.value : null)">
+            <select onchange="saveField(${a.id},'office_id',this.value ? +this.value : null,this)">
               <option value="">— None —</option>
               ${offices.map(o=>`<option value="${o.id}" ${(a.office_id===o.id)?'selected':''}>${esc(o.name)}</option>`).join('')}
             </select>
           </div>
           <div class="field">
             <label>Cell phone</label>
-            <input type="tel" value="${esc(a.cell_raw||fmtPhone(a.cell_e164))}" onchange="chg('phone',this.value)"
+            <input type="tel" value="${esc(a.cell_raw||fmtPhone(a.cell_e164))}" onchange="saveField(${a.id},'phone',this.value,this)"
               placeholder="(386) 555-0100" class="${!a.cell_e164&&!a.cell_raw?'f-warn':''}">
             ${!a.cell_e164&&!a.cell_raw?`<span class="field-hint h-warn">Missing</span>`:''}
           </div>
-          <div class="field"><label>Website</label><input type="url" value="${esc(a.website)}" onchange="chg('website',this.value)" placeholder="https://…"></div>
-          <div class="field ff"><label>Designations</label><input type="text" value="${esc(a.designations)}" onchange="chg('designations',this.value)" placeholder="GRI, ABR, CRS"></div>
-          <div class="field"><label>Languages</label><input type="text" value="${esc(a.languages)}" onchange="chg('languages',this.value)" placeholder="English, Spanish"></div>
+          <div class="field"><label>Website</label><input type="url" value="${esc(a.website)}" onchange="saveField(${a.id},'website',this.value,this)" placeholder="https://…"></div>
+          <div class="field ff"><label>Designations</label><input type="text" value="${esc(a.designations)}" onchange="saveField(${a.id},'designations',this.value,this)" placeholder="GRI, ABR, CRS"></div>
+          <div class="field"><label>Languages</label><input type="text" value="${esc(a.languages)}" onchange="saveField(${a.id},'languages',this.value,this)" placeholder="English, Spanish"></div>
         </div>
       </div>
     </div>
@@ -819,7 +804,7 @@ function renderDetail(a) {
           <div class="field">
             <label>DeltaNet ID (dmg_id)</label>
             <div class="id-wrap">
-              <input type="text" value="${esc(a.dmg_id)}" onchange="chg('dmg_id',this.value)"
+              <input type="text" value="${esc(a.dmg_id)}" onchange="saveField(${a.id},'dmg_id',this.value,this)"
                 placeholder="e.g. 81500018" class="${!a.dmg_id?'f-warn':''}">
               <span class="src src-dn">DN</span>
             </div>
@@ -828,7 +813,7 @@ function renderDetail(a) {
           <div class="field">
             <label>Profit Power ID (pp_id)</label>
             <div class="id-wrap">
-              <input type="text" value="${esc(a.pp_id)}" onchange="chg('pp_id',this.value)"
+              <input type="text" value="${esc(a.pp_id)}" onchange="saveField(${a.id},'pp_id',this.value,this)"
                 placeholder="e.g. 9426" class="${!a.pp_id?'f-warn':''}">
               <span class="src src-pp">PP</span>
             </div>
@@ -837,7 +822,7 @@ function renderDetail(a) {
           <div class="field">
             <label>NRDS ID <a href="https://login.connect.realtor/#!/forgotmember" target="_blank" rel="noopener" style="font-weight:400;font-size:11px;margin-left:4px">Look up ↗</a></label>
             <div class="id-wrap">
-              <input type="text" value="${esc(a.nrds_id)}" onchange="chg('nrds_id',this.value)" placeholder="e.g. 123456789">
+              <input type="text" value="${esc(a.nrds_id)}" onchange="saveField(${a.id},'nrds_id',this.value,this)" placeholder="e.g. 123456789">
               <span class="src src-nar">NAR</span>
             </div>
           </div>
@@ -849,17 +834,17 @@ function renderDetail(a) {
       <div class="card-head">Notifications &amp; status</div>
       <div class="card-body">
         <div class="toggle-row"><div class="toggle-label">Active agent<small>Inactive agents cannot log in</small></div>
-          <label class="toggle"><input type="checkbox" ${a.active?'checked':''} onchange="chg('active',this.checked)"><span class="toggle-track"></span></label></div>
+          <label class="toggle"><input type="checkbox" ${a.active?'checked':''} onchange="saveField(${a.id},'active',this.checked,this)"><span class="toggle-track"></span></label></div>
         <div class="toggle-row"><div class="toggle-label">SMS notifications<small>Check-in reminders and coaching alerts</small></div>
-          <label class="toggle"><input type="checkbox" ${a.sms_opted_in?'checked':''} onchange="chg('sms_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
+          <label class="toggle"><input type="checkbox" ${a.sms_opted_in?'checked':''} onchange="saveField(${a.id},'sms_opted_in',this.checked,this)"><span class="toggle-track"></span></label></div>
         <div class="toggle-row"><div class="toggle-label">Per-topic communication preferences<small>Pathfinder, Company Events, Office Events, President's Update, Office Announcements — email/SMS individually, set by the agent (or you, here)</small></div>
           <a class="btn btn-secondary btn-sm" style="display:inline-block;text-decoration:none" href="./communication-preferences.html?agentId=${a.id}" target="_blank" rel="noopener">Manage →</a></div>
         <div class="toggle-row"><div class="toggle-label">Email notifications<small>Coaching digests and system alerts</small></div>
-          <label class="toggle"><input type="checkbox" ${a.email_opted_in?'checked':''} onchange="chg('email_opted_in',this.checked)"><span class="toggle-track"></span></label></div>
+          <label class="toggle"><input type="checkbox" ${a.email_opted_in?'checked':''} onchange="saveField(${a.id},'email_opted_in',this.checked,this)"><span class="toggle-track"></span></label></div>
         <div class="toggle-row"><div class="toggle-label">Award eligible<small>Included in the Production Leaderboard and other recognition programs</small></div>
-          <label class="toggle"><input type="checkbox" ${a.award_eligible!==false?'checked':''} onchange="chg('award_eligible',this.checked)"><span class="toggle-track"></span></label></div>
+          <label class="toggle"><input type="checkbox" ${a.award_eligible!==false?'checked':''} onchange="saveField(${a.id},'award_eligible',this.checked,this)"><span class="toggle-track"></span></label></div>
         <div class="toggle-row"><div class="toggle-label">Display name on agent hotsheet<small>Turn off to hide this agent from the agent-facing Hotsheet (still visible to managers)</small></div>
-          <label class="toggle"><input type="checkbox" ${a.show_on_hotsheet!==false?'checked':''} onchange="chg('show_on_hotsheet',this.checked)"><span class="toggle-track"></span></label></div>
+          <label class="toggle"><input type="checkbox" ${a.show_on_hotsheet!==false?'checked':''} onchange="saveField(${a.id},'show_on_hotsheet',this.checked,this)"><span class="toggle-track"></span></label></div>
       </div>
     </div>
 
@@ -898,17 +883,17 @@ function renderDetail(a) {
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
             <div class="field" style="min-width:180px">
               <label>Donation type</label>
-              <select id="foundation-type-${a.id}" onchange="onFoundationTypeChange(${a.id})">
+              <select id="foundation-type-${a.id}" onchange="onFoundationTypePicked(${a.id})">
                 <option value="fixed_amount">Fixed amount ($)</option>
                 <option value="percentage">Percentage of commission (%)</option>
               </select>
             </div>
             <div class="field" style="min-width:120px">
               <label id="foundation-amount-lbl-${a.id}">Amount ($)</label>
-              <input type="number" id="foundation-amount-${a.id}" min="0" step="0.01" placeholder="e.g. 50">
+              <input type="number" id="foundation-amount-${a.id}" min="0" step="0.01" placeholder="e.g. 50" onchange="saveFoundationDonation(${a.id}, false)">
             </div>
-            <button class="btn btn-primary btn-sm" onclick="saveFoundationDonation(${a.id}, false)">Save donation settings</button>
           </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">Saves as soon as you enter the amount.</div>
           <div id="foundation-msg-${a.id}" style="font-size:12px;margin-top:6px"></div>
         </div>
       </div>
@@ -1076,59 +1061,116 @@ async function runRecon(agentId, dmgId, agentData) {
 }
 
 async function applyDnNrds(id, nrdsId) {
-  pending['nrds_id'] = nrdsId;
-  document.getElementById('save-bar')?.classList.add('on');
-  const inputs = document.querySelectorAll(`input[onchange*="nrds_id"]`);
-  inputs.forEach(i => i.value = nrdsId);
-  toast('NRDS ID staged — click Save to apply', '');
+  const input = document.querySelector(`input[onchange*="'nrds_id'"]`);
+  if (input) input.value = nrdsId;
+  saveField(id, 'nrds_id', nrdsId, input);
 }
 
 // ── Edit / Save ───────────────────────────────────────────────────────────────
-function chg(f, v) { pending[f] = v; document.getElementById('save-bar')?.classList.add('on'); }
+// Every field saves as soon as it's changed (on blur/Enter for text, on click
+// for toggles) — there's no Save button (user, 2026-10-04): staged edits used
+// to be lost without warning when switching to another agent. PUT /agent/:id
+// is a plain partial update with no side effects, so one field per call is
+// fine. agentId is captured when the field changes, not read from currentId,
+// so a save that's still in flight when the user clicks another agent lands
+// on the right record. The input's default value/checked state is "last
+// saved", so a failed save can put it back.
+const FIELD_CACHE_KEY = { firstName: 'first_name', lastName: 'last_name', phone: 'cell_raw' };
 
-function chgEmail(el) {
-  const original = allAgents.find(a => a.id === currentId)?.email || '';
+function lastSavedValue(el) {
+  if (!el) return undefined;
+  if (el.type === 'checkbox') return el.defaultChecked;
+  if (el.tagName === 'SELECT') return [...el.options].find(o => o.defaultSelected)?.value ?? '';
+  return el.defaultValue;
+}
+function markSaved(el) {
+  if (!el) return;
+  if (el.type === 'checkbox') el.defaultChecked = el.checked;
+  else if (el.tagName === 'SELECT') [...el.options].forEach(o => { o.defaultSelected = o.selected; });
+  else el.defaultValue = el.value;
+}
+function revertField(el) {
+  if (!el) return;
+  if (el.type === 'checkbox') el.checked = el.defaultChecked;
+  else el.value = lastSavedValue(el);
+}
+
+async function saveField(agentId, field, value, el) {
+  const agent = allAgents.find(a => a.id === agentId);
+
+  // Turning Active off takes effect immediately and stops the agent signing in.
+  if (field === 'active' && value === false) {
+    const name = agent ? `${agent.first_name} ${agent.last_name}` : 'this agent';
+    if (!confirm(`Turn off Active for ${name}?\n\nThey won't be able to sign in.`)) { revertField(el); return; }
+  }
+
+  try {
+    const r = await fetch(`${PROXY_URL}/agent/${agentId}`, {
+      method: 'PUT', headers: H(), body: JSON.stringify({ [field]: value }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
+  } catch (e) {
+    revertField(el);
+    toast('Not saved: ' + e.message, 'err');
+    return;
+  }
+
+  markSaved(el);
+  if (agent) {
+    agent[FIELD_CACHE_KEY[field] || field] = value;
+    if (field === 'office_id') agent.office = offices.find(o => o.id === value)?.name || null;
+  }
+  // The server normalizes phone numbers (cell_e164), so pull the saved record back.
+  if (field === 'phone' && agent) {
+    try {
+      const r = await fetch(`${PROXY_URL}/agent/detail/${agentId}`, { headers: H() });
+      if (r.ok) Object.assign(agent, await r.json());
+    } catch (_) {}
+  }
+  filterList();
+  if (currentId === agentId && agent) refreshHeader(agent);
+  toast('Saved', 'ok');
+}
+
+// Updates the detail header (name, email, badges) in place after a save,
+// without re-rendering the form — so focus stays in whatever field is next.
+function refreshHeader(a) {
+  const nameEl = document.querySelector('#detail-content .header-name');
+  const emailEl = document.querySelector('#detail-content .header-email');
+  const badgesEl = document.querySelector('#detail-content .header-badges');
+  if (nameEl) nameEl.textContent = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+  if (emailEl) emailEl.textContent = a.email || '';
+  if (badgesEl) {
+    const donor = badgesEl.querySelector('.badge-donor');
+    badgesEl.innerHTML = headerBadgesHtml(a);
+    if (donor) badgesEl.appendChild(donor);
+  }
+}
+
+function headerBadgesHtml(a) {
+  const ii = issues(a);
+  return `
+    <span class="badge ${a.active?'badge-active':'badge-inactive'}">${a.active?'Active':'Inactive'}</span>
+    ${a.office?`<span class="badge badge-office">${esc(a.office)}</span>`:''}
+    ${a.sms_opted_in?`<span class="badge badge-sms">SMS on</span>`:''}
+    ${a.enrollment_id?`<span class="badge" style="background:#F5F3FF;color:#5B21B6;border-color:#C4B5FD">Pathfinder</span>`:''}
+    ${ii.length?`<span class="badge badge-issue">${ii.length} issue${ii.length>1?'s':''}</span>`:'<span class="badge badge-active">✓ Complete</span>'}`;
+}
+
+function chgEmail(agentId, el) {
+  const original = el.defaultValue || '';
   const next = el.value.trim();
-  if (next.toLowerCase() === (original || '').toLowerCase()) { delete pending.email; return; }
+  if (next.toLowerCase() === original.toLowerCase()) { el.value = original; return; }
+  if (!next) { toast('Email cannot be blank', 'err'); el.value = original; return; }
   if (!confirm(`Change this agent's email to "${next}"?\n\nThis only updates our record — it will NOT rename the Google Workspace account. Sign-in, DeltaNet sync, and Google reconciliation will break until the Workspace account's email matches this value.`)) {
     el.value = original;
     return;
   }
-  chg('email', next);
-}
-function discard() { pending = {}; document.getElementById('save-bar')?.classList.remove('on'); selectAgent(currentId); }
-
-async function save() {
-  if (!currentId || !Object.keys(pending).length) return;
-  const btn = document.getElementById('save-btn');
-  if (btn) { btn.disabled=true; btn.textContent='Saving…'; }
-
-  try {
-    const r = await fetch(`${PROXY_URL}/agent/${currentId}`, {
-      method:'PUT', headers:H(), body:JSON.stringify(pending),
-    });
-    if (!r.ok) throw new Error('HTTP '+r.status);
-
-    // Update local cache
-    const idx = allAgents.findIndex(x=>x.id===currentId);
-    if (idx>=0) {
-      const map = { firstName:'first_name', lastName:'last_name', phone:'cell_raw' };
-      Object.entries(pending).forEach(([k,v]) => { allAgents[idx][map[k]||k] = v; });
-      if (pending.office_id !== undefined) {
-        const o = offices.find(o => o.id === pending.office_id);
-        allAgents[idx].office = o ? o.name : null;
-      }
-    }
-
-    pending = {};
-    document.getElementById('save-bar')?.classList.remove('on');
-    toast('Saved', 'ok');
-    await selectAgent(currentId);
-    filterList();
-  } catch(e) {
-    toast('Save failed: '+e.message, 'err');
-    if (btn) { btn.disabled=false; btn.textContent='Save'; }
-  }
+  el.value = next;
+  saveField(agentId, 'email', next, el);
 }
 
 async function syncProfitPowerIds() {
@@ -1790,6 +1832,13 @@ function onFoundationToggle(agentId) {
   }
 }
 
+// The user picked a different donation type — relabel the amount field, and
+// save if there's already an amount (otherwise the amount's own change saves).
+function onFoundationTypePicked(agentId) {
+  onFoundationTypeChange(agentId);
+  if (document.getElementById(`foundation-amount-${agentId}`)?.value) saveFoundationDonation(agentId, false);
+}
+
 function onFoundationTypeChange(agentId) {
   const typeEl   = document.getElementById(`foundation-type-${agentId}`);
   const lblEl    = document.getElementById(`foundation-amount-lbl-${agentId}`);
@@ -2412,13 +2461,14 @@ async function saveFloorEligibility(agentId) {
   msgEl.textContent = 'Saving…';
   msgEl.style.color = 'var(--muted)';
   try {
-    await fetch(`${PROXY_URL}/api/floor/eligibility/agent/${agentId}`, {
+    const r = await fetch(`${PROXY_URL}/api/floor/eligibility/agent/${agentId}`, {
       method: 'PUT', headers: H(),
       body: JSON.stringify({
         is_eligible:    eligible,
         eligible_since: eligible ? (sinceEl.value || today) : null
       })
     });
+    if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || 'HTTP ' + r.status); }
     msgEl.textContent = 'Saved';
     msgEl.style.color = 'var(--green)';
     statusEl.textContent = eligible ? '✓ Eligible' : '';
