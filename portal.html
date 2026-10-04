@@ -213,6 +213,24 @@ async function load() {
   }
 }
 
+// Generic Adams Cameron contact, used when a deal's agent has left the company
+// (user, 2026-10-04). The server supplies it; this is the fallback.
+let company = { name: 'Adams, Cameron & Co. Realtors', email: 'referral@adamscameron.com', phone: '+13862538044' };
+function companyHtml() {
+  return `<section class="agent" aria-label="Adams, Cameron &amp; Co.">
+    <div class="agent-initials" aria-hidden="true">AC</div>
+    <div style="min-width:0">
+      <div class="agent-label">Here to help</div>
+      <div class="agent-name">Adams, Cameron &amp; Co.</div>
+      <div class="agent-office">Your agent is no longer with us, but we're glad to help with anything about your home.</div>
+      <div class="agent-actions">
+        <a class="primary" href="tel:${esc(company.phone)}">Call ${esc(fmtPhone(company.phone))}</a>
+        <a href="mailto:${esc(company.email)}">Email us</a>
+      </div>
+    </div>
+  </section>`;
+}
+
 function agentHtml(a, label) {
   const photo = a.photo
     ? `<img class="agent-photo" src="${esc(a.photo)}" alt="${esc(a.name)}" onerror="this.outerHTML='<div class=&quot;agent-initials&quot;>${esc(a.name.split(' ').map(w => w[0]).join('').slice(0, 2))}</div>'">`
@@ -236,6 +254,11 @@ function dealHtml(d, agentsById) {
   const lead = agentsById[d.agentIds[0]];
   const parts = [];
   parts.push(`<p class="stage-note">${esc(d.stageNote)}</p>`);
+  // Every current agent on this deal, or the company if the agent has left.
+  const dealAgents = d.agentIds.map(id => agentsById[id]).filter(Boolean);
+  parts.push(`<p style="margin:0;color:var(--slate);font-size:.95rem">${dealAgents.length
+    ? `Your agent${dealAgents.length > 1 ? 's' : ''}: <strong>${dealAgents.map(a => esc(a.name)).join(' &amp; ')}</strong>`
+    : `Questions about this home? Contact Adams, Cameron &amp; Co. at <a href="mailto:${esc(company.email)}">${esc(company.email)}</a> or <a href="tel:${esc(company.phone)}">${esc(fmtPhone(company.phone))}</a>.`}</p>`);
   parts.push(`<div class="section"><h3>Progress</h3><ol class="timeline">${d.timeline.map(s =>
     `<li class="${s.done ? 'done' : ''}"><div class="step">${esc(s.step)}</div><div class="when">${s.date ? esc(fmtDate(s.date)) : (s.done ? 'Done' : 'Upcoming')}</div></li>`).join('')}</ol></div>`);
 
@@ -245,8 +268,18 @@ function dealHtml(d, agentsById) {
       <div class="fact"><div class="k">List price</div><div class="v">${money(L.price)}</div></div>
       ${L.listDate ? `<div class="fact"><div class="k">Listed</div><div class="v">${esc(fmtDate(L.listDate))}</div></div>` : ''}
       ${L.daysOnMarket != null ? `<div class="fact"><div class="k">Days on market</div><div class="v">${L.daysOnMarket}</div></div>` : ''}
-      ${d.tour ? `<div class="fact"><div class="k">Tour views</div><div class="v">${d.tour.views}</div></div>` : ''}
     </div></div>`);
+    if (d.tour) {
+      // Same view data as Cameron's Stage's own analytics.
+      const T = d.tour;
+      parts.push(`<div class="section"><h3>Your virtual tour</h3><div class="facts">
+        <div class="fact"><div class="k">Total views</div><div class="v">${T.views}</div></div>
+        <div class="fact"><div class="k">Last 7 days</div><div class="v">${T.views7d}</div></div>
+        <div class="fact"><div class="k">Last 30 days</div><div class="v">${T.views30d}</div></div>
+        <div class="fact"><div class="k">From the MLS</div><div class="v">${T.viewsMls}</div></div>
+        <div class="fact"><div class="k">From shared links</div><div class="v">${T.viewsShared}</div></div>
+      </div><p style="margin:8px 0 0;color:var(--slate);font-size:.9rem">${T.lastViewed ? `Last viewed ${esc(fmtDate(T.lastViewed))}. ` : 'No views yet. '}"From the MLS" counts buyers opening it from your listing; "shared links" counts views from social media, Zillow, email and texts.</p></div>`);
+    }
     const links = [
       L.companyUrl ? `<a class="btn" href="${esc(L.companyUrl)}" target="_blank" rel="noopener">See it on adamscameron.com</a>` : '',
       L.agentSiteUrl ? `<a class="btn ghost" href="${esc(L.agentSiteUrl)}" target="_blank" rel="noopener">See it on ${esc(lead ? lead.name.split(' ')[0] + "'s" : "your agent's")} website</a>` : '',
@@ -290,14 +323,17 @@ function dealHtml(d, agentsById) {
     const R = d.reviewLinks || {};
     const reviews = [['google', 'Google'], ['facebook', 'Facebook'], ['zillow', 'Zillow']].filter(([k]) => R[k])
       .map(([k, label]) => `<a class="btn ghost" href="${esc(R[k])}" target="_blank" rel="noopener">Review on ${label}</a>`).join('');
-    if (reviews) parts.push(`<div class="section"><h3>How did we do?</h3><p style="margin:0 0 10px">A quick review helps ${esc(lead ? lead.name.split(' ')[0] : 'your agent')} more than you'd think.</p><div class="links">${reviews}</div></div>`);
+    if (reviews) parts.push(`<div class="section"><h3>How did we do?</h3><p style="margin:0 0 10px">A quick review helps ${esc(lead ? lead.name.split(' ')[0] : 'us')} more than you'd think.</p><div class="links">${reviews}</div></div>`);
   }
 
-  if (lead && (d.status === 'closed' || d.status === 'under_contract')) {
+  if (d.status === 'closed' || d.status === 'under_contract') {
+    // Referrals go to the agent, or to referral@ when the agent has left.
+    const to = lead?.email || company.email;
+    const who = lead ? lead.name.split(' ')[0] : 'Adams, Cameron & Co.';
     const subject = encodeURIComponent('A referral for you');
-    const body = encodeURIComponent(`Hi ${lead.name.split(' ')[0]},\n\nI'd like to introduce you to someone who may be buying or selling:\n\nName:\nPhone:\nEmail:\n\nThanks!`);
+    const body = encodeURIComponent(`Hi ${lead ? who : 'there'},\n\nI'd like to introduce you to someone who may be buying or selling:\n\nName:\nPhone:\nEmail:\n\nThanks!`);
     parts.push(`<div class="section"><h3>Know someone moving?</h3><div class="links">
-      ${lead.email ? `<a class="btn gold" href="mailto:${esc(lead.email)}?subject=${subject}&body=${body}">Refer a friend to ${esc(lead.name.split(' ')[0])}</a>` : ''}
+      <a class="btn gold" href="mailto:${esc(to)}?subject=${subject}&body=${body}">Refer a friend to ${esc(who)}</a>
     </div></div>`);
   }
 
@@ -337,11 +373,14 @@ function render(data) {
     return;
   }
   const agentsById = Object.fromEntries(data.agents.map(a => [a.id, a]));
-  // Lead agents first (one per deal), each shown once.
-  const leadIds = [...new Set(data.deals.map(d => d.agentIds[0]).filter(Boolean))];
+  company = data.company || company;
+  // Every current agent on the customer's deals, lead agents first, each once.
+  const agentIds = [...new Set([...data.deals.map(d => d.agentIds[0]), ...data.deals.flatMap(d => d.agentIds)].filter(Boolean))];
+  // A deal whose agent has left the company gets Adams Cameron's card instead.
+  const needsCompany = data.deals.some(d => !d.agentIds.length);
   app(`
     <h1 class="hello">${data.firstName ? `Welcome, ${esc(data.firstName)}` : 'Welcome'}</h1>
-    <div class="agents">${leadIds.map(id => agentHtml(agentsById[id], leadIds.length > 1 ? 'One of your agents' : 'Your agent')).join('')}</div>
+    <div class="agents">${agentIds.map(id => agentHtml(agentsById[id], agentIds.length > 1 ? 'One of your agents' : 'Your agent')).join('')}${needsCompany ? companyHtml() : ''}</div>
     ${data.deals.map(d => dealHtml(d, agentsById)).join('')}
     ${partnersHtml(data.partners || [])}
     <p class="footnote">Questions? Contact your agent, or Adams, Cameron &amp; Co. at <a href="mailto:info@adamscameron.com">info@adamscameron.com</a>.</p>`);
