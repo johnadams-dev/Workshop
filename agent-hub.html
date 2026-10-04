@@ -255,6 +255,8 @@
       background: var(--red); color: #fff; padding: .15rem .55rem; border-radius: 100px;
     }
     .txn-address { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 600; line-height: 1.25; margin-bottom: .5rem; }
+    /* A teammate's listing, shown because this agent leads the team (see teams.js) */
+    .txn-team { font-size: .7rem; color: var(--slate); margin: -.3rem 0 .45rem; }
     .txn-status {
       font-size: .64rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
       padding: .12rem .5rem; border-radius: 100px; background: rgba(90,90,120,.1); color: var(--slate);
@@ -1488,6 +1490,7 @@ function renderTransactionsSection(transactions, checklist) {
     return `<div class="txn-card ${agentPending ? 'has-pending' : ''}" onclick="openTxnModal('${t.id}')">
       ${agentPending ? `<span class="txn-pending-badge">${agentPending} pending</span>` : ''}
       <div class="txn-address">${escapeHtml(t.property_address)}</div>
+      ${t.is_own === false ? `<div class="txn-team">Team · ${escapeHtml(t.teammate_names || 'teammate')}</div>` : ''}
       <span class="txn-status ${escapeHtml(t.status)}">${escapeHtml(t.status.replace(/_/g, ' '))}</span>
       ${total ? `
         <div class="txn-progress-bar">
