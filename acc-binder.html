@@ -609,9 +609,9 @@ function renderStep2() {
       </div>
       <div class="card">
         <h2 class="title">Link to Transaction</h2>
-        ${isStaffTier() ? `
+        ${(isStaffTier() || STATE.agents.length) ? `
           <div class="agent-box">
-            <div class="agent-box-title">Acting as</div>
+            <div class="agent-box-title">${isStaffTier() ? "Acting as" : "Which team member's Form Simplicity account?"}</div>
             <select class="agent-select" id="agentSelect" onchange="onAgentChange(this.value)">
               <option value="">Myself (${esc(userEmail)})</option>
               ${STATE.agents.map((a) => `<option value="${esc(a.email)}" ${STATE.selectedAgentEmail === a.email ? "selected" : ""}>${esc(a.firstName)} ${esc(a.lastName)} (${esc(a.email)})</option>`).join("")}
@@ -657,10 +657,12 @@ function onAgentChange(email) {
 }
 
 async function initStep2() {
-  if (isStaffTier() && !STATE.agentsLoaded) {
+  // Staff can act as any agent; a team leader can choose a teammate's account
+  // (teams decide which member's Form Simplicity account holds their files).
+  if (!STATE.agentsLoaded) {
     STATE.agentsLoaded = true;
     try {
-      STATE.agents = await api('/acc-binder/fs/agents', { method: "POST", body: JSON.stringify({}) });
+      STATE.agents = await api(isStaffTier() ? '/acc-binder/fs/agents' : '/acc-binder/fs/team-agents', { method: "POST", body: JSON.stringify({}) }) || [];
       if (STATE.step === 2) render(); // reflect the newly loaded agent list in the picker
     } catch (e) {
       console.error("Failed to load agent list:", e.message);
