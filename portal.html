@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Your Home | Adams, Cameron &amp; Co.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Customer Portal (prototype) — customer-facing, so Adams Cameron's navy and
+   gold rather than the Workshop's tool look. Backed by
+   server/customer-portal-routes.js. Mobile-first: most customers open it from
+   an email on their phone. */
+:root {
+  --navy: #1a1a2e;
+  --navy-soft: #2b2b45;
+  --gold: #c9a84c;
+  --gold-soft: #f4ecd6;
+  --ink: #1f2330;
+  --slate: #5b6170;
+  --line: #e4e1d8;
+  --bg: #f7f5f0;
+  --card: #ffffff;
+  --green: #2f7a3e;
+  --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --sans: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
+a { color: var(--navy); }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.topbar { background: var(--navy); color: #fff; padding: 14px 16px; }
+.topbar-inner { max-width: 880px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-family: var(--display); font-size: 1.35rem; font-weight: 600; letter-spacing: .01em; }
+.brand span { color: var(--gold); }
+.signout { background: none; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 6px; padding: 6px 12px; font: 500 .85rem var(--sans); cursor: pointer; }
+
+.wrap { max-width: 880px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: grid; gap: 20px; }
+
+/* Sign-in */
+.signin { max-width: 440px; margin: 6vh auto 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 28px 24px; }
+.signin h1 { font-family: var(--display); font-size: 2rem; margin: 0 0 6px; text-wrap: balance; }
+.signin p { color: var(--slate); margin: 0 0 18px; }
+.signin label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
+.signin input { width: 100%; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; }
+.btn { display: inline-block; background: var(--navy); color: #fff; border: 0; border-radius: 8px; padding: 12px 20px; font: 600 1rem var(--sans); cursor: pointer; text-decoration: none; }
+.btn.block { width: 100%; margin-top: 14px; }
+.btn.gold { background: var(--gold); color: var(--navy); }
+.btn.ghost { background: transparent; color: var(--navy); border: 1px solid var(--navy); }
+.msg { margin-top: 16px; padding: 12px 14px; border-radius: 8px; background: var(--gold-soft); font-size: .95rem; }
+.msg.err { background: #fbe9e6; color: #8a2c20; }
+
+/* Agent hero */
+.hello { font-family: var(--display); font-size: 2rem; margin: 0; text-wrap: balance; }
+.agents { display: grid; gap: 14px; }
+.agent { background: var(--navy); color: #fff; border-radius: 16px; padding: 20px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+.agent-photo { width: 104px; height: 104px; border-radius: 50%; object-fit: cover; background: var(--navy-soft); border: 3px solid var(--gold); }
+.agent-initials { width: 104px; height: 104px; border-radius: 50%; display: grid; place-items: center; background: var(--navy-soft); border: 3px solid var(--gold); font: 600 2rem var(--display); }
+.agent-label { color: var(--gold); font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.agent-name { font-family: var(--display); font-size: 1.7rem; font-weight: 600; line-height: 1.15; }
+.agent-office { color: #c9c9d6; font-size: .92rem; }
+.agent-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.agent-actions a { background: rgba(255,255,255,.1); color: #fff; text-decoration: none; padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: .9rem; }
+.agent-actions a.primary { background: var(--gold); color: var(--navy); }
+
+/* Deals */
+.deal { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.deal-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.deal-side { font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); }
+.deal-addr { font-family: var(--display); font-size: 1.6rem; font-weight: 600; line-height: 1.2; margin: 2px 0 8px; overflow-wrap: anywhere; }
+.status { display: inline-block; font-size: .8rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--gold-soft); color: #7a5e14; }
+.status.closed { background: #e4f2e6; color: var(--green); }
+.deal-body { padding: 16px 20px 20px; display: grid; gap: 18px; }
+.stage-note { margin: 0; color: var(--ink); }
+.section h3 { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); margin: 0 0 8px; }
+
+.timeline { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; list-style: none; padding: 0; margin: 0; }
+.timeline li { border-top: 4px solid var(--line); padding-top: 8px; font-size: .9rem; }
+.timeline li.done { border-top-color: var(--gold); }
+.timeline .step { font-weight: 600; }
+.timeline .when { color: var(--slate); font-size: .85rem; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.fact { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.fact .k { font-size: .8rem; color: var(--slate); }
+.fact .v { font-weight: 700; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.links a { text-decoration: none; }
+.rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.rows li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed var(--line); padding-bottom: 6px; font-variant-numeric: tabular-nums; }
+.rows li span:first-child { color: var(--slate); }
+details.plan { background: var(--bg); border-radius: 10px; padding: 10px 14px; }
+details.plan summary { cursor: pointer; font-weight: 600; }
+details.plan h4 { margin: 14px 0 4px; font-family: var(--display); font-size: 1.2rem; }
+details.plan p { margin: 0; color: var(--ink); }
+.gift { background: var(--gold-soft); border-radius: 10px; padding: 12px 14px; }
+
+/* Partners */
+.partners { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.partner { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+.partner img { max-width: 160px; height: auto; }
+.partner h3 { margin: 0; font-family: var(--display); font-size: 1.35rem; }
+.partner p { margin: 0; color: var(--slate); font-size: .95rem; }
+.partner ul { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 4px; font-size: .92rem; }
+.footnote { text-align: center; color: var(--slate); font-size: .85rem; }
+
+@media (max-width: 520px) {
+  .agent { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+  .agent-actions { justify-content: center; }
+  .deal-addr, .hello { font-size: 1.45rem; }
+  .timeline { grid-auto-flow: row; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">Adams, Cameron <span>&amp;</span> Co.</div>
+    <button class="signout" id="signout" hidden onclick="signOut()">Sign out</button>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <div class="msg" style="text-align:center">Loading…</div>
+</main>
+
+<script>
+const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+const TOKEN_KEY = 'acp_token';
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => n == null || n === '' ? '—' : '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+// Dates arrive as YYYY-MM-DD or ISO; show them as the calendar date, not shifted by time zone.
+const fmtDate = d => {
+  if (!d) return '';
+  const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const dt = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(d);
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+const fmtPhone = e => { const d = String(e || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : (e || ''); };
+const STATUS_LABEL = { coming_soon: 'Coming soon', active_listing: 'On the market', temporarily_off_market: 'Temporarily off market', under_contract: 'Under contract', closed: 'Closed' };
+
+function storedToken() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function storeToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+// A link opens portal.html?t=… (emailed) or ?id=… (shared by the agent).
+// Keep it in this browser and clean the address bar.
+(function takeTokenFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const t = p.get('t') || p.get('id');
+  if (t) { storeToken(t); history.replaceState(null, '', location.pathname); }
+})();
+
+function app(html) { document.getElementById('app').innerHTML = html; }
+
+// ── Sign-in ──────────────────────────────────────────────────────────────────
+function showSignIn(note) {
+  document.getElementById('signout').hidden = true;
+  app(`<section class="signin" aria-labelledby="si-title">
+    <h1 id="si-title">Your home, in one place</h1>
+    <p>Enter the email address you gave your Adams Cameron agent. We'll email you a link to your personal portal.</p>
+    ${note ? `<div class="msg err" role="alert">${esc(note)}</div><br>` : ''}
+    <form id="si-form">
+      <label for="si-email">Email address</label>
+      <input id="si-email" type="email" autocomplete="email" required placeholder="you@example.com">
+      <button class="btn block" id="si-btn" type="submit">Email me my link</button>
+    </form>
+    <div id="si-msg"></div>
+  </section>`);
+  document.getElementById('si-form').addEventListener('submit', requestLink);
+}
+
+async function requestLink(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('si-btn');
+  const out = document.getElementById('si-msg');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await fetch(`${PROXY}/portal/request-link`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: document.getElementById('si-email').value }),
+    });
+    const data = await r.json().catch(() => ({}));
+    out.innerHTML = r.ok
+      ? `<div class="msg" role="status">${esc(data.message)}</div>`
+      : `<div class="msg err" role="alert">${esc(data.error || 'Something went wrong. Please try again.')}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="msg err" role="alert">We couldn't reach the portal. Check your connection and try again.</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Email me my link';
+}
+
+function signOut() { storeToken(''); showSignIn(); }
+
+// ── Portal ───────────────────────────────────────────────────────────────────
+async function load() {
+  const token = storedToken();
+  if (!token) return showSignIn();
+  try {
+    const r = await fetch(`${PROXY}/portal/me`, { headers: { 'x-portal-token': token } });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) { storeToken(''); return showSignIn(data.error); }
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    render(data);
+  } catch (e) {
+    app(`<div class="msg err" role="alert">${esc(e.message)}</div>`);
+  }
+}
+
+function agentHtml(a, label) {
+  const photo = a.photo
+    ? `<img class="agent-photo" src="${esc(a.photo)}" alt="${esc(a.name)}" onerror="this.outerHTML='<div class=&quot;agent-initials&quot;>${esc(a.name.split(' ').map(w => w[0]).join('').slice(0, 2))}</div>'">`
+    : `<div class="agent-initials">${esc(a.name.split(' ').map(w => w[0]).join('').slice(0, 2))}</div>`;
+  return `<section class="agent" aria-label="Your agent">
+    ${photo}
+    <div style="min-width:0">
+      <div class="agent-label">${esc(label)}</div>
+      <div class="agent-name">${esc(a.name)}</div>
+      ${a.office ? `<div class="agent-office">Adams, Cameron &amp; Co. · ${esc(a.office)}</div>` : ''}
+      <div class="agent-actions">
+        ${a.phone ? `<a class="primary" href="tel:${esc(a.phone)}">Call ${esc(fmtPhone(a.phone))}</a><a href="sms:${esc(a.phone)}">Text</a>` : ''}
+        ${a.email ? `<a href="mailto:${esc(a.email)}">Email</a>` : ''}
+        ${a.website ? `<a href="${esc(a.website)}" target="_blank" rel="noopener">Website</a>` : ''}
+      </div>
+    </div>
+  </section>`;
+}
+
+function dealHtml(d, agentsById) {
+  const lead = agentsById[d.agentIds[0]];
+  const parts = [];
+  parts.push(`<p class="stage-note">${esc(d.stageNote)}</p>`);
+  parts.push(`<div class="section"><h3>Progress</h3><ol class="timeline">${d.timeline.map(s =>
+    `<li class="${s.done ? 'done' : ''}"><div class="step">${esc(s.step)}</div><div class="when">${s.date ? esc(fmtDate(s.date)) : (s.done ? 'Done' : 'Upcoming')}</div></li>`).join('')}</ol></div>`);
+
+  if (d.listing) {
+    const L = d.listing;
+    parts.push(`<div class="section"><h3>Your listing</h3><div class="facts">
+      <div class="fact"><div class="k">List price</div><div class="v">${money(L.price)}</div></div>
+      ${L.listDate ? `<div class="fact"><div class="k">Listed</div><div class="v">${esc(fmtDate(L.listDate))}</div></div>` : ''}
+      ${L.daysOnMarket != null ? `<div class="fact"><div class="k">Days on market</div><div class="v">${L.daysOnMarket}</div></div>` : ''}
+      ${d.tour ? `<div class="fact"><div class="k">Tour views</div><div class="v">${d.tour.views}</div></div>` : ''}
+    </div></div>`);
+    const links = [
+      L.companyUrl ? `<a class="btn" href="${esc(L.companyUrl)}" target="_blank" rel="noopener">See it on adamscameron.com</a>` : '',
+      L.agentSiteUrl ? `<a class="btn ghost" href="${esc(L.agentSiteUrl)}" target="_blank" rel="noopener">See it on ${esc(lead ? lead.name.split(' ')[0] + "'s" : "your agent's")} website</a>` : '',
+      d.tour ? `<a class="btn gold" href="${esc(d.tour.url)}" target="_blank" rel="noopener">Watch the virtual tour</a>` : '',
+    ].filter(Boolean).join('');
+    if (links) parts.push(`<div class="links">${links}</div>`);
+    if (L.openHouses.length) parts.push(`<div class="section"><h3>Upcoming open houses</h3><ul class="rows">${L.openHouses.map(o =>
+      `<li><span>${esc(fmtDate(o.date))}</span><span>${esc([o.start, o.end].filter(Boolean).join(' – '))}</span></li>`).join('')}</ul></div>`);
+    if (L.priceChanges.length) parts.push(`<div class="section"><h3>Price changes</h3><ul class="rows">${L.priceChanges.map(p =>
+      `<li><span>${esc(fmtDate(p.date))}</span><span>${p.prior ? money(p.prior) + ' → ' : ''}${money(p.price)}</span></li>`).join('')}</ul></div>`);
+  }
+
+  if (d.mls.length) parts.push(`<div class="section"><h3>MLS</h3><ul class="rows">${d.mls.map(m =>
+    `<li><span>${esc(m.board)}</span><span>#${esc(m.mlsId)}</span></li>`).join('')}</ul></div>`);
+
+  if (d.marketingPlan && d.marketingPlan.length) parts.push(`<details class="plan"><summary>How your home is being marketed</summary>${d.marketingPlan.map(s =>
+    `<h4>${esc(s.heading)}</h4><p>${esc(s.body)}</p>`).join('')}</details>`);
+
+  if (d.contract) {
+    const C = d.contract;
+    parts.push(`<div class="section"><h3>Your contract</h3><div class="facts">
+      ${C.contractDate ? `<div class="fact"><div class="k">Contract date</div><div class="v">${esc(fmtDate(C.contractDate))}</div></div>` : ''}
+      ${C.price ? `<div class="fact"><div class="k">Contract price</div><div class="v">${money(C.price)}</div></div>` : ''}
+      ${C.expectedClosing ? `<div class="fact"><div class="k">Expected closing</div><div class="v">${esc(fmtDate(C.expectedClosing))}</div></div>` : ''}
+      ${C.titleCompany ? `<div class="fact"><div class="k">Title company</div><div class="v">${esc(C.titleCompany)}</div></div>` : ''}
+      ${C.lender ? `<div class="fact"><div class="k">Lender</div><div class="v">${esc(C.lender)}</div></div>` : ''}
+    </div></div>`);
+    if (C.deadlines.length) parts.push(`<div class="section"><h3>Key dates</h3><ul class="rows">${C.deadlines.map(x =>
+      `<li><span>${esc(x.label)}</span><span>${esc(fmtDate(x.date))}</span></li>`).join('')}</ul>
+      ${C.timelineUrl ? `<p style="margin:10px 0 0"><a href="${esc(C.timelineUrl)}" target="_blank" rel="noopener">See the full contract timeline →</a></p>` : ''}</div>`);
+  }
+
+  if (d.closing) {
+    const X = d.closing;
+    parts.push(`<div class="section"><h3>Closing</h3><div class="facts">
+      ${X.date ? `<div class="fact"><div class="k">Closed</div><div class="v">${esc(fmtDate(X.date))}</div></div>` : ''}
+      ${X.price ? `<div class="fact"><div class="k">${d.side === 'selling' ? 'Sold for' : 'Purchase price'}</div><div class="v">${money(X.price)}</div></div>` : ''}
+      ${X.titleCompany ? `<div class="fact"><div class="k">Title company</div><div class="v">${esc(X.titleCompany)}</div></div>` : ''}
+    </div></div>`);
+    if (d.foundationGift) parts.push(`<div class="gift">💛 ${d.foundationGift.donor ? esc(d.foundationGift.donor) + ' made' : 'Your agent made'} a gift to the <strong>Adams Cameron Foundation</strong> in honor of your closing.</div>`);
+    const R = d.reviewLinks || {};
+    const reviews = [['google', 'Google'], ['facebook', 'Facebook'], ['zillow', 'Zillow']].filter(([k]) => R[k])
+      .map(([k, label]) => `<a class="btn ghost" href="${esc(R[k])}" target="_blank" rel="noopener">Review on ${label}</a>`).join('');
+    if (reviews) parts.push(`<div class="section"><h3>How did we do?</h3><p style="margin:0 0 10px">A quick review helps ${esc(lead ? lead.name.split(' ')[0] : 'your agent')} more than you'd think.</p><div class="links">${reviews}</div></div>`);
+  }
+
+  if (lead && (d.status === 'closed' || d.status === 'under_contract')) {
+    const subject = encodeURIComponent('A referral for you');
+    const body = encodeURIComponent(`Hi ${lead.name.split(' ')[0]},\n\nI'd like to introduce you to someone who may be buying or selling:\n\nName:\nPhone:\nEmail:\n\nThanks!`);
+    parts.push(`<div class="section"><h3>Know someone moving?</h3><div class="links">
+      ${lead.email ? `<a class="btn gold" href="mailto:${esc(lead.email)}?subject=${subject}&body=${body}">Refer a friend to ${esc(lead.name.split(' ')[0])}</a>` : ''}
+    </div></div>`);
+  }
+
+  return `<article class="deal">
+    <div class="deal-head">
+      <div class="deal-side">${d.side === 'selling' ? 'Your sale' : 'Your purchase'}</div>
+      <div class="deal-addr">${esc(d.address)}</div>
+      <span class="status ${d.status === 'closed' ? 'closed' : ''}">${esc(STATUS_LABEL[d.status] || d.status)}</span>
+    </div>
+    <div class="deal-body">${parts.join('')}</div>
+  </article>`;
+}
+
+function partnersHtml(partners) {
+  const mortgage = partners.filter(p => p.category === 'mortgage');
+  return `<section aria-label="Our partners"><div class="partners">
+    <div class="partner">
+      <img src="adams-cameron-title-logo.png" alt="Adams Cameron Title Services">
+      <h3>Title &amp; Closing Services</h3>
+      <p>Adams Cameron Title Services can hold escrow for the buyer and accept an order to begin the title insurance and closing process for sellers — keeping everything under one trusted roof.</p>
+      <p>Orders: <a href="mailto:orders@adamscamerontitle.com">orders@adamscamerontitle.com</a> · <a href="tel:+13862583425">(386) 258-3425</a></p>
+      <a href="https://www.adamscamerontitle.com/" target="_blank" rel="noopener">Visit adamscamerontitle.com ↗</a>
+    </div>
+    <div class="partner">
+      <h3>CMG Home Loans</h3>
+      <p>Our mortgage partner. Whether you're buying next or refinancing, talk to one of our local loan officers.</p>
+      ${mortgage.length ? `<ul>${mortgage.map(m => `<li><strong>${esc(m.contact_name)}</strong>${m.phone ? ` · <a href="tel:${esc(String(m.phone).replace(/[^\d+]/g, ''))}">${esc(fmtPhone(m.phone))}</a>` : ''}${m.email ? ` · <a href="mailto:${esc(m.email)}">Email</a>` : ''}</li>`).join('')}</ul>` : ''}
+      <a href="https://www.cmghomeloans.com/" target="_blank" rel="noopener">Visit cmghomeloans.com ↗</a>
+    </div>
+  </div></section>`;
+}
+
+function render(data) {
+  document.getElementById('signout').hidden = false;
+  if (!data.deals.length) {
+    app(`<div class="msg">We couldn't find any current homes for this email. Please contact your agent, or us at <a href="mailto:info@adamscameron.com">info@adamscameron.com</a>.</div>${partnersHtml(data.partners || [])}`);
+    return;
+  }
+  const agentsById = Object.fromEntries(data.agents.map(a => [a.id, a]));
+  // Lead agents first (one per deal), each shown once.
+  const leadIds = [...new Set(data.deals.map(d => d.agentIds[0]).filter(Boolean))];
+  app(`
+    <h1 class="hello">${data.firstName ? `Welcome, ${esc(data.firstName)}` : 'Welcome'}</h1>
+    <div class="agents">${leadIds.map(id => agentHtml(agentsById[id], leadIds.length > 1 ? 'One of your agents' : 'Your agent')).join('')}</div>
+    ${data.deals.map(d => dealHtml(d, agentsById)).join('')}
+    ${partnersHtml(data.partners || [])}
+    <p class="footnote">Questions? Contact your agent, or Adams, Cameron &amp; Co. at <a href="mailto:info@adamscameron.com">info@adamscameron.com</a>.</p>`);
+}
+
+load();
+</script>
+</body>
+</html>

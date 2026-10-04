@@ -1534,8 +1534,12 @@ function openTxnModal(txnId) {
   const tools = toolsForTransaction(t);
 
   document.getElementById('modalAddress').textContent = t.property_address;
+  // Customer Portal: one shareable link per customer we represent (portal.html).
+  const portalButtons = (t.portal_customers || []).map(c =>
+    `<button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
+       onclick="copyPortalLink(this)">🔗 Copy portal link for ${escapeHtml(c.name || c.email)}</button>`).join('');
   document.getElementById('modalTools').innerHTML = tools
-    .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('');
+    .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('') + portalButtons;
   document.getElementById('modalChecklist').innerHTML = items.length
     ? items.map(i => renderChecklistItemRow(i, txnId)).join('')
     : '<p class="empty-state">No checklist steps yet.</p>';
@@ -1545,6 +1549,27 @@ function openTxnModal(txnId) {
 
 function closeTxnModal() {
   document.getElementById('txnModal').classList.remove('open');
+}
+
+// The customer's stable portal link (same link each time until revoked in
+// Daily Desk) — copied for the agent to send however they like.
+async function copyPortalLink(btn) {
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      body: JSON.stringify({ email: btn.dataset.email }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    try { await navigator.clipboard.writeText(data.url); btn.textContent = '✓ Copied — paste it into a text or email'; }
+    catch (_) { prompt('Copy this portal link:', data.url); }
+  } catch (e) {
+    btn.textContent = "Couldn't get a link: " + e.message;
+  }
+  setTimeout(() => { btn.innerHTML = label; btn.disabled = false; }, 2500);
 }
 
 // Maps a committed prospecting strategy's slug to a relevant internal/

@@ -2481,6 +2481,9 @@ tbody tr.clickable { cursor: pointer; }
       </div>
     </div>
 
+    <div class="divider">Customer Portal</div>
+    <div id="drawer-portal" style="font-size:12px;"></div>
+
     <div class="divider">Linked MLS Listings</div>
     <div id="drawer-linked-listings"><div class="empty">Loading…</div></div>
 
@@ -6286,6 +6289,8 @@ function renderDrawer(t) {
     return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}${descHtml}</div>${actionHtml}</div>`;
   }).join('') : '<div class="empty">No checklist items.</div>';
 
+  renderDrawerPortal(t);
+
   const actEl = document.getElementById('drawer-activity');
   const events = t.events || [];
   actEl.innerHTML = events.length ? events.map(ev => {
@@ -6300,6 +6305,47 @@ function renderDrawer(t) {
     }
     return `<div>${fmtDate(ev.event_date || ev.submitted_at)} — ${escapeHtml(ev.notes || ev.event_type)}</div>`;
   }).join('') : '<div>No activity recorded.</div>';
+}
+
+// ── Customer Portal links (portal.html — see customer-portal-routes.js) ──────
+// One shareable link per customer we represent on this deal: the same link
+// every time until revoked. Customers on the other side of the deal (e.g. a
+// co-broke buyer on our listing) never get a portal link.
+function renderDrawerPortal(t) {
+  const el = document.getElementById('drawer-portal');
+  if (!el) return;
+  const ours = (t.customers || []).filter(c =>
+    c.email && ((c.role === 'seller' && t.represents_seller) || (c.role === 'buyer' && t.represents_buyer)));
+  el.innerHTML = ours.length
+    ? ours.map(c => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <span style="flex:1;min-width:140px;"><strong>${escapeHtml(c.name || c.email)}</strong> <span style="color:var(--text-dim);">${escapeHtml(c.email)}</span></span>
+        <button class="btn btn-ghost btn-sm" data-email="${escapeHtml(c.email)}" onclick="copyPortalLink(this.dataset.email, this)">Copy portal link</button>
+        <button class="btn btn-ghost btn-sm" data-email="${escapeHtml(c.email)}" onclick="revokePortalLink(this.dataset.email, this)" title="Stop the current link working; the next copy makes a new one">Revoke</button>
+      </div>`).join('')
+    : '<div class="empty">No customer emails on file for our side of this deal. Add one to share the portal.</div>';
+}
+
+async function copyPortalLink(email, btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  try {
+    const { url } = await POST('/portal/agent-link', { email });
+    try { await navigator.clipboard.writeText(url); btn.textContent = 'Copied ✓'; }
+    catch (_) { prompt('Copy this portal link:', url); btn.textContent = label; }
+  } catch (e) {
+    alert('Could not get a portal link: ' + e.message);
+  }
+  setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 1800);
+}
+
+async function revokePortalLink(email, btn) {
+  if (!confirm(`Stop ${email}'s current portal link from working?\n\nThe next "Copy portal link" will make a new one.`)) return;
+  try {
+    const { revoked } = await POST('/portal/agent-link/revoke', { email });
+    btn.textContent = revoked ? 'Revoked ✓' : 'No link to revoke';
+  } catch (e) {
+    alert('Could not revoke: ' + e.message);
+  }
 }
 
 function closeDrawer() {
