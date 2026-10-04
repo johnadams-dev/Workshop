@@ -470,7 +470,7 @@ function setOfficeFilter(name, el) {
 function renderAgents(q) {
   const rows = STATE.agents.filter(a =>
     (!STATE.activeOffice || a.office_name === STATE.activeOffice) &&
-    matchesSearch([a.first_name, a.last_name, a.office_name, a.cell_e164, a.designations, a.languages], q)
+    matchesSearch([a.first_name, a.last_name, a.office_name, a.cell_e164, a.designations, a.languages, a.team_name], q)
   );
   document.getElementById('agents-count').textContent = rows.length ? `(${rows.length})` : '';
   document.getElementById('agents-list').innerHTML = rows.length
@@ -483,7 +483,7 @@ function agentRow(a) {
   const name = [a.first_name, a.last_name].filter(Boolean).join(' ');
   // Phone shown right next to office, per the ask — quick access without
   // opening the detail card, since web users want to glance-and-dial.
-  const sub = [a.office_name, a.cell_e164 ? fmtPhone(a.cell_e164) : null].filter(Boolean).join(' · ');
+  const sub = [a.office_name, a.team_name, a.cell_e164 ? fmtPhone(a.cell_e164) : null].filter(Boolean).join(' · ');
   const websiteHref = a.website ? (/^https?:\/\//i.test(a.website) ? a.website : 'https://' + a.website) : null;
   return `
     <div class="row-card clickable" onclick="openAgentCard(${a.id})">
@@ -513,6 +513,7 @@ function openAgentCard(id) {
   if (a.cell_e164) rows.push(`<a class="detail-row" href="sms:${esc(a.cell_e164)}"><span class="icon">💬</span><span class="label">${esc(fmtPhone(a.cell_e164))} · Text</span></a>`);
   rows.push(sendMessageRowHtml());
   if (a.email) rows.push(`<a class="detail-row" href="mailto:${esc(a.email)}"><span class="icon">✉️</span><span class="label">${esc(a.email)}</span></a>`);
+  if (a.team_name) rows.push(`<div class="detail-row"><span class="icon">👥</span><span class="label">${esc(a.team_name)}${a.teammates ? ` · with ${esc(a.teammates)}` : ''}</span></div>`);
   if (a.designations) rows.push(`<div class="detail-row"><span class="icon">🏅</span><span class="label">${esc(a.designations)}</span></div>`);
   if (a.languages) rows.push(`<div class="detail-row"><span class="icon">🗣️</span><span class="label">${esc(a.languages)}</span></div>`);
   if (websiteHref) rows.push(`<a class="detail-row" href="${esc(websiteHref)}" target="_blank" rel="noopener"><span class="icon">🌐</span><span class="label">${esc(a.website)}</span></a>`);

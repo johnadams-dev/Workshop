@@ -405,6 +405,7 @@
 
   .empty { text-align: center; padding: 60px 20px; color: var(--text-light); font-size: 15px; }
   .loading { text-align: center; padding: 60px 20px; color: var(--text-light); font-size: 14px; }
+  .team-tag { color: var(--text-light); font-weight: 400; font-size: 0.92em; }
 
   @media (max-width: 600px) {
     .card-grid { grid-template-columns: 1fr; }
@@ -605,6 +606,13 @@ function photoEl(item, size = "card") {
 // just omitted from whatever row it's on; the row itself still shows if a
 // non-hidden co-agent/other-side agent is on it. Deal activity only (new
 // listings/contracts/closings/changes) — not upcoming/buyer needs/open houses.
+// Sales team shown after an ACC agent's name (from the report's agentTeams
+// lookup — DeltaNet teams, see teams.js). Hidden agents have no name, so no tag.
+function teamTag(first, last) {
+  const team = STATE.data?.agentTeams?.[`${first || ''} ${last || ''}`.trim()];
+  return team ? ` <span class="team-tag">· ${escapeHtml(team)}</span>` : '';
+}
+
 function maskHiddenAgents(item, isManager) {
   if (isManager) return item;
   const masked = { ...item };
@@ -675,7 +683,7 @@ function listingCard(item, isManager = false) {
         ${item.sqft ? `<span>📐 ${Number(item.sqft).toLocaleString()} sqft</span>` : ""}
       </div>
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
         ${coAgentsHtml(item.coListingAgents)}
       </div>
@@ -767,13 +775,13 @@ function closingCard(item, isManager = false) {
       <div class="card-two-col">
         <div>
           <div class="col-label">Listing</div>
-          <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+          <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
           ${item.listingOffice ? `<div class="card-office">${escapeHtml(item.listingOffice)}</div>` : ""}
           ${coAgentsHtml(item.coListingAgents)}
         </div>
         <div>
           <div class="col-label">Selling</div>
-          <strong>${escapeHtml(item.sellingAgentFirst)} ${escapeHtml(item.sellingAgentLast)}</strong>
+          <strong>${escapeHtml(item.sellingAgentFirst)} ${escapeHtml(item.sellingAgentLast)}</strong>${teamTag(item.sellingAgentFirst, item.sellingAgentLast)}
           ${item.sellingOffice ? `<div class="card-office">${escapeHtml(item.sellingOffice)}</div>` : ""}
           ${coAgentsHtml(item.coSellingAgents)}
         </div>
@@ -807,7 +815,7 @@ function changeCard(item) {
         <span class="change-label">${escapeHtml(item.change || "Change")}</span>
       </div>
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
         ${coAgentsHtml(item.coListingAgents)}
       </div>
@@ -836,7 +844,7 @@ function dnOnlyCard(item) {
         ${item.sqft ? `<span>📐 ${Number(item.sqft).toLocaleString()} sqft</span>` : ""}
       </div>
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
       </div>
     </div>
@@ -873,7 +881,7 @@ function upcomingCard(item, isStaffUser) {
       </div>
       ${item.comments ? `<div class="card-comments">${escapeHtml(item.comments)}</div>` : ""}
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.agentOffice ? `<span class="card-office">${escapeHtml(item.agentOffice)}</span>` : ""}
         ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
       </div>
@@ -898,7 +906,7 @@ function buyerCard(item, isStaffUser) {
       </div>
       ${item.comments ? `<div class="card-comments">${escapeHtml(item.comments)}</div>` : ""}
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.agentOffice ? `<span class="card-office">${escapeHtml(item.agentOffice)}</span>` : ""}
         ${contactHref ? `<a href="${contactHref}" class="card-contact">${escapeHtml(item.contact || item.agentEmail)}</a>` : ""}
       </div>
@@ -925,7 +933,7 @@ function openHouseCard(item) {
         ${item.openStart && item.openEnd ? `<span>⏰ ${item.openStart} – ${item.openEnd}</span>` : ""}
       </div>
       <div class="card-agent">
-        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>
+        <strong>${escapeHtml(item.agentFirst)} ${escapeHtml(item.agentLast)}</strong>${teamTag(item.agentFirst, item.agentLast)}
         ${item.listingOffice ? `<span class="card-office">${escapeHtml(item.listingOffice)}</span>` : ""}
       </div>
     </div>
