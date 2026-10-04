@@ -691,6 +691,7 @@ async function selectAgent(id) {
   renderDetail(a);
   loadFloorEligibility(a.id);
   loadFoundationDonation(a.id);
+  loadTeams(a.id);
 }
 
 function renderDetail(a) {
@@ -724,6 +725,8 @@ function renderDetail(a) {
       <a href="#card-ext-ids-${a.id}">External IDs</a>
       <span>·</span>
       <a href="#card-notif-${a.id}">Notifications &amp; Status</a>
+      <span>·</span>
+      <a href="#card-team-${a.id}">Team</a>
       <span>·</span>
       <a href="#floor-duty-card-${a.id}">Floor Time</a>
       <span>·</span>
@@ -846,6 +849,11 @@ function renderDetail(a) {
         <div class="toggle-row"><div class="toggle-label">Display name on agent hotsheet<small>Turn off to hide this agent from the agent-facing Hotsheet (still visible to managers)</small></div>
           <label class="toggle"><input type="checkbox" ${a.show_on_hotsheet!==false?'checked':''} onchange="saveField(${a.id},'show_on_hotsheet',this.checked,this)"><span class="toggle-track"></span></label></div>
       </div>
+    </div>
+
+    <div class="card" id="card-team-${a.id}">
+      <div class="card-head">Team <span style="font-weight:400;font-size:11px;color:var(--muted)">— from DeltaNet, updated nightly</span></div>
+      <div class="card-body" id="team-body-${a.id}"><span style="font-size:12px;color:var(--muted)">Loading…</span></div>
     </div>
 
     <div class="card" id="floor-duty-card-${a.id}">
@@ -2420,6 +2428,57 @@ async function createStaff() {
     toast('Error: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = 'Add Staff';
+  }
+}
+
+// ── Team (read-only membership from DeltaNet; our own flags editable) ────────
+// Membership comes from DeltaNet's teams, synced nightly (teams-routes.js).
+// "Sales team", brand name and website are ours and save on change. Leaders
+// can work on all of the team's listings; members only on their own.
+async function loadTeams(agentId) {
+  const el = document.getElementById(`team-body-${agentId}`);
+  if (!el) return;
+  try {
+    const r = await fetch(`${PROXY_URL}/teams/agent/${agentId}`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const { teams } = await r.json();
+    if (currentId !== agentId) return;
+    if (!teams.length) {
+      el.innerHTML = '<span style="font-size:12px;color:var(--muted)">Not on a team in DeltaNet.</span>';
+      return;
+    }
+    el.innerHTML = teams.map(t => {
+      const members = t.members.map(m =>
+        `${esc(m.name)}${m.role === 'leader' ? ' <span style="color:var(--muted)">(leader)</span>' : ''}`).join(', ');
+      return `<div style="padding:4px 0 12px;border-bottom:1px solid var(--border);margin-bottom:12px">
+        <div style="font-weight:600;font-size:13px">${esc(t.name)}
+          <span class="badge ${t.is_sales_team ? 'badge-active' : 'badge-inactive'}" style="margin-left:6px">${t.role === 'leader' ? 'Leader' : 'Member'}</span></div>
+        <div style="font-size:12px;color:var(--muted);margin:4px 0 10px">${members || 'No members matched to agent records'}</div>
+        <div class="toggle-row"><div class="toggle-label">Sales team<small>Turn off for DeltaNet entries that aren't real sales teams (e.g. Coaching). When off, the team is ignored everywhere.</small></div>
+          <label class="toggle"><input type="checkbox" ${t.is_sales_team ? 'checked' : ''} onchange="saveTeamField(${t.id},'is_sales_team',this.checked,this)"><span class="toggle-track"></span></label></div>
+        <div class="fg" style="margin-top:8px">
+          <div class="field"><label>Brand name</label><input type="text" value="${esc(t.brand_name)}" placeholder="e.g. Team Lynch" onchange="saveTeamField(${t.id},'brand_name',this.value,this)"></div>
+          <div class="field"><label>Team website</label><input type="url" value="${esc(t.website)}" placeholder="https://…" onchange="saveTeamField(${t.id},'website',this.value,this)"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<span style="font-size:12px;color:var(--red)">Couldn't load team: ${esc(e.message)}</span>`;
+  }
+}
+
+async function saveTeamField(teamId, field, value, el) {
+  try {
+    const r = await fetch(`${PROXY_URL}/teams/${teamId}`, {
+      method: 'PUT', headers: H(), body: JSON.stringify({ [field]: value }),
+    });
+    if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || 'HTTP ' + r.status); }
+    markSaved(el);
+    toast('Saved', 'ok');
+    if (field === 'is_sales_team' && currentId) loadTeams(currentId);
+  } catch (e) {
+    revertField(el);
+    toast('Not saved: ' + e.message, 'err');
   }
 }
 
