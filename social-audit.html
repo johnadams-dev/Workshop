@@ -511,9 +511,10 @@ function onTeamChange() {
   const info = document.getElementById('f-team-info');
   if (!t) { info.textContent = ''; return; }
   document.getElementById('f-team-city').value = officeCityDefault(t.office_name);
+  // The team's name is its brand (brand_name only overrides it when staff set
+  // one). No website on file isn't a problem — the audit searches for it.
   info.innerHTML = `Members: ${esc((t.members || []).join(', '))}<br>` +
-    (t.website ? `Website: ${esc(t.website)}` : 'No team website on file — add it in Agent Records (Team section) for a more accurate audit.') +
-    (t.brand_name ? '' : '<br>No brand name on file — the audit will use the DeltaNet team name.');
+    (t.website ? `Website: ${esc(t.website)}` : "The audit will look up the team's website.");
   hideCooldownBanner();
   checkAuditCooldown(`${PROXY}/api/audits/team/${t.id}/history`, 'team');
 }
