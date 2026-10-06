@@ -557,11 +557,24 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
         <span id="testimonial-pull-status" style="font-size:.8rem;color:var(--text-muted)"></span>
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="downloadTestimonialsCsv()">⬇ Download DeltaNet CSV</button>
       </div>
+      <!-- Changes below stay on this page until one of these buttons sends
+           every selected row in a single request. -->
+      <div class="filters" id="testimonial-batch-bar" style="margin-bottom:0.75rem;position:sticky;top:0;z-index:5;background:var(--ink);padding:.4rem 0">
+        <span id="testimonial-selected-count" style="font-size:.85rem;font-weight:600">0 selected</span>
+        <button class="btn btn-amber btn-sm" onclick="applyTestimonialBatch('approved')">Approve selected</button>
+        <button class="btn btn-ghost btn-sm" onclick="applyTestimonialBatch('rejected')">Reject selected</button>
+        <button class="btn btn-ghost btn-sm" onclick="applyTestimonialBatch(null)">Save agent changes</button>
+        <label style="font-size:.8rem;display:flex;align-items:center;gap:.3rem">
+          <input type="checkbox" id="testimonial-notify" checked> Draft agent notification emails on approve
+        </label>
+        <span id="testimonial-batch-status" style="font-size:.8rem;color:var(--text-muted)"></span>
+      </div>
 
       <div class="tbl-wrap">
         <table>
           <thead>
             <tr>
+              <th><input type="checkbox" id="testimonial-select-all" title="Select all shown" onchange="toggleAllTestimonials(this.checked)"></th>
               <th>Source</th>
               <th>Customer</th>
               <th>Rating</th>
@@ -571,7 +584,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               <th></th>
             </tr>
           </thead>
-          <tbody id="testimonials-body"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+          <tbody id="testimonials-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1668,35 +1681,60 @@ function agentOptionsHtml(selectedId) {
 
 const TESTIMONIAL_SOURCE_LABEL = { google: "Google", zillow: "Zillow", facebook: "Facebook", email: "Email", manual: "Manual" };
 
+// Rows as last loaded, plus what staff have changed on this page but not
+// sent yet. Picking an agent or ticking a row no longer calls the server or
+// reloads the list (slow with 500+ Google reviews) -- the batch bar sends
+// every selected row in one request (POST /review/testimonials/batch).
+let _testimonials = [];
+const _tSelected = new Set();
+const _tAgentEdits = new Map(); // testimonial id -> agent id ("" = unassigned)
+
 async function loadTestimonials() {
   const tbody = document.getElementById("testimonials-body");
-  tbody.innerHTML = `<tr><td colspan="7" class="loading">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
   try {
     await getAgentsList();
     const status = document.getElementById("testimonial-status-filter").value;
     const data = await GET(`/review/testimonials${status ? `?status=${encodeURIComponent(status)}` : ""}`);
-    renderTestimonials(data.testimonials || []);
+    _testimonials = data.testimonials || [];
+    _tSelected.clear();
+    _tAgentEdits.clear();
+    renderTestimonials(_testimonials);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red)">Failed to load: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red)">Failed to load: ${esc(e.message)}</td></tr>`;
   }
+}
+
+// The agent each row will be saved/approved with: a pick made on this page,
+// else the saved agent, else the suggestion (approving a row with a
+// suggestion showing confirms it, as before).
+function effectiveTestimonialAgent(t) {
+  if (_tAgentEdits.has(t.id)) return _tAgentEdits.get(t.id) || null;
+  return t.agent_id || t.suggested_agent_id || null;
+}
+
+function agentNameById(id) {
+  const a = (_agentsCache || []).find(x => String(x.id) === String(id));
+  return a ? `${a.first_name} ${a.last_name}` : "";
 }
 
 function renderTestimonials(rows) {
   const tbody = document.getElementById("testimonials-body");
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--text-muted);padding:1rem">Nothing here.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--text-muted);padding:1rem">Nothing here.</td></tr>`;
+    updateTestimonialSelection();
     return;
   }
   tbody.innerHTML = rows.map(t => {
     const name = [t.customer_first_name, t.customer_last_name].filter(Boolean).join(" ") || "—";
-    const selectedAgent = t.agent_id || t.suggested_agent_id || "";
+    const selectedAgent = effectiveTestimonialAgent(t) || "";
     const suggestedNote = (!t.agent_id && t.suggested_agent_id)
       ? `<div style="font-size:.72rem;color:var(--amber)">suggested: ${esc(t.suggested_agent_first_name)} ${esc(t.suggested_agent_last_name)}</div>` : "";
     const actions = t.status === "pending"
-      ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'approved',${t.agent_id || "null"},${t.suggested_agent_id || "null"})">Approve</button>
-         <button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null,null)">Reject</button>`
+      ? `<button class="btn btn-ghost btn-sm" onclick="applyTestimonialBatch('approved', [${t.id}])">Approve</button>
+         <button class="btn btn-ghost btn-sm" onclick="applyTestimonialBatch('rejected', [${t.id}])">Reject</button>`
       : t.status === "approved"
-        ? `<button class="btn btn-ghost btn-sm" onclick="setTestimonialStatus(${t.id},'rejected',null,null)">Reject</button>`
+        ? `<button class="btn btn-ghost btn-sm" onclick="applyTestimonialBatch('rejected', [${t.id}])">Reject</button>`
         : "";
     // DeltaNet won't accept a blank rating -- assume 5 stars when none was
     // captured, same default the export applies; shown greyed out so staff
@@ -1704,23 +1742,118 @@ function renderTestimonials(rows) {
     const ratingCell = t.rating != null
       ? "★".repeat(t.rating)
       : `<span style="color:var(--text-dim)" title="No rating captured -- exports as 5 stars">★★★★★</span>`;
+    // Only the chosen agent is drawn up front; the full ~200-agent list is
+    // filled in when the dropdown is first opened (fillAgentSelect), so
+    // 500+ rows don't build 100,000 <option>s on every render.
+    const agentOption = selectedAgent
+      ? `<option value="${selectedAgent}" selected>${esc(agentNameById(selectedAgent))}</option>` : "";
     return `
-      <tr>
+      <tr data-id="${t.id}">
+        <td><input type="checkbox" class="t-select" ${_tSelected.has(t.id) ? "checked" : ""} onchange="toggleTestimonial(${t.id}, this.checked)"></td>
         <td>${esc(TESTIMONIAL_SOURCE_LABEL[t.source] || t.source)}</td>
         <td>${esc(name)}</td>
         <td>${ratingCell}</td>
         <td>${t.review_date ? esc(String(t.review_date).slice(0, 10)) : "—"}</td>
         <td style="max-width:320px;white-space:normal">${esc((t.content || "").slice(0, 220))}${(t.content || "").length > 220 ? "…" : ""}</td>
         <td>
-          <select onchange="setTestimonialAgent(${t.id}, this.value)" style="width:100%">
+          <select onmousedown="fillAgentSelect(this)" onfocus="fillAgentSelect(this)" onchange="stageTestimonialAgent(${t.id}, this.value)" style="width:100%">
             <option value="">— unassigned —</option>
-            ${agentOptionsHtml(selectedAgent)}
+            ${agentOption}
           </select>
           ${suggestedNote}
         </td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
   }).join("");
+  updateTestimonialSelection();
+}
+
+function fillAgentSelect(sel) {
+  if (sel.dataset.filled) return;
+  sel.dataset.filled = "1";
+  const current = sel.value;
+  sel.innerHTML = `<option value="">— unassigned —</option>${agentOptionsHtml(current)}`;
+}
+
+// Changing a row's agent selects that row, so "Save agent changes" or
+// "Approve selected" picks it up.
+function stageTestimonialAgent(id, agentId) {
+  _tAgentEdits.set(id, agentId ? parseInt(agentId, 10) : "");
+  toggleTestimonial(id, true);
+  const box = document.querySelector(`#testimonials-body tr[data-id="${id}"] .t-select`);
+  if (box) box.checked = true;
+}
+
+function toggleTestimonial(id, on) {
+  if (on) _tSelected.add(id); else _tSelected.delete(id);
+  updateTestimonialSelection();
+}
+
+function toggleAllTestimonials(on) {
+  _testimonials.forEach(t => on ? _tSelected.add(t.id) : _tSelected.delete(t.id));
+  document.querySelectorAll("#testimonials-body .t-select").forEach(b => { b.checked = on; });
+  updateTestimonialSelection();
+}
+
+function updateTestimonialSelection() {
+  document.getElementById("testimonial-selected-count").textContent = `${_tSelected.size} selected`;
+  const all = document.getElementById("testimonial-select-all");
+  all.checked = _testimonials.length > 0 && _tSelected.size === _testimonials.length;
+  all.indeterminate = _tSelected.size > 0 && _tSelected.size < _testimonials.length;
+}
+
+// status: 'approved' | 'rejected' | null (save agent changes only).
+// ids: one row's Approve/Reject button passes its own id; the batch bar
+// uses every selected row.
+async function applyTestimonialBatch(status, ids) {
+  const msg = document.getElementById("testimonial-batch-status");
+  const targetIds = ids || [..._tSelected];
+  const rows = _testimonials.filter(t => targetIds.includes(t.id));
+  if (!rows.length) { msg.textContent = "Select at least one review first."; return; }
+
+  const updates = [];
+  for (const t of rows) {
+    const u = { id: t.id };
+    if (status) u.status = status;
+    if (status === "approved") {
+      u.agent_id = effectiveTestimonialAgent(t);
+    } else if (_tAgentEdits.has(t.id)) {
+      u.agent_id = _tAgentEdits.get(t.id) || null;
+    }
+    if (!status && !("agent_id" in u)) continue; // nothing to save for this row
+    updates.push(u);
+  }
+  if (!updates.length) { msg.textContent = "No agent changes to save in the selected rows."; return; }
+
+  const notify = document.getElementById("testimonial-notify").checked;
+  if (status === "approved") {
+    const noAgent = updates.filter(u => !u.agent_id).length;
+    if (noAgent && !confirm(`${noAgent} of these ${updates.length} review${updates.length === 1 ? " has" : "s have"} no agent. Approve ${noAgent === 1 ? "it" : "them"} as general company reviews?`)) return;
+    const newApprovals = rows.filter(t => t.status !== "approved").length;
+    if (notify && newApprovals > 10 && !confirm(`This will create ${newApprovals} Gmail notification drafts (one per review). Continue? (Untick "Draft agent notification emails" to approve without them.)`)) return;
+  }
+
+  msg.textContent = "Saving…";
+  try {
+    const result = await POST("/review/testimonials/batch", { updates, notify });
+    const verb = status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Saved";
+    msg.textContent = `${verb} ${result.updated}${status === "approved" && notify && result.notified ? ` · ${result.notified} notification draft${result.notified === 1 ? "" : "s"} created` : ""}.`;
+    // Update the list in place rather than reloading all of it.
+    const filter = document.getElementById("testimonial-status-filter").value;
+    const byId = new Map(updates.map(u => [u.id, u]));
+    _testimonials = _testimonials.filter(t => {
+      const u = byId.get(t.id);
+      if (!u) return true;
+      if ("agent_id" in u) t.agent_id = u.agent_id;
+      if (u.status) t.status = u.status;
+      _tSelected.delete(t.id);
+      _tAgentEdits.delete(t.id);
+      return !filter || t.status === filter;
+    });
+    renderTestimonials(_testimonials);
+  } catch (e) {
+    msg.textContent = "Couldn't save: " + e.message;
+  }
 }
 
 async function pullTestimonials(source) {
@@ -1735,40 +1868,6 @@ async function pullTestimonials(source) {
     loadTestimonials();
   } catch (e) {
     status.textContent = "Error: " + e.message;
-  }
-}
-
-async function setTestimonialAgent(id, agentId) {
-  // Reload after saving (not just on failure) — the Approve button embeds
-  // the row's agent_id at render time, so it needs a fresh render to reflect
-  // whatever was just picked here before it can be trusted.
-  try {
-    await PUT(`/review/testimonials/${id}`, { agent_id: agentId ? parseInt(agentId, 10) : null });
-  } catch (e) {
-    alert("Couldn't save agent: " + e.message);
-  }
-  loadTestimonials();
-}
-
-async function setTestimonialStatus(id, status, currentAgentId, suggestedAgentId) {
-  const body = { status };
-  if (status === "approved") {
-    // A suggested-but-not-yet-clicked agent shows selected in the dropdown
-    // already, so approving without touching it should just confirm that
-    // suggestion, not block the approval -- adopt it here rather than
-    // requiring a redundant manual re-pick of the same agent.
-    const effectiveAgentId = currentAgentId || suggestedAgentId || null;
-    if (effectiveAgentId) {
-      body.agent_id = effectiveAgentId;
-    } else if (!confirm("No agent was identified for this review. Approve it as a general company review?")) {
-      return;
-    }
-  }
-  try {
-    await PUT(`/review/testimonials/${id}`, body);
-    loadTestimonials();
-  } catch (e) {
-    alert("Couldn't update: " + e.message);
   }
 }
 
