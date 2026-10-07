@@ -549,6 +549,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
       <div class="filters" style="margin-bottom:0.75rem">
         <select id="testimonial-status-filter" onchange="loadTestimonials()">
           <option value="pending" selected>Pending (needs agent confirmation)</option>
+          <option value="needs_match">Needs a customer match</option>
           <option value="approved">Approved (ready to export)</option>
           <option value="exported">Exported</option>
           <option value="rejected">Rejected</option>
@@ -581,10 +582,11 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               <th>Date</th>
               <th>Content</th>
               <th>Agent</th>
+              <th title="The Review Engine customer this review is counted for">Customer match</th>
               <th></th>
             </tr>
           </thead>
-          <tbody id="testimonials-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+          <tbody id="testimonials-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -616,7 +618,7 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
         <div>
           <h3 style="font-size:1rem;margin:0 0 .35rem">Testimonials Pipeline</h3>
           <p style="font-size:.85rem;color:var(--muted);margin:0 0 .75rem">
-            Used by the Testimonials tab's "Pull Google" and "Check Email" buttons.
+            Used by the Testimonials tab's pull buttons and the nightly pull (Google, Zillow and email, every night).
           </p>
           <div style="display:flex;flex-direction:column;gap:.9rem">
             <div>
@@ -634,6 +636,14 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
               <label style="display:block;font-weight:600;margin-bottom:.3rem">Gmail Label for Testimonial Emails</label>
               <input id="setting-testimonials-gmail-label" type="text" class="edit-input" style="width:100%"
                      placeholder="Reviews">
+            </div>
+            <div>
+              <label style="display:block;font-weight:600;margin-bottom:.3rem">
+                New reviews email goes to
+                <span style="font-weight:400;font-size:.85rem;color:var(--muted)">— after each nightly pull, one list of every new Google, Zillow and email review (nothing is sent on nights with none). Separate several addresses with commas.</span>
+              </label>
+              <input id="setting-testimonials-digest-to" type="text" class="edit-input" style="width:100%"
+                     placeholder="johnadams@adamscameron.com">
             </div>
           </div>
         </div>
@@ -1691,7 +1701,7 @@ const _tAgentEdits = new Map(); // testimonial id -> agent id ("" = unassigned)
 
 async function loadTestimonials() {
   const tbody = document.getElementById("testimonials-body");
-  tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
   try {
     await getAgentsList();
     const status = document.getElementById("testimonial-status-filter").value;
@@ -1701,7 +1711,7 @@ async function loadTestimonials() {
     _tAgentEdits.clear();
     renderTestimonials(_testimonials);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red)">Failed to load: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--red)">Failed to load: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -1721,7 +1731,7 @@ function agentNameById(id) {
 function renderTestimonials(rows) {
   const tbody = document.getElementById("testimonials-body");
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--text-muted);padding:1rem">Nothing here.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--text-muted);padding:1rem">Nothing here.</td></tr>`;
     updateTestimonialSelection();
     return;
   }
@@ -1762,10 +1772,51 @@ function renderTestimonials(rows) {
           </select>
           ${suggestedNote}
         </td>
+        <td>${recipientMatchCell(t)}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>`;
   }).join("");
   updateTestimonialSelection();
+}
+
+// Which Review Engine customer the review counts for (review-matching.js
+// on the server): matched, a suggestion to confirm, or unmatched (counted
+// under the reviewer's name only). Blank for Facebook/manual entries and
+// reviews from before Review Engine started.
+function recipientMatchCell(t) {
+  const closed = t.match_close_date ? ` <span style="color:var(--text-muted)">· closed ${esc(String(t.match_close_date).slice(0, 10))}</span>` : "";
+  if (t.recipient_match === "matched") {
+    return `<span style="color:var(--green)">✓ ${esc(t.match_customer || "Matched")}</span>${closed}`;
+  }
+  if (t.recipient_match === "suggested") {
+    return `<div style="color:var(--amber)">${esc(t.match_customer)}?${closed}</div>
+      <div style="display:flex;gap:.3rem;margin-top:.25rem">
+        <button class="btn btn-ghost btn-sm" onclick="resolveRecipientMatch(${t.id}, true)">Confirm</button>
+        <button class="btn btn-ghost btn-sm" onclick="resolveRecipientMatch(${t.id}, false)">Not them</button>
+      </div>`;
+  }
+  if (t.recipient_match === "unmatched") {
+    return `<span style="color:var(--text-muted)" title="Counted as an unmatched review under the reviewer's name">No match</span>`;
+  }
+  return `<span style="color:var(--text-dim)">—</span>`;
+}
+
+async function resolveRecipientMatch(id, confirm) {
+  const msg = document.getElementById("testimonial-batch-status");
+  try {
+    await POST(`/review/testimonials/${id}/recipient-match`, { confirm });
+    const t = _testimonials.find(x => x.id === id);
+    if (t) {
+      t.recipient_match = confirm ? "matched" : "unmatched";
+      if (!confirm) { t.match_customer = null; t.match_close_date = null; }
+    }
+    const filter = document.getElementById("testimonial-status-filter").value;
+    if (filter === "needs_match") _testimonials = _testimonials.filter(x => x.id !== id);
+    renderTestimonials(_testimonials);
+    msg.textContent = confirm ? "Customer match confirmed." : "Recorded as an unmatched review.";
+  } catch (e) {
+    msg.textContent = "Couldn't save the match: " + e.message;
+  }
 }
 
 function fillAgentSelect(sel) {
@@ -1848,7 +1899,7 @@ async function applyTestimonialBatch(status, ids) {
       if (u.status) t.status = u.status;
       _tSelected.delete(t.id);
       _tAgentEdits.delete(t.id);
-      return !filter || t.status === filter;
+      return !filter || filter === "needs_match" || t.status === filter;
     });
     renderTestimonials(_testimonials);
   } catch (e) {
@@ -1864,7 +1915,10 @@ async function pullTestimonials(source) {
     const fromListings = result.locations ? ` from ${result.locations} Google listing${result.locations === 1 ? "" : "s"}` : "";
     const failedNote = result.failed && result.failed.length
       ? ` ${result.failed.length} listing${result.failed.length === 1 ? "" : "s"} couldn't be read: ${result.failed.map(f => f.location).join("; ")}.` : "";
-    status.textContent = `Added ${result.added}, skipped ${result.skipped}${fromListings} (skipped = already imported or not testimonial-shaped).${failedNote}`;
+    const m = result.matching;
+    const matchNote = m && (m.matched || m.suggested || m.unmatched)
+      ? ` Customer matching: ${m.matched} matched, ${m.suggested} to confirm, ${m.unmatched} unmatched.` : "";
+    status.textContent = `Added ${result.added}, skipped ${result.skipped}${fromListings} (skipped = already imported or not testimonial-shaped).${matchNote}${failedNote}`;
     loadTestimonials();
   } catch (e) {
     status.textContent = "Error: " + e.message;
@@ -1983,6 +2037,7 @@ async function loadSettings() {
     document.getElementById("setting-email-address").value   = data.email_address   || "";
     document.getElementById("setting-email-phone").value     = data.email_phone     || "";
     document.getElementById("setting-testimonials-gmail-label").value  = data.testimonials_gmail_label  || "";
+    document.getElementById("setting-testimonials-digest-to").value    = data.testimonials_digest_to    || "";
 
     const tbody = document.getElementById("office-google-body");
     if (!data.offices || !data.offices.length) {
@@ -2084,6 +2139,7 @@ async function saveSettings() {
       from_name_options: fromNameOptions,
       officeGoogleUrls,
       testimonials_gmail_label:  document.getElementById("setting-testimonials-gmail-label").value.trim()  || null,
+      testimonials_digest_to:    document.getElementById("setting-testimonials-digest-to").value.trim()    || null,
     });
     FROM_NAME_OPTIONS = fromNameOptions;
     // Keep the Recipients tab's "check for reviews" links in sync — without
