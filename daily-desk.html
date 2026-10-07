@@ -7280,7 +7280,7 @@ function closeNoticeCaravanModal() {
   _noticeCaravanId = null;
 }
 
-function confirmNoticeCaravan() {
+async function confirmNoticeCaravan() {
   const caravanDate        = document.getElementById('ncm-date').value.trim();
   const entryInstructions  = document.getElementById('ncm-entry').value.trim();
   const agentComments      = document.getElementById('ncm-comments').value.trim();
@@ -7304,7 +7304,7 @@ function confirmNoticeCaravan() {
     return;
   }
 
-  cvQueue.push({
+  const item = {
     addr,
     city,
     entryInstructions,
@@ -7313,11 +7313,16 @@ function confirmNoticeCaravan() {
     agent: notice.agent_name || '',
     _raw: notice,
     _fromNotice: true,
-  });
+  };
+  cvQueue.push(item);
+  closeNoticeCaravanModal();
+  // Saved like the other two ways of adding (it used to live only in this
+  // browser's queue), and saved before the email goes out so the email's
+  // list for that date includes it.
+  await cvSaveItemToDB(item);
   cvRenderQueue();
   cvToast('✓', 'Added to caravan. Switch to the 🚗 Caravan tab to print.');
-  cvSendNotify(addr || city, city, caravanDate);
-  closeNoticeCaravanModal();
+  cvSendNotify(caravanDate);
 }
 
 /* ─────────────────────────────────────────────────────────────────── */
