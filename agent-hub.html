@@ -194,18 +194,37 @@
       line-height: 1.5; margin: 0;
     }
 
-    /* ── REMINDER BOX ── */
-    .reminder-box {
-      background: rgba(201,168,76,.08);
-      border: 1px solid rgba(201,168,76,.25);
-      border-radius: 10px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.5rem;
-      display: none;
+    /* ── NEEDS ATTENTION — compliance gaps and pending steps, each a
+       collapsed bar with a count; opened only when the agent wants detail,
+       so listings and contracts stay near the top of the page. ── */
+    .attention-row { display: flex; flex-direction: column; gap: .6rem; margin: 0 0 1.5rem; }
+    .attn { border-radius: 10px; background: white; box-shadow: var(--shadow); overflow: hidden; }
+    .attn.gaps  { border: 1px solid rgba(231,76,60,.25); }
+    .attn.steps { border: 1px solid rgba(201,168,76,.35); }
+    .attn > summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; gap: .7rem;
+      padding: .8rem 1.1rem; user-select: none;
     }
-    .reminder-label { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); margin-bottom: .4rem; }
+    .attn > summary::-webkit-details-marker { display: none; }
+    .attn > summary:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+    .attn-count {
+      min-width: 1.7rem; height: 1.7rem; padding: 0 .45rem; border-radius: 100px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: .82rem; font-weight: 700; color: white; flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .attn.gaps  .attn-count { background: var(--red); }
+    .attn.steps .attn-count { background: var(--gold); }
+    .attn-text { min-width: 0; flex: 1; }
+    .attn-title { font-weight: 600; font-size: .92rem; color: var(--ink); }
+    .attn-hint { font-size: .78rem; color: var(--slate); margin-top: .1rem; }
+    .attn-toggle { font-size: .75rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .attn-toggle::after { content: 'Show ▾'; }
+    .attn[open] .attn-toggle::after { content: 'Hide ▴'; }
+    .attn-body { border-top: 1px solid var(--cream-dark); }
+    .attn.steps .attn-body { padding: .9rem 1.1rem 1rem; }
+    .attn .gap-box { border: none; box-shadow: none; border-radius: 0; }
     .reminder-text { font-size: .85rem; color: var(--ink-soft); line-height: 1.55; }
-    .reminder-summary { font-size: .82rem; color: var(--ink-soft); margin-bottom: .75rem; }
     .reminder-group-label { font-size: .72rem; font-weight: 600; color: var(--ink); margin: .8rem 0 .15rem; }
     .reminder-group-label:first-child { margin-top: 0; }
     .checklist-check.checkable { cursor: pointer; }
@@ -494,16 +513,30 @@
         <p id="whyBannerText"></p>
       </div>
 
-      <div class="section" id="complianceGapsWrap" style="display:none">
-        <p class="section-label" style="color:var(--red)">Needs Attention</p>
-        <h2 class="section-title">Compliance Gaps</h2>
-        <div class="gap-box" id="complianceGapsBox"></div>
-      </div>
-
-      <div class="reminder-box" id="reminderBox">
-        <div class="reminder-label">💡 Pending Steps</div>
-        <div class="reminder-summary" id="reminderSummary"></div>
-        <div class="checklist-list" id="reminderList"></div>
+      <div class="attention-row" id="attentionRow" style="display:none">
+        <p class="section-label" style="margin:0">Needs Attention</p>
+        <details class="attn gaps" id="complianceGapsWrap" style="display:none" ontoggle="rememberAttnOpen(this)">
+          <summary>
+            <span class="attn-count" id="complianceGapsCount">0</span>
+            <span class="attn-text">
+              <div class="attn-title">Compliance Gaps</div>
+              <div class="attn-hint" id="complianceGapsHint"></div>
+            </span>
+            <span class="attn-toggle"></span>
+          </summary>
+          <div class="attn-body"><div class="gap-box" id="complianceGapsBox"></div></div>
+        </details>
+        <details class="attn steps" id="reminderBox" style="display:none" ontoggle="rememberAttnOpen(this)">
+          <summary>
+            <span class="attn-count" id="reminderCount">0</span>
+            <span class="attn-text">
+              <div class="attn-title">Pending Steps</div>
+              <div class="attn-hint" id="reminderSummary"></div>
+            </span>
+            <span class="attn-toggle"></span>
+          </summary>
+          <div class="attn-body"><div class="checklist-list" id="reminderList"></div></div>
+        </details>
       </div>
 
       <div id="situationSection"></div>
@@ -1163,14 +1196,15 @@ function renderPendingSteps() {
   for (const t of (data.transactions || [])) addrByTxn[t.id] = t.property_address;
 
   const pending = (data.checklist || []).filter(c => c.responsible_party === 'agent' && c.progress_status === 'pending');
-  if (!pending.length) { box.style.display = 'none'; return; }
+  if (!pending.length) { box.style.display = 'none'; updateAttentionRow(); return; }
 
   const byTxn = {};
   for (const c of pending) (byTxn[c.transaction_id] ||= []).push(c);
   const txnCount = Object.keys(byTxn).length;
 
+  document.getElementById('reminderCount').textContent = pending.length;
   document.getElementById('reminderSummary').textContent =
-    `You have ${pending.length} pending step${pending.length === 1 ? '' : 's'} across ${txnCount} transaction${txnCount === 1 ? '' : 's'}.`;
+    `Step${pending.length === 1 ? '' : 's'} for you to finish across ${txnCount} transaction${txnCount === 1 ? '' : 's'}.`;
 
   document.getElementById('reminderList').innerHTML = Object.entries(byTxn).map(([txnId, items]) => `
     <div class="reminder-group-label">${escapeHtml(addrByTxn[txnId] || 'Untitled listing')}</div>
@@ -1178,6 +1212,25 @@ function renderPendingSteps() {
   `).join('');
 
   box.style.display = 'block';
+  restoreAttnOpen(box);
+  updateAttentionRow();
+}
+
+// The "Needs Attention" heading shows only when one of the two bars does.
+function updateAttentionRow() {
+  const shown = ['complianceGapsWrap', 'reminderBox'].some(id => document.getElementById(id).style.display !== 'none');
+  document.getElementById('attentionRow').style.display = shown ? '' : 'none';
+}
+
+// Each bar starts closed; an agent who opens one finds it open next visit
+// (this browser only — a convenience, not saved anywhere else).
+function rememberAttnOpen(el) {
+  try { localStorage.setItem('ac_agent_hub_open_' + el.id, el.open ? '1' : '0'); } catch {}
+}
+function restoreAttnOpen(el) {
+  let open = false;
+  try { open = localStorage.getItem('ac_agent_hub_open_' + el.id) === '1'; } catch {}
+  if (open && !el.open) el.open = true;
 }
 
 // Shared sort — used everywhere a listing's full checklist is shown (the
@@ -1295,9 +1348,19 @@ function renderComplianceGapsSection(gaps, mlsGaps) {
 
   if (!untracked.length && !mismatches.length && !mlsGapRows.length) {
     wrap.style.display = 'none';
+    updateAttentionRow();
     return;
   }
   wrap.style.display = '';
+  const total = untracked.length + mismatches.length + mlsGapRows.length;
+  document.getElementById('complianceGapsCount').textContent = total;
+  const hintParts = [];
+  if (untracked.length)  hintParts.push(`${untracked.length} need${untracked.length === 1 ? 's' : ''} paperwork`);
+  if (mismatches.length) hintParts.push(`${mismatches.length} MLS change${mismatches.length === 1 ? '' : 's'} to record`);
+  if (mlsGapRows.length) hintParts.push(`${mlsGapRows.length} missing from an MLS`);
+  document.getElementById('complianceGapsHint').textContent = hintParts.join(' · ');
+  restoreAttnOpen(wrap);
+  updateAttentionRow();
 
   const untrackedRows = untracked.map(u => `
     <div class="gap-row">
