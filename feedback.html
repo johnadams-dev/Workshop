@@ -96,6 +96,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .feed-by{font-size:12px;color:var(--muted)}
 .feed-desc{font-size:13px;color:#4B5563;margin-top:10px;white-space:pre-wrap;line-height:1.6;display:none;border-top:1px solid var(--border);padding-top:10px}
 .feed-desc.open{display:block}
+/* Clicking the response text doesn't collapse the card, so it can be selected and copied */
+.feed-desc{cursor:text}
 /* ── Manager controls ── */
 .mgr-controls{margin-top:10px;display:none}
 .mgr-controls.show{display:block}
@@ -577,7 +579,7 @@ function renderFeed() {
          </div>`
       : '';
     return `
-      <div class="feed-item" onclick="toggleDesc('${item.id}')">
+      <div class="feed-item" onclick="toggleDesc(event, '${item.id}')">
         <div class="feed-meta">
           <span class="badge badge-${item.type}">${fmtType(item.type)}</span>
           <span class="badge badge-tool">${esc(tool)}</span>
@@ -587,7 +589,7 @@ function renderFeed() {
         <div class="feed-by">${esc(item.submitted_by)} · ${ds}</div>
         ${voteLine}
         ${(item.description || item.screenshot)
-          ? `<div class="feed-desc" id="desc-${item.id}">
+          ? `<div class="feed-desc" id="desc-${item.id}" onclick="event.stopPropagation()">
                ${item.description ? esc(item.description) : ''}
                ${item.screenshot
                  ? `<div class="feed-screenshot" id="shot-${item.id}">
@@ -608,7 +610,9 @@ function renderFeed() {
   }).join('');
 }
 
-async function toggleDesc(id) {
+async function toggleDesc(event, id) {
+  // Selecting text (a drag ending in a click) shouldn't open or close the card.
+  if (event && String(window.getSelection?.() || '').trim()) return;
   const desc = document.getElementById('desc-' + id);
   const shot = document.getElementById('shot-' + id);
   const vdiv = document.getElementById('vote-' + id);
