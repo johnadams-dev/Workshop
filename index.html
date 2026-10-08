@@ -656,6 +656,7 @@
     <a href="#maintain-relationships">Maintain Relationships</a>
     <a href="#learn-and-help">Learn &amp; Find Help</a>
     <a href="#office-operations">Office &amp; Operations</a>
+    <a href="#business-growth" class="manager-section" style="display:none">Business Growth</a>
   </div>
 </nav>
 
@@ -823,19 +824,6 @@
       <span class="card-status status-beta">Beta</span>
       <h2>Marketing Plan</h2>
       <p>Generate a structured, printable marketing plan for a listing — grounded in ACC's own marketing programs, not generic advice. Works for signed listings and pre-market opportunities alike.</p>
-      <div class="card-arrow">
-        Open Tool
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </div>
-    </a>
-
-    <!-- Cameron's Stage — Outside Listings — manager/admin only -->
-    <a href="./camerons-stage-external.html" class="card manager-card" style="display:none">
-      <div class="card-icon">🎬</div>
-      <span class="card-status status-beta">Beta</span>
-      <span class="card-status status-restricted">Manager Only</span>
-      <h2>Cameron's Stage — Outside Listings</h2>
-      <p>Build a branded virtual tour for any MLS listing, not just ours — pulls from Stellar or Daytona MLS instead of DeltaNet.</p>
       <div class="card-arrow">
         Open Tool
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -1219,6 +1207,44 @@
   </div>
 </section>
 
+<!-- BUSINESS GROWTH — the whole section is for managers only: hidden until the
+     role check confirms a manager, same as .manager-card (see showManagerOnly). -->
+<hr class="divider manager-section" style="display:none">
+
+<section class="section manager-section" id="business-growth" style="display:none">
+  <p class="section-label">Recruit &amp; Grow the Company</p>
+  <h2 class="section-title">Business Growth</h2>
+  <div class="cards">
+
+    <!-- Cameron's Stage — Outside Listings — manager/admin only. Shows outside agents what we'd do for their listings. -->
+    <a href="./camerons-stage-external.html" class="card manager-card" style="display:none">
+      <div class="card-icon">🎬</div>
+      <span class="card-status status-beta">Beta</span>
+      <span class="card-status status-restricted">Manager Only</span>
+      <h2>Cameron's Stage — Outside Listings</h2>
+      <p>Build a branded virtual tour for any MLS listing, not just ours — pulls from Stellar or Daytona MLS instead of DeltaNet.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+    <!-- Online Presence Audit — Outside Agents — opens the audit on its External Agent tab -->
+    <a href="./social-audit.html?mode=external" class="card manager-card" style="display:none">
+      <div class="card-icon">🔎</div>
+      <span class="card-status status-beta">Beta</span>
+      <span class="card-status status-restricted">Manager Only</span>
+      <h2>Online Presence Audit — Outside Agents</h2>
+      <p>Audit an agent at another brokerage — social media, reviews, profiles, local SEO and AI search visibility — to open a recruiting conversation with a clear picture of where they stand.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+  </div>
+</section>
+
 <!-- Sign-in fallback modal — shown when the silent Google prompt is blocked/skipped -->
 <div id="signinModal" style="display:none; position:fixed; inset:0; background:rgba(26,26,46,0.6); z-index:1000; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:12px; padding:2.5rem 2rem; text-align:center; max-width:320px; box-shadow:var(--shadow-hover);">
@@ -1293,7 +1319,7 @@ async function handleCredential(cred) {
     });
     const data = await r.json();
     localStorage.setItem('ac_is_manager', data.isManager ? '1' : '0');
-    document.querySelectorAll('.manager-card').forEach(el => el.style.display = data.isManager ? '' : 'none');
+    showManagerOnly(data.isManager);
   } catch (_) {}
 
   // Shared proxy key, same /config/init exchange every tool page does — this
@@ -1407,7 +1433,7 @@ function signOut() {
   localStorage.removeItem('ac_is_manager');
   localStorage.removeItem('ac_home_page');
   sessionStorage.removeItem('ac_user_email');
-  document.querySelectorAll('.manager-card').forEach(el => el.style.display = 'none');
+  showManagerOnly(false);
   if (window.google?.accounts?.id) { google.accounts.id.disableAutoSelect(); }
   renderAuthStatus();
 }
@@ -1435,9 +1461,12 @@ function initGoogleSignIn() {
 // network round-trip needed. Google's silent sign-in runs in the background and
 // will update both if anything's changed.
 renderAuthStatus();
-if (localStorage.getItem('ac_is_manager') === '1') {
-  document.querySelectorAll('.manager-card').forEach(el => el.style.display = '');
+// Manager-only cards, and whole manager-only sections (Business Growth) with
+// their divider and quick-nav pill.
+function showManagerOnly(isManager) {
+  document.querySelectorAll('.manager-card, .manager-section').forEach(el => el.style.display = isManager ? '' : 'none');
 }
+if (localStorage.getItem('ac_is_manager') === '1') showManagerOnly(true);
 checkHomePage();
 
 // Initialize as soon as the Google SDK loads
@@ -1466,6 +1495,8 @@ function filterTools() {
     document.querySelectorAll('.card.search-hidden').forEach(c => c.classList.remove('search-hidden'));
     document.querySelectorAll('.section, hr.divider').forEach(el => el.style.display = '');
     document.querySelectorAll('.quick-nav a').forEach(a => a.style.display = '');
+    // Clearing the search mustn't reveal a manager-only section to anyone else.
+    showManagerOnly(localStorage.getItem('ac_is_manager') === '1');
     resultsEl.style.display = 'none';
     emptyEl.style.display = 'none';
     return;

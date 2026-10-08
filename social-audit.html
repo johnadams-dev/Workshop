@@ -1065,6 +1065,10 @@ async function init() {
   ]);
   userRole = me.role;
   applyRoleRestrictions();
+  // index.html's Business Growth card links here with ?mode=external to open
+  // straight on the External Agent tab (managers only — the tab is hidden
+  // for everyone else).
+  if (new URLSearchParams(location.search).get('mode') === 'external' && userRole === 'manager') setMode('external');
 }
 
 function applyRoleRestrictions() {
