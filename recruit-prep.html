@@ -720,7 +720,7 @@ async function loadHistory() {
       ? rows.map(b => `<div class="history-item" onclick="openBriefing(${b.id})">
           <b>${esc(b.agent_name)}</b><span class="hint">${esc(b.brokerage || '')}${b.market_area ? ' · ' + esc(b.market_area) : ''}</span>
           <span class="status">${esc(b.status)}</span>
-          <span class="hint" style="margin-left:auto">${new Date(b.created_at).toLocaleDateString()}${d.showingAll ? ' · ' + esc(b.created_by_email) + (b.is_guest ? ' (guest)' : '') : ''}</span>
+          <span class="hint" style="margin-left:auto">${new Date(b.created_at).toLocaleDateString()}${d.showingAll ? ' · ' + (b.is_guest ? esc([b.guest_name, b.guest_brokerage].filter(Boolean).join(', ') || 'unnamed') + ' (guest)' : esc(b.created_by_email)) : ''}</span>
         </div>`).join('')
       : 'No briefings yet.';
   } catch (e) {

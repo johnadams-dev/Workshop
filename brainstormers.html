@@ -57,6 +57,15 @@ main { max-width: 1040px; margin: -32px auto 0; padding: 0 16px 56px; }
 .card-go { margin-top: auto; font-weight: 600; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; padding-top: 6px; }
 .card.locked { pointer-events: none; opacity: .55; }
 
+.whoami { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
+.whoami h2 { font-size: 1.35rem; margin-bottom: 2px; }
+.whoami p { font-size: 13px; color: var(--slate); margin-bottom: 10px; }
+.whoami form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.whoami label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--slate); flex: 1 1 200px; min-width: 0; }
+.whoami input { font: inherit; font-weight: 400; padding: 9px 11px; border: 1px solid rgba(26,26,46,.16); border-radius: 8px; width: 100%; }
+.whoami button { font: inherit; font-weight: 600; border-radius: 8px; padding: 9px 16px; border: none; cursor: pointer; }
+.whoami .save { background: var(--gold); color: var(--ink); }
+.whoami .skip { background: transparent; color: var(--slate); text-decoration: underline; padding: 9px 4px; }
 .note { margin-top: 26px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; font-size: 13px; color: var(--slate); }
 .note h2 { font-size: 1.2rem; color: var(--ink); margin-bottom: 6px; }
 .note ul { padding-left: 18px; }
@@ -77,6 +86,20 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
 </section>
 
 <main>
+  <!-- Optional "who are you" — no sign-in, just so we know who tried the
+       tools. Sent with the guest session (POST /guest/anonymous name /
+       brokerage) and shown in the activity log; asked once per device. -->
+  <section class="whoami" id="whoami" hidden>
+    <h2>Who's visiting?</h2>
+    <p>Optional — it helps us follow up and see who found the tools useful.</p>
+    <form onsubmit="saveWho(event)">
+      <label>Your name <input type="text" id="who-name" autocomplete="name" maxlength="100"></label>
+      <label>Brokerage <input type="text" id="who-brokerage" autocomplete="organization" maxlength="100"></label>
+      <button class="save" type="submit">Save</button>
+      <button class="skip" type="button" onclick="skipWho()">Skip</button>
+    </form>
+  </section>
+
   <div class="cards">
     <a class="card locked" href="./recruit-prep.html">
       <div class="card-icon">🤝</div>
@@ -142,6 +165,36 @@ function guestPayload() {
 function ready(text) {
   document.getElementById('signed').textContent = text;
   document.querySelectorAll('.card.locked').forEach(c => c.classList.remove('locked'));
+  const p = guestPayload();
+  let asked = false;
+  try { asked = localStorage.getItem('ac_guest_who_asked') === '1'; } catch {}
+  if (p && p.name && p.name !== 'Guest') {
+    document.getElementById('signed').textContent = `Welcome, ${p.name}.`;
+  } else if (!accSignedIn && !asked) {
+    document.getElementById('whoami').hidden = false;
+  }
+}
+
+async function saveWho(e) {
+  e.preventDefault();
+  const name = document.getElementById('who-name').value.trim();
+  const brokerage = document.getElementById('who-brokerage').value.trim();
+  if (!name && !brokerage) return skipWho();
+  try {
+    const r = await fetch(`${PROXY}/guest/anonymous`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: 'brainstormers', previousToken: guestToken || undefined, name, brokerage }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not save');
+    guestToken = d.guestToken;
+    localStorage.setItem('ac_guest_token', guestToken);
+  } catch { /* optional — never block the tools on it */ }
+  skipWho();
+  if (name) document.getElementById('signed').textContent = `Welcome, ${name}.`;
+}
+
+function skipWho() {
+  try { localStorage.setItem('ac_guest_who_asked', '1'); } catch {}
+  document.getElementById('whoami').hidden = true;
 }
 
 // Adams Cameron staff already signed in use their own session; everyone
