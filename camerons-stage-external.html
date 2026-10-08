@@ -371,8 +371,20 @@ const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 
 let userEmail = localStorage.getItem('ac_user_email') || "";
 let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
+// Guests (any Google account, Business Growth — guest-access.js on the
+// server) can build tours for outside listings, saved under their own email.
+// Their session lives under ac_guest_token, never the shared ac_* keys.
+let guestToken = localStorage.getItem('ac_guest_token') || "";
+function guestPayload() {
+  try {
+    const b = guestToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
+    return p.exp > Date.now() ? p : null;
+  } catch { return null; }
+}
+const isGuest = () => !(proxyKey && userEmail) && !!guestPayload();
 
-if (proxyKey && userEmail) {
+if ((proxyKey && userEmail) || isGuest()) {
   document.getElementById('auth-gate').style.display = 'none';
   window.addEventListener('load', boot);
 }
@@ -380,16 +392,33 @@ if (proxyKey && userEmail) {
 window.addEventListener('load', () => {
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
+  if (!(proxyKey && userEmail) && !isGuest()) google.accounts.id.prompt();
 });
 
 async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || "";
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ""; }
+  let email = "";
+  try { email = (JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || "").toLowerCase(); } catch {}
 
+  if (email && !email.endsWith('@adamscameron.com')) {
+    try {
+      const r = await fetch(`${PROXY}/guest/session`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: response.credential, tool: 'camerons-stage-external' }),
+      });
+      const data = await r.json();
+      if (!r.ok) { alert(data.error || 'Sign-in failed.'); return; }
+      guestToken = data.guestToken;
+      localStorage.setItem('ac_guest_token', guestToken);
+      document.getElementById('auth-gate').style.display = 'none';
+      await boot();
+    } catch (e) {
+      alert('Authentication error: ' + e.message);
+    }
+    return;
+  }
+
+  userEmail = email;
+  localStorage.setItem('ac_user_email', userEmail);
   try {
     const r = await fetch(`${PROXY}/config/init`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -407,7 +436,8 @@ async function handleGoogleSignIn(response) {
 }
 
 async function api(path, opts = {}) {
-  const headers = { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail, ...(opts.headers || {}) };
+  const auth = isGuest() ? { 'x-guest-token': guestToken } : { 'x-proxy-key': proxyKey, 'x-user-email': userEmail };
+  const headers = { 'Content-Type': 'application/json', ...auth, ...(opts.headers || {}) };
   const res = await fetch(PROXY + path, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || res.statusText);
@@ -427,6 +457,12 @@ function toast(msg) {
    ROLE GATE — manager/admin only
 ═══════════════════════════════════════════════════════════════════ */
 async function boot() {
+  if (isGuest()) {
+    // The server limits guests to the outside-listing endpoints.
+    document.getElementById('app').style.display = 'block';
+    init();
+    return;
+  }
   try {
     const me = await GET('/lockbox/me');
     if (me.role !== 'admin' && me.role !== 'manager') {

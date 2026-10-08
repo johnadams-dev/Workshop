@@ -167,7 +167,7 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
     <div class="auth-logo">AC</div>
     <div class="auth-brand">Adams Cameron &amp; Co.</div>
     <div class="auth-title">Online Presence Audit</div>
-    <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit.</div>
+    <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit. Guests: sign in with any Google account to audit an agent at another brokerage.</div>
     <div id="g-signin-btn"></div>
   </div>
 </div>
@@ -380,7 +380,21 @@ let currentAgentId = null;
 let allAgents = [];
 let userRole = null; // 'manager' | 'staff' | 'agent' | 'unknown'
 
-const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
+// Guests (any Google account, Business Growth — guest-access.js on the
+// server) can run outside-agent audits only. Adams Cameron accounts keep the
+// shared ac_* keys.
+let GUEST_TOKEN = localStorage.getItem('ac_guest_token') || '';
+function guestPayload() {
+  try {
+    const b = GUEST_TOKEN.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
+    return p.exp > Date.now() ? p : null;
+  } catch(_) { return null; }
+}
+const isGuest = () => !(PROXY_KEY && USER_EMAIL) && !!guestPayload();
+const H = () => isGuest()
+  ? { 'Content-Type':'application/json', 'x-guest-token': GUEST_TOKEN }
+  : { 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL };
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
@@ -1026,6 +1040,23 @@ function exportDoc() {
 // so the proxy key is only ever handed to a verified account instead of
 // being hardcoded in this page's source for anyone to read.
 async function handleCredential(cred) {
+  let credEmail = '';
+  try { credEmail = (JSON.parse(atob(cred.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || '').toLowerCase(); } catch(_) {}
+  if (credEmail && !credEmail.endsWith('@adamscameron.com')) {
+    // Guest: a session for the outside-agent audit only.
+    try {
+      const r = await fetch(`${PROXY}/guest/session`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: cred.credential, tool: 'social-audit' }),
+      });
+      const data = await r.json();
+      if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
+      GUEST_TOKEN = data.guestToken;
+      localStorage.setItem('ac_guest_token', GUEST_TOKEN);
+    } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
+    startGuest();
+    return;
+  }
   try {
     const r = await fetch(`${PROXY}/config/init`, {
       method:  'POST',
@@ -1053,6 +1084,19 @@ function initGoogleSignIn() {
       google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large' });
     }
   });
+}
+
+// Guests see only the External Agent tab and their own audits.
+function startGuest() {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('header-user').textContent = (guestPayload()?.email || '') + ' (guest)';
+  userRole = 'guest';
+  document.getElementById('tab-internal').style.display = 'none';
+  document.getElementById('tab-team').style.display = 'none';
+  setMode('external');
+  showView('list');
+  loadAuditList();
 }
 
 async function init() {
@@ -1098,7 +1142,9 @@ function applyRoleRestrictions() {
   }
 }
 
-if (USER_EMAIL && PROXY_KEY) {
+if (isGuest()) {
+  startGuest();
+} else if (USER_EMAIL && PROXY_KEY) {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('header-user').textContent = USER_EMAIL;
