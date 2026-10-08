@@ -325,6 +325,8 @@ function start() {
   const s = session();
   if (!s) return;
   document.getElementById('auth-gate').style.display = 'none';
+  // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
+  if (s.kind === 'guest') document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
   document.getElementById('who').innerHTML = esc(s.email) + (s.kind === 'guest' ? ' <span class="guest-pill">Guest</span>' : '');
   loadHistory();
   loadSettings();

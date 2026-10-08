@@ -1092,6 +1092,8 @@ function startGuest() {
   document.getElementById('app').style.display = 'block';
   document.getElementById('header-user').textContent = (guestPayload()?.email || '') + ' (guest)';
   userRole = 'guest';
+  // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
+  document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
   document.getElementById('tab-internal').style.display = 'none';
   document.getElementById('tab-team').style.display = 'none';
   setMode('external');

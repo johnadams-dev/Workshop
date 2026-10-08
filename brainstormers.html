@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YETWYXQ92E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-YETWYXQ92E');
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brainstormers — John's Workshop</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<!--
+  Guest landing page for the Brainstormers group (October 2026). It is the
+  ONLY place outside guests are pointed to: the same three tools are
+  manager-only on index.html. Any Google account signs in here and gets a
+  guest session (POST /guest/session — guest-access.js on the server, logged
+  by email, daily caps, ends after system_config.guest_access_until), kept
+  under ac_guest_token so the tool pages open already signed in. Adams
+  Cameron accounts sign in the usual way with the shared ac_* keys.
+-->
+<style>
+:root {
+  --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c; --gold-soft: rgba(201,168,76,.14);
+  --cream: #faf8f3; --cream-dark: #f0ece0; --slate: #5a5a78; --muted: #8a8aa8;
+  --border: rgba(26,26,46,.10); --shadow: 0 2px 20px rgba(26,26,46,.08); --shadow-hover: 0 10px 34px rgba(26,26,46,.15);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.6; font-size: 15px; }
+h1, h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; text-wrap: balance; }
+
+.hero { background: var(--ink); color: var(--cream); padding: 56px 16px 64px; text-align: center; }
+.hero-inner { max-width: 760px; margin: 0 auto; }
+.eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+.hero h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05; margin-bottom: 14px; }
+.hero p { color: rgba(250,248,243,.78); max-width: 600px; margin: 0 auto; }
+.signin { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.signed { font-size: 14px; color: rgba(250,248,243,.85); }
+.signed button { background: none; border: none; color: var(--gold); font: inherit; cursor: pointer; text-decoration: underline; margin-left: 6px; }
+
+main { max-width: 1040px; margin: -32px auto 0; padding: 0 16px 56px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 24px 22px 22px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: inherit; transition: box-shadow .2s, transform .2s; min-width: 0; }
+.card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+.card-icon { font-size: 28px; }
+.card h2 { font-size: 1.55rem; line-height: 1.15; }
+.card p { color: var(--slate); font-size: 14px; }
+.card ul { padding-left: 18px; color: var(--ink-soft); font-size: 13px; }
+.card ul li { margin: 3px 0; }
+.card-go { margin-top: auto; font-weight: 600; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; padding-top: 6px; }
+.card.locked { pointer-events: none; opacity: .55; }
+
+.note { margin-top: 26px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; font-size: 13px; color: var(--slate); }
+.note h2 { font-size: 1.2rem; color: var(--ink); margin-bottom: 6px; }
+.note ul { padding-left: 18px; }
+footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 36px; }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-inner">
+    <p class="eyebrow">Adams, Cameron &amp; Co. · Brainstormers</p>
+    <h1>Recruiting tools from John's Workshop</h1>
+    <p>Three tools we use to grow our company, open for you to try. Sign in with any Google account — your work stays private to you.</p>
+    <div class="signin">
+      <div id="g-signin-btn"></div>
+      <div class="signed" id="signed" hidden></div>
+      <div class="signed" id="signin-error" hidden></div>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div class="cards">
+    <a class="card locked" href="./recruit-prep.html">
+      <div class="card-icon">🤝</div>
+      <h2>Recruiting Prep</h2>
+      <p>Prepare for a recruiting conversation with an agent at another company.</p>
+      <ul>
+        <li>Talking points to open with</li>
+        <li>Pain and Pleasure: recent changes in their work and life</li>
+        <li>Production over time — MLS-verified in Stellar MLS, public-profile estimates elsewhere</li>
+        <li>Discovery questions, objections, a demo and a follow-up email</li>
+      </ul>
+      <span class="card-go">Open Recruiting Prep →</span>
+    </a>
+    <a class="card locked" href="./social-audit.html?mode=external">
+      <div class="card-icon">🔎</div>
+      <h2>Online Presence Audit</h2>
+      <p>Score an agent's online presence — social media, reviews, platform profiles, local SEO and AI search visibility — with every finding linked to its source.</p>
+      <ul>
+        <li>Category scores and red flags</li>
+        <li>Top 5 actions ranked by impact</li>
+      </ul>
+      <span class="card-go">Open the audit →</span>
+    </a>
+    <a class="card locked" href="./camerons-stage-external.html">
+      <div class="card-icon">🎬</div>
+      <h2>Cameron's Stage</h2>
+      <p>Build a branded virtual tour, with an AI-composed song, for any listing in Stellar or Daytona MLS — a link that can go in the MLS or on social media.</p>
+      <ul>
+        <li>Pick photos and a music style</li>
+        <li>Share the tour link</li>
+      </ul>
+      <span class="card-go">Open Cameron's Stage →</span>
+    </a>
+  </div>
+
+  <div class="note">
+    <h2>Good to know</h2>
+    <ul>
+      <li>Open through October 31, 2026.</li>
+      <li>Each person can run 3 briefings, 3 audits and 3 tours a day.</li>
+      <li>We record your email and what you run. Your briefings and audits are visible only to you and Adams, Cameron &amp; Co. managers.</li>
+      <li>Everything comes from public information, plus anything you choose to add.</li>
+    </ul>
+  </div>
+</main>
+
+<footer>Adams, Cameron &amp; Co., Realtors · John's Workshop</footer>
+
+<script>
+const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+
+let userEmail  = localStorage.getItem('ac_user_email') || '';
+let proxyKey   = localStorage.getItem('ac_proxy_key') || '';
+let guestToken = localStorage.getItem('ac_guest_token') || '';
+
+function guestPayload() {
+  try {
+    const b = guestToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
+    return p.exp > Date.now() ? p : null;
+  } catch { return null; }
+}
+const currentEmail = () => (proxyKey && userEmail) ? userEmail : (guestPayload()?.email || '');
+
+function showSignedIn() {
+  const email = currentEmail();
+  const signed = document.getElementById('signed');
+  if (!email) return;
+  document.getElementById('g-signin-btn').hidden = true;
+  signed.hidden = false;
+  signed.innerHTML = `Signed in as <b></b><button type="button">Sign out</button>`;
+  signed.querySelector('b').textContent = email;
+  signed.querySelector('button').onclick = signOut;
+  document.querySelectorAll('.card.locked').forEach(c => c.classList.remove('locked'));
+}
+
+function signOut() {
+  localStorage.removeItem('ac_guest_token');
+  try { google.accounts.id.disableAutoSelect(); } catch {}
+  location.reload();
+}
+
+async function handleGoogleSignIn(response) {
+  const err = document.getElementById('signin-error');
+  err.hidden = true;
+  let email = '';
+  try { email = (JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || '').toLowerCase(); } catch {}
+  try {
+    if (email.endsWith('@adamscameron.com')) {
+      const r = await fetch(`${PROXY}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
+      proxyKey = d.proxyKey || ''; userEmail = email;
+      localStorage.setItem('ac_proxy_key', proxyKey);
+      localStorage.setItem('ac_user_email', userEmail);
+    } else {
+      const r = await fetch(`${PROXY}/guest/session`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential, tool: 'brainstormers' }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
+      guestToken = d.guestToken;
+      localStorage.setItem('ac_guest_token', guestToken);
+    }
+    showSignedIn();
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  }
+}
+
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', width: 280, text: 'signin_with' });
+  if (!currentEmail()) google.accounts.id.prompt();
+});
+
+showSignedIn();
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Brainstormers',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
