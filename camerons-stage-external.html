@@ -207,6 +207,7 @@ header {
   <div class="box">
     <h1>Cameron's <span style="color:var(--gold)">Stage</span></h1>
     <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
+    <div><button type="button" onclick="guestStartClick()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
     <a href="./index.html">← Tools</a>
   </div>
 </div>
@@ -394,6 +395,22 @@ window.addEventListener('load', () => {
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
   if (!(proxyKey && userEmail) && !isGuest()) google.accounts.id.prompt();
 });
+
+// No-login guest session (guest-access.js POST /guest/anonymous) — outside
+// visitors can't use our Google sign-in, which only accepts Adams Cameron
+// accounts. Keeps the same guest id when renewing an earlier session.
+async function continueAsGuest(tool) {
+  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
+  const d = await r.json();
+  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
+  localStorage.setItem('ac_guest_token', d.guestToken);
+  return d.guestToken;
+}
+async function guestStartClick() {
+  const t = await continueAsGuest('camerons-stage-external');
+  if (t) { guestToken = t; document.getElementById('auth-gate').style.display = 'none'; await boot(); }
+}
 
 async function handleGoogleSignIn(response) {
   let email = "";

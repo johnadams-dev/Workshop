@@ -162,8 +162,9 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
 <div id="auth-gate">
   <div class="box">
     <h1>Recruiting Prep</h1>
-    <p>Prepare for a recruiting conversation: talking points, recent changes in the agent's work and life, production over time, and what we'd offer them. Sign in with any Google account.</p>
+    <p>Prepare for a recruiting conversation: talking points, recent changes in the agent's work and life, production over time, and what we'd offer them.</p>
     <div id="g-signin-btn" style="display:inline-block"></div>
+    <div><button type="button" onclick="guestStart()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
     <div><a href="./index.html">← Back to John's Workshop</a></div>
   </div>
 </div>
@@ -304,6 +305,22 @@ async function handleGoogleSignIn(response) {
   }
 }
 
+// No-login guest session (guest-access.js POST /guest/anonymous) — outside
+// visitors can't use our Google sign-in, which only accepts Adams Cameron
+// accounts. Keeps the same guest id when renewing an earlier session.
+async function continueAsGuest(tool) {
+  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
+  const d = await r.json();
+  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
+  localStorage.setItem('ac_guest_token', d.guestToken);
+  return d.guestToken;
+}
+async function guestStart() {
+  const t = await continueAsGuest('recruit-prep');
+  if (t) { guestToken = t; start(); }
+}
+
 function signOut() {
   if (isAcc()) {
     localStorage.removeItem('ac_proxy_key'); localStorage.removeItem('ac_user_email');
@@ -327,7 +344,7 @@ function start() {
   document.getElementById('auth-gate').style.display = 'none';
   // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
   if (s.kind === 'guest') document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
-  document.getElementById('who').innerHTML = esc(s.email) + (s.kind === 'guest' ? ' <span class="guest-pill">Guest</span>' : '');
+  document.getElementById('who').innerHTML = (s.kind === 'guest' && guestPayload()?.anon ? '' : esc(s.email) + ' ') + (s.kind === 'guest' ? '<span class="guest-pill">Guest</span>' : '');
   loadHistory();
   loadSettings();
   const id = new URLSearchParams(location.search).get('id');

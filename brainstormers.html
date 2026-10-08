@@ -16,15 +16,15 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
-<script src="https://accounts.google.com/gsi/client" async></script>
 <!--
   Guest landing page for the Brainstormers group (October 2026). It is the
   ONLY place outside guests are pointed to: the same three tools are
-  manager-only on index.html. Any Google account signs in here and gets a
-  guest session (POST /guest/session — guest-access.js on the server, logged
-  by email, daily caps, ends after system_config.guest_access_until), kept
-  under ac_guest_token so the tool pages open already signed in. Adams
-  Cameron accounts sign in the usual way with the shared ac_* keys.
+  manager-only on index.html. No sign-in: opening this page starts a guest
+  session (POST /guest/anonymous — guest-access.js on the server; runs are
+  logged and capped per connection; ends after
+  system_config.guest_access_until), kept under ac_guest_token so the tool
+  pages open without asking. Our Google sign-in only accepts Adams Cameron
+  accounts, so outside visitors couldn't use it anyway.
 -->
 <style>
 :root {
@@ -69,11 +69,9 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
   <div class="hero-inner">
     <p class="eyebrow">Adams, Cameron &amp; Co. · Brainstormers</p>
     <h1>Recruiting tools from John's Workshop</h1>
-    <p>Three tools we use to grow our company, open for you to try. Sign in with any Google account — your work stays private to you.</p>
+    <p>Three tools we use to grow our company, open for you to try — no sign-in needed. What you create stays private to you on this device.</p>
     <div class="signin">
-      <div id="g-signin-btn"></div>
-      <div class="signed" id="signed" hidden></div>
-      <div class="signed" id="signin-error" hidden></div>
+      <div class="signed" id="signed">Getting things ready…</div>
     </div>
   </div>
 </section>
@@ -118,8 +116,8 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
     <h2>Good to know</h2>
     <ul>
       <li>Open through October 31, 2026.</li>
-      <li>Each person can run 3 briefings, 3 audits and 3 tours a day.</li>
-      <li>We record your email and what you run. Your briefings and audits are visible only to you and Adams, Cameron &amp; Co. managers.</li>
+      <li>Each connection can run 3 briefings, 3 audits and 3 tours a day.</li>
+      <li>We keep a record of what's run. Your briefings and audits are visible only to you (on this device) and to Adams, Cameron &amp; Co. managers.</li>
       <li>Everything comes from public information, plus anything you choose to add.</li>
     </ul>
   </div>
@@ -129,11 +127,9 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
 
 <script>
 const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
-const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 
-let userEmail  = localStorage.getItem('ac_user_email') || '';
-let proxyKey   = localStorage.getItem('ac_proxy_key') || '';
 let guestToken = localStorage.getItem('ac_guest_token') || '';
+const accSignedIn = !!(localStorage.getItem('ac_proxy_key') && localStorage.getItem('ac_user_email'));
 
 function guestPayload() {
   try {
@@ -142,60 +138,30 @@ function guestPayload() {
     return p.exp > Date.now() ? p : null;
   } catch { return null; }
 }
-const currentEmail = () => (proxyKey && userEmail) ? userEmail : (guestPayload()?.email || '');
 
-function showSignedIn() {
-  const email = currentEmail();
-  const signed = document.getElementById('signed');
-  if (!email) return;
-  document.getElementById('g-signin-btn').hidden = true;
-  signed.hidden = false;
-  signed.innerHTML = `Signed in as <b></b><button type="button">Sign out</button>`;
-  signed.querySelector('b').textContent = email;
-  signed.querySelector('button').onclick = signOut;
+function ready(text) {
+  document.getElementById('signed').textContent = text;
   document.querySelectorAll('.card.locked').forEach(c => c.classList.remove('locked'));
 }
 
-function signOut() {
-  localStorage.removeItem('ac_guest_token');
-  try { google.accounts.id.disableAutoSelect(); } catch {}
-  location.reload();
-}
-
-async function handleGoogleSignIn(response) {
-  const err = document.getElementById('signin-error');
-  err.hidden = true;
-  let email = '';
-  try { email = (JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || '').toLowerCase(); } catch {}
+// Adams Cameron staff already signed in use their own session; everyone
+// else gets a guest session, renewed when it's close to expiring.
+async function start() {
+  if (accSignedIn) return ready('Signed in with your Adams Cameron account.');
+  const p = guestPayload();
+  if (p && p.exp - Date.now() > 2 * 3600 * 1000) return ready("You're browsing as a guest.");
   try {
-    if (email.endsWith('@adamscameron.com')) {
-      const r = await fetch(`${PROXY}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
-      proxyKey = d.proxyKey || ''; userEmail = email;
-      localStorage.setItem('ac_proxy_key', proxyKey);
-      localStorage.setItem('ac_user_email', userEmail);
-    } else {
-      const r = await fetch(`${PROXY}/guest/session`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential, tool: 'brainstormers' }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
-      guestToken = d.guestToken;
-      localStorage.setItem('ac_guest_token', guestToken);
-    }
-    showSignedIn();
+    const r = await fetch(`${PROXY}/guest/anonymous`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'brainstormers', previousToken: guestToken || undefined }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Guest access is unavailable right now.');
+    guestToken = d.guestToken;
+    localStorage.setItem('ac_guest_token', guestToken);
+    ready("You're browsing as a guest.");
   } catch (e) {
-    err.textContent = e.message;
-    err.hidden = false;
+    document.getElementById('signed').textContent = e.message;
   }
 }
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', width: 280, text: 'signin_with' });
-  if (!currentEmail()) google.accounts.id.prompt();
-});
-
-showSignedIn();
+start();
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Brainstormers',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>

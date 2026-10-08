@@ -167,8 +167,9 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
     <div class="auth-logo">AC</div>
     <div class="auth-brand">Adams Cameron &amp; Co.</div>
     <div class="auth-title">Online Presence Audit</div>
-    <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit. Guests: sign in with any Google account to audit an agent at another brokerage.</div>
+    <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit.</div>
     <div id="g-signin-btn"></div>
+    <div><button type="button" onclick="guestStartClick()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
   </div>
 </div>
 
@@ -1087,10 +1088,26 @@ function initGoogleSignIn() {
 }
 
 // Guests see only the External Agent tab and their own audits.
+// No-login guest session (guest-access.js POST /guest/anonymous) — outside
+// visitors can't use our Google sign-in, which only accepts Adams Cameron
+// accounts. Keeps the same guest id when renewing an earlier session.
+async function continueAsGuest(tool) {
+  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
+  const d = await r.json();
+  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
+  localStorage.setItem('ac_guest_token', d.guestToken);
+  return d.guestToken;
+}
+async function guestStartClick() {
+  const t = await continueAsGuest('social-audit');
+  if (t) { GUEST_TOKEN = t; startGuest(); }
+}
+
 function startGuest() {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('header-user').textContent = (guestPayload()?.email || '') + ' (guest)';
+  document.getElementById('header-user').textContent = guestPayload()?.anon ? 'Guest' : (guestPayload()?.email || '') + ' (guest)';
   userRole = 'guest';
   // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
   document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
