@@ -75,6 +75,12 @@ textarea { resize: vertical; min-height: 90px; }
 .thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
 .thumbs button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: none; background: var(--ink); color: #fff; font-size: 11px; cursor: pointer; }
 
+.input-block { border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; margin-top: 12px; background: var(--cream); }
+.input-block h3 { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.input-block textarea { background: #fff; }
+.file-chip { margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 13px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; flex-wrap: wrap; }
+.file-chip button { margin-left: auto; background: none; border: none; color: var(--slate); text-decoration: underline; cursor: pointer; font: inherit; }
+.source-tag.courted { background: #e8eefc; color: #2b4a9a; }
 #progress { display: none; }
 .progress-bar { height: 6px; border-radius: 100px; background: var(--cream-dark); overflow: hidden; margin: 10px 0; }
 .progress-bar span { display: block; height: 100%; width: 30%; background: var(--gold); border-radius: 100px; animation: slide 1.6s ease-in-out infinite; }
@@ -210,13 +216,26 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
     </div>
 
     <p class="section-label" style="margin-top:18px">Step 2 · optional</p>
-    <h2 style="font-size:1.15rem">What you know personally</h2>
-    <div class="hint">If you're friends with them on Facebook or elsewhere, paste recent updates or add screenshots. They're used only for this briefing, marked "from your notes", and screenshots aren't saved. Only you see your notes.</div>
-    <label class="field" for="notes">Notes</label>
-    <textarea id="notes" placeholder="e.g. Just became a grandmother in August; posted about her office being sold to a franchise group…"></textarea>
-    <label class="field" for="shots">Screenshots (up to 5)</label>
-    <input type="file" id="shots" accept="image/*" multiple onchange="addShots(this.files)">
-    <div class="thumbs" id="thumbs"></div>
+    <h2 style="font-size:1.15rem">Add what you have</h2>
+    <div class="hint">Anything you add is used only for this briefing. Files aren't saved, and your notes are visible only to you.</div>
+
+    <div class="input-block">
+      <h3>Social media and what you know personally</h3>
+      <div class="hint">Paste posts or updates from their Facebook, Instagram, LinkedIn or elsewhere — including personal profiles you can see as a friend — or add screenshots. Marked "your notes" in the briefing.</div>
+      <label class="field" for="notes">Notes</label>
+      <textarea id="notes" placeholder="e.g. Posted that she just became a grandmother in August; shared that her office is being sold to a franchise group…"></textarea>
+      <label class="field" for="shots">Screenshots (up to 5)</label>
+      <input type="file" id="shots" accept="image/*" multiple onchange="addShots(this.files)">
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+
+    <div class="input-block">
+      <h3>Courted export</h3>
+      <div class="hint">Upload the agent's export from Courted — Excel, CSV, PDF or a screenshot. Its production figures are added to the briefing, labeled "Courted export". Especially useful for agents outside Stellar MLS.</div>
+      <label class="field" for="courted">Courted file</label>
+      <input type="file" id="courted" accept=".csv,.xlsx,.xls,.pdf,.txt,image/*" onchange="addCourted(this.files[0])">
+      <div class="file-chip" id="courted-chip" hidden></div>
+    </div>
 
     <div style="margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-gold" id="run-btn" onclick="run()">Prepare briefing</button>
@@ -248,7 +267,7 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
   </section>
 </main>
 
-<footer>Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked "Stellar MLS" comes from MLS records; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.</footer>
+<footer>Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked "Stellar MLS" comes from MLS records and "Courted export" from the file you uploaded; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.</footer>
 
 <div id="toast"></div>
 
@@ -446,6 +465,62 @@ function renderShots() {
     `<div class="t"><img src="${s}" alt="Screenshot ${i + 1}"><button onclick="shots.splice(${i},1);renderShots()" title="Remove">✕</button></div>`).join('');
 }
 
+// Courted export: spreadsheets become text in the browser (SheetJS, loaded
+// only when needed), PDFs go as a document, images like screenshots.
+let courted = null;
+function loadSheetJs() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = resolve; sc.onerror = () => reject(new Error("Couldn't load the spreadsheet reader"));
+    document.head.appendChild(sc);
+  });
+}
+function readFile(file, how) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result); r.onerror = () => reject(r.error);
+    r[how](file);
+  });
+}
+async function addCourted(file) {
+  const chip = document.getElementById('courted-chip');
+  document.getElementById('courted').value = '';
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  chip.hidden = false;
+  chip.textContent = 'Reading ' + file.name + '…';
+  try {
+    if (['xlsx', 'xls'].includes(ext)) {
+      await loadSheetJs();
+      const wb = XLSX.read(await readFile(file, 'readAsArrayBuffer'), { type: 'array' });
+      const text = wb.SheetNames.map(n => '## Sheet: ' + n + '\n' + XLSX.utils.sheet_to_csv(wb.Sheets[n], { blankrows: false })).join('\n\n');
+      courted = { name: file.name, kind: 'table', text };
+    } else if (['csv', 'txt'].includes(ext) || file.type === 'text/csv') {
+      courted = { name: file.name, kind: 'table', text: await readFile(file, 'readAsText') };
+    } else if (ext === 'pdf' || file.type === 'application/pdf') {
+      if (file.size > 10 * 1024 * 1024) throw new Error('That PDF is over 10 MB.');
+      courted = { name: file.name, kind: 'pdf', dataUrl: await readFile(file, 'readAsDataURL') };
+    } else if (file.type.startsWith('image/')) {
+      courted = { name: file.name, kind: 'image', dataUrl: await resizeImage(file) };
+    } else {
+      throw new Error('Use an Excel, CSV, PDF or image file.');
+    }
+    if (courted.kind === 'table' && courted.text.length > 150000) toast('Large export — only the first part will be used');
+    chip.innerHTML = '';
+    const label = document.createElement('span');
+    label.textContent = '📎 ' + file.name;
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.textContent = 'Remove';
+    rm.onclick = () => { courted = null; chip.hidden = true; };
+    chip.append(label, rm);
+  } catch (e) {
+    courted = null;
+    chip.textContent = e.message;
+  }
+}
+
 // ── Running a briefing ──────────────────────────────────────────────────
 let progressTimer = null;
 function showProgress(on) {
@@ -482,6 +557,7 @@ async function run() {
   }
   body.notes = document.getElementById('notes').value.trim();
   body.screenshots = shots;
+  if (courted) body.courted = courted;
   document.getElementById('report').style.display = 'none';
   showProgress(true);
   try {
@@ -530,6 +606,15 @@ function productionChart(years) {
   </svg>`;
 }
 
+function courtedHtml(r) {
+  const rows = list(r.courted_production);
+  if (!rows.length) return '';
+  return `<p class="section-label" style="margin-top:14px">From your Courted export</p>
+    <span class="source-tag courted">Courted export — third-party data you provided</span>
+    <div class="tbl-wrap" style="margin-top:8px"><table><tr><th>Figure</th><th>Period</th><th>Note</th></tr>
+      ${rows.map(c => `<tr><td class="wrap">${esc(c.figure)}</td><td>${esc(c.period || '')}</td><td class="wrap">${esc(c.note || '')}</td></tr>`).join('')}</table></div>`;
+}
+
 function productionHtml(mls, r) {
   if (mls && mls.source === 'stellar_mls') {
     const ys = mls.by_year || [];
@@ -549,11 +634,16 @@ function productionHtml(mls, r) {
       ${act.length ? `<p class="section-label" style="margin-top:6px">Active and pending listings</p><div class="tbl-wrap"><table>
         <tr><th>Address</th><th>City</th><th>Status</th><th>List price</th><th>DOM</th></tr>
         ${act.map(l => `<tr><td class="wrap">${esc(l.address)}</td><td>${esc(l.city)}</td><td>${esc(l.status)}</td><td>${money(l.price)}</td><td>${l.days_on_market ?? '—'}</td></tr>`).join('')}
-      </table></div>` : ''}`;
+      </table></div>` : ''}
+      ${courtedHtml(r)}`;
   }
   const pub = list(r.public_production);
   const mlsErr = mls && mls.source === 'error' ? `<div class="warn">${esc(mls.error)}</div>` : '';
-  return `${mlsErr}<span class="source-tag est">Estimate from public profiles — not MLS data</span>
+  const hasCourted = list(r.courted_production).length > 0;
+  if (hasCourted && !pub.length) {
+    return `${mlsErr}${r.production_reading ? `<p style="margin:10px 0">${esc(r.production_reading)}</p>` : ''}${courtedHtml(r)}`;
+  }
+  return `${mlsErr}${hasCourted ? courtedHtml(r) + '<div style="height:12px"></div>' : ''}<span class="source-tag est">Estimate from public profiles — not MLS data</span>
     ${r.production_reading ? `<p style="margin:10px 0">${esc(r.production_reading)}</p>` : ''}
     ${pub.length ? `<div class="tbl-wrap" style="margin-top:8px"><table><tr><th>What the profile shows</th><th>As of</th><th>Source</th></tr>
       ${pub.map(p => `<tr><td class="wrap">${esc(p.figure)}</td><td>${esc(p.as_of)}</td><td>${sourceHtml(p.source)}</td></tr>`).join('')}</table></div>`
@@ -687,6 +777,7 @@ function reportText() {
   } else {
     sec('Production (estimate from public profiles)', list(r.public_production).map(p => `${p.figure} (${p.as_of || ''}; ${p.source || ''})`));
   }
+  sec('Production (Courted export)', list(r.courted_production).map(c => c.figure + (c.period ? ' (' + c.period + ')' : '') + (c.note ? ' — ' + c.note : '')));
   if (r.production_reading) L.push(r.production_reading);
   if (r.tech_comfort) L.push('', `Tech comfort: ${r.tech_comfort.level} — ${r.tech_comfort.evidence || ''}`);
   sec("What we'd give them", list(r.recommended_tools).map(t => `${t.name}: ${t.why || ''}`));
