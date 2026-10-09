@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open House Plan — Adams Cameron Workshop</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* One open house: the host's dated plan (tasks with checklists and how-to
+   links), MLS/DeltaNet entry checks, reminder events on the host's own Google
+   Calendar (Contract Date Calculator model — created in this browser), the
+   generated drafts and the wrap-up. The listing agent sees it read-only, plus
+   their own two entry tasks and Cancel. Backed by open-house-routes.js. */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --green-lt:#E3F5EC; --blue-lt:#E8F1FA;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr nav { display: flex; gap: 16px; font-size: .85rem; flex-wrap: wrap; }
+.hdr nav a { color: #d6e2ef; text-decoration: none; }
+main { max-width: 900px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+.box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 14px; }
+.box h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.top { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; }
+.top img, .noimg { width: 180px; height: 130px; object-fit: cover; border-radius: 8px; background: #e5e7eb; display: block; }
+.addr { font-size: 1.15rem; font-weight: 700; }
+.when { font-size: 1rem; margin: 2px 0 6px; }
+.meta { color: var(--muted); font-size: .85rem; }
+.people { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.person { font-size: .85rem; background: var(--bg); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
+.person b { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.notes { font-size: .88rem; background: var(--gold-lt); border-radius: 6px; padding: 8px 10px; margin-top: 10px; }
+.banner { border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: .92rem; }
+.banner.warn { background: #FFF7ED; border: 1px solid #FDBA74; color: #7c2d12; }
+.banner.info { background: var(--blue-lt); border: 1px solid #a9c8e8; }
+.banner.ok { background: var(--green-lt); border: 1px solid #9fd8b5; }
+.banner.gray { background: #eef0f3; border: 1px solid var(--border); }
+.banner .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn.primary { background: var(--navy); color: #fff; }
+.btn.gold { background: var(--gold); border-color: var(--gold); color: #fff; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.small { padding: 4px 9px; font-size: .78rem; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.check { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: .88rem; }
+.check .st { font-weight: 700; }
+.st.ok { color: var(--green); } .st.wait { color: #9a3412; }
+.task { border-top: 1px solid var(--border); padding: 12px 0; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
+.task:first-of-type { border-top: none; }
+.dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: .8rem; font-weight: 700; margin-top: 2px; }
+.task.done .dot { background: var(--green); border-color: var(--green); color: #fff; }
+.task.skipped .dot { background: #eef0f3; color: var(--muted); }
+.task.cancelled { opacity: .55; }
+.task-title { font-weight: 700; }
+.task.done .task-title, .task.skipped .task-title { color: var(--muted); }
+.due { font-size: .82rem; color: var(--muted); }
+.due.overdue { color: var(--red); font-weight: 600; }
+.tag { display: inline-block; font-size: .7rem; font-weight: 700; padding: 0 7px; border-radius: 999px; background: var(--blue-lt); color: var(--blue); margin-left: 4px; vertical-align: 1px; }
+.tag.catch { background: #FFEDD5; color: #9a3412; }
+.tag.la { background: var(--gold-lt); color: #8a6d1d; }
+.desc { font-size: .88rem; margin: 4px 0; }
+.cl { list-style: none; margin: 6px 0; padding: 0; font-size: .88rem; }
+.cl li { padding: 2px 0; }
+.cl label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.cl input { margin-top: 4px; }
+.cl .grp { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: 6px; }
+.links { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: .85rem; margin: 6px 0; }
+.links a { color: var(--blue); }
+.links a.howto { font-weight: 700; }
+.draft { background: var(--bg); border-radius: 8px; padding: 10px; margin: 8px 0; }
+.draft h4 { margin: 0 0 6px; font-size: .85rem; }
+textarea { width: 100%; min-height: 90px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: .88rem; resize: vertical; }
+.task-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.wrap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.wrap-grid label { font-size: .8rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.wrap-grid input { padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font: inherit; }
+fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px 12px; margin: 0 0 10px; }
+legend { font-size: .85rem; font-weight: 600; padding: 0 4px; }
+.msg { text-align: center; color: var(--muted); padding: 28px 12px; }
+#gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: .9rem; z-index: 50; max-width: calc(100% - 32px); }
+.toast.err { background: var(--red); }
+@media (max-width: 640px) {
+  .top { grid-template-columns: 1fr; }
+  .top img, .noimg { width: 100%; height: 180px; }
+}
+@media print { header, .no-print { display: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Open House Plan</h1>
+    <nav>
+      <a href="./hold-open-house.html?tab=mine">My open houses</a>
+      <a href="./feedback.html?tool=hold-open-house">Feedback</a>
+      <a href="./index.html">← Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div id="gate" hidden>
+  <p>Sign in with your Adams Cameron Google account.</p>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+</div>
+
+<main id="app" hidden><div class="msg">Loading…</div></main>
+
+<script>
+const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+// Same Google Calendar OAuth client as the Contract Date Calculator.
+const CALENDAR_CLIENT_ID = '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com';
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+
+const params = new URLSearchParams(location.search);
+const EVENT_ID = params.get('id');
+const S = { d: null, checking: false, checkError: '' };
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
+const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
+function fmtDay(date, long) { const [y, m, d] = date.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', long ? { weekday: 'long', month: 'long', day: 'numeric' } : { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
+function fmtWindow(s, e) { const a = fmtTime(s), b = fmtTime(e); return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`; }
+const fmtDue = iso => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function toast(msg, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  t.setAttribute('role', 'status'); document.body.appendChild(t); setTimeout(() => t.remove(), 4500);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(PROXY_BASE + path, { ...opts, headers: H() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+  return data;
+}
+
+// ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
+if (proxyKey && userEmail) start();
+window.addEventListener('load', () => {
+  if (!window.google?.accounts?.id) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
+  if (!proxyKey || !userEmail) { document.getElementById('gate').hidden = false; google.accounts.id.prompt(); }
+});
+async function handleGoogleSignIn(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const r = await fetch(`${PROXY_BASE}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
+    userEmail = (payload.email || '').toLowerCase(); proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_user_email', userEmail);
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('gate').hidden = true;
+    start();
+  } catch (e) { alert(e.message); }
+}
+
+async function start() {
+  const app = document.getElementById('app'); app.hidden = false;
+  if (!EVENT_ID) { app.innerHTML = '<div class="msg">No open house selected. <a href="./hold-open-house.html?tab=mine">See your open houses</a>.</div>'; return; }
+  try {
+    S.d = await api(`/open-house/events/${EVENT_ID}`);
+    render();
+  } catch (e) { app.innerHTML = `<div class="msg">Couldn't load this open house: ${esc(e.message)}</div>`; return; }
+  // Links from the status-change email: ?decide=hold|cancel
+  const decide = params.get('decide');
+  if (decide && S.d.event.needs_decision) setTimeout(() => decideEvent(decide), 300);
+  if (S.d.event.status === 'scheduled') checkEntry();
+}
+
+// MLS + DeltaNet entry check, through DeltaNet's open house feed (can be slow).
+async function checkEntry() {
+  S.checking = true; S.checkError = ''; renderChecks();
+  try { S.d = await api(`/open-house/events/${EVENT_ID}/check-entry`, { method: 'POST' }); }
+  catch (e) { S.checkError = e.message; }
+  S.checking = false; render();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  const { event: ev, listing: l, host, listingAgent: la, roles } = S.d;
+  const app = document.getElementById('app');
+  const facts = [l.city, money(l.current_price), l.bedrooms ? `${Number(l.bedrooms)} bd` : '', l.bathrooms ? `${Number(l.bathrooms)} ba` : '', l.mls_id ? 'MLS# ' + l.mls_id : ''].filter(Boolean);
+  const started = new Date(ev.starts_at).getTime() <= Date.now();
+  app.innerHTML = `
+    ${bannersHtml()}
+    <div class="box">
+      <div class="top">
+        ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="">` : '<div class="noimg"></div>'}
+        <div style="min-width:0">
+          <div class="addr">${esc(l.property_address)}</div>
+          <div class="when">${esc(fmtDay(ev.date, true))}, ${esc(fmtWindow(ev.start, ev.end))}${ev.theme ? ` · <em>${esc(ev.theme)}</em>` : ''}</div>
+          <div class="meta">${facts.map(esc).join(' · ')}</div>
+          <div class="people">
+            ${personHtml(ev.own ? 'Listing agent and host' : 'Host', host)}
+            ${ev.own ? '' : personHtml('Listing agent', la)}
+          </div>
+        </div>
+      </div>
+      ${ev.hosting_notes ? `<div class="notes"><strong>Notes for the host:</strong> ${esc(ev.hosting_notes)}</div>` : ''}
+      ${ev.status === 'scheduled' ? `<div class="actions no-print" style="margin-top:12px">
+        ${roles.isHost ? calendarButtonHtml() : ''}
+        ${roles.isHost || roles.isListing || roles.isManager ? '<button class="btn danger" onclick="cancelEvent()">Cancel open house</button>' : ''}
+        ${roles.isHost ? '<button class="btn" onclick="reschedule()">Reschedule</button>' : ''}
+      </div>` : ''}
+    </div>
+    ${ev.status !== 'cancelled' ? `<div class="box" id="checks"></div>` : ''}
+    <div class="box">
+      <h2>The plan</h2>
+      <div id="tasks">${S.d.tasks.map(taskHtml).join('')}</div>
+    </div>
+    ${ev.status !== 'cancelled' && (roles.isHost || ev.wrap_up_at) ? `<div class="box" id="wrapup">${wrapUpHtml(started)}</div>` : ''}`;
+  renderChecks();
+}
+
+function personHtml(label, p) {
+  if (!p) return '';
+  return `<div class="person"><b>${esc(label)}</b>${esc(p.name)}${p.office_name ? ` · ${esc(p.office_name)}` : ''}<br>
+    <a href="mailto:${esc(p.email)}">${esc(p.email)}</a>${p.phone ? ` · <a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>` : ''}</div>`;
+}
+
+function bannersHtml() {
+  const { event: ev, roles, tasks } = S.d;
+  const out = [];
+  if (params.get('new') && ev.status === 'scheduled' && roles.isHost) {
+    out.push(`<div class="banner ok"><strong>You're booked.</strong> ${ev.own ? '' : "We've emailed the listing agent to enter it in the MLS and add you as showing agent in DeltaNet. "}Next: add the open house and your reminders to your Google Calendar.</div>`);
+  }
+  if (ev.status === 'cancelled') {
+    out.push(`<div class="banner gray"><strong>This open house was cancelled</strong>${ev.cancel_reason ? ': ' + esc(ev.cancel_reason) : '.'}</div>`);
+  }
+  if (ev.calendar_cleanup_pending && roles.isHost) {
+    out.push(`<div class="banner warn no-print"><strong>Calendar cleanup:</strong> the open house and its reminders are still on your Google Calendar.
+      <div class="row"><button class="btn primary" onclick="removeFromCalendar()">Remove from my calendar</button></div></div>`);
+  }
+  if (ev.needs_decision && ev.status === 'scheduled') {
+    out.push(`<div class="banner warn"><strong>The listing is no longer Active.</strong> This open house is still scheduled — hold it anyway?
+      ${roles.isHost || roles.isListing || roles.isManager ? `<div class="row"><button class="btn primary" onclick="decideEvent('hold')">Hold it anyway?</button><button class="btn danger" onclick="decideEvent('cancel')">Cancel</button></div>` : ''}</div>`);
+  }
+  const catchUp = tasks.filter(t => t.catch_up && t.status === 'pending' && t.assignee_role === 'hosting_agent');
+  if (catchUp.length && ev.status === 'scheduled' && roles.isHost) {
+    out.push(`<div class="banner info">You reserved on short notice, so ${catchUp.map(t => esc(t.title.toLowerCase())).join(', ')} ${catchUp.length === 1 ? 'is' : 'are'} due today. Neighbor outreach works best before the day — do what you can.</div>`);
+  }
+  if (ev.status === 'completed') out.push(`<div class="banner ok"><strong>Held.</strong> ${ev.visitor_count ?? 0} visitor${ev.visitor_count === 1 ? '' : 's'}, ${ev.serious_prospects ?? 0} serious.${ev.report_sent_at ? ' The report went to the listing agent.' : ''}</div>`);
+  return out.join('');
+}
+
+function renderChecks() {
+  const el = document.getElementById('checks');
+  if (!el) return;
+  const ev = S.d.event;
+  const mlsOk = ['verified_in_deltanet', 'manual_confirmed'].includes(ev.mls_status);
+  const dnOk = ['verified', 'manual_confirmed'].includes(ev.deltanet_status);
+  const who = ev.own ? 'You' : 'The listing agent';
+  el.innerHTML = `<h2>MLS and DeltaNet entry</h2>
+    <div class="checks">
+      <div class="check"><div class="st ${mlsOk ? 'ok' : 'wait'}">${mlsOk ? '✓ In the MLS' : 'Waiting for MLS entry'}</div>
+        <div class="meta">${mlsOk ? (ev.mls_status === 'manual_confirmed' ? 'Confirmed by hand.' : 'Found in DeltaNet, which picks up MLS open houses.') : `${who} enter${ev.own ? '' : 's'} the open house in the MLS with this date and time.`}</div></div>
+      <div class="check"><div class="st ${dnOk ? 'ok' : 'wait'}">${dnOk ? '✓ Host set in DeltaNet' : ev.deltanet_status === 'open_house_no_host' ? 'In DeltaNet, host not set yet' : 'Waiting for DeltaNet'}</div>
+        <div class="meta">${dnOk ? 'Open house searchers see the host.' : `${who} set${ev.own ? '' : 's'} ${ev.own ? 'yourself' : S.d.host.name} as the showing agent on DeltaNet's open house, so searchers see the host.`}</div></div>
+    </div>
+    <div class="meta" style="margin-top:8px">${S.checking ? 'Checking DeltaNet…' : S.checkError ? esc(S.checkError) : ev.deltanet_checked_at ? 'Last checked ' + esc(new Date(ev.deltanet_checked_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) + '.' : ''}
+      ${ev.status === 'scheduled' && !S.checking ? ' <button class="btn small no-print" onclick="checkEntry()">Check again</button>' : ''}</div>`;
+}
+
+function canEditTask(t) {
+  const { roles, event: ev } = S.d;
+  if (ev.status === 'cancelled' || t.status === 'cancelled') return false;
+  if (roles.isHost || roles.isManager) return true;
+  return roles.isListing && t.assignee_role === 'listing_agent';
+}
+
+function taskHtml(t) {
+  const ev = S.d.event;
+  const edit = canEditTask(t);
+  const overdue = t.status === 'pending' && new Date(t.due_at) < Date.now() && !t.catch_up;
+  const forLA = t.assignee_role === 'listing_agent';
+  const dueText = t.anchor === 'reservation' ? 'On reservation' : t.catch_up ? 'Due today (catch-up)' : fmtDue(t.due_at);
+  let lastGroup = null;
+  const cl = (t.checklist || []).map((i, idx) => {
+    const grp = i.group && i.group !== lastGroup ? `<li class="grp">${esc(i.group)}</li>` : '';
+    lastGroup = i.group || lastGroup;
+    return `${grp}<li><label><input type="checkbox" ${i.done ? 'checked' : ''} ${edit ? '' : 'disabled'} onchange="tickItem('${t.task_id}', ${idx}, this.checked)"> <span>${esc(i.text)}</span></label></li>`;
+  }).join('');
+  const links = [
+    t.how_to_url ? `<a class="howto" href="${esc(t.how_to_url)}" target="_blank" rel="noopener">How to ↗</a>` : '',
+    ...(t.links || []).map(k => `<a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.label)}${k.page ? ` (p. ${k.page})` : ''} ↗</a>`),
+  ].filter(Boolean).join('');
+  return `<div class="task ${t.status}" id="t-${t.task_id}">
+    <div class="dot" aria-hidden="true">${t.status === 'done' ? '✓' : t.status === 'skipped' ? '–' : ''}</div>
+    <div style="min-width:0">
+      <div class="task-title">${esc(t.title)}${forLA ? `<span class="tag la">${ev.own ? 'Listing step' : 'Listing agent'}</span>` : ''}${t.catch_up && t.status === 'pending' ? '<span class="tag catch">Catch-up</span>' : ''}${t.status === 'done' && t.completion_source === 'feed_verified' ? '<span class="tag">Checked in DeltaNet</span>' : ''}</div>
+      <div class="due ${overdue ? 'overdue' : ''}">${esc(dueText)}${t.status === 'skipped' ? ' · skipped' : ''}</div>
+      ${t.status === 'pending' || t.template_key === 'wrap_up' ? `<div class="desc">${esc(t.description || '')}</div>` : ''}
+      ${cl && t.status !== 'cancelled' ? `<ul class="cl">${cl}</ul>` : ''}
+      ${links ? `<div class="links">${links}</div>` : ''}
+      ${deliverableHtml(t)}
+      ${edit ? `<div class="task-actions no-print">
+        ${t.status === 'pending' ? `<button class="btn small primary" onclick="setTask('${t.task_id}','done')">Mark done</button>
+          ${t.template_key === 'wrap_up' ? '' : `<button class="btn small" onclick="setTask('${t.task_id}','skipped')">Skip</button>`}`
+          : `<button class="btn small" onclick="setTask('${t.task_id}','pending')">Undo</button>`}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+const DRAFT_LABEL = { social_copy: 'Social post drafts', neighbor_note: 'Neighbor courtesy note', theme: 'Theme ideas (optional)' };
+function draftBlock(kind) {
+  const { event: ev, roles } = S.d;
+  const text = ev.drafts?.[kind] || '';
+  if (!roles.isHost) return text ? `<div class="draft"><h4>${DRAFT_LABEL[kind]}</h4><div style="white-space:pre-wrap;font-size:.88rem">${esc(text)}</div></div>` : '';
+  if (ev.status === 'cancelled') return '';
+  return `<div class="draft no-print-keep">
+    <h4>${DRAFT_LABEL[kind]}</h4>
+    ${text ? `<textarea id="d-${kind}" aria-label="${DRAFT_LABEL[kind]}">${esc(text)}</textarea>` : '<div class="meta">Generated from the listing and your profile. A draft — edit it before you use it.</div>'}
+    <div class="task-actions no-print">
+      <button class="btn small ${text ? '' : 'primary'}" onclick="genDraft('${kind}', this)">${text ? 'Write a new draft' : 'Write a draft'}</button>
+      ${text ? `<button class="btn small" onclick="saveDraft('${kind}')">Save edits</button>
+        <button class="btn small" onclick="copyDraft('${kind}')">Copy</button>
+        ${kind === 'neighbor_note' ? `<button class="btn small" onclick="printNote()">Print</button>` : ''}` : ''}
+    </div>
+  </div>`;
+}
+function deliverableHtml(t) {
+  if (t.template_key === 'tell_sphere') {
+    const ev = S.d.event;
+    return draftBlock('social_copy') + draftBlock('theme') + (S.d.roles.isHost && ev.status === 'scheduled' ? `
+      <div class="task-actions no-print"><input id="themeInput" value="${esc(ev.theme || '')}" placeholder="Your theme, if any" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:.85rem;min-width:0;flex:1" aria-label="Theme">
+      <button class="btn small" onclick="saveTheme()">Save theme</button></div>` : '');
+  }
+  if (t.template_key === 'neighbors') return draftBlock('neighbor_note');
+  if (t.template_key === 'wrap_up' && S.d.roles.isHost && t.status === 'pending') return '<div class="links"><a href="#wrapup">Go to the wrap-up form ↓</a></div>';
+  return '';
+}
+
+// ── Tasks ──────────────────────────────────────────────────────────────────
+function taskById(id) { return S.d.tasks.find(t => t.task_id === id); }
+async function setTask(id, status) {
+  try {
+    const { task } = await api(`/open-house/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    Object.assign(taskById(id), task);
+    if (['mls_entry', 'deltanet_host'].includes(taskById(id).template_key)) S.d = await api(`/open-house/events/${EVENT_ID}`);
+    render();
+  } catch (e) { toast(e.message, true); }
+}
+async function tickItem(id, idx, done) {
+  const t = taskById(id);
+  t.checklist[idx].done = done;
+  try { await api(`/open-house/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ checklist: t.checklist }) }); }
+  catch (e) { toast(e.message, true); }
+}
+
+// ── Drafts ─────────────────────────────────────────────────────────────────
+async function genDraft(kind, btn) {
+  btn.disabled = true; btn.textContent = 'Writing…';
+  try {
+    const { text } = await api(`/open-house/events/${EVENT_ID}/drafts/${kind}`, { method: 'POST' });
+    S.d.event.drafts = { ...(S.d.event.drafts || {}), [kind]: text };
+    render();
+    document.getElementById('d-' + kind)?.focus();
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Write a draft'; }
+}
+async function saveDraft(kind) {
+  const text = document.getElementById('d-' + kind).value;
+  try { await api(`/open-house/events/${EVENT_ID}/drafts/${kind}`, { method: 'PUT', body: JSON.stringify({ text }) }); S.d.event.drafts[kind] = text; toast('Saved.'); }
+  catch (e) { toast(e.message, true); }
+}
+async function copyDraft(kind) {
+  try { await navigator.clipboard.writeText(document.getElementById('d-' + kind).value); toast('Copied.'); }
+  catch (_) { toast("Couldn't copy — select the text and copy it.", true); }
+}
+async function saveTheme() {
+  try { S.d = await api(`/open-house/events/${EVENT_ID}`, { method: 'PATCH', body: JSON.stringify({ theme: document.getElementById('themeInput').value.trim() }) }); render(); toast('Theme saved.'); }
+  catch (e) { toast(e.message, true); }
+}
+// The courtesy note as a printable page, to pair with a DeltaNet flyer.
+function printNote() {
+  const text = document.getElementById('d-neighbor_note').value;
+  const h = S.d.host;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Allow pop-ups to print the note.', true); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Neighbor note</title>
+    <style>body{font:16px/1.6 Georgia,serif;max-width:620px;margin:40px auto;padding:0 20px;color:#1a1d23}
+    .sig{display:flex;gap:14px;align-items:center;margin-top:28px;font-family:Helvetica,Arial,sans-serif;font-size:14px}
+    .sig img{width:72px;height:72px;border-radius:50%;object-fit:cover}.brand{color:#1B3A5C;font-weight:700}</style></head>
+    <body><div style="white-space:pre-wrap">${esc(text)}</div>
+    <div class="sig">${h.photo_url ? `<img src="${esc(h.photo_url)}" alt="">` : ''}<div><strong>${esc(h.name)}</strong><br>${esc(h.phone || '')}<br>${esc(h.email)}<br><span class="brand">Adams, Cameron &amp; Co. Realtors</span></div></div>
+    <script>setTimeout(()=>print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+// ── Cancel / decide / reschedule ───────────────────────────────────────────
+async function cancelEvent() {
+  const reason = prompt('Why is this open house being cancelled? (The other agent sees this.)');
+  if (reason === null) return;
+  if (!reason.trim()) { toast('Please give a reason.', true); return; }
+  try {
+    S.d = await api(`/open-house/events/${EVENT_ID}/cancel`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) });
+    render(); toast('Cancelled.');
+    return true;
+  } catch (e) { toast(e.message, true); return false; }
+}
+async function decideEvent(decision) {
+  if (decision === 'cancel' && !confirm('Cancel this open house? It removes the open house, its tasks, and (with your OK) the calendar events.')) return;
+  if (decision === 'hold' && !confirm('Hold this open house anyway?')) return;
+  try {
+    S.d = await api(`/open-house/events/${EVENT_ID}/decision`, { method: 'POST', body: JSON.stringify({ decision }) });
+    render(); toast(decision === 'hold' ? "It's on." : 'Cancelled.');
+  } catch (e) { toast(e.message, true); }
+}
+// Reschedule = cancel + reserve; date-independent work already done carries over.
+async function reschedule() {
+  const ev = S.d.event;
+  if (!confirm('Reschedule: this date is cancelled and you pick a new one. Work you already did that doesn\'t depend on the date carries over. Continue?')) return;
+  try {
+    S.d = await api(`/open-house/events/${EVENT_ID}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Rescheduled by the host' }) });
+  } catch (e) { toast(e.message, true); return; }
+  render();
+  const next = ev.own ? `./open-house-listings.html?transactionId=${ev.transaction_id}` : `./hold-open-house.html?reschedule=${ev.event_id}`;
+  const hasCal = S.d.event.calendar_cleanup_pending;
+  document.getElementById('app').insertAdjacentHTML('afterbegin', `<div class="banner info"><strong>Cancelled.</strong> ${hasCal ? 'Remove the old calendar events below, then ' : ''}<a href="${next}">pick a new date →</a></div>`);
+}
+
+// ── Google Calendar (host's own calendar, Contract Date Calculator model) ──
+let tokenClient = null, accessToken = null, afterToken = null;
+function withCalendar(fn) {
+  if (accessToken) return fn();
+  if (!window.google?.accounts?.oauth2) { toast('Google is still loading — try again in a moment.', true); return; }
+  tokenClient ||= google.accounts.oauth2.initTokenClient({
+    client_id: CALENDAR_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+    callback: res => {
+      if (res.error) { toast('Calendar access was not granted.', true); return; }
+      accessToken = res.access_token;
+      const f = afterToken; afterToken = null; f && f();
+    },
+  });
+  afterToken = fn;
+  tokenClient.requestAccessToken();
+}
+async function gcal(method, path, body) {
+  const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events' + path, {
+    method, headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (method === 'DELETE' && (r.ok || r.status === 404 || r.status === 410)) return null;
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error?.message || 'Calendar error ' + r.status);
+  return data;
+}
+
+function calendarButtonHtml() {
+  const { event: ev, tasks } = S.d;
+  const hasAny = ev.calendar_event_id || tasks.some(t => t.calendar_event_id);
+  const missing = tasks.filter(t => t.status === 'pending' && t.assignee_agent_id === S.d.host.id && !t.calendar_event_id && new Date(t.due_at) > Date.now());
+  if (hasAny && !missing.length) return '<span class="meta" style="align-self:center">✓ On your Google Calendar</span>';
+  return `<button class="btn gold" onclick="addToCalendar(this)">${hasAny ? 'Add the new reminders to my Google Calendar' : 'Add to my Google Calendar'}</button>`;
+}
+
+function addToCalendar(btn) {
+  withCalendar(async () => {
+    btn.disabled = true; btn.textContent = 'Adding…';
+    const { event: ev, listing: l, tasks } = S.d;
+    const page = location.origin + location.pathname + '?id=' + ev.event_id;
+    const where = [l.property_address, l.city, l.state].filter(Boolean).join(', ');
+    let ok = 0, failed = 0;
+    try {
+      if (!ev.calendar_event_id) {
+        const created = await gcal('POST', '', {
+          summary: `Open house: ${l.property_address}`,
+          location: where,
+          description: [`Open house plan: ${page}`, ev.hosting_notes ? `Notes for the host: ${ev.hosting_notes}` : ''].filter(Boolean).join('\n\n'),
+          start: { dateTime: `${ev.date}T${ev.start}:00`, timeZone: 'America/New_York' },
+          end: { dateTime: `${ev.date}T${ev.end}:00`, timeZone: 'America/New_York' },
+          reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }] },
+        });
+        await api(`/open-house/events/${ev.event_id}`, { method: 'PATCH', body: JSON.stringify({ calendarEventId: created.id }) });
+        ok++;
+      }
+      // One short reminder event per task at its due time — not all-day blocks.
+      for (const t of tasks) {
+        if (t.status !== 'pending' || t.calendar_event_id || t.assignee_agent_id !== S.d.host.id || new Date(t.due_at) <= Date.now()) continue;
+        const start = new Date(t.due_at), end = new Date(start.getTime() + 20 * 60000);
+        const desc = [
+          t.description || '',
+          (t.checklist || []).map(i => '☐ ' + i.text).join('\n'),
+          t.how_to_url ? 'How to: ' + t.how_to_url : '',
+          ...(t.links || []).map(k => `${k.label}${k.page ? ` (p. ${k.page})` : ''}: ${k.url}`),
+          'Open house plan: ' + page,
+        ].filter(Boolean).join('\n\n');
+        try {
+          const c = await gcal('POST', '', {
+            summary: `${t.title} — ${l.property_address}`,
+            description: desc,
+            start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
+            transparency: 'transparent',
+            reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+          });
+          await api(`/open-house/tasks/${t.task_id}`, { method: 'PATCH', body: JSON.stringify({ calendarEventId: c.id }) });
+          t.calendar_event_id = c.id; ok++;
+        } catch (e) { console.error(e); failed++; }
+      }
+      S.d = await api(`/open-house/events/${EVENT_ID}`);
+      render();
+      toast(failed ? `Added ${ok} events; ${failed} couldn't be added — try again.` : `Added ${ok} event${ok === 1 ? '' : 's'} to your Google Calendar.`, !!failed);
+    } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Add to my Google Calendar'; }
+  });
+}
+
+function removeFromCalendar() {
+  withCalendar(async () => {
+    const ids = [S.d.event.calendar_event_id, ...S.d.tasks.map(t => t.calendar_event_id)].filter(Boolean);
+    try {
+      for (const id of ids) await gcal('DELETE', '/' + encodeURIComponent(id));
+      S.d = await api(`/open-house/events/${EVENT_ID}`, { method: 'PATCH', body: JSON.stringify({ calendarCleared: true }) });
+      render(); toast(`Removed ${ids.length} event${ids.length === 1 ? '' : 's'} from your calendar.`);
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+// ── Wrap-up (no visitor names or contacts — those go in DeltaNet) ──────────
+function wrapUpHtml(started) {
+  const { event: ev, roles } = S.d;
+  const h = ev.how_heard || {};
+  if (!roles.isHost) {
+    return `<h2>Wrap-up</h2>
+      <p>${ev.visitor_count ?? 0} visitors, ${ev.serious_prospects ?? 0} serious prospects.</p>
+      ${ev.wrap_up_comments ? `<p style="white-space:pre-wrap">${esc(ev.wrap_up_comments)}</p>` : ''}`;
+  }
+  if (!started) return `<h2>Wrap-up</h2><p class="meta">The wrap-up opens once the open house starts. It takes a minute: how many came, how they heard, and what they said${ev.own ? '' : ' — it goes to the listing agent as a report'}.</p>`;
+  const heard = [['signs', 'Signs'], ['social', 'Social media'], ['neighbors', 'Neighbors'], ['online', 'Online search'], ['other', 'Other']];
+  return `<h2>Wrap-up</h2>
+    <p class="meta">No names, phone numbers or emails here — those go into DeltaNet.${ev.own ? '' : ' Submitting emails this report to the listing agent only.'}</p>
+    <div class="wrap-grid">
+      <label>Visitors <input type="number" id="wVisitors" min="0" value="${ev.visitor_count ?? ''}" required></label>
+      <label>Serious prospects <input type="number" id="wSerious" min="0" value="${ev.serious_prospects ?? ''}"></label>
+    </div>
+    <fieldset><legend>How visitors heard (rough count)</legend><div class="wrap-grid" style="margin:0">
+      ${heard.map(([k, label]) => `<label>${label} <input type="number" min="0" id="wh-${k}" value="${h[k] ?? ''}"></label>`).join('')}
+    </div></fieldset>
+    <label for="wComments" style="font-size:.85rem;font-weight:600">What visitors said${ev.own ? '' : ' (for the listing agent)'} — price, condition, layout…</label>
+    <textarea id="wComments">${esc(ev.wrap_up_comments || '')}</textarea>
+    ${ev.own ? '' : `<div class="task-actions"><button class="btn small" onclick="summarize(this)">Write a short summary</button></div>
+      <label for="wSummary" style="font-size:.85rem;font-weight:600;display:block;margin-top:8px">Summary for the listing agent (optional, editable)</label>
+      <textarea id="wSummary" style="min-height:60px"></textarea>`}
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0;font-size:.9rem"><input type="checkbox" id="wEntered" ${ev.entered_in_deltanet ? 'checked' : ''}> Visitors entered in DeltaNet and set up for Open House Campaign</label>
+    ${ev.report_sent_at ? `<label style="display:flex;gap:8px;align-items:center;margin:0 0 10px;font-size:.9rem"><input type="checkbox" id="wResend"> Email the listing agent the updated report</label>` : ''}
+    <button class="btn primary" onclick="submitWrapUp(this)">${ev.wrap_up_at ? 'Update the wrap-up' : ev.own ? 'Save the wrap-up' : 'Send the report'}</button>`;
+}
+async function summarize(btn) {
+  const comments = document.getElementById('wComments').value.trim();
+  if (!comments) { toast('Add what visitors said first.', true); return; }
+  btn.disabled = true; btn.textContent = 'Writing…';
+  try {
+    const { summary } = await api(`/open-house/events/${EVENT_ID}/wrap-up/summary`, { method: 'POST', body: JSON.stringify({ comments }) });
+    document.getElementById('wSummary').value = summary;
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = 'Write a short summary';
+}
+async function submitWrapUp(btn) {
+  const v = id => document.getElementById(id)?.value ?? '';
+  if (v('wVisitors') === '') { toast('How many visitors came? Enter 0 if none.', true); return; }
+  const body = {
+    visitorCount: v('wVisitors'), seriousProspects: v('wSerious'),
+    howHeard: Object.fromEntries(['signs', 'social', 'neighbors', 'online', 'other'].map(k => [k, v('wh-' + k)])),
+    comments: v('wComments'), summary: v('wSummary'),
+    enteredInDeltanet: document.getElementById('wEntered').checked,
+    resend: document.getElementById('wResend')?.checked || false,
+  };
+  btn.disabled = true;
+  const firstReport = !S.d.event.report_sent_at;
+  try {
+    S.d = await api(`/open-house/events/${EVENT_ID}/wrap-up`, { method: 'POST', body: JSON.stringify(body) });
+    render(); toast(S.d.event.own ? 'Wrap-up saved.' : firstReport || body.resend ? 'Report sent to the listing agent.' : 'Wrap-up updated.');
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hold an Open House',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>

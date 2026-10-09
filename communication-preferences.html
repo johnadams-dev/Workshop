@@ -161,6 +161,9 @@ const TOPICS = [
   { key: 'company_events',    label: 'Company Events',     desc: "Company-wide events and trainings — Annual Meeting, President's Club, Legacy Club, Spring Fling, Christmas Party, and similar.", wiredEmail: true, wiredSms: true },
   { key: 'office_events', mirrorKey: 'office_announcements', label: 'Office Updates', desc: 'Events, trainings, and general announcements specific to your office.', wiredEmail: true, wiredSms: true },
   { key: 'presidents_update', label: "President's Update",  desc: "Regular updates from the company president.", wiredEmail: true, wiredSms: true },
+  // Open House emails (reservations, cancellations, reports) always go — they're
+  // about a commitment between two agents — so only the text copy is optional.
+  { key: 'open_house', smsOnly: true, label: 'Open Houses', desc: 'Texts when someone reserves your listing, a date you reserved is withdrawn or cancelled, or a listing goes pending. The emails always come.', wiredEmail: true, wiredSms: true },
 ];
 // No topic is currently unwired on either channel, so this never renders —
 // kept for whenever a future topic ships with a channel not wired yet.
@@ -271,7 +274,7 @@ function renderTopics() {
     <div class="topic-card">
       <div class="topic-title">${esc(t.label)}</div>
       <div class="topic-desc">${esc(t.desc)}</div>
-      ${prefRow(t.key, 'email', 'Email', t.wiredEmail)}
+      ${t.smsOnly ? '' : prefRow(t.key, 'email', 'Email', t.wiredEmail)}
       ${prefRow(t.key, 'sms', 'Text Message', t.wiredSms)}
     </div>
   `).join('');

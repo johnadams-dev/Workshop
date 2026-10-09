@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hold an Open House — Adams Cameron Workshop</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* Part 2 of the Open House tool: browse listings other agents have made
+   available, reserve a date, and get a dated plan (open-house-event.html).
+   Backed by open-house-routes.js (GET /open-house/available, /plan-preview,
+   /my-events; POST /open-house/events). Spec: docs/Open House/open-house-plan.md. */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --green-lt:#E3F5EC; --blue-lt:#E8F1FA;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr nav { display: flex; gap: 16px; font-size: .85rem; flex-wrap: wrap; }
+.hdr nav a { color: #d6e2ef; text-decoration: none; }
+main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+.hero { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--gold); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.hero p { margin: 0 0 6px; font-size: 1.02rem; }
+.hero p.sub { margin: 0; color: var(--muted); font-size: .88rem; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.tab { border: none; background: none; font: inherit; font-weight: 600; color: var(--muted); padding: 8px 14px; cursor: pointer; border-bottom: 3px solid transparent; }
+.tab[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--navy); }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.filters label { font-size: .75rem; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.filters input, .filters select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: .9rem; min-width: 0; }
+.count { color: var(--muted); font-size: .85rem; margin: 0 0 10px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; display: grid; grid-template-columns: 150px minmax(0, 1fr); overflow: hidden; }
+.card img, .noimg { width: 150px; height: 100%; min-height: 120px; object-fit: cover; background: #e5e7eb; display: block; }
+.card-body { padding: 12px 14px; min-width: 0; }
+.addr { font-weight: 700; }
+.meta { color: var(--muted); font-size: .85rem; }
+.notes { font-size: .85rem; background: var(--gold-lt); border-radius: 6px; padding: 6px 9px; margin-top: 6px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.chip { border: 1px solid var(--green); background: var(--green-lt); color: #14532d; border-radius: 999px; padding: 4px 11px; font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--green); color: #fff; }
+.btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--navy); color: #fff; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn:focus-visible, .chip:focus-visible, .tab:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.reserve { border-top: 1px dashed var(--border); margin-top: 10px; padding-top: 10px; }
+.slot-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: .88rem; margin-bottom: 6px; }
+.slot-row input { padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: .85rem; }
+.preview { background: var(--bg); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: .85rem; }
+.preview h4 { margin: 0 0 6px; font-size: .88rem; }
+.preview ol { margin: 0; padding-left: 20px; }
+.preview .catch { color: #9a3412; font-weight: 600; }
+.shortnote { background: #FFF7ED; border: 1px solid #FDBA74; color: #9a3412; border-radius: 6px; padding: 6px 9px; font-size: .85rem; margin-bottom: 6px; }
+.ev { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; text-decoration: none; color: inherit; }
+.ev:hover { border-color: var(--blue); }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--blue-lt); color: var(--blue); }
+.pill.green { background: var(--green-lt); color: var(--green); }
+.pill.red { background: #FDE8E8; color: var(--red); }
+.pill.gray { background: #eef0f3; color: var(--muted); }
+.progress { width: 120px; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+.progress div { height: 100%; background: var(--green); }
+.msg, .empty { text-align: center; color: var(--muted); padding: 28px 12px; }
+#gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: .9rem; z-index: 50; max-width: calc(100% - 32px); }
+.toast.err { background: var(--red); }
+@media (max-width: 640px) {
+  .card { grid-template-columns: 1fr; }
+  .card img, .noimg { width: 100%; height: 160px; }
+  .ev { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Hold an Open House</h1>
+    <nav>
+      <a href="./open-house-listings.html">My listings' open houses</a>
+      <a href="./feedback.html?tool=hold-open-house">Feedback</a>
+      <a href="./index.html">← Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div id="gate" hidden>
+  <p>Sign in with your Adams Cameron Google account.</p>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+</div>
+
+<main id="app" hidden>
+  <div class="hero">
+    <p><strong>Hosting an open house is an opportunity to market to your sphere, put your name in front of buyers, and bring in new prospects.</strong></p>
+    <p class="sub">Reserve a date on another agent's listing and you'll get a dated plan with reminders on your Google Calendar. The visitors you meet are yours. Want to hold one of your own listings open? Use <a href="./open-house-listings.html">Open House Listing Manager</a>.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-find" aria-selected="true" onclick="showTab('find')">Find a listing</button>
+    <button class="tab" role="tab" id="tab-mine" aria-selected="false" onclick="showTab('mine')">My open houses</button>
+  </div>
+
+  <section id="pane-find" role="tabpanel" aria-labelledby="tab-find">
+    <div class="filters">
+      <label>From <input type="date" id="fFrom"></label>
+      <label>To <input type="date" id="fTo"></label>
+      <label>City <input type="text" id="fCity" placeholder="Any"></label>
+      <label>Min price <input type="number" id="fMin" min="0" step="10000" placeholder="Any"></label>
+      <label>Max price <input type="number" id="fMax" min="0" step="10000" placeholder="Any"></label>
+      <label>Beds <select id="fBeds"><option value="">Any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label>Type <input type="text" id="fType" placeholder="Any"></label>
+    </div>
+    <p class="count" id="count"></p>
+    <div id="results"><div class="msg">Loading…</div></div>
+  </section>
+
+  <section id="pane-mine" role="tabpanel" aria-labelledby="tab-mine" hidden>
+    <div id="mine"><div class="msg">Loading…</div></div>
+  </section>
+</main>
+
+<script>
+const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+
+const S = { slots: [], picked: {}, today: '' }; // picked: { transaction_id: Set(availability_date_id) }
+const params = new URLSearchParams(location.search);
+const rescheduleFrom = params.get('reschedule');
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
+const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
+function fmtDay(date) { const [y, m, d] = date.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
+function fmtWindow(s, e) { const a = fmtTime(s), b = fmtTime(e); return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`; }
+const fmtDue = iso => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+function toast(msg, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  t.setAttribute('role', 'status'); document.body.appendChild(t); setTimeout(() => t.remove(), 4500);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(PROXY_BASE + path, { ...opts, headers: H() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+  return data;
+}
+
+// ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
+if (proxyKey && userEmail) start();
+window.addEventListener('load', () => {
+  if (!window.google?.accounts?.id) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
+  if (!proxyKey || !userEmail) { document.getElementById('gate').hidden = false; google.accounts.id.prompt(); }
+});
+async function handleGoogleSignIn(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const r = await fetch(`${PROXY_BASE}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
+    userEmail = (payload.email || '').toLowerCase(); proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_user_email', userEmail);
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('gate').hidden = true;
+    start();
+  } catch (e) { alert(e.message); }
+}
+
+function start() {
+  document.getElementById('app').hidden = false;
+  let timer;
+  for (const id of ['fFrom', 'fTo', 'fCity', 'fMin', 'fMax', 'fBeds', 'fType']) {
+    document.getElementById(id).addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(loadSlots, 350); });
+  }
+  if (params.get('tab') === 'mine') showTab('mine');
+  loadSlots();
+}
+
+function showTab(which) {
+  for (const t of ['find', 'mine']) {
+    document.getElementById('tab-' + t).setAttribute('aria-selected', String(t === which));
+    document.getElementById('pane-' + t).hidden = t !== which;
+  }
+  if (which === 'mine') loadMine();
+}
+
+// ── Browse ─────────────────────────────────────────────────────────────────
+async function loadSlots() {
+  const q = new URLSearchParams();
+  const v = id => document.getElementById(id).value.trim();
+  if (v('fFrom')) q.set('from', v('fFrom'));
+  if (v('fTo')) q.set('to', v('fTo'));
+  if (v('fCity')) q.set('city', v('fCity'));
+  if (v('fMin')) q.set('minPrice', v('fMin'));
+  if (v('fMax')) q.set('maxPrice', v('fMax'));
+  if (v('fBeds')) q.set('beds', v('fBeds'));
+  if (v('fType')) q.set('type', v('fType'));
+  try {
+    const data = await api('/open-house/available?' + q);
+    S.slots = data.slots; S.today = data.today;
+    render();
+  } catch (e) {
+    document.getElementById('results').innerHTML = `<div class="msg">Couldn't load listings: ${esc(e.message)}</div>`;
+  }
+}
+
+function grouped() {
+  const by = new Map();
+  for (const s of S.slots) {
+    if (!by.has(s.transaction_id)) by.set(s.transaction_id, { ...s, slots: [] });
+    by.get(s.transaction_id).slots.push(s);
+  }
+  return [...by.values()];
+}
+
+function render() {
+  const groups = grouped();
+  document.getElementById('count').textContent = groups.length
+    ? `${groups.length} listing${groups.length === 1 ? '' : 's'} with ${S.slots.length} available date${S.slots.length === 1 ? '' : 's'}` : '';
+  document.getElementById('results').innerHTML = groups.length ? groups.map(cardHtml).join('')
+    : '<div class="empty">No listings are available for those filters right now. Listing agents add dates in Open House Listing Manager.</div>';
+  for (const g of groups) if (S.picked[g.transaction_id]?.size) updatePreview(g.transaction_id);
+}
+
+function cardHtml(g) {
+  const picked = S.picked[g.transaction_id] || new Set();
+  const facts = [g.city, money(g.current_price), g.bedrooms ? `${Number(g.bedrooms)} bd` : '', g.bathrooms ? `${Number(g.bathrooms)} ba` : '', g.property_type, g.mls_id ? 'MLS# ' + g.mls_id : ''].filter(Boolean);
+  return `<div class="card" id="c-${g.transaction_id}">
+    ${g.photo_url ? `<img src="${esc(g.photo_url)}" alt="" loading="lazy">` : '<div class="noimg"></div>'}
+    <div class="card-body">
+      <div class="addr">${esc(g.property_address)}</div>
+      <div class="meta">${facts.map(esc).join(' · ')}</div>
+      <div class="meta">Listing agent: ${esc(g.listing_agent_name)}</div>
+      ${g.hosting_notes ? `<div class="notes">${esc(g.hosting_notes)}</div>` : ''}
+      <div class="chips" role="group" aria-label="Available dates">
+        ${g.slots.map(s => `<button class="chip" aria-pressed="${picked.has(s.availability_date_id)}" onclick="toggleSlot('${g.transaction_id}','${s.availability_date_id}')">${esc(fmtDay(s.date))} · ${esc(fmtWindow(s.start, s.end))}</button>`).join('')}
+      </div>
+      <div id="r-${g.transaction_id}"></div>
+    </div>
+  </div>`;
+}
+
+function toggleSlot(txn, id) {
+  const set = (S.picked[txn] ||= new Set());
+  set.has(id) ? set.delete(id) : set.add(id);
+  document.querySelectorAll(`#c-${txn} .chip`).forEach(b => {
+    const m = b.getAttribute('onclick').match(/'([^']+)'\)$/);
+    if (m) b.setAttribute('aria-pressed', String(set.has(m[1])));
+  });
+  updatePreview(txn);
+}
+
+// Times default to the listing agent's window and can be narrowed within it.
+async function updatePreview(txn) {
+  const box = document.getElementById('r-' + txn);
+  const set = S.picked[txn];
+  if (!set?.size) { box.innerHTML = ''; return; }
+  const slots = S.slots.filter(s => set.has(s.availability_date_id)).sort((a, b) => a.date.localeCompare(b.date));
+  for (const s of slots) if (document.getElementById('s-' + s.availability_date_id)) readTimes(s); // remember typed times
+  box.innerHTML = `<div class="reserve">
+    ${slots.map(s => `<div class="slot-row"><strong>${esc(fmtDay(s.date))}</strong>
+      <input type="time" id="s-${s.availability_date_id}" value="${s.start}" min="${s.start}" max="${s.end}" step="900" aria-label="Start time" onchange="updatePreview('${txn}')"> to
+      <input type="time" id="e-${s.availability_date_id}" value="${s.end}" min="${s.start}" max="${s.end}" step="900" aria-label="End time" onchange="updatePreview('${txn}')">
+      <span class="meta">(allowed ${esc(fmtWindow(s.start, s.end))})</span></div>`).join('')}
+    <div id="p-${txn}" class="preview">Working out your plan…</div>
+    <button class="btn primary" onclick="reserve('${txn}')">Reserve ${slots.length === 1 ? 'this date' : slots.length + ' dates'}</button>
+  </div>`;
+  // Keep any times already typed (the re-render above resets them).
+  for (const s of slots) {
+    const prev = S.times?.[s.availability_date_id];
+    if (prev) { document.getElementById('s-' + s.availability_date_id).value = prev.start; document.getElementById('e-' + s.availability_date_id).value = prev.end; }
+  }
+  const first = slots[0];
+  const t = readTimes(first);
+  try {
+    const p = await api(`/open-house/plan-preview?date=${first.date}&start=${t.start}&end=${t.end}`);
+    const mine = p.tasks.filter(x => x.role === 'hosting_agent');
+    const catchUp = mine.filter(x => x.catch_up);
+    document.getElementById('p-' + txn).innerHTML = `
+      ${catchUp.length ? `<div class="shortnote">You're reserving ${p.daysOut} day${p.daysOut === 1 ? '' : 's'} out, so ${catchUp.map(x => esc(x.title.toLowerCase())).join(', ')} ${catchUp.length === 1 ? 'is' : 'are'} due today.</div>` : ''}
+      <h4>Your plan for ${esc(fmtDay(first.date))}${slots.length > 1 ? ' (each date gets its own)' : ''}</h4>
+      <ol>${mine.map(x => `<li>${x.catch_up ? '<span class="catch">Today</span>' : esc(x.anchor === 'reservation' ? 'Now' : fmtDue(x.due_at))} — ${esc(x.title)}</li>`).join('')}</ol>
+      <div class="meta" style="margin-top:6px">The listing agent is emailed to enter it in the MLS and add you as showing agent in DeltaNet.</div>`;
+  } catch (e) {
+    document.getElementById('p-' + txn).textContent = "Couldn't preview the plan: " + e.message;
+  }
+}
+function readTimes(s) {
+  const st = document.getElementById('s-' + s.availability_date_id)?.value || s.start;
+  const en = document.getElementById('e-' + s.availability_date_id)?.value || s.end;
+  (S.times ||= {})[s.availability_date_id] = { start: st, end: en };
+  return { start: st, end: en };
+}
+
+async function reserve(txn) {
+  const set = S.picked[txn];
+  const slots = S.slots.filter(s => set.has(s.availability_date_id));
+  const dates = [];
+  for (const s of slots) {
+    const t = readTimes(s);
+    if (!t.start || !t.end || t.end <= t.start || t.start < s.start || t.end > s.end) { toast(`Check the times on ${fmtDay(s.date)} — allowed ${fmtWindow(s.start, s.end)}.`, true); return; }
+    dates.push({ availabilityDateId: s.availability_date_id, start: t.start, end: t.end });
+  }
+  const btn = document.querySelector(`#r-${txn} .btn.primary`); btn.disabled = true;
+  try {
+    const data = await api('/open-house/events', { method: 'POST', body: JSON.stringify({ transactionId: txn, dates, rescheduleFrom: rescheduleFrom || undefined }) });
+    if (data.events.length === 1) { location.href = `./open-house-event.html?id=${data.events[0].event_id}&new=1`; return; }
+    delete S.picked[txn];
+    toast(`Reserved ${data.events.length} dates. Each has its own plan under My open houses.`);
+    showTab('mine'); loadSlots();
+  } catch (e) { toast(e.message, true); btn.disabled = false; loadSlots(); }
+}
+
+// ── My open houses ─────────────────────────────────────────────────────────
+async function loadMine() {
+  const el = document.getElementById('mine');
+  try {
+    const { events } = await api('/open-house/my-events');
+    if (!events.length) { el.innerHTML = '<div class="empty">No open houses yet. Find a listing to reserve one.</div>'; return; }
+    const now = Date.now();
+    const upcoming = events.filter(e => e.status === 'scheduled' && new Date(e.ends_at) > now - 86400000).reverse();
+    const rest = events.filter(e => !upcoming.includes(e));
+    el.innerHTML = (upcoming.length ? '<h3 style="font-size:1rem;margin:4px 0 10px">Upcoming</h3>' + upcoming.map(evHtml).join('') : '')
+      + (rest.length ? '<h3 style="font-size:1rem;margin:18px 0 10px">Past and cancelled</h3>' + rest.map(evHtml).join('') : '');
+  } catch (e) { el.innerHTML = `<div class="msg">Couldn't load your open houses: ${esc(e.message)}</div>`; }
+}
+function evHtml(e) {
+  const when = new Date(e.starts_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const pct = e.task_total ? Math.round(100 * e.task_done / e.task_total) : 0;
+  const badges = [
+    e.status === 'cancelled' ? '<span class="pill gray">Cancelled</span>' : '',
+    e.status === 'completed' ? `<span class="pill green">Held${e.visitor_count != null ? ` · ${e.visitor_count} visitors` : ''}</span>` : '',
+    e.needs_decision ? '<span class="pill red">Hold it anyway?</span>' : '',
+    e.calendar_cleanup_pending ? '<span class="pill red">Remove from calendar</span>' : '',
+    e.own ? '<span class="pill">Your listing</span>' : '',
+  ].join(' ');
+  return `<a class="ev" href="./open-house-event.html?id=${e.event_id}">
+    <div style="min-width:0">
+      <div class="addr">${esc(e.property_address)} ${badges}</div>
+      <div class="meta">${esc(when)}${e.own ? '' : ' · listing agent ' + esc(e.listing_agent_name)}</div>
+      ${e.status === 'scheduled' && e.next_task ? `<div class="meta">Next: ${esc(e.next_task.title)} — ${esc(fmtDue(e.next_task.due_at))}</div>` : ''}
+    </div>
+    ${e.status === 'scheduled' ? `<div><div class="progress" aria-label="${pct}% of the plan done"><div style="width:${pct}%"></div></div><div class="meta">${e.task_done} of ${e.task_total} done</div></div>` : '<div></div>'}
+  </a>`;
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hold an Open House',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>

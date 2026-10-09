@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open House Listing Manager — Adams Cameron Workshop</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* Part 1 of the Open House tool: a listing agent marks on a calendar the dates
+   each listing is available (or not) to be held open by other agents, or hosts
+   it themselves. Backed by open-house-routes.js (GET /open-house/my-listings,
+   PUT /open-house/availability/:transactionId, POST /open-house/events).
+   Spec: docs/Open House/open-house-plan.md. */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --green-lt:#E3F5EC; --blue-lt:#E8F1FA;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr nav { display: flex; gap: 16px; font-size: .85rem; }
+.hdr nav a { color: #d6e2ef; text-decoration: none; }
+main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; }
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.intro p { margin: 0 0 6px; }
+.intro p:last-child { margin: 0; color: var(--muted); font-size: .9rem; }
+.viewas { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; font-size: .9rem; }
+.viewas select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; max-width: 100%; }
+.listing { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.listing-head { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; padding: 12px 14px; align-items: center; cursor: pointer; }
+.listing-head img, .noimg { width: 96px; height: 72px; object-fit: cover; border-radius: 7px; background: #e5e7eb; display: block; }
+.addr { font-weight: 700; }
+.meta { color: var(--muted); font-size: .85rem; }
+.summary { font-size: .88rem; margin-top: 4px; }
+.summary .warn { color: var(--red); font-weight: 600; }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--blue-lt); color: var(--blue); }
+.pill.green { background: var(--green-lt); color: var(--green); }
+.pill.gold { background: var(--gold-lt); color: #8a6d1d; }
+.pill.red { background: #FDE8E8; color: var(--red); }
+.btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--navy); color: #fff; }
+.btn.gold { background: var(--gold); border-color: var(--gold); color: #fff; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, .day:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.panel { border-top: 1px solid var(--border); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 18px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-nav strong { font-size: 1rem; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.dow { text-align: center; font-size: .72rem; color: var(--muted); font-weight: 700; padding: 2px 0; }
+.day { min-height: 58px; border: 1px solid var(--border); border-radius: 7px; padding: 4px 5px; font-size: .78rem; background: var(--surface); cursor: pointer; text-align: left; font-family: inherit; color: inherit; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.day .n { font-weight: 700; font-size: .85rem; }
+.day .t { font-size: .68rem; line-height: 1.2; overflow-wrap: anywhere; }
+.day.past, .day.blank { background: transparent; border-color: transparent; color: #c0c4cc; cursor: default; }
+.day.available { background: var(--green-lt); border-color: #9fd8b5; }
+.day.unavailable { background: #f1f2f4; color: var(--muted); }
+.day.unavailable .n { text-decoration: line-through; }
+.day.reserved { background: var(--blue-lt); border-color: #a9c8e8; }
+.day.own { background: var(--gold-lt); border-color: #e6cf8f; }
+.day.sel { outline: 3px solid var(--navy); outline-offset: -2px; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .75rem; color: var(--muted); margin-top: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; border: 1px solid var(--border); }
+.legend .l-av::before { background: var(--green-lt); } .legend .l-un::before { background: #f1f2f4; }
+.legend .l-re::before { background: var(--blue-lt); } .legend .l-own::before { background: var(--gold-lt); }
+.side h3 { margin: 0 0 6px; font-size: .95rem; }
+.side .hint { color: var(--muted); font-size: .82rem; margin: 0 0 10px; }
+.times { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: .85rem; flex-wrap: wrap; }
+.times input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font: inherit; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.quick .btn { font-size: .78rem; padding: 4px 9px; font-weight: 500; }
+textarea { width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; resize: vertical; }
+.sel-list { font-size: .82rem; margin: 0 0 10px; color: var(--text); }
+.reserved-list { margin: 12px 0 0; padding: 0; list-style: none; font-size: .85rem; }
+.reserved-list li { padding: 6px 0; border-top: 1px solid var(--border); }
+.msg, .empty { text-align: center; color: var(--muted); padding: 28px 12px; }
+.note { font-size: .8rem; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: .9rem; z-index: 50; max-width: calc(100% - 32px); }
+.toast.err { background: var(--red); }
+#gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
+@media (max-width: 760px) {
+  .panel { grid-template-columns: 1fr; }
+  .listing-head { grid-template-columns: 72px minmax(0, 1fr); }
+  .listing-head img, .noimg { width: 72px; height: 56px; }
+  .listing-head .btn { grid-column: 1 / -1; justify-self: start; }
+  .day { min-height: 46px; padding: 3px; }
+  .day .t { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Open House Listing Manager</h1>
+    <nav>
+      <a href="./hold-open-house.html">Hold an Open House</a>
+      <a href="./feedback.html?tool=open-house-listings">Feedback</a>
+      <a href="./index.html">← Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div id="gate" hidden>
+  <p>Sign in with your Adams Cameron Google account.</p>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+</div>
+
+<main id="app" hidden>
+  <div class="intro">
+    <p>You can't hold every listing open; your seller gets the exposure and so do you. Mark the dates each listing is available, and other agents can reserve them from <a href="./hold-open-house.html">Hold an Open House</a>. <strong>The host keeps the visitors they meet; you get the report.</strong></p>
+    <p>You decide which dates work — there's no separate seller approval. You can also host a listing yourself. Everything a host needs (access, showing instructions) should already be on the listing.</p>
+  </div>
+  <div class="viewas" id="viewas" hidden>
+    <label for="agentPick">Viewing as</label>
+    <select id="agentPick"><option value="">Me</option></select>
+  </div>
+  <div id="list"><div class="msg">Loading…</div></div>
+</main>
+
+<script>
+const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+let userEmail = localStorage.getItem('ac_user_email') || '';
+let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+
+const S = {
+  data: null,          // last GET /my-listings
+  open: null,          // transaction_id whose calendar is open
+  month: null,         // 'YYYY-MM' shown in the open calendar
+  sel: new Set(),      // selected 'YYYY-MM-DD' dates
+  viewAgentId: new URLSearchParams(location.search).get('agentId') || '',
+};
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
+const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
+const ymd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function fmtDay(date, opts) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', opts || { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
+function fmtWindow(s, e) { const a = fmtTime(s), b = fmtTime(e); return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`; }
+function toast(msg, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  t.setAttribute('role', 'status'); document.body.appendChild(t); setTimeout(() => t.remove(), 4000);
+}
+async function api(path, opts = {}) {
+  const r = await fetch(PROXY_BASE + path, { ...opts, headers: H() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(data.error || 'HTTP ' + r.status); e.status = r.status; e.data = data; throw e; }
+  return data;
+}
+
+// ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
+if (proxyKey && userEmail) start();
+window.addEventListener('load', () => {
+  if (!window.google?.accounts?.id) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
+  if (!proxyKey || !userEmail) { document.getElementById('gate').hidden = false; google.accounts.id.prompt(); }
+});
+async function handleGoogleSignIn(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const r = await fetch(`${PROXY_BASE}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
+    userEmail = (payload.email || '').toLowerCase(); proxyKey = data.proxyKey || '';
+    localStorage.setItem('ac_user_email', userEmail);
+    localStorage.setItem('ac_proxy_key', proxyKey);
+    document.getElementById('gate').hidden = true;
+    start();
+  } catch (e) { alert(e.message); }
+}
+
+function start() {
+  document.getElementById('app').hidden = false;
+  load().then(() => {
+    // Deep link from Agent Hub: ?transactionId=<uuid> opens that calendar.
+    const t = new URLSearchParams(location.search).get('transactionId');
+    if (t && S.data?.listings.some(l => l.transaction_id === t)) toggle(t, true);
+  });
+}
+
+async function load() {
+  try {
+    S.data = await api('/open-house/my-listings' + (S.viewAgentId ? `?agentId=${encodeURIComponent(S.viewAgentId)}` : ''));
+    if (S.data.viewer.isManager) setupViewAs();
+    render();
+  } catch (e) {
+    document.getElementById('list').innerHTML = `<div class="msg">Couldn't load your listings: ${esc(e.message)}</div>`;
+  }
+}
+
+// Managers can look at any agent's listings ("View as", like Agent Hub).
+let rosterLoaded = false;
+async function setupViewAs() {
+  const box = document.getElementById('viewas'); box.hidden = false;
+  if (rosterLoaded) return; rosterLoaded = true;
+  try {
+    const agents = await api('/roster/agents');
+    agents.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || '') || (a.first_name || '').localeCompare(b.first_name || ''));
+    const sel = document.getElementById('agentPick');
+    sel.innerHTML = '<option value="">Me</option>' + agents.map(a => `<option value="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}</option>`).join('');
+    sel.value = S.viewAgentId;
+    sel.onchange = () => {
+      S.viewAgentId = sel.value; S.open = null;
+      const url = new URL(location.href);
+      sel.value ? url.searchParams.set('agentId', sel.value) : url.searchParams.delete('agentId');
+      history.replaceState(null, '', url); load();
+    };
+  } catch (_) {}
+}
+
+// ── List ───────────────────────────────────────────────────────────────────
+function summaryHtml(l) {
+  const today = S.data.today;
+  const upcoming = l.events.filter(e => e.status === 'scheduled' && e.date >= today);
+  const held = l.events.filter(e => e.status === 'completed' || (e.status === 'scheduled' && e.date < today));
+  const reservedDates = new Set(upcoming.map(e => e.date));
+  const openDates = l.dates.filter(d => d.available && !reservedDates.has(d.date));
+  const parts = [];
+  for (const e of upcoming) {
+    const own = e.hosting_agent_id === e.listing_agent_id;
+    parts.push(`<span class="pill ${own ? 'gold' : ''}">${own ? 'Hosting it yourself' : 'Reserved by ' + esc(e.host_name)}</span> ${esc(fmtDay(e.date))}, ${esc(fmtWindow(e.start, e.end))}${e.needs_decision ? ' <span class="warn">— hold it anyway?</span>' : ''}`);
+  }
+  if (openDates.length) parts.push(`<span class="pill green">Available</span> ${openDates.length} date${openDates.length === 1 ? '' : 's'} (next ${esc(fmtDay(openDates[0].date))})`);
+  const last = held[held.length - 1];
+  if (last) parts.push(`<span class="pill">Held</span> ${esc(fmtDay(last.date, { month: 'short', day: 'numeric' }))}${last.visitor_count != null ? `: ${last.visitor_count} visitor${last.visitor_count === 1 ? '' : 's'}${last.serious_prospects != null ? `, ${last.serious_prospects} serious` : ''}` : ''}`);
+  if (l.closed) parts.unshift(`<span class="pill red">Not available</span> listing ${esc(l.closed_reason || 'left Active')}`);
+  if (!parts.length) parts.push(l.txn_status === 'coming_soon' ? 'No dates yet. Open houses can be reserved once the listing is Active.' : 'No dates available');
+  return parts.map(p => `<div>${p}</div>`).join('');
+}
+
+function render() {
+  const el = document.getElementById('list');
+  const ls = S.data.listings;
+  if (!ls.length) {
+    el.innerHTML = `<div class="empty">${S.viewAgentId ? 'This agent has' : 'You have'} no Active or Coming Soon listings in Daily Desk.</div>`;
+    return;
+  }
+  el.innerHTML = ls.map(l => `
+    <div class="listing" id="l-${l.transaction_id}">
+      <div class="listing-head" onclick="toggle('${l.transaction_id}')">
+        ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy">` : '<div class="noimg"></div>'}
+        <div style="min-width:0">
+          <div class="addr">${esc(l.property_address)}</div>
+          <div class="meta">${[l.city, money(l.current_price), l.txn_status === 'coming_soon' ? 'Coming soon' : 'Active', l.mls_id ? 'MLS# ' + l.mls_id : ''].filter(Boolean).map(esc).join(' · ')}</div>
+          <div class="summary">${summaryHtml(l)}</div>
+        </div>
+        <button class="btn ${S.open === l.transaction_id ? '' : 'primary'}" aria-expanded="${S.open === l.transaction_id}">${S.open === l.transaction_id ? 'Close' : 'Set open house dates'}</button>
+      </div>
+      ${S.open === l.transaction_id ? panelHtml(l) : ''}
+    </div>`).join('');
+}
+
+function toggle(id, scroll) {
+  if (S.open === id) { S.open = null; render(); return; }
+  S.open = id; S.sel = new Set();
+  const l = current();
+  const first = [...l.events.filter(e => e.status === 'scheduled').map(e => e.date), ...l.dates.map(d => d.date)].filter(d => d >= S.data.today).sort()[0];
+  S.month = (first || S.data.today).slice(0, 7);
+  render();
+  if (scroll) document.getElementById('l-' + id)?.scrollIntoView({ behavior: 'smooth' });
+}
+const current = () => S.data.listings.find(l => l.transaction_id === S.open);
+
+// ── Calendar ───────────────────────────────────────────────────────────────
+function dayInfo(l, date) {
+  const ev = l.events.find(e => e.status === 'scheduled' && e.date === date);
+  if (ev) return { kind: ev.hosting_agent_id === ev.listing_agent_id ? 'own' : 'reserved', ev };
+  const d = l.dates.find(x => x.date === date);
+  if (d) return { kind: d.available ? 'available' : 'unavailable', d };
+  return { kind: 'none' };
+}
+
+function panelHtml(l) {
+  const [y, m] = S.month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1), days = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < first.getDay(); i++) cells.push('<div class="day blank" aria-hidden="true"></div>');
+  for (let d = 1; d <= days; d++) {
+    const date = ymd(y, m, d);
+    const past = date < S.data.today;
+    const info = dayInfo(l, date);
+    let label = '';
+    if (info.kind === 'available') label = fmtWindow(info.d.start, info.d.end);
+    if (info.kind === 'unavailable') label = 'Not available';
+    if (info.kind === 'reserved') label = info.ev.host_name.split(' ')[0] + ' · ' + fmtWindow(info.ev.start, info.ev.end);
+    if (info.kind === 'own') label = 'You · ' + fmtWindow(info.ev.start, info.ev.end);
+    const cls = past ? 'past' : `${info.kind} ${S.sel.has(date) ? 'sel' : ''}`;
+    cells.push(`<button type="button" class="day ${cls}" ${past ? 'disabled' : `onclick="pick('${date}')"`}
+      aria-pressed="${S.sel.has(date)}" aria-label="${esc(fmtDay(date, { weekday: 'long', month: 'long', day: 'numeric' }))}${label ? ': ' + esc(label) : ''}">
+      <span class="n">${d}</span><span class="t">${esc(label)}</span></button>`);
+  }
+  const canPrev = S.month > S.data.today.slice(0, 7);
+  const selDates = [...S.sel].sort();
+  const reserved = l.events.filter(e => e.status === 'scheduled' && e.date >= S.data.today);
+  const activeOk = l.txn_status === 'active_listing';
+  return `<div class="panel">
+    <div>
+      <div class="cal-nav">
+        <button class="btn" onclick="shiftMonth(-1)" ${canPrev ? '' : 'disabled'} aria-label="Previous month">‹</button>
+        <strong>${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</strong>
+        <button class="btn" onclick="shiftMonth(1)" aria-label="Next month">›</button>
+      </div>
+      <div class="cal">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="dow">${d}</div>`).join('')}${cells.join('')}</div>
+      <div class="legend"><span class="l-av">Available</span><span class="l-un">Not available</span><span class="l-re">Reserved</span><span class="l-own">You're hosting</span></div>
+      ${reserved.length ? `<ul class="reserved-list">${reserved.map(e => `<li>${esc(fmtDay(e.date))}, ${esc(fmtWindow(e.start, e.end))} — ${e.hosting_agent_id === e.listing_agent_id ? "you're hosting" : 'reserved by ' + esc(e.host_name)} · <a href="./open-house-event.html?id=${e.event_id}">event page</a>${e.needs_decision ? ' <span class="pill red">hold it anyway?</span>' : ''}</li>`).join('')}</ul>` : ''}
+    </div>
+    <div class="side">
+      <h3>${selDates.length ? `${selDates.length} date${selDates.length === 1 ? '' : 's'} selected` : 'Select dates'}</h3>
+      <p class="hint">Tap dates on the calendar to select several, then mark them. Tap again to unselect.</p>
+      <div class="quick">
+        <button class="btn" onclick="selectWeekends(0)">Weekends this month</button>
+        <button class="btn" onclick="selectWeekends(6)">Saturdays</button>
+        <button class="btn" onclick="selectWeekends(7)">Sundays</button>
+        ${selDates.length ? '<button class="btn" onclick="S.sel.clear();render()">Clear selection</button>' : ''}
+      </div>
+      ${selDates.length ? `<p class="sel-list">${selDates.map(d => esc(fmtDay(d))).join(', ')}</p>` : ''}
+      <div class="times">
+        <label>From <input type="time" id="tStart" value="13:00" step="900"></label>
+        <label>to <input type="time" id="tEnd" value="16:00" step="900"></label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="mark(true)" ${selDates.length ? '' : 'disabled'}>Mark available</button>
+        <button class="btn" onclick="mark(false)" ${selDates.length ? '' : 'disabled'}>Mark not available</button>
+        <button class="btn" onclick="mark(null)" ${selDates.length ? '' : 'disabled'} title="Back to not offered">Clear</button>
+      </div>
+      <div class="actions">
+        <button class="btn gold" onclick="hostMyself()" ${selDates.length && activeOk ? '' : 'disabled'}>I'll host it myself</button>
+      </div>
+      ${activeOk ? '' : '<p class="note">Open houses can be reserved and held once the listing is Active. You can set dates now.</p>'}
+      <p class="note">Withdrawing a reserved date cancels that open house and lets the host know.</p>
+      <h3 style="margin-top:16px">Notes for the host <span class="note">(optional)</span></h3>
+      <p class="hint">Only extras — access and showing instructions belong on the listing itself.</p>
+      <textarea id="notes" maxlength="2000" placeholder="e.g. Seller's dog will be out for the afternoon.">${esc(l.hosting_notes)}</textarea>
+      <div class="actions" style="margin-top:6px"><button class="btn" onclick="saveNotes()">Save notes</button></div>
+    </div>
+  </div>`;
+}
+
+function shiftMonth(n) {
+  const [y, m] = S.month.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  S.month = ymd(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7);
+  render();
+}
+function pick(date) {
+  const l = current(), info = dayInfo(l, date);
+  if ((info.kind === 'reserved' || info.kind === 'own') && !S.sel.has(date)) {
+    // Reserved dates are selectable too (to withdraw), but say what they are.
+    toast(`${fmtDay(date)}: ${info.kind === 'own' ? "you're hosting" : 'reserved by ' + info.ev.host_name}. Mark it not available to withdraw it.`);
+  }
+  S.sel.has(date) ? S.sel.delete(date) : S.sel.add(date);
+  // Keep the times the agent typed across the re-render; picking a single
+  // available date shows its current window instead, ready to edit.
+  let start = document.getElementById('tStart')?.value || '13:00', end = document.getElementById('tEnd')?.value || '16:00';
+  if (S.sel.size === 1 && info.kind === 'available' && S.sel.has(date)) { start = info.d.start; end = info.d.end; }
+  render();
+  document.getElementById('tStart').value = start; document.getElementById('tEnd').value = end;
+}
+// dow 0 = Sat+Sun, 6 = Saturdays, 7 = Sundays (this month, from today)
+function selectWeekends(which) {
+  const [y, m] = S.month.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  for (let d = 1; d <= days; d++) {
+    const date = ymd(y, m, d), wd = new Date(y, m - 1, d).getDay();
+    if (date < S.data.today) continue;
+    if ((which === 0 && (wd === 0 || wd === 6)) || (which === 6 && wd === 6) || (which === 7 && wd === 0)) S.sel.add(date);
+  }
+  render();
+}
+
+async function putAvailability(body) {
+  const l = current();
+  try {
+    const data = await api(`/open-house/availability/${l.transaction_id}`, { method: 'PUT', body: JSON.stringify(body) });
+    Object.assign(l, data.listing);
+    return data;
+  } catch (e) {
+    if (e.status === 409 && e.data?.needsConfirm) {
+      const lines = e.data.conflicts.map(c => `• ${fmtDay(c.date)} — ${c.own ? "you're hosting" : 'reserved by ' + c.host_name}`).join('\n');
+      if (!confirm(`These dates are reserved:\n${lines}\n\nWithdrawing them cancels those open houses${e.data.conflicts.some(c => !c.own) ? ' and lets the host know' : ''}. Continue?`)) return null;
+      const reason = e.data.conflicts.some(c => !c.own) ? (prompt('Reason for the host (optional):') || '') : '';
+      return putAvailability({ ...body, confirmWithdraw: true, reason });
+    }
+    throw e;
+  }
+}
+
+async function mark(available) {
+  const start = document.getElementById('tStart').value, end = document.getElementById('tEnd').value;
+  if (available === true && (!start || !end || end <= start)) { toast('Check the times.', true); return; }
+  const dates = [...S.sel].sort().map(date => ({ date, available, start, end }));
+  try {
+    const data = await putAvailability({ dates });
+    if (!data) return;
+    S.sel.clear(); render();
+    toast(available === true ? 'Dates marked available.' : available === false ? 'Dates marked not available.' : 'Dates cleared.');
+    if (data.withdrawn) toast(`${data.withdrawn} open house${data.withdrawn === 1 ? '' : 's'} cancelled.`);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function saveNotes() {
+  try {
+    await putAvailability({ hostingNotes: document.getElementById('notes').value.trim(), dates: [] });
+    render(); toast('Notes saved.');
+  } catch (e) { toast(e.message, true); }
+}
+
+// The listing agent as host: same plan, same event page.
+async function hostMyself() {
+  const l = current();
+  const start = document.getElementById('tStart').value, end = document.getElementById('tEnd').value;
+  if (!start || !end || end <= start) { toast('Check the times.', true); return; }
+  const dates = [...S.sel].sort();
+  const taken = dates.filter(d => ['reserved', 'own'].includes(dayInfo(l, d).kind));
+  if (taken.length) { toast(`${taken.map(d => fmtDay(d)).join(', ')} already ${taken.length === 1 ? 'has' : 'have'} an open house.`, true); return; }
+  if (!confirm(`Host ${l.property_address} yourself on ${dates.map(d => fmtDay(d)).join(', ')}, ${fmtWindow(start, end)}?\n\nYou'll get the full plan and reminders, as both listing agent and host.`)) return;
+  try {
+    const data = await api('/open-house/events', { method: 'POST', body: JSON.stringify({ transactionId: l.transaction_id, own: true, dates: dates.map(date => ({ date, start, end })) }) });
+    if (data.events.length === 1) { location.href = `./open-house-event.html?id=${data.events[0].event_id}&new=1`; return; }
+    S.sel.clear(); await load(); toast(`${data.events.length} open houses created — open each from the list below the calendar.`);
+  } catch (e) { toast(e.message, true); }
+}
+</script>
+<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Open House Listing Manager',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
+</body>
+</html>
