@@ -236,8 +236,13 @@ function grouped() {
 
 function render() {
   const groups = grouped();
+  const anytimeCount = groups.filter(g => g.anytime).length;
+  const datedSlots = groups.filter(g => !g.anytime).reduce((n, g) => n + g.slots.length, 0);
   document.getElementById('count').textContent = groups.length
-    ? `${groups.length} listing${groups.length === 1 ? '' : 's'} with ${S.slots.length} available date${S.slots.length === 1 ? '' : 's'}` : '';
+    ? `${groups.length} listing${groups.length === 1 ? '' : 's'}` + [
+        datedSlots ? `${datedSlots} available date${datedSlots === 1 ? '' : 's'}` : '',
+        anytimeCount ? `${anytimeCount} open anytime` : '',
+      ].filter(Boolean).map((t, i) => (i ? ', ' : ' — ') + t).join('') : '';
   document.getElementById('results').innerHTML = groups.length ? groups.map(cardHtml).join('')
     : '<div class="empty">No listings are available for those filters right now. Listing agents add dates in Open House Listing Manager.</div>';
   for (const g of groups) if (S.picked[g.transaction_id]?.size) updatePreview(g.transaction_id);
@@ -253,17 +258,40 @@ function cardHtml(g) {
       <div class="meta">${facts.map(esc).join(' · ')}</div>
       <div class="meta">Listing agent: ${esc(g.listing_agent_name)}</div>
       ${g.hosting_notes ? `<div class="notes">${esc(g.hosting_notes)}</div>` : ''}
-      <div class="chips" role="group" aria-label="Available dates">
+      ${g.anytime ? anytimePickerHtml(g, picked) : `<div class="chips" role="group" aria-label="Available dates">
         ${g.slots.map(s => `<button class="chip" aria-pressed="${picked.has(s.availability_date_id)}" onclick="toggleSlot('${g.transaction_id}','${s.availability_date_id}')">${esc(fmtDay(s.date))} · ${esc(fmtWindow(s.start, s.end))}</button>`).join('')}
-      </div>
+      </div>`}
       <div id="r-${g.transaction_id}"></div>
     </div>
   </div>`;
 }
 
+// A listing open "anytime" (vacant — set by the listing agent) has a date for
+// every day, so instead of ~90 buttons: a date picker, with the picked dates
+// shown as buttons that can be tapped to remove.
+function anytimePickerHtml(g, picked) {
+  const dates = g.slots.map(s => s.date).sort();
+  const chosen = g.slots.filter(s => picked.has(s.availability_date_id));
+  return `<div class="meta"><strong>Open anytime</strong> — any day, ${esc(fmtWindow(g.anytime_start, g.anytime_end))}.</div>
+    <div class="chips" role="group" aria-label="Pick dates">
+      <label class="meta">Pick a date <input type="date" min="${dates[0] || ''}" max="${dates[dates.length - 1] || ''}" onchange="pickAnytime('${g.transaction_id}', this.value); this.value = ''"></label>
+      ${chosen.map(s => `<button class="chip" aria-pressed="true" title="Remove" onclick="toggleSlot('${g.transaction_id}','${s.availability_date_id}')">${esc(fmtDay(s.date))} · ${esc(fmtWindow(s.start, s.end))} ✕</button>`).join('')}
+    </div>`;
+}
+
+function pickAnytime(txn, date) {
+  if (!date) return;
+  const slot = S.slots.find(s => s.transaction_id === txn && s.date === date);
+  if (!slot) { toast(`${fmtDay(date)} isn't available on this listing — it may be reserved or marked not available.`, true); return; }
+  const set = (S.picked[txn] ||= new Set());
+  if (!set.has(slot.availability_date_id)) set.add(slot.availability_date_id);
+  render();
+}
+
 function toggleSlot(txn, id) {
   const set = (S.picked[txn] ||= new Set());
   set.has(id) ? set.delete(id) : set.add(id);
+  if (S.slots.some(s => s.transaction_id === txn && s.anytime)) { render(); return; }
   document.querySelectorAll(`#c-${txn} .chip`).forEach(b => {
     const m = b.getAttribute('onclick').match(/'([^']+)'\)$/);
     if (m) b.setAttribute('aria-pressed', String(set.has(m[1])));

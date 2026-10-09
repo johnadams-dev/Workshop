@@ -71,6 +71,11 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 2
 .times input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font: inherit; }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.anytime { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; background: var(--bg); }
+.anytime.on { border-color: var(--green); background: var(--green-lt); }
+.anytime strong { display: block; margin-bottom: 2px; }
+.anytime .times { margin: 8px 0; }
+.anytime .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .quick .btn { font-size: .78rem; padding: 4px 9px; font-weight: 500; }
 textarea { width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; resize: vertical; }
 .sel-list { font-size: .82rem; margin: 0 0 10px; color: var(--text); }
@@ -232,7 +237,8 @@ function summaryHtml(l) {
     const own = e.hosting_agent_id === e.listing_agent_id;
     parts.push(`<span class="pill ${own ? 'gold' : ''}">${own ? 'Hosting it yourself' : 'Reserved by ' + esc(e.host_name)}</span> ${esc(fmtDay(e.date))}, ${esc(fmtWindow(e.start, e.end))}${e.needs_decision ? ' <span class="warn">— hold it anyway?</span>' : ''}`);
   }
-  if (openDates.length) parts.push(`<span class="pill green">Available</span> ${openDates.length} date${openDates.length === 1 ? '' : 's'} (next ${esc(fmtDay(openDates[0].date))})`);
+  if (l.anytime && !l.closed) parts.push(`<span class="pill green">Open anytime</span> every day, ${esc(fmtWindow(l.anytime_start, l.anytime_end))}`);
+  else if (openDates.length) parts.push(`<span class="pill green">Available</span> ${openDates.length} date${openDates.length === 1 ? '' : 's'} (next ${esc(fmtDay(openDates[0].date))})`);
   const last = held[held.length - 1];
   if (last) parts.push(`<span class="pill">Held</span> ${esc(fmtDay(last.date, { month: 'short', day: 'numeric' }))}${last.visitor_count != null ? `: ${last.visitor_count} visitor${last.visitor_count === 1 ? '' : 's'}${last.serious_prospects != null ? `, ${last.serious_prospects} serious` : ''}` : ''}`);
   if (l.closed) parts.unshift(`<span class="pill red">Not available</span> listing ${esc(l.closed_reason || 'left Active')}`);
@@ -317,6 +323,7 @@ function panelHtml(l) {
       ${reserved.length ? `<ul class="reserved-list">${reserved.map(e => `<li>${esc(fmtDay(e.date))}, ${esc(fmtWindow(e.start, e.end))} — ${e.hosting_agent_id === e.listing_agent_id ? "you're hosting" : 'reserved by ' + esc(e.host_name)} · <a href="./open-house-event.html?id=${e.event_id}">event page</a>${e.needs_decision ? ' <span class="pill red">hold it anyway?</span>' : ''}</li>`).join('')}</ul>` : ''}
     </div>
     <div class="side">
+      ${anytimeHtml(l, activeOk)}
       <h3>${selDates.length ? `${selDates.length} date${selDates.length === 1 ? '' : 's'} selected` : 'Select dates'}</h3>
       <p class="hint">Tap dates on the calendar to select several, then mark them. Tap again to unselect.</p>
       <div class="quick">
@@ -421,6 +428,49 @@ async function putAvailability(body) {
     }
     throw e;
   }
+}
+
+// "Allow anytime" — for a vacant listing that can be held open any day.
+// Every day stays available within one daily window while the listing is
+// Active or Coming Soon; the server fills in the dates as they come up, so
+// nothing needs renewing. Dates marked not available, or given other hours,
+// still apply on top.
+function anytimeHtml(l, activeOk) {
+  if (l.closed) return '';
+  if (l.anytime) {
+    return `<div class="anytime on">
+      <strong>✓ Open anytime</strong>
+      <span class="hint">Every day, ${esc(fmtWindow(l.anytime_start, l.anytime_end))}, while the listing is ${activeOk ? 'Active' : 'Active or Coming Soon'}. Dates you mark not available still apply.</span>
+      <div class="times">
+        <label>From <input type="time" id="aStart" value="${l.anytime_start}" step="900"></label>
+        <label>to <input type="time" id="aEnd" value="${l.anytime_end}" step="900"></label>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="setAnytime(true)">Save hours</button>
+        <button class="btn" onclick="setAnytime(false)">Turn off anytime</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="anytime">
+    <strong>Vacant or easy to show?</strong>
+    <span class="hint">Let agents hold it open any day they choose, instead of picking dates.</span>
+    <div class="times">
+      <label>From <input type="time" id="aStart" value="09:00" step="900"></label>
+      <label>to <input type="time" id="aEnd" value="19:00" step="900"></label>
+    </div>
+    <div class="actions"><button class="btn primary" onclick="setAnytime(true)">Allow anytime</button></div>
+  </div>`;
+}
+
+async function setAnytime(on) {
+  const start = document.getElementById('aStart')?.value || '09:00', end = document.getElementById('aEnd')?.value || '19:00';
+  if (on && (!start || !end || end <= start)) { toast('Check the hours.', true); return; }
+  try {
+    const data = await putAvailability({ anytime: { on, start, end }, dates: [] });
+    if (!data) return;
+    render();
+    toast(on ? `Open anytime, ${fmtWindow(start, end)}.` : 'Anytime is off. Dates already reserved stay as they are.');
+  } catch (e) { toast(e.message, true); }
 }
 
 async function mark(available) {

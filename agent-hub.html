@@ -1534,6 +1534,7 @@ function openHouseLine(t) {
   }
   const held = events.filter(e => e.status === 'completed').pop();
   if (held) text = `Held ${new Date(held.starts_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' })}: ${held.visitor_count ?? 0} visitors, ${held.serious_prospects ?? 0} serious`;
+  else if (oh?.anytime) text = 'Open house: open anytime';
   else if (oh?.openDates) text = `${oh.openDates} open house date${oh.openDates === 1 ? '' : 's'} available`;
   else text = 'Offer for open house';
   return `<div class="txn-progress-label">🏠 ${link(text, manage)}</div>`;
