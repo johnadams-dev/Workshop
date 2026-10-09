@@ -137,6 +137,9 @@ const S = {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
 const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
+// Listing photos go through the server's /photo-proxy, like the Hotsheet —
+// DeltaNet's images.php doesn't serve them reliably to a browser directly.
+const photoSrc = url => `${PROXY_BASE}/photo-proxy?key=${encodeURIComponent(proxyKey)}&url=${encodeURIComponent(url)}`;
 const ymd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 function fmtDay(date, opts) {
   const [y, m, d] = date.split('-').map(Number);
@@ -247,7 +250,7 @@ function render() {
   el.innerHTML = ls.map(l => `
     <div class="listing" id="l-${l.transaction_id}">
       <div class="listing-head" onclick="toggle('${l.transaction_id}')">
-        ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy">` : '<div class="noimg"></div>'}
+        ${l.photo_url ? `<img src="${esc(photoSrc(l.photo_url))}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;noimg&quot;></div>'">` : '<div class="noimg"></div>'}
         <div style="min-width:0">
           <div class="addr">${esc(l.property_address)}</div>
           <div class="meta">${[l.city, money(l.current_price), l.txn_status === 'coming_soon' ? 'Coming soon' : 'Active', l.mls_id ? 'MLS# ' + l.mls_id : ''].filter(Boolean).map(esc).join(' · ')}</div>
