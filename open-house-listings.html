@@ -320,12 +320,16 @@ function panelHtml(l) {
       <h3>${selDates.length ? `${selDates.length} date${selDates.length === 1 ? '' : 's'} selected` : 'Select dates'}</h3>
       <p class="hint">Tap dates on the calendar to select several, then mark them. Tap again to unselect.</p>
       <div class="quick">
+        <button class="btn" onclick="selectAll(false)">Every day this month</button>
+        <button class="btn" onclick="selectAll(true)">Every day, next 90 days</button>
         <button class="btn" onclick="selectWeekends(0)">Weekends this month</button>
         <button class="btn" onclick="selectWeekends(6)">Saturdays</button>
         <button class="btn" onclick="selectWeekends(7)">Sundays</button>
         ${selDates.length ? '<button class="btn" onclick="S.sel.clear();render()">Clear selection</button>' : ''}
       </div>
-      ${selDates.length ? `<p class="sel-list">${selDates.map(d => esc(fmtDay(d))).join(', ')}</p>` : ''}
+      ${selDates.length ? `<p class="sel-list">${selDates.length > 12
+        ? `${esc(fmtDay(selDates[0]))} through ${esc(fmtDay(selDates[selDates.length - 1]))}`
+        : selDates.map(d => esc(fmtDay(d))).join(', ')}</p>` : ''}
       <div class="times">
         <label>From <input type="time" id="tStart" value="13:00" step="900"></label>
         <label>to <input type="time" id="tEnd" value="16:00" step="900"></label>
@@ -368,6 +372,26 @@ function pick(date) {
   render();
   document.getElementById('tStart').value = start; document.getElementById('tEnd').value = end;
 }
+// "Any day" in one go: every date from today to the end of the shown month,
+// or the next 90 days (across months). Dates that already have an open house
+// are left out, so marking the rest available can't change a reserved date.
+function selectAll(next90) {
+  const l = current();
+  const [ty, tm, td] = S.data.today.split('-').map(Number);
+  const [y, m] = S.month.split('-').map(Number);
+  const start = next90 ? new Date(ty, tm - 1, td) : new Date(y, m - 1, 1);
+  const end = next90 ? new Date(ty, tm - 1, td + 89) : new Date(y, m, 0);
+  let skipped = 0;
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const date = ymd(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    if (date < S.data.today) continue;
+    if (['reserved', 'own'].includes(dayInfo(l, date).kind)) { skipped++; continue; }
+    S.sel.add(date);
+  }
+  render();
+  toast(`${S.sel.size} dates selected${next90 ? ' over the next 90 days' : ''}${skipped ? ` (${skipped} with an open house left as they are)` : ''}. Set the times, then Mark available.`);
+}
+
 // dow 0 = Sat+Sun, 6 = Saturdays, 7 = Sundays (this month, from today)
 function selectWeekends(which) {
   const [y, m] = S.month.split('-').map(Number);
