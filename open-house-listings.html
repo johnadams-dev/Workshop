@@ -331,8 +331,8 @@ function panelHtml(l) {
         ? `${esc(fmtDay(selDates[0]))} through ${esc(fmtDay(selDates[selDates.length - 1]))}`
         : selDates.map(d => esc(fmtDay(d))).join(', ')}</p>` : ''}
       <div class="times">
-        <label>From <input type="time" id="tStart" value="13:00" step="900"></label>
-        <label>to <input type="time" id="tEnd" value="16:00" step="900"></label>
+        <label>From <input type="time" id="tStart" value="09:00" step="900"></label>
+        <label>to <input type="time" id="tEnd" value="19:00" step="900"></label>
       </div>
       <div class="actions">
         <button class="btn primary" onclick="mark(true)" ${selDates.length ? '' : 'disabled'}>Mark available</button>
@@ -367,7 +367,9 @@ function pick(date) {
   S.sel.has(date) ? S.sel.delete(date) : S.sel.add(date);
   // Keep the times the agent typed across the re-render; picking a single
   // available date shows its current window instead, ready to edit.
-  let start = document.getElementById('tStart')?.value || '13:00', end = document.getElementById('tEnd')?.value || '16:00';
+  // Default availability is wide (9 am–7 pm, John Adams 2026-10-09) so hosts
+  // can choose their own hours inside it.
+  let start = document.getElementById('tStart')?.value || '09:00', end = document.getElementById('tEnd')?.value || '19:00';
   if (S.sel.size === 1 && info.kind === 'available' && S.sel.has(date)) { start = info.d.start; end = info.d.end; }
   render();
   document.getElementById('tStart').value = start; document.getElementById('tEnd').value = end;

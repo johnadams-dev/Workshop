@@ -138,6 +138,19 @@ const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
 const photoSrc = url => `${PROXY_BASE}/photo-proxy?key=${encodeURIComponent(proxyKey)}&url=${encodeURIComponent(url)}`;
 function fmtDay(date) { const [y, m, d] = date.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
+// The host's open house time starts at the usual 1–4 pm, fitted inside the
+// listing agent's window (which defaults to a wide 9 am–7 pm). If the window
+// doesn't cover 1–4, use a 3-hour block as close to it as fits, or the whole
+// window when it's shorter than that.
+function hostDefault(s) {
+  const toMin = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+  const toTime = n => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+  const ws = toMin(s.start), we = toMin(s.end);
+  if (we - ws <= 180) return { start: s.start, end: s.end };
+  const st = Math.min(Math.max(13 * 60, ws), we - 180);
+  return { start: toTime(st), end: toTime(st + 180) };
+}
+
 function fmtWindow(s, e) { const a = fmtTime(s), b = fmtTime(e); return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`; }
 const fmtDue = iso => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 function toast(msg, err) {
@@ -267,8 +280,8 @@ async function updatePreview(txn) {
   for (const s of slots) if (document.getElementById('s-' + s.availability_date_id)) readTimes(s); // remember typed times
   box.innerHTML = `<div class="reserve">
     ${slots.map(s => `<div class="slot-row"><strong>${esc(fmtDay(s.date))}</strong>
-      <input type="time" id="s-${s.availability_date_id}" value="${s.start}" min="${s.start}" max="${s.end}" step="900" aria-label="Start time" onchange="updatePreview('${txn}')"> to
-      <input type="time" id="e-${s.availability_date_id}" value="${s.end}" min="${s.start}" max="${s.end}" step="900" aria-label="End time" onchange="updatePreview('${txn}')">
+      <input type="time" id="s-${s.availability_date_id}" value="${hostDefault(s).start}" min="${s.start}" max="${s.end}" step="900" aria-label="Start time" onchange="updatePreview('${txn}')"> to
+      <input type="time" id="e-${s.availability_date_id}" value="${hostDefault(s).end}" min="${s.start}" max="${s.end}" step="900" aria-label="End time" onchange="updatePreview('${txn}')">
       <span class="meta">(allowed ${esc(fmtWindow(s.start, s.end))})</span></div>`).join('')}
     <div id="p-${txn}" class="preview">Working out your plan…</div>
     <button class="btn primary" onclick="reserve('${txn}')">Reserve ${slots.length === 1 ? 'this date' : slots.length + ' dates'}</button>
@@ -294,8 +307,8 @@ async function updatePreview(txn) {
   }
 }
 function readTimes(s) {
-  const st = document.getElementById('s-' + s.availability_date_id)?.value || s.start;
-  const en = document.getElementById('e-' + s.availability_date_id)?.value || s.end;
+  const st = document.getElementById('s-' + s.availability_date_id)?.value || hostDefault(s).start;
+  const en = document.getElementById('e-' + s.availability_date_id)?.value || hostDefault(s).end;
   (S.times ||= {})[s.availability_date_id] = { start: st, end: en };
   return { start: st, end: en };
 }
