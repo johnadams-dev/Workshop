@@ -1637,10 +1637,14 @@ const CHECKLIST_STATUS_META = {
   skipped:        { cls: 'dismissed', icon: '—', rowCls: 'is-dismissed' },
 };
 
-// Appends transactionId=<txnId> to a resource_url, whether or not it
-// already carries a query string (Cameron's Lens's two agent-facing items
-// ship with `?mode=desc`/`?mode=photo` already baked in).
+// Appends transactionId=<txnId> to a Workshop page's URL, whether or not it
+// already carries a query string (Cameron's Lens's links carry ?mode=).
+// Checklist links saved with a {transactionId} placeholder arrive already
+// filled in by the server, so those (and any outside site, e.g. FRED or
+// Form Simplicity) are left as they are.
 function withTxnParam(url, txnId) {
+  if (/[?&]transaction_?id=/i.test(url)) return url;
+  if (/^https?:\/\//i.test(url) && !/^https?:\/\/(www\.)?johnadams\.org\//i.test(url)) return url;
   return url + (url.includes('?') ? '&' : '?') + 'transactionId=' + encodeURIComponent(txnId);
 }
 

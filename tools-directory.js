@@ -30,6 +30,10 @@
 //   results lists on index.html and agent-hub.html leave these out for
 //   anyone not signed in as a manager/admin. It only hides the link; each
 //   tool's own page/route still enforces access server-side.
+//   `transactionParam` names the URL parameter a tool reads to open one
+//   transaction directly (e.g. ?transactionId=<uuid>). Daily Desk's checklist
+//   Tool picker saves such links with a {transactionId} placeholder, which
+//   every place showing checklist links fills in.
 //
 //   kind: 'resource' — an ACC company-wide resource, NOT one of the
 //   Workshop's own tools. First-pass transcription from a PDF ("ACC
@@ -87,7 +91,7 @@ const WORKSHOP_RESOURCES = [
   { kind: 'workshop', slug: 'open-house-listings', name: 'Open House Listing Manager', url: './open-house-listings.html',
     description: 'Mark on a calendar the dates your listings are available for other agents to hold open — or host one yourself. Your seller gets the exposure, and you get a report afterwards.',
     tags: ['open house', 'listing', 'availability', 'calendar'],
-    feedbackGroup: 'Day to Day' },
+    feedbackGroup: 'Day to Day', transactionParam: 'transactionId' },
   { kind: 'workshop', slug: 'market-update', name: 'Comprehensive Market Update', url: './market-update.html',
     description: 'Upload an active and sold listing export from your MLS (Excel, CSV, and more) to generate a full market analysis — days on market, absorption rate, price per square foot, and beyond.',
     feedbackGroup: 'Day to Day' },
@@ -96,13 +100,20 @@ const WORKSHOP_RESOURCES = [
     feedbackGroup: 'Day to Day' },
   { kind: 'workshop', slug: 'camerons-lens', name: "Cameron's Lens", url: './camerons-lens.html',
     description: 'Take your existing listing information and let AI enhance the property description and suggest photo improvements — making every listing stand out without starting from scratch.',
-    feedbackGroup: 'Day to Day' },
+    feedbackGroup: 'Day to Day', transactionParam: 'transactionId',
+    // Screens a link can open on (used by Daily Desk's checklist Tool picker).
+    // Keys match the tool_key values on existing checklist items and
+    // marketing-plan-routes.js's TASK_TOOL_LINKS.
+    modes: [
+      { key: 'camerons-lens-desc',  name: 'Description', url: './camerons-lens.html?mode=desc' },
+      { key: 'camerons-lens-photo', name: 'Photos',      url: './camerons-lens.html?mode=photo' },
+    ] },
   { kind: 'workshop', slug: 'camerons-stage', name: "Cameron's Stage", url: './camerons-stage.html',
     description: 'Create a virtual tour for the property, including an AI-generated song — a tour link you can drop into your MLS listing or share on social media.',
-    feedbackGroup: 'Day to Day' },
+    feedbackGroup: 'Day to Day', transactionParam: 'transactionId' },
   { kind: 'workshop', slug: 'marketing-plan', name: 'Marketing Plan', url: './marketing-plan.html',
     description: "Generate a structured, printable marketing plan for a listing — grounded in ACC's own marketing programs, not generic advice. Works for signed listings and pre-market opportunities alike.",
-    feedbackGroup: 'Day to Day' },
+    feedbackGroup: 'Day to Day', transactionParam: 'transactionId' },
   // Business Growth — manager-only in the Workshop. Guests (partners outside
   // the company) reach these from brainstormers.html; see guest-access.js.
   { kind: 'workshop', slug: 'recruit-prep', name: 'Recruiting Prep', url: './recruit-prep.html',
@@ -183,7 +194,7 @@ const WORKSHOP_RESOURCES = [
   { kind: 'workshop', slug: 'marketing-bucks', name: 'Marketing Bucks', url: './marketing-bucks.html',
     description: 'Issue and track $50 Marketing Bucks credits — see what\'s outstanding and redeemed, and report by office and agent.',
     managerOnly: true,
-    feedbackGroup: 'Administrative' },
+    feedbackGroup: 'Administrative', transactionParam: 'transaction_id' },
   { kind: 'workshop', slug: 'agent-checklists', name: 'Agent Onboarding & Offboarding', url: './agent-checklists.html',
     description: 'Onboarding and offboarding task lists for agents joining or leaving — assigned to the Office Coordinator, Sales Manager, or Admin, filterable by office and agent, with bulk completion by task.',
     managerOnly: true,

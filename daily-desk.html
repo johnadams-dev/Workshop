@@ -2930,13 +2930,10 @@ function renderTodayTable(rows) {
     const [chipClass, chipLabel] = statusChip(item.transaction_status);
     const ageDays = Math.max(0, Math.floor((Date.now() - new Date(item.created_at).getTime()) / 86400000));
     const ageLabel = ageDays === 0 ? 'Today' : (ageDays === 1 ? '1 day' : `${ageDays} days`);
-    // {transactionId} in a checklist item's resource_url is substituted with
-    // the real transaction id before linking out — lets a task's link jump
-    // straight to "this closing's" record in another tool (e.g. Marketing
-    // Bucks) instead of a generic, un-filtered landing page.
-    const resolvedUrl = item.resource_url
-      ? item.resource_url.replace(/\{transactionId\}/g, encodeURIComponent(item.transaction_id))
-      : null;
+    // The server has already filled the link's {transactionId} /
+    // {propertyAddress} placeholders (checklist-links.js), so a task's link
+    // jumps straight to this transaction in the other tool.
+    const resolvedUrl = item.resource_url || null;
     const linkCell = resolvedUrl
       ? `<a href="${escapeHtml(resolvedUrl)}" target="_blank" rel="noopener" class="tbl-link" style="font-size:12px;">${escapeHtml(item.resource_label || 'Open')}</a>`
       : '—';
@@ -6288,7 +6285,11 @@ function renderDrawer(t) {
       actionHtml = '<div class="cl-action">Mark done</div>';
     }
     const descHtml = item.description ? `<div class="cl-desc">${escapeHtml(item.description)}</div>` : '';
-    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}${descHtml}</div>${actionHtml}</div>`;
+    // The server has already filled any {transactionId} with this transaction.
+    const linkHtml = item.resource_url
+      ? ` <a href="${escapeHtml(item.resource_url)}" target="_blank" rel="noopener" class="tbl-link" style="font-size:12px;" onclick="event.stopPropagation()">${escapeHtml(item.resource_label || 'Open')}</a>`
+      : '';
+    return `<div class="cl-item ${cls}">${checkHtml}<div class="cl-label">${escapeHtml(item.title)}${linkHtml}${descHtml}</div>${actionHtml}</div>`;
   }).join('') : '<div class="empty">No checklist items.</div>';
 
   renderDrawerPortal(t);
@@ -6359,15 +6360,15 @@ function closeDrawer() {
    ADMIN — checklist template / item management
    Two views: a summary list of every checklist (click a row to open it),
    and one checklist's items as compact rows (click a row to edit it).
-   Each item's tool link is picked from one dropdown — links already used on
-   checklists, then the Workshop tools and company resources from
-   tools-directory.js — with "+ Add another…" for anything new. It still
+   Each item's tool link is picked from one dropdown — Workshop tools and
+   company resources from tools-directory.js, A–Z, then any saved link not
+   in the directory — with "+ Add another…" for anything new. It still
    writes the same tool_key / resource_url / resource_label columns.
 ═══════════════════════════════════════════════════════════════════ */
 let adminTemplates = [];
 let adminOpenTemplateId = null;   // null = summary list
 let adminOpenItemId = null;       // item row currently expanded for editing ('new' = add form)
-let adminToolList = [];           // [{ key, label, url, group }] — dropdown option values are indexes
+let adminToolList = [];           // [{ key, label, url, linkText, group }] — dropdown option values are indexes
 
 const ADMIN_RESPONSIBLE_LABELS = {
   office_coordinator: 'Office Coordinator', coordinator: 'Office Coordinator', agent: 'Agent',
@@ -6380,64 +6381,90 @@ function adminFieldLabel(text) {
   return `<span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">${text}</span>`;
 }
 
-// Builds the Tool dropdown's option list: every label/URL pair already on a
-// checklist item (so links with {transactionId} etc. stay pickable), then
-// Workshop tools and company resources not already covered by URL.
+// The Tool dropdown lists tools by name, A–Z, from tools-directory.js (one
+// entry per screen for a tool with `modes`, e.g. Cameron's Lens). A saved
+// link is matched to its tool by URL, so "Open Cameron's Stage" shows as
+// Cameron's Stage instead of hiding it. Links that match nothing in the
+// directory stay pickable under "Other links in use". Picking a different
+// tool saves its URL with "Open <tool>" as the link text; leaving the tool
+// unchanged keeps the item's existing link as saved. A tool with
+// `transactionParam` is saved as e.g. ./camerons-stage.html?transactionId=
+// {transactionId}, so the link opens the item's own transaction.
+function adminToolMatchKey(url) {
+  if (!url) return '';
+  const u = String(url).trim()
+    .replace(/^https?:\/\/(www\.)?/i, '').replace(/^johnadams\.org\//i, '').replace(/^\.?\//, '');
+  const [path, query = ''] = u.split('?');
+  const kept = query.split('&').filter(p => p && !/^transaction_?id=/i.test(p)).sort().join('&');
+  return (path.replace(/\/$/, '') + (kept ? '?' + kept : '')).toLowerCase();
+}
+
+function adminWithTransactionParam(url, param) {
+  return url + (url.includes('?') ? '&' : '?') + param + '={transactionId}';
+}
+
 function adminBuildToolList() {
   const list = [];
-  const seenUrls = new Set();
-  const byPair = new Map();
-  for (const t of adminTemplates) {
-    for (const it of (t.items || [])) {
-      if (!it.resource_url) continue;
-      const pair = `${it.resource_label || ''}|${it.resource_url}`;
-      if (byPair.has(pair)) {
-        const entry = byPair.get(pair);
-        entry.count++;
-        if (!entry.key && it.tool_key) entry.key = it.tool_key;
-        continue;
-      }
-      const entry = { key: it.tool_key || null, label: it.resource_label || it.resource_url, url: it.resource_url, group: 'used', count: 1 };
-      byPair.set(pair, entry);
-      list.push(entry);
-      seenUrls.add(it.resource_url);
+  const byMatch = new Map();
+  const add = (entry, matchUrls) => {
+    list.push(entry);
+    for (const u of matchUrls) {
+      const k = adminToolMatchKey(u);
+      if (k && !byMatch.has(k)) byMatch.set(k, entry);
     }
-  }
-  list.sort((a, b) => a.label.localeCompare(b.label));
+  };
   const directory = typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [];
   for (const r of directory) {
-    if (!r.url || seenUrls.has(r.url)) continue;
-    seenUrls.add(r.url);
-    list.push({ key: r.slug || null, label: r.name, url: r.url, group: r.kind === 'workshop' ? 'workshop' : 'resource' });
+    if (!r.url) continue;
+    const group = r.kind === 'workshop' ? 'workshop' : 'resource';
+    const p = r.transactionParam;
+    const saveUrl = url => p ? adminWithTransactionParam(url, p) : url;
+    if (r.modes && r.modes.length) {
+      // The bare URL opens the first mode's screen, so it matches that one.
+      r.modes.forEach((m, i) => add(
+        { key: m.key, label: `${r.name} — ${m.name}`, url: saveUrl(m.url), linkText: `Open ${r.name}`, group, opensTransaction: !!p },
+        i === 0 ? [m.url, r.url] : [m.url]));
+    } else {
+      add({ key: r.slug || null, label: r.name, url: saveUrl(r.url), linkText: `Open ${r.name}`, group, opensTransaction: !!p }, [r.url]);
+    }
   }
+  for (const t of adminTemplates) {
+    for (const it of (t.items || [])) {
+      if (!it.resource_url || byMatch.has(adminToolMatchKey(it.resource_url))) continue;
+      const label = it.resource_label || it.resource_url;
+      add({ key: it.tool_key || null, label, url: it.resource_url, linkText: label, group: 'other',
+            opensTransaction: /\{(transactionId|propertyAddress)\}/.test(it.resource_url) }, [it.resource_url]);
+    }
+  }
+  const order = { workshop: 0, resource: 1, other: 2 };
+  list.sort((a, b) => (order[a.group] - order[b.group]) || a.label.localeCompare(b.label));
   adminToolList = list;
+  adminToolByMatch = byMatch;
 }
+let adminToolByMatch = new Map();
 
 function adminToolIndexFor(item) {
   if (!item.resource_url) return '';
-  const i = adminToolList.findIndex(t => t.url === item.resource_url && t.label === (item.resource_label || item.resource_url));
+  const entry = adminToolByMatch.get(adminToolMatchKey(item.resource_url));
+  const i = entry ? adminToolList.indexOf(entry) : -1;
   return i >= 0 ? String(i) : '';
 }
 
 function adminToolSelectHtml(item) {
   const selected = adminToolIndexFor(item);
-  const dupLabels = new Set();
-  const seen = new Set();
-  adminToolList.forEach(t => { if (seen.has(t.label)) dupLabels.add(t.label); seen.add(t.label); });
-  const opt = (t, i) => {
-    const text = dupLabels.has(t.label) ? `${t.label} — ${t.url}` : t.label;
-    return `<option value="${i}" ${String(i) === selected ? 'selected' : ''}>${escapeHtml(text)}</option>`;
-  };
   const group = (name, label) => {
-    const opts = adminToolList.map((t, i) => t.group === name ? opt(t, i) : '').join('');
+    const opts = adminToolList.map((t, i) => t.group === name
+      ? `<option value="${i}" ${String(i) === selected ? 'selected' : ''}>${escapeHtml(t.label)}${t.opensTransaction ? ' · opens the transaction' : ''}</option>` : '').join('');
     return opts ? `<optgroup label="${label}">${opts}</optgroup>` : '';
   };
   return `
-    <select class="ai-tool" onchange="adminToolChanged(this)" style="${ADMIN_INPUT_STYLE}">
+    <select class="ai-tool" data-original="${selected}" data-original-url="${escapeHtml(item.resource_url || '')}"
+            data-original-label="${escapeHtml(item.resource_label || '')}" data-original-key="${escapeHtml(item.tool_key || '')}"
+            onchange="adminToolChanged(this)" style="${ADMIN_INPUT_STYLE}">
       <option value="" ${selected === '' ? 'selected' : ''}>No tool link</option>
-      ${group('used', 'Already used on checklists')}
       ${group('workshop', 'Workshop tools')}
       ${group('resource', 'Company resources')}
+      ${group('other', 'Other links in use')}
       <option value="new">+ Add another…</option>
     </select>`;
 }
@@ -6495,7 +6522,7 @@ function adminItemFieldsHtml(item) {
         </div>
         <div class="field" style="display:flex; flex-direction:column; gap:4px;">
           ${adminFieldLabel('URL')}
-          <input type="text" class="ai-resource-url" placeholder="https://… — {transactionId} is replaced with the transaction" style="${ADMIN_INPUT_STYLE}">
+          <input type="text" class="ai-resource-url" placeholder="https://… — {transactionId} and {propertyAddress} are filled in per transaction" style="${ADMIN_INPUT_STYLE}">
         </div>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);">
@@ -6586,7 +6613,13 @@ function adminBackToList() {
 
 function adminToolCellHtml(item) {
   if (!item.resource_url) return '<span style="color:var(--text-dim);">—</span>';
-  return escapeHtml(item.resource_label || item.resource_url);
+  const entry = adminToolByMatch.get(adminToolMatchKey(item.resource_url));
+  const name = entry && entry.group !== 'other' ? entry.label : (item.resource_label || item.resource_url);
+  const txn = item.resource_url.includes('{transactionId}')
+    ? ' <span class="chip chip-blue" title="Opens this transaction in the tool">transaction</span>' : '';
+  const addr = item.resource_url.includes('{propertyAddress}')
+    ? ' <span class="chip chip-blue" title="Fills in the property address">address</span>' : '';
+  return escapeHtml(name) + txn + addr;
 }
 
 function adminRenderTemplateDetail(t) {
@@ -6652,15 +6685,25 @@ function adminToggleItem(id) {
 }
 
 function adminReadItemFields(container) {
-  const toolValue = container.querySelector('.ai-tool').value;
+  const toolSelect = container.querySelector('.ai-tool');
+  const toolValue = toolSelect.value;
   let tool = { tool_key: null, resource_url: null, resource_label: null };
-  if (toolValue === 'new') {
+  if (toolValue !== '' && toolValue === toolSelect.dataset.original) {
+    // Same tool as before — keep the saved link text and tool_key. The link
+    // itself is kept too, unless the tool can open the transaction and the
+    // saved link doesn't yet; then it's upgraded to the transaction link.
+    const t = adminToolList[Number(toolValue)];
+    const d = toolSelect.dataset;
+    tool = t.opensTransaction && !d.originalUrl.includes('{transactionId}')
+      ? { tool_key: d.originalKey || t.key, resource_url: t.url, resource_label: d.originalLabel || t.linkText }
+      : {};
+  } else if (toolValue === 'new') {
     const url = container.querySelector('.ai-resource-url').value.trim();
     const label = container.querySelector('.ai-resource-label').value.trim();
     if (url) tool = { tool_key: null, resource_url: url, resource_label: label || null };
   } else if (toolValue !== '') {
     const t = adminToolList[Number(toolValue)];
-    tool = { tool_key: t.key, resource_url: t.url, resource_label: t.label };
+    tool = { tool_key: t.key, resource_url: t.url, resource_label: t.linkText };
   }
   return {
     sort_order: Number(container.querySelector('.ai-sort').value) || 0,
