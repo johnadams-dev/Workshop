@@ -6383,8 +6383,10 @@ function adminFieldLabel(text) {
 
 // The Tool dropdown lists tools by name, A–Z, from tools-directory.js (one
 // entry per screen for a tool with `modes`, e.g. Cameron's Lens). A saved
-// link is matched to its tool by URL, so "Open Cameron's Stage" shows as
-// Cameron's Stage instead of hiding it. Links that match nothing in the
+// link is matched to its tool by its tool_key first (so a link an admin has
+// since changed in Agent Records → Tools & Links still shows as that tool),
+// then by URL, so "Open Cameron's Stage" shows as Cameron's Stage instead of
+// hiding it. Links that match nothing in the
 // directory stay pickable under "Other links in use". Picking a different
 // tool saves its URL with "Open <tool>" as the link text; leaving the tool
 // unchanged keeps the item's existing link as saved. A tool with
@@ -6428,9 +6430,11 @@ function adminBuildToolList() {
       add({ key: r.slug || null, label: r.name, url: saveUrl(r.url), linkText: `Open ${r.name}`, group, opensTransaction: !!p }, [r.url]);
     }
   }
+  const directoryKeys = new Set(list.map(e => e.key).filter(Boolean));
   for (const t of adminTemplates) {
     for (const it of (t.items || [])) {
       if (!it.resource_url || byMatch.has(adminToolMatchKey(it.resource_url))) continue;
+      if (it.tool_key && directoryKeys.has(it.tool_key)) continue;
       const label = it.resource_label || it.resource_url;
       add({ key: it.tool_key || null, label, url: it.resource_url, linkText: label, group: 'other',
             opensTransaction: /\{(transactionId|propertyAddress)\}/.test(it.resource_url) }, [it.resource_url]);
@@ -6443,9 +6447,19 @@ function adminBuildToolList() {
 }
 let adminToolByMatch = new Map();
 
+// The live Tools & Links list usually arrives after the page loads (until
+// then the bundled copy is used): rebuild the dropdown, and redraw unless an
+// item is open for editing (so nothing being typed is lost).
+window.addEventListener('workshop-resources-updated', () => {
+  if (!adminTemplates.length) return;
+  adminBuildToolList();
+  if (adminOpenItemId == null) adminRenderTemplates();
+});
+
 function adminToolIndexFor(item) {
   if (!item.resource_url) return '';
-  const entry = adminToolByMatch.get(adminToolMatchKey(item.resource_url));
+  const entry = (item.tool_key && adminToolList.find(t => t.group !== 'other' && t.key === item.tool_key))
+    || adminToolByMatch.get(adminToolMatchKey(item.resource_url));
   const i = entry ? adminToolList.indexOf(entry) : -1;
   return i >= 0 ? String(i) : '';
 }

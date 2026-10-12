@@ -645,104 +645,44 @@ const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
 let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 
-// ── External tool links — filled in 2026-08-21 from the live ACCAgents
-// site (captured directly, since the Google Sites API route in
-// scripts/verify-google-sites-access.js doesn't work — see agent-hub-plan.md
-// Step 2). Cards still render defensively (grayed/disabled) if a URL is
-// ever emptied out again. ──────────────────────────────────────────────────
-const FRED_URL      = 'https://app.realforce.com/login';
-const MCFL_URL      = 'https://online.adamscameron.com/marketing/mcfl';
-const AC_SOCIAL_URL = 'https://adamscameron.advocacy.sproutsocial.com/login/sso?dest=%2Ffeed';
-const ASK_CAMERON_URL = 'https://notebook.google.com/notebook/fe6d893f-889c-4004-bebd-386bd25830a8?pli=1';
+// ── Tools & Links ─────────────────────────────────────────────────────────────
+// The sidebar menu, the More Tools cards and the FRED / MCFL / AC Social /
+// Ask Cameron links all come from the Tools & Links directory
+// (tools-directory.js, kept current by admins in Agent Records → Tools &
+// Links). Each entry's hubSidebarCategory puts it in a sidebar section, its
+// hubSidebarAccess limits who sees it there ('manager' = admin/sales manager,
+// 'staff' = any staff level, office coordinators included — match the access
+// its own page and routes enforce), and hubMoreTools makes it a More Tools
+// card. Section order is fixed here; entries keep the directory's order.
+const SIDEBAR_SECTIONS = ['Find New Prospects', 'Listing Marketing', 'Maintain Relationships', 'Learn and Find Help', 'Office and Operations'];
 
-// Static fallback for the intranet ("ACCAgents") tools section — a live
-// pull via the Google Sites API was attempted and does not currently work
-// (see scripts/verify-google-sites-access.js and agent-hub-plan.md Step 2).
-// Seeded 2026-08-21 from a direct capture of the live site (a curated subset —
-// tools already represented elsewhere on this page, e.g. Market Update,
-// Contract Calculator, Cameron's Lens, aren't repeated here). Add/update by
-// hand as the intranet changes.
-const INTRANET_LINKS = [
-  { title: 'DeltaNet', desc: 'General marketing platform including website, CRM, flyers, and more.', url: 'https://online.adamscameron.com/home', icon: '🌐', external: true },
-  { title: 'Daytona MLS (FlexMLS)', desc: 'MLS for the Daytona Beach area.', url: 'http://dba.flexmls.com/', icon: '🏠', external: true },
-  { title: 'StellarMLS', desc: 'MLS for all of Central Florida except Daytona.', url: 'https://stellar.mlsmatrix.com/', icon: '🏠', external: true },
-  { title: 'Form Simplicity', desc: 'Transaction management system with electronic signatures and broker submittal.', url: 'http://forms.formsimplicity.com/', icon: '📝', external: true },
-  { title: 'AdWerx', desc: 'Online marketing platform to target the area around the listing or sphere of influence.', url: 'http://adamscameron.adwerx.com', icon: '📣', external: true },
-  { title: 'Institute (LeadingRE Learning)', desc: 'Online real estate training platform.', url: 'https://in.leadingre.com/learn', icon: '🎓', external: true },
-  { title: 'DeltaNet Academy', desc: 'Online training platform for the DeltaNet marketing platform.', url: 'https://online.adamscameron.com/training_resources/deltanet_academy', icon: '🎓', external: true },
-  { title: 'CE Shop (agent discount)', desc: 'Continuing education.', url: 'https://adamscameron.theceshop.com/real-estate', icon: '📚', external: true },
-  { title: 'Questions Forum', desc: 'Forum for discussing any number of topics with fellow agents.', url: 'https://groups.google.com/a/adamscameron.com/g/questionsgroup', icon: '💬', external: true },
-  { title: 'ACCAgents Intranet', desc: 'Platform to find a wide variety of Adams Cameron resources.', url: 'https://sites.google.com/adamscameron.com/agent-portal-v2', icon: '🏠', external: true },
-];
+function directoryEntries() {
+  return typeof WORKSHOP_RESOURCES !== 'undefined' ? WORKSHOP_RESOURCES : [];
+}
+function isExternalUrl(url) { return /^(https?:|mailto:)/.test(url || ''); }
+// A resource's current link by slug ('' when it has none).
+function resourceUrl(slug) { return directoryEntries().find(r => r.slug === slug)?.url || ''; }
 
-// ── Sidebar tool menu ─────────────────────────────────────────────────────────
-// Mirrors index.html's category grouping (see CLAUDE.md's Tools Directory),
-// deduped — each cross-listed tool (Lockbox Manager, ACC Binder, Contract
-// Date Calculator, Hotsheet) appears once, under whichever category it's
-// most associated with, rather than repeated per index.html's cross-listing
-// convention — a persistent sidebar benefits more from one entry per item
-// than a long scrolling page does. `gated: true` items only render for
-// S.isManager (admin/sales manager); `staffOnly: true` items render for any
-// staff level, office coordinators included — match each to the access its
-// own page and routes enforce (requireManager vs requireStaff).
-const SIDEBAR_CATEGORIES = [
-  { label: 'Find New Prospects', items: [
-    { title: 'Floor Time', url: './floor-time.html', icon: '📅' },
-    { title: 'Hold an Open House', url: './hold-open-house.html', icon: '🏠' },
-    { title: 'Agent Notices', url: './agent-notices.html', icon: '📋' },
-    { title: 'Bio Creator', url: './bio-creator.html', icon: '✍️' },
-    { title: 'Photo Updater', url: './photo-updater.html', icon: '🖼️' },
-    { title: 'Online Presence Audit', url: './social-audit.html', icon: '🔍' },
-    { title: 'DeltaNet Profile Audit', url: './deltanet-profile-audit.html', icon: '📋' },
-  ]},
-  { label: 'Listing Marketing', items: [
-    { title: 'Market Update', url: './market-update.html', icon: '📊' },
-    { title: 'MLS Magic', url: 'https://mls-data-sync.web.app/', icon: '✨', external: true },
-    { title: "Cameron's Lens", url: './camerons-lens.html', icon: '📸' },
-    { title: "Cameron's Stage", url: './camerons-stage.html', icon: '🎵' },
-    { title: 'Marketing Plan', url: './marketing-plan.html', icon: '📋' },
-    { title: 'Open House Listing Manager', url: './open-house-listings.html', icon: '🗓️' },
-    { title: "Cameron's Stage — Outside Listings", url: './camerons-stage-external.html', icon: '🎬', gated: true },
-    { title: 'Lockbox Manager', url: './lockbox-app.html', icon: '🔑' },
-    { title: 'ACC Binder', url: './acc-binder.html', icon: '📋' },
-    { title: 'Contract Date Calculator', url: './contract-calculator.html', icon: '📅' },
-    { title: 'Hotsheet', url: './hotsheet-v2.html', icon: '📊' },
-  ]},
-  { label: 'Maintain Relationships', items: [
-    { title: 'Review Engine', url: './review-engine.html', icon: '⭐', gated: true },
-    { title: 'AC Foundation', url: './foundation.html', icon: '🏛' },
-    { title: 'Customer Portal', url: './portal-share.html', icon: '🏡' },
-  ]},
-  { label: 'Learn and Find Help', items: [
-    { title: 'AC Pathfinder', url: './pathfinder.html', icon: '🧭' },
-    { title: 'Agent Recognition Quiz', url: './agent-quiz.html', icon: '🧑‍🤝‍🧑' },
-    { title: 'Staff Reference Guide', url: './staff-guide.html', icon: '📖', gated: true },
-  ]},
-  { label: 'Office and Operations', items: [
-    { title: 'Agent Roster', url: './roster.html', icon: '👥' },
-    { title: 'Agent Records', url: './agent-master-form.html', icon: '🗂️', gated: true },
-    { title: 'Daily Desk', url: './daily-desk.html', icon: '📋', gated: true },
-    { title: 'Agent Onboarding & Offboarding', url: './agent-checklists.html', icon: '🗂️', gated: true },
-    { title: 'Marketing Bucks', url: './marketing-bucks.html', icon: '💰', staffOnly: true },
-    { title: 'Scorecard Report', url: './scorecard-report.html', icon: '📈', gated: true },
-    { title: 'Broadcast Messaging', url: './broadcast-messaging.html', icon: '📣', gated: true },
-    { title: 'Scorecard Data Entry', url: './scorecard-entry.html', icon: '📊', gated: true },
-    { title: 'Tool Usage', url: './usage-stats.html', icon: '📈', gated: true },
-    { title: 'Mr. Johnson from Accounts', url: './bi-chat.html', icon: '📊', gated: true },
-    { title: 'Production Leaderboard', url: './leaderboard.html', icon: '🏆' },
-  ]},
-];
+function sidebarCategories() {
+  return SIDEBAR_SECTIONS.map(label => ({
+    label,
+    items: directoryEntries()
+      .filter(r => r.hubSidebarCategory === label && r.url)
+      .map(r => ({ title: r.shortName || r.name, url: r.url, icon: r.icon || '🔗', external: isExternalUrl(r.url),
+                   gated: r.hubSidebarAccess === 'manager', staffOnly: r.hubSidebarAccess === 'staff' })),
+  }));
+}
 
 // Permanent, always at the bottom of the menu regardless of category/role.
 const PINNED_LINKS = [
   { title: 'Workshop Guide', url: './workshop-guide.html', icon: '📘' },
   { title: 'Feedback & Support', url: './feedback.html?tool=agent-hub', icon: '💬' },
-  { title: 'Ask Cameron', url: '', icon: '🤖' }, // url filled in from ASK_CAMERON_URL at render time
+  { title: 'Ask Cameron', url: '', icon: '🤖' }, // url filled in from the directory's ask-cameron entry at render time
 ];
 
 function renderSidebar() {
   const el = document.getElementById('sidebar');
-  const categoriesHtml = SIDEBAR_CATEGORIES.map(cat => {
+  const categoriesHtml = sidebarCategories().map(cat => {
     const items = cat.items.filter(i => (!i.gated || S.isManager) && (!i.staffOnly || S.isStaff));
     if (!items.length) return '';
     return `<div class="nav-cat">
@@ -751,7 +691,7 @@ function renderSidebar() {
     </div>`;
   }).join('');
 
-  const pinned = PINNED_LINKS.map(l => navLinkHtml(l.title === 'Ask Cameron' ? { ...l, url: ASK_CAMERON_URL, external: true } : l)).join('');
+  const pinned = PINNED_LINKS.map(l => navLinkHtml(l.title === 'Ask Cameron' ? { ...l, url: resourceUrl('ask-cameron'), external: true } : l)).join('');
 
   el.innerHTML = `${categoriesHtml}<div class="nav-pinned">${pinned}</div>`;
 }
@@ -1721,9 +1661,9 @@ async function copyPortalLink(btn) {
 function toolsForStrategy(slug) {
   const map = {
     floor_time: [{ title: 'Floor Time', url: './floor-time.html', icon: '📅' }],
-    soi:              [{ title: 'FRED', url: FRED_URL, icon: '📣' }, { title: 'MCFL (via DeltaNet)', url: MCFL_URL, icon: '💌' }],
-    referral_network: [{ title: 'MCFL (via DeltaNet)', url: MCFL_URL, icon: '💌' }],
-    social:           [{ title: 'AC Social', url: AC_SOCIAL_URL, icon: '📱' }],
+    soi:              [{ title: 'FRED', url: resourceUrl('fred'), icon: '📣' }, { title: 'MCFL (via DeltaNet)', url: resourceUrl('mcfl'), icon: '💌' }],
+    referral_network: [{ title: 'MCFL (via DeltaNet)', url: resourceUrl('mcfl'), icon: '💌' }],
+    social:           [{ title: 'AC Social', url: resourceUrl('ac-social'), icon: '📱' }],
   };
   return map[slug] || [];
 }
@@ -1761,17 +1701,25 @@ function renderOnboardingSection(deltanetAudit) {
 }
 
 // ── Always-shown section ──────────────────────────────────────────────────────
-const ALWAYS_LINKS = [
-  { title: 'Online Presence Audit', desc: 'See how you show up in search and on social.', url: './social-audit.html', icon: '🔍', badge: 'badge-slate' },
-  { title: 'Ask Cameron', desc: 'AI assistant for marketing and listing questions (Notebook).', url: ASK_CAMERON_URL, icon: '🤖', badge: 'badge-gold', external: true },
-  { title: 'FRED', desc: 'AI based targeted marketing platform to find buyers for a particular listing.', url: FRED_URL, icon: '📣', badge: 'badge-slate', external: true },
-  { title: 'MCFL (via DeltaNet)', desc: 'Personally customized newsletter to provide valuable content to your connections.', url: MCFL_URL, icon: '💌', badge: 'badge-slate', external: true },
-  { title: 'AC Social', desc: 'Social media posting tool with curated articles that can be scheduled to generate content.', url: AC_SOCIAL_URL, icon: '📱', badge: 'badge-slate', external: true },
-  ...INTRANET_LINKS.map(l => ({ title: l.title, desc: l.desc, url: l.url, icon: l.icon, badge: 'badge-slate', external: true })),
-];
+// The More Tools cards: every directory entry marked hubMoreTools, in
+// directory order. Entries without a link render as a dimmed "Link coming
+// soon" card (see portalCardHtml).
+function alwaysLinks() {
+  return directoryEntries()
+    .filter(r => r.hubMoreTools)
+    .map(r => ({ title: r.name, desc: r.description || '', url: r.url, icon: r.icon || '🔗', badge: 'badge-slate', external: isExternalUrl(r.url) }));
+}
+
+// The live Tools & Links list usually arrives after the first render (until
+// then the bundled copy is used) — redraw whatever was already drawn from it.
+window.addEventListener('workshop-resources-updated', () => {
+  if (document.getElementById('sidebar').innerHTML.trim()) renderSidebar();
+  if (document.getElementById('alwaysSection').innerHTML.trim()) renderAlways();
+  if (document.getElementById('tool-search').value.trim()) filterTools();
+});
 
 function renderAlways() {
-  document.getElementById('alwaysSection').innerHTML = ALWAYS_LINKS
+  document.getElementById('alwaysSection').innerHTML = alwaysLinks()
     .map(l => portalCardHtml(l.title, l.desc, l.url, l.icon, l.badge, '', l.external))
     .join('');
 }

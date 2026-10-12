@@ -208,6 +208,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="tab-btn" id="tab-roster" onclick="switchMode('roster')">Roster</button>
     <button class="tab-btn" id="tab-partners" onclick="switchMode('partners')">Partners</button>
     <button class="tab-btn" id="tab-offices" onclick="switchMode('offices')">Offices</button>
+    <button class="tab-btn" id="tab-tools" onclick="switchMode('tools')">Tools &amp; Links</button>
   </div>
   <div class="topbar-right">
     <a href="./feedback.html?tool=agent-master-form" style="font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em">Feedback</a>
@@ -216,6 +217,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="btn btn-secondary btn-sm" id="add-agent-btn" onclick="openNewAgent()" style="display:none">+ Add Agent</button>
     <button class="btn btn-secondary btn-sm" id="add-staff-btn" onclick="openNewStaff()" style="display:none">+ Add Staff</button>
     <button class="btn btn-secondary btn-sm" id="add-partner-btn" onclick="openNewPartner()" style="display:none">+ Add Partner</button>
+    <button class="btn btn-secondary btn-sm" id="add-tool-btn" onclick="openNewTool()" style="display:none">+ Add Resource</button>
     <button class="btn btn-secondary btn-sm" id="sync-pp-btn" onclick="syncProfitPowerIds()" style="display:none">Sync PP IDs</button>
     <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportCsv()">Export</button>
   </div>
@@ -324,6 +326,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div style="padding:24px;text-align:center;color:var(--muted)">
           <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tools & Links Panel — the directory behind search, Agent Hub's menu and
+     More Tools cards, the checklist tool picker and the SMS assistants
+     (server: tools-directory-routes.js). Admins edit; other staff can view. -->
+<div id="tools-panel" style="display:none;height:calc(100vh - 50px);overflow:auto;padding:24px 28px;background:var(--bg);box-sizing:border-box">
+  <div style="max-width:960px;margin:0 auto">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6">
+      Every Workshop tool and company resource shown in search, Agent Hub's menu and More Tools cards, the checklist tool picker and the text-message assistant.
+      A link changed here updates all of those, and existing checklist items that use it. Links are checked every night; broken ones are flagged here and emailed to John.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <input type="search" id="tools-search" placeholder="Search name, link, description or tag…" oninput="renderTools()" style="flex:1;min-width:220px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit">
+      <select id="tools-kind" onchange="renderTools()" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit">
+        <option value="">Tools and resources</option>
+        <option value="workshop">Workshop tools</option>
+        <option value="resource">Company resources</option>
+      </select>
+      <select id="tools-show" onchange="renderTools()" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit">
+        <option value="">Everything</option>
+        <option value="broken">Broken links</option>
+        <option value="nolink">No link yet</option>
+        <option value="hidden">Hidden</option>
+      </select>
+    </div>
+    <div id="tools-summary" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+    <div id="tools-groups">
+      <div style="padding:24px;text-align:center;color:var(--muted)">
+        <div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…
       </div>
     </div>
   </div>
@@ -544,6 +578,63 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Tools & Links edit modal -->
+<div class="modal-overlay" id="tool-modal">
+  <div class="modal" style="max-width:600px;width:100%;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-head"><span id="tool-modal-title">Edit</span> <button onclick="closeToolModal()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body" style="overflow:auto">
+      <div class="fg">
+        <div class="field"><label>Name</label><input type="text" id="td-name"></div>
+        <div class="field"><label>Short name <span style="font-weight:400;color:var(--muted)">(Agent Hub menu)</span></label><input type="text" id="td-short-name" placeholder="Optional"></div>
+      </div>
+      <div class="field">
+        <label>Link</label>
+        <input type="text" id="td-url" placeholder="https://…">
+        <div id="td-url-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="td-description" rows="3" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box"></textarea></div>
+      <div class="field"><label>Search tags <span style="font-weight:400;color:var(--muted)">(comma-separated)</span></label><input type="text" id="td-tags"></div>
+      <div class="fg">
+        <div class="field"><label>Icon</label><input type="text" id="td-icon" placeholder="e.g. 📣" maxlength="16"></div>
+        <div class="field"><label>Order</label><input type="number" id="td-sort-order"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px"><input type="checkbox" id="td-active"> Shown (untick to hide it everywhere)</label>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px"><input type="checkbox" id="td-manager-only"> Staff only — left out of search for agents</label>
+      <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px;font-weight:700;font-size:12px;color:var(--navy)">Agent Hub</div>
+      <div class="fg">
+        <div class="field">
+          <label>Menu section</label>
+          <select id="td-hub-category">
+            <option value="">Not in the menu</option>
+            <option>Find New Prospects</option>
+            <option>Listing Marketing</option>
+            <option>Maintain Relationships</option>
+            <option>Learn and Find Help</option>
+            <option>Office and Operations</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Who sees it in the menu</label>
+          <select id="td-hub-access">
+            <option value="everyone">Everyone</option>
+            <option value="staff">Staff</option>
+            <option value="manager">Managers and admins</option>
+          </select>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px"><input type="checkbox" id="td-hub-more-tools"> Show as a More Tools card</label>
+      <div id="td-history-wrap" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-weight:700;font-size:12px;color:var(--navy);margin-bottom:6px">Change history</div>
+        <div id="td-history" style="font-size:12px;color:var(--muted)"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeToolModal()">Cancel</button>
+      <button class="btn btn-primary" id="td-save-btn" onclick="saveTool()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROXY_URL    = 'https://mls-proxy-975684028597.us-east1.run.app';
@@ -616,6 +707,7 @@ async function load() {
     toast(`${allAgents.length} agents`, 'ok');
 
     loadGoogleUsers(); // background — populates googleSnap for reconciliation panel
+    if (new URLSearchParams(location.search).get('tab') === 'tools') switchMode('tools');
   } catch(e) { toast('Load failed: '+e.message,'err'); }
 }
 
@@ -1924,16 +2016,19 @@ async function switchMode(mode) {
   const rosterMode = (mode === 'roster');
   const partnersMode = (mode === 'partners');
   const officesMode = (mode === 'offices');
-  const otherPanel = rosterMode || partnersMode || officesMode;
+  const toolsMode = (mode === 'tools');
+  const otherPanel = rosterMode || partnersMode || officesMode || toolsMode;
   document.getElementById('tab-agents').classList.toggle('active', mode === 'agents');
   document.getElementById('tab-staff').classList.toggle('active', mode === 'staff');
   document.getElementById('tab-roster').classList.toggle('active', mode === 'roster');
   document.getElementById('tab-partners').classList.toggle('active', mode === 'partners');
   document.getElementById('tab-offices').classList.toggle('active', mode === 'offices');
-  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : officesMode ? 'Offices' : staffMode ? 'Staff Records' : 'Agent Records';
+  document.getElementById('tab-tools').classList.toggle('active', mode === 'tools');
+  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : officesMode ? 'Offices' : toolsMode ? 'Tools & Links' : staffMode ? 'Staff Records' : 'Agent Records';
   document.getElementById('add-agent-btn').style.display = !staffMode && !otherPanel && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-partner-btn').style.display = partnersMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('add-tool-btn').style.display = toolsMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('sync-pp-btn').style.display = !staffMode && !otherPanel && (USER_ROLE === 'admin' || USER_ROLE === 'sales_manager') ? '' : 'none';
   document.getElementById('export-btn').style.display   = (staffMode || otherPanel) ? 'none' : '';
   document.getElementById('issue-summary').style.display = (staffMode || otherPanel) ? 'none' : '';
@@ -1943,6 +2038,7 @@ async function switchMode(mode) {
   document.getElementById('roster-panel').style.display = rosterMode ? 'block' : 'none';
   document.getElementById('partners-panel').style.display = partnersMode ? 'block' : 'none';
   document.getElementById('offices-panel').style.display = officesMode ? 'block' : 'none';
+  document.getElementById('tools-panel').style.display = toolsMode ? 'block' : 'none';
 
   if (rosterMode) {
     loadRosterReport();
@@ -1954,6 +2050,10 @@ async function switchMode(mode) {
   }
   if (officesMode) {
     loadOffices();
+    return;
+  }
+  if (toolsMode) {
+    loadTools();
     return;
   }
 
@@ -2124,6 +2224,236 @@ async function reactivatePartner(id) {
     renderPartners();
     toast('Partner reactivated', 'ok');
   } catch (e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── Tools & Links tab ─────────────────────────────────────────────────────────
+// The Tools & Links directory (server: tools-directory-routes.js). Admins edit;
+// other staff can look. A Workshop page's own address comes from the code and
+// can't be changed here (urlEditable is false for those); outside tools (e.g.
+// MLS Magic) and company resources can.
+let allTools = [], _toolsLoaded = false, editingToolId = null;
+const TOOL_FIELD_LABELS = {
+  name: 'Name', short_name: 'Short name', description: 'Description', url: 'Link', tags: 'Tags', icon: 'Icon',
+  manager_only: 'Staff only', active: 'Shown', sort_order: 'Order', hub_sidebar_category: 'Agent Hub menu section',
+  hub_sidebar_access: 'Agent Hub menu visibility', hub_more_tools: 'More Tools card',
+};
+
+async function loadTools(force) {
+  if (_toolsLoaded && !force) { renderTools(); return; }
+  try {
+    const r = await fetch(`${PROXY_URL}/tools-directory/admin`, { headers: H() });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
+    allTools = await r.json();
+    _toolsLoaded = true;
+    renderTools();
+  } catch (e) {
+    document.getElementById('tools-groups').innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted)">Failed to load Tools &amp; Links: ${esc(e.message)}</div>`;
+  }
+}
+
+function fmtToolDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function toolLinkStatusHtml(t) {
+  if (!t.url) return `<span class="badge badge-issue">No link yet</span>`;
+  if (/^mailto:/i.test(t.url)) return '';
+  if (t.linkStatus === 'broken') {
+    return `<span class="badge badge-missing" title="${esc(t.linkError || '')}">Broken since ${esc(fmtToolDate(t.linkBrokenSince))}${t.linkError ? ' · ' + esc(t.linkError) : ''}</span>`;
+  }
+  if (t.linkStatus === 'ok') return `<span class="badge badge-active" title="Checked ${esc(fmtToolDate(t.linkCheckedAt))}">Working</span>`;
+  return `<span class="badge badge-inactive">Not checked yet</span>`;
+}
+
+function renderTools() {
+  const q = document.getElementById('tools-search').value.trim().toLowerCase();
+  const kind = document.getElementById('tools-kind').value;
+  const show = document.getElementById('tools-show').value;
+  const isAdmin = USER_ROLE === 'admin';
+  const rows = allTools.filter(t => {
+    if (kind && t.kind !== kind) return false;
+    if (show === 'broken' && t.linkStatus !== 'broken') return false;
+    if (show === 'nolink' && t.url) return false;
+    if (show === 'hidden' && t.active) return false;
+    if (!q) return true;
+    return [t.name, t.shortName, t.url, t.description, ...(t.tags || [])].filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+
+  const broken = allTools.filter(t => t.active && t.linkStatus === 'broken').length;
+  const noLink = allTools.filter(t => t.active && !t.url).length;
+  document.getElementById('tools-summary').innerHTML =
+    `${allTools.length} entries` +
+    (broken ? ` · <a href="#" onclick="document.getElementById('tools-show').value='broken';renderTools();return false" style="color:var(--miss-t);font-weight:600">${broken} broken link${broken === 1 ? '' : 's'}</a>` : ' · no broken links') +
+    (noLink ? ` · <a href="#" onclick="document.getElementById('tools-show').value='nolink';renderTools();return false">${noLink} without a link yet</a>` : '');
+
+  const group = (label, list) => !list.length ? '' : `
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">${esc(label)} (${list.length})</div>
+      <div class="card-body" style="padding:0">
+        ${list.map(t => `
+          <div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px${t.active ? '' : ';opacity:.6'}">
+            <div style="display:flex;gap:10px;align-items:flex-start;min-width:0">
+              <div style="width:28px;text-align:center;font-size:18px;flex-shrink:0">${esc(t.icon || '')}</div>
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:13px;color:var(--navy)">
+                  ${esc(t.name)}
+                  ${!t.active ? '<span class="badge badge-inactive" style="margin-left:6px">Hidden</span>' : ''}
+                  ${t.managerOnly ? '<span class="badge badge-office" style="margin-left:6px">Staff only</span>' : ''}
+                  ${t.hubSidebarCategory ? `<span class="badge badge-inactive" style="margin-left:6px" title="Agent Hub menu">Menu: ${esc(t.hubSidebarCategory)}</span>` : ''}
+                  ${t.hubMoreTools ? '<span class="badge badge-inactive" style="margin-left:6px">More Tools card</span>' : ''}
+                </div>
+                <div style="font-size:12px;margin-top:3px;word-break:break-all">
+                  ${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener" style="color:var(--muted)">${esc(t.url)}</a>` : ''}
+                  ${toolLinkStatusHtml(t)}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              ${isAdmin && t.url && !/^mailto:/i.test(t.url) ? `<button class="btn btn-secondary btn-sm" onclick="checkToolLink(${t.id}, this)">Check</button>` : ''}
+              <button class="btn btn-secondary btn-sm" onclick="openEditTool(${t.id})">${isAdmin ? 'Edit' : 'View'}</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  const html = group('Workshop tools', rows.filter(t => t.kind === 'workshop')) + group('Company resources', rows.filter(t => t.kind === 'resource'));
+  document.getElementById('tools-groups').innerHTML = html || `<div style="padding:24px;text-align:center;color:var(--muted)">Nothing matches.</div>`;
+}
+
+function fillToolForm(t) {
+  const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+  set('td-name', t.name);
+  set('td-short-name', t.shortName);
+  set('td-url', t.url);
+  set('td-description', t.description);
+  set('td-tags', (t.tags || []).join(', '));
+  set('td-icon', t.icon);
+  set('td-sort-order', t.sortOrder);
+  set('td-hub-category', t.hubSidebarCategory || '');
+  set('td-hub-access', t.hubSidebarAccess || 'everyone');
+  document.getElementById('td-active').checked = t.active !== false;
+  document.getElementById('td-manager-only').checked = !!t.managerOnly;
+  document.getElementById('td-hub-more-tools').checked = !!t.hubMoreTools;
+
+  const urlInput = document.getElementById('td-url');
+  urlInput.disabled = t.urlEditable === false;
+  document.getElementById('td-url-note').textContent = t.urlEditable === false
+    ? "This is a Workshop page — its address comes from the page itself and can't be changed here."
+    : 'https://… for a website, or mailto:name@adamscameron.com for an email contact. Leave blank if there is no link yet.';
+
+  const isAdmin = USER_ROLE === 'admin';
+  document.querySelectorAll('#tool-modal input, #tool-modal select, #tool-modal textarea').forEach(el => {
+    if (el.id !== 'td-url') el.disabled = !isAdmin;
+    else if (!isAdmin) el.disabled = true;
+  });
+  document.getElementById('td-save-btn').style.display = isAdmin ? '' : 'none';
+}
+
+function openEditTool(id) {
+  const t = allTools.find(x => x.id === id);
+  if (!t) return;
+  editingToolId = id;
+  document.getElementById('tool-modal-title').textContent = `${t.kind === 'workshop' ? 'Workshop tool' : 'Company resource'}: ${t.name}`;
+  document.getElementById('td-save-btn').textContent = 'Save Changes';
+  fillToolForm(t);
+  document.getElementById('td-history-wrap').style.display = '';
+  document.getElementById('td-history').textContent = 'Loading…';
+  document.getElementById('tool-modal').classList.add('open');
+  loadToolHistory(id);
+}
+
+function openNewTool() {
+  editingToolId = null;
+  document.getElementById('tool-modal-title').textContent = 'Add Company Resource';
+  document.getElementById('td-save-btn').textContent = 'Add Resource';
+  fillToolForm({ kind: 'resource', urlEditable: true, active: true, hubSidebarAccess: 'everyone' });
+  document.getElementById('td-sort-order').value = '';
+  document.getElementById('td-history-wrap').style.display = 'none';
+  document.getElementById('tool-modal').classList.add('open');
+}
+
+function closeToolModal() { document.getElementById('tool-modal').classList.remove('open'); }
+
+function fmtToolValue(field, v) {
+  if (v == null || v === '') return '(blank)';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '(none)';
+  if (typeof v === 'boolean') return v ? 'yes' : 'no';
+  return String(v);
+}
+
+async function loadToolHistory(id) {
+  const el = document.getElementById('td-history');
+  try {
+    const r = await fetch(`${PROXY_URL}/tools-directory/admin/${id}/history`, { headers: H() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rows = await r.json();
+    if (editingToolId !== id) return;
+    el.innerHTML = rows.length ? rows.map(h => `
+      <div style="padding:5px 0;border-bottom:1px solid var(--border)">
+        <div><strong style="color:var(--navy)">${esc(fmtToolDate(h.changed_at))}</strong> · ${esc(h.changed_by || 'unknown')}${h.action === 'created' ? ' · added' : ''}</div>
+        ${Object.entries(h.changes || {}).map(([f, c]) => `<div>${esc(TOOL_FIELD_LABELS[f] || f)}: ${esc(fmtToolValue(f, c.from))} → ${esc(fmtToolValue(f, c.to))}</div>`).join('')}
+      </div>`).join('') : 'No changes yet — this is the list as it was set up.';
+  } catch (e) {
+    el.textContent = "Couldn't load the history: " + e.message;
+  }
+}
+
+async function saveTool() {
+  const val = (id) => document.getElementById(id).value.trim();
+  const body = {
+    name: val('td-name'),
+    short_name: val('td-short-name') || null,
+    description: val('td-description') || null,
+    tags: val('td-tags'),
+    icon: val('td-icon') || null,
+    manager_only: document.getElementById('td-manager-only').checked,
+    active: document.getElementById('td-active').checked,
+    hub_sidebar_category: val('td-hub-category') || null,
+    hub_sidebar_access: val('td-hub-access'),
+    hub_more_tools: document.getElementById('td-hub-more-tools').checked,
+  };
+  if (val('td-sort-order') !== '') body.sort_order = parseInt(val('td-sort-order'), 10);
+  if (!document.getElementById('td-url').disabled) body.url = val('td-url') || null;
+  if (!body.name) { alert('Name is required.'); return; }
+
+  const btn = document.getElementById('td-save-btn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(
+      editingToolId ? `${PROXY_URL}/tools-directory/admin/${editingToolId}` : `${PROXY_URL}/tools-directory/admin`,
+      { method: editingToolId ? 'PUT' : 'POST', headers: H(), body: JSON.stringify(body) }
+    );
+    const saved = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(saved.error || 'HTTP ' + r.status);
+    const idx = allTools.findIndex(x => x.id === saved.id);
+    if (idx >= 0) allTools[idx] = saved; else allTools.push(saved);
+    allTools.sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name));
+    closeToolModal();
+    renderTools();
+    const linkNote = saved.linkStatus === 'broken' ? ` — but the link isn't working (${saved.linkError || 'no answer'})` : '';
+    toast((editingToolId ? 'Saved' : 'Resource added') + linkNote, saved.linkStatus === 'broken' ? 'err' : 'ok');
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function checkToolLink(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const r = await fetch(`${PROXY_URL}/tools-directory/admin/${id}/check`, { method: 'POST', headers: H() });
+    const saved = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(saved.error || 'HTTP ' + r.status);
+    const idx = allTools.findIndex(x => x.id === id);
+    if (idx >= 0) allTools[idx] = saved;
+    renderTools();
+    toast(saved.linkStatus === 'broken' ? `${saved.name}: not working (${saved.linkError || 'no answer'})` : `${saved.name}: working`, saved.linkStatus === 'broken' ? 'err' : 'ok');
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Check'; }
+  }
 }
 
 // ── Offices tab — phone/address only (see PUT /roster/offices/:id) ──────────
