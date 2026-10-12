@@ -271,18 +271,23 @@ function cardHtml(g) {
 // A listing open "anytime" (vacant — set by the listing agent) has a date for
 // every day, so instead of ~90 buttons: a date picker, with the picked dates
 // shown as buttons that can be tapped to remove.
+// The picker only holds the date; the Add button commits it. Acting on its
+// change event instead broke phones: iOS fires change the moment the picker
+// opens (pre-filled with today), and the re-render closed it.
 function anytimePickerHtml(g, picked) {
   const dates = g.slots.map(s => s.date).sort();
   const chosen = g.slots.filter(s => picked.has(s.availability_date_id));
   return `<div class="meta"><strong>Open anytime</strong> — any day, ${esc(fmtWindow(g.anytime_start, g.anytime_end))}.</div>
-    <div class="chips" role="group" aria-label="Pick dates">
-      <label class="meta">Pick a date <input type="date" min="${dates[0] || ''}" max="${dates[dates.length - 1] || ''}" onchange="pickAnytime('${g.transaction_id}', this.value); this.value = ''"></label>
+    <div class="chips" role="group" aria-label="Pick dates" style="align-items:center">
+      <label class="meta">Pick a date <input type="date" id="d-${g.transaction_id}" min="${dates[0] || ''}" max="${dates[dates.length - 1] || ''}"></label>
+      <button class="btn" onclick="pickAnytime('${g.transaction_id}')">Add date</button>
       ${chosen.map(s => `<button class="chip" aria-pressed="true" title="Remove" onclick="toggleSlot('${g.transaction_id}','${s.availability_date_id}')">${esc(fmtDay(s.date))} · ${esc(fmtWindow(s.start, s.end))} ✕</button>`).join('')}
     </div>`;
 }
 
-function pickAnytime(txn, date) {
-  if (!date) return;
+function pickAnytime(txn) {
+  const date = document.getElementById('d-' + txn)?.value;
+  if (!date) { toast('Pick a date first.', true); return; }
   const slot = S.slots.find(s => s.transaction_id === txn && s.date === date);
   if (!slot) { toast(`${fmtDay(date)} isn't available on this listing — it may be reserved or marked not available.`, true); return; }
   const set = (S.picked[txn] ||= new Set());
@@ -310,8 +315,8 @@ async function updatePreview(txn) {
   for (const s of slots) if (document.getElementById('s-' + s.availability_date_id)) readTimes(s); // remember typed times
   box.innerHTML = `<div class="reserve">
     ${slots.map(s => `<div class="slot-row"><strong>${esc(fmtDay(s.date))}</strong>
-      <input type="time" id="s-${s.availability_date_id}" value="${hostDefault(s).start}" min="${s.start}" max="${s.end}" step="900" aria-label="Start time" onchange="updatePreview('${txn}')"> to
-      <input type="time" id="e-${s.availability_date_id}" value="${hostDefault(s).end}" min="${s.start}" max="${s.end}" step="900" aria-label="End time" onchange="updatePreview('${txn}')">
+      <input type="time" id="s-${s.availability_date_id}" value="${hostDefault(s).start}" min="${s.start}" max="${s.end}" step="900" aria-label="Start time" onchange="refreshPlan('${txn}')"> to
+      <input type="time" id="e-${s.availability_date_id}" value="${hostDefault(s).end}" min="${s.start}" max="${s.end}" step="900" aria-label="End time" onchange="refreshPlan('${txn}')">
       <span class="meta">(allowed ${esc(fmtWindow(s.start, s.end))})</span></div>`).join('')}
     <div id="p-${txn}" class="preview">Working out your plan…</div>
     <button class="btn primary" onclick="reserve('${txn}')">Reserve ${slots.length === 1 ? 'this date' : slots.length + ' dates'}</button>
@@ -321,6 +326,16 @@ async function updatePreview(txn) {
     const prev = S.times?.[s.availability_date_id];
     if (prev) { document.getElementById('s-' + s.availability_date_id).value = prev.start; document.getElementById('e-' + s.availability_date_id).value = prev.end; }
   }
+  refreshPlan(txn);
+}
+
+// Only the plan text is redrawn on a time change — rebuilding the time inputs
+// while a phone's time picker is open closes it (same iOS issue as above).
+async function refreshPlan(txn) {
+  const set = S.picked[txn];
+  if (!set?.size || !document.getElementById('p-' + txn)) return;
+  const slots = S.slots.filter(s => set.has(s.availability_date_id)).sort((a, b) => a.date.localeCompare(b.date));
+  for (const s of slots) readTimes(s); // remember typed times
   const first = slots[0];
   const t = readTimes(first);
   try {
