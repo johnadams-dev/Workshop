@@ -192,7 +192,8 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
     <div class="tab-nav" role="tablist">
       <button class="tab-btn active" onclick="switchTab('sales')" data-tab="sales">🏆 Sales Leader</button>
       <button class="tab-btn" onclick="switchTab('listings')" data-tab="listings">🏘️ Listing Leader</button>
-      <button class="tab-btn" onclick="switchTab('presidents')" data-tab="presidents">🏅 President's Club</button>
+      <!-- Hidden until /leaderboard/presidents-club loads: staff-only until 2027-01-01 (see leaderboard-routes.js) -->
+      <button class="tab-btn" id="tab-presidents" style="display:none" onclick="switchTab('presidents')" data-tab="presidents">🏅 President's Club</button>
     </div>
 
     <!-- Month + office filters (Sales + Listings only) -->
@@ -574,7 +575,10 @@ async function load() {
     if (!officesRes.ok) throw new Error('Offices HTTP ' + officesRes.status);
 
     offices = await officesRes.json();
-    if (pcRes.ok) pcData = await pcRes.json();
+    if (pcRes.ok) {
+      pcData = await pcRes.json();
+      document.getElementById('tab-presidents').style.display = '';
+    }
 
     const sel = document.getElementById('office-select');
     sel.innerHTML = '<option value="">All Offices</option>' +
