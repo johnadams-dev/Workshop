@@ -3422,8 +3422,9 @@ async function nlSaveListing() {
   try {
     let txn;
     if (_stDeltaListingId) {
-      txn = await POST('/daily-desk/start-tracking', { ...body, delta_listing_id: _stDeltaListingId });
+      txn = await POST('/daily-desk/start-tracking', { ...body, delta_listing_id: _stDeltaListingId, allow_duplicate: _stAllowDuplicate });
       _stDeltaListingId = null;
+      _stAllowDuplicate = false;
     } else {
       txn = await POST('/daily-desk/transactions', body);
     }
@@ -5790,19 +5791,30 @@ function renderUntrackedTable(rows) {
 
   tbody.innerHTML = rows.map(r => {
     const sub = [r.city, ...(r.mls_ids || [])].filter(Boolean).join(' &middot; ');
+    // Same address as a deal already open — almost always this property on
+    // its other MLS board (server: addressMatchKey in daily-desk-routes.js).
+    const pm = r.possible_match;
+    const pmLine = pm ? `<div class="addr-sub" style="color:var(--amber, #b45309); font-weight:600;">
+                  Probably already tracked: ${escapeHtml(pm.property_address)}${pm.mls_ids ? ' &middot; MLS ' + escapeHtml(pm.mls_ids) : ''}
+                  (${escapeHtml(String(pm.status || '').replace(/_/g, ' '))})</div>` : '';
     return `
             <tr>
               <td>
                 <div class="addr-cell">${escapeHtml(r.address) || 'Unknown address'}</div>
                 <div class="addr-sub">${sub || '—'}</div>
+                ${pmLine}
               </td>
               <td>${escapeHtml(r.agent_name) || '—'}</td>
               <td>${fmtMoney(r.price_asking)}</td>
               <td>${fmtDate(r.cached_at)}</td>
               <td>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-                  <button class="btn btn-ghost btn-sm" onclick="openMatchModal('${escapeJs(r.delta_listing_id)}')">Match</button>
-                  <button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button>
+                  ${pm
+                    ? `<button class="btn btn-primary btn-sm" onclick="linkToPossibleMatch('${escapeJs(r.delta_listing_id)}')" title="Add this listing's MLS# to the deal already in Daily Desk">Link to it</button>
+                       <button class="btn btn-ghost btn-sm" onclick="openMatchModal('${escapeJs(r.delta_listing_id)}')">Match</button>
+                       <button class="btn btn-ghost btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button>`
+                    : `<button class="btn btn-ghost btn-sm" onclick="openMatchModal('${escapeJs(r.delta_listing_id)}')">Match</button>
+                       <button class="btn btn-primary btn-sm" onclick="startTracking('${escapeJs(r.delta_listing_id)}')">Start Tracking</button>`}
                 </div>
               </td>
             </tr>`;
@@ -5854,10 +5866,42 @@ function renderMismatchTable(rows) {
 }
 
 let _stDeltaListingId = null;
+let _stAllowDuplicate = false;   // the coordinator chose a second record despite a same-address deal
+
+function possibleMatchLabel(pm) {
+  return `${pm.property_address}${pm.city ? ', ' + pm.city : ''} — ${String(pm.status || '').replace(/_/g, ' ')}${pm.mls_ids ? ' (MLS# ' + pm.mls_ids + ')' : ''}`;
+}
+
+// Adds this DeltaNet listing (and its MLS#) to the deal already open at the
+// same address, instead of creating a second record (POST /deltanet-matches).
+async function linkToPossibleMatch(deltaListingId, skipConfirm) {
+  const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
+  const pm = row && row.possible_match;
+  if (!pm) return;
+  if (!skipConfirm && !confirm(`Link ${row.address}${row.mls_ids?.length ? ' (MLS# ' + row.mls_ids.join(', ') + ')' : ''} to the deal already in Daily Desk?\n\n${possibleMatchLabel(pm)}`)) return;
+  try {
+    await POST('/daily-desk/deltanet-matches', { delta_listing_id: deltaListingId, transaction_id: pm.id });
+    await renderAll();
+  } catch (e) {
+    alert('Failed to link: ' + e.message);
+  }
+}
 
 async function startTracking(deltaListingId) {
   const row = STATE.untracked.find(r => r.delta_listing_id === deltaListingId);
   if (!row) return;
+  // Same property already open under its other MLS board? Linking is almost
+  // always right — 1712 Arash Circle was tracked twice this way (2026-10-14).
+  _stAllowDuplicate = false;
+  if (row.possible_match) {
+    const label = possibleMatchLabel(row.possible_match);
+    if (confirm(`This looks like a listing that's already in Daily Desk:\n\n${label}\n\n`
+        + `It's probably the same property on the other MLS board. OK links this DeltaNet listing to that deal (recommended). Cancel for other options.`)) {
+      return linkToPossibleMatch(deltaListingId, true);
+    }
+    if (!confirm(`Create a separate, second record for ${row.address} anyway?\n\nOnly do this if it really is a different listing from:\n${label}`)) return;
+    _stAllowDuplicate = true;
+  }
   _stDeltaListingId = deltaListingId;
 
   await openNewModal();   // resets all fields and loads agents
@@ -5926,6 +5970,7 @@ async function confirmStartTracking() {
   try {
     await POST('/daily-desk/start-tracking', {
       delta_listing_id: _stDeltaListingId,
+      allow_duplicate: _stAllowDuplicate,
       agent_id:  agentId,
       office_id: officeId !== 'all' ? officeId : null,
       split_pct: stSplitPct,
