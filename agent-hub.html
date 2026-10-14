@@ -306,6 +306,11 @@
     .modal-close { background: none; border: none; font-size: 1.4rem; line-height: 1; color: var(--muted); cursor: pointer; }
     .modal-close:hover { color: var(--ink); }
     .modal-tools { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .modal-customers { font-size: .82rem; margin-bottom: 1rem; padding-bottom: .9rem; border-bottom: 1px solid var(--cream-dark); }
+    .modal-customers .cust-side { margin-bottom: .3rem; color: var(--ink-soft); }
+    .modal-customers .cust-side strong { color: var(--ink); }
+    .cust-missing { color: #b45309; font-weight: 600; }
+    .txn-customer-gap { font-size: .72rem; color: #b45309; margin-top: .4rem; font-weight: 600; }
     .txn-tool-link {
       font-size: .76rem; font-weight: 500; color: var(--gold); text-decoration: none;
       border: 1px solid rgba(201,168,76,.3); border-radius: 100px; padding: .3rem .8rem;
@@ -632,6 +637,7 @@
       <div class="modal-title" id="modalAddress"></div>
       <button class="modal-close" onclick="closeTxnModal()">&times;</button>
     </div>
+    <div class="modal-customers" id="modalCustomers"></div>
     <div class="modal-tools" id="modalTools"></div>
     <div class="checklist-list" id="modalChecklist"></div>
   </div>
@@ -1560,6 +1566,7 @@ function renderTransactionsSection(transactions, checklist) {
         </div>
       ` : '<div class="txn-progress-label">No checklist steps yet.</div>'}
       ${openHouseLine(t)}
+      ${customerGapNote(t)}
     </div>`;
   }).join('');
 
@@ -1588,6 +1595,43 @@ function withTxnParam(url, txnId) {
   return url + (url.includes('?') ? '&' : '?') + 'transactionId=' + encodeURIComponent(txnId);
 }
 
+// ── Customer details on a deal ───────────────────────────────────────────────
+// my_customers / my_sides (agent-hub-routes.js): the sellers or buyers on the
+// side this agent works. A side with no customer on file is flagged on the
+// card (there's no one to share a portal with), and the deal window links to
+// the Customer Portal page's editor, where
+// the agent can add sellers/buyers, their email, phone, mailing address and
+// a nickname (customer-portal-routes.js, /portal/deals/:id/customers).
+const SIDE_LABEL = { seller: 'seller', buyer: 'buyer' };
+
+// The portal works without an email (the agent can text the link), so the
+// card only flags a side with no customer on file at all.
+function sidesWithNoCustomer(t) {
+  const custs = t.my_customers || [];
+  return (t.my_sides || []).filter(side => !custs.some(c => c.role === side));
+}
+
+function customerGapNote(t) {
+  const missing = sidesWithNoCustomer(t);
+  if (!missing.length) return '';
+  return `<div class="txn-customer-gap">⚠ No ${missing.map(x => SIDE_LABEL[x]).join(' or ')} on file — open to add</div>`;
+}
+
+function customerSectionHtml(t) {
+  const sides = t.my_sides || [];
+  if (!sides.length) return '';
+  const custs = t.my_customers || [];
+  const lines = sides.map(side => {
+    const list = custs.filter(c => c.role === side);
+    const people = list.length
+      ? list.map(c => `${escapeHtml(c.name || '(no name)')}${c.nickname ? ` <span style="color:var(--muted)">(“${escapeHtml(c.nickname)}”)</span>` : ''}${c.has_email ? '' : ' <span style="color:var(--muted)" title="Their portal link can be texted; review requests need an email">· no email</span>'}`).join(', ')
+      : '<span class="cust-missing">None on file</span>';
+    return `<div class="cust-side"><strong>${side === 'seller' ? 'Sellers' : 'Buyers'}:</strong> ${people}</div>`;
+  }).join('');
+  const label = sidesWithNoCustomer(t).length ? '✏ Add customer details' : '✏ Edit customer details';
+  return `${lines}<a class="txn-tool-link" style="margin-top:.35rem" href="./portal-share.html?deal=${encodeURIComponent(t.id)}">${label}</a>`;
+}
+
 function openTxnModal(txnId) {
   const t = S.txnById?.[txnId];
   if (!t) return;
@@ -1595,12 +1639,19 @@ function openTxnModal(txnId) {
   const tools = toolsForTransaction(t);
 
   document.getElementById('modalAddress').textContent = t.property_address;
+  const custEl = document.getElementById('modalCustomers');
+  custEl.innerHTML = customerSectionHtml(t);
+  custEl.style.display = custEl.innerHTML ? '' : 'none';
   // Customer Portal: preview and a shareable link per customer we represent (portal.html).
-  const portalButtons = (t.portal_customers || []).map(c => `
-    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
+  // A customer with no email still gets a link (keyed by their record) — text it.
+  const portalButtons = (t.portal_customers || []).map(c => {
+    const who = `data-email="${escapeHtml(c.email || '')}" data-customer-id="${escapeHtml(c.id || '')}"`;
+    return `
+    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" ${who}
        onclick="previewPortal(this)">👁 Preview ${escapeHtml(c.name || c.email)}'s portal</button>
-    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" data-email="${escapeHtml(c.email)}"
-       onclick="copyPortalLink(this)">🔗 Copy portal link for ${escapeHtml(c.name || c.email)}</button>`).join('');
+    <button class="txn-tool-link" style="cursor:pointer;border:none;font:inherit" ${who}
+       onclick="copyPortalLink(this)">🔗 Copy portal link for ${escapeHtml(c.name || c.email)}</button>`;
+  }).join('');
   document.getElementById('modalTools').innerHTML = tools
     .map(tool => `<a class="txn-tool-link" href="${tool.url}">${tool.icon} ${escapeHtml(tool.title)}</a>`).join('') + portalButtons;
   document.getElementById('modalChecklist').innerHTML = items.length
@@ -1614,6 +1665,12 @@ function closeTxnModal() {
   document.getElementById('txnModal').classList.remove('open');
 }
 
+// The customer a portal button is for: their email when they have one (one
+// link for all their deals), otherwise their customer record.
+function portalTarget(btn) {
+  return btn.dataset.email ? { email: btn.dataset.email } : { customerId: btn.dataset.customerId };
+}
+
 // Opens the customer's portal as a preview (&preview=1 — not remembered in
 // the agent's browser). The tab opens before the request so it isn't blocked
 // as a pop-up.
@@ -1623,7 +1680,7 @@ async function previewPortal(btn) {
     const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
-      body: JSON.stringify({ email: btn.dataset.email }),
+      body: JSON.stringify(portalTarget(btn)),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
@@ -1643,7 +1700,7 @@ async function copyPortalLink(btn) {
     const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
-      body: JSON.stringify({ email: btn.dataset.email }),
+      body: JSON.stringify(portalTarget(btn)),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);

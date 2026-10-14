@@ -6301,8 +6301,11 @@ function renderDrawer(t) {
       try {
         const c = JSON.parse(ev.notes || '{}');
         const roleLabel = { seller: 'Seller', buyer: 'Buyer' };
-        const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
+        const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || FC_CUSTOMER_EVENT_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
         const label = c.role ? `${roleLabel[c.role] || c.role} — ${fieldLabel}` : fieldLabel;
+        if (c.role && c.field === 'added') {
+          return `<div><strong>${fmtDate(ev.event_date || ev.submitted_at)}</strong> — ➕ <em>${escapeHtml(roleLabel[c.role] || c.role)}</em> added: "${escapeHtml(c.new)}"<br><span style="color:var(--text-dim);font-size:11px;">${escapeHtml(c.reason)}</span></div>`;
+        }
         return `<div><strong>${fmtDate(ev.event_date || ev.submitted_at)}</strong> — ✏ <em>${escapeHtml(label)}</em> corrected: "${escapeHtml(c.old)}" → "${escapeHtml(c.new)}"<br><span style="color:var(--text-dim);font-size:11px;">Reason: ${escapeHtml(c.reason)}</span></div>`;
       } catch { /* fall through */ }
     }
@@ -6317,22 +6320,34 @@ function renderDrawer(t) {
 function renderDrawerPortal(t) {
   const el = document.getElementById('drawer-portal');
   if (!el) return;
+  // Email isn't required: a customer without one gets a link keyed by their
+  // record, which the agent can text (customer-portal-routes.js).
   const ours = (t.customers || []).filter(c =>
-    c.email && ((c.role === 'seller' && t.represents_seller) || (c.role === 'buyer' && t.represents_buyer)));
+    (c.role === 'seller' && t.represents_seller) || (c.role === 'buyer' && t.represents_buyer));
   el.innerHTML = ours.length
-    ? ours.map(c => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-        <span style="flex:1;min-width:140px;"><strong>${escapeHtml(c.name || c.email)}</strong> <span style="color:var(--text-dim);">${escapeHtml(c.email)}</span></span>
-        <button class="btn btn-ghost btn-sm" data-email="${escapeHtml(c.email)}" onclick="copyPortalLink(this.dataset.email, this)">Copy portal link</button>
-        <button class="btn btn-ghost btn-sm" data-email="${escapeHtml(c.email)}" onclick="revokePortalLink(this.dataset.email, this)" title="Stop the current link working; the next copy makes a new one">Revoke</button>
-      </div>`).join('')
-    : '<div class="empty">No customer emails on file for our side of this deal. Add one to share the portal.</div>';
+    ? ours.map(c => {
+        const email = c.email && c.email.includes('@') ? c.email.trim().toLowerCase() : '';
+        const who = `data-email="${escapeHtml(email)}" data-customer-id="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name || email)}"`;
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <span style="flex:1;min-width:140px;"><strong>${escapeHtml(c.name || email || '(no name)')}</strong> <span style="color:var(--text-dim);">${escapeHtml(email || 'no email — text the link')}</span></span>
+        <button class="btn btn-ghost btn-sm" ${who} onclick="copyPortalLink(this)">Copy portal link</button>
+        <button class="btn btn-ghost btn-sm" ${who} onclick="revokePortalLink(this)" title="Stop the current link working; the next copy makes a new one">Revoke</button>
+      </div>`;
+      }).join('')
+    : '<div class="empty">No customer on file for our side of this deal. Add one to share the portal.</div>';
 }
 
-async function copyPortalLink(email, btn) {
+// Email when the customer has one (one link for all their deals), otherwise
+// their customer record.
+function portalTarget(btn) {
+  return btn.dataset.email ? { email: btn.dataset.email } : { customerId: btn.dataset.customerId };
+}
+
+async function copyPortalLink(btn) {
   const label = btn.textContent;
   btn.disabled = true;
   try {
-    const { url } = await POST('/portal/agent-link', { email });
+    const { url } = await POST('/portal/agent-link', portalTarget(btn));
     try { await navigator.clipboard.writeText(url); btn.textContent = 'Copied ✓'; }
     catch (_) { prompt('Copy this portal link:', url); btn.textContent = label; }
   } catch (e) {
@@ -6341,10 +6356,10 @@ async function copyPortalLink(email, btn) {
   setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 1800);
 }
 
-async function revokePortalLink(email, btn) {
-  if (!confirm(`Stop ${email}'s current portal link from working?\n\nThe next "Copy portal link" will make a new one.`)) return;
+async function revokePortalLink(btn) {
+  if (!confirm(`Stop ${btn.dataset.name}'s current portal link from working?\n\nThe next "Copy portal link" will make a new one.`)) return;
   try {
-    const { revoked } = await POST('/portal/agent-link/revoke', { email });
+    const { revoked } = await POST('/portal/agent-link/revoke', portalTarget(btn));
     btn.textContent = revoked ? 'Revoked ✓' : 'No link to revoke';
   } catch (e) {
     alert('Could not revoke: ' + e.message);
@@ -7350,13 +7365,19 @@ const FC_FIELD_LABELS = {
   notes:                  'Notes',
 };
 const FC_CUSTOMER_FIELD_LABELS = {
-  name:    'Name',
-  email:   'Email',
+  name:     'Name',
+  nickname: 'Nickname (greeting)',
+  email:    'Email',
+  phone:    'Phone',
   address: 'Mailing Address',
   city:    'City',
   state:   'State',
   zip:     'Zip',
 };
+
+// Customer events that aren't a field correction: an agent adding a seller or
+// buyer from the Customer Portal page / Agent Hub (customer-portal-routes.js).
+const FC_CUSTOMER_EVENT_LABELS = { added: 'Added' };
 
 let _fcTxnId   = null;
 let _fcTxnData = null;
@@ -7887,7 +7908,7 @@ async function rptLoadCorrections() {
       let c = {};
       try { c = JSON.parse(r.notes || '{}'); } catch(_) {}
       const prop = [r.property_address, r.city].filter(Boolean).join(', ') || '—';
-      const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
+      const fieldLabel = c.role ? (FC_CUSTOMER_FIELD_LABELS[c.field] || FC_CUSTOMER_EVENT_LABELS[c.field] || c.field) : (FC_FIELD_LABELS[c.field] || c.field);
       const field = c.role ? `${FC_ROLE_LABELS[c.role] || c.role} — ${escapeHtml(fieldLabel)}` : (escapeHtml(fieldLabel) || '—');
       return `<tr>
         <td class="td-mono">${fmtDate(r.event_date)}</td>

@@ -7,12 +7,16 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* Agent-facing companion to portal.html: every customer an agent can share a
-   portal with (closed deals too), with Preview / Copy link / Revoke. Backed by
-   customer-portal-routes.js (GET /portal/my-customers, POST /portal/agent-link). */
+   portal with (closed deals too), with Preview / Copy link / Revoke, and an
+   editor for the customers on the agent's side of each deal — add a seller or
+   buyer, their email, phone, mailing address and a nickname for the greeting.
+   Backed by customer-portal-routes.js (GET /portal/my-customers,
+   POST /portal/agent-link, /portal/deals/:id/customers). ?deal=<id> opens
+   that deal's editor (Agent Hub links here). */
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
   --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
-  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --amber:#B45309;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
@@ -30,7 +34,9 @@ main { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 20
 .cust { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
         display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; align-items: start; }
 .cust-name { font-weight: 700; }
+.cust-nick { font-weight: 400; color: var(--muted); font-size: .85rem; }
 .cust-email { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.cust-email.none { font-style: italic; }
 .deals { margin: 6px 0 0; padding: 0; list-style: none; font-size: .88rem; }
 .deals li { margin-top: 2px; }
 .pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #E8F1FA; color: var(--blue); margin-left: 4px; }
@@ -41,10 +47,43 @@ main { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 20
 .btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .btn.primary { background: var(--navy); color: #fff; }
 .btn.link { border: none; background: none; color: var(--muted); text-decoration: underline; padding: 7px 4px; }
+.btn.small { padding: 2px 8px; font-size: .78rem; margin-left: 6px; }
+.btn:disabled { opacity: .6; cursor: default; }
 .btn:focus-visible, .search:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .empty, .msg { text-align: center; color: var(--muted); padding: 28px 12px; }
 #gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
-@media (max-width: 600px) { .cust { grid-template-columns: 1fr; } .actions { justify-content: flex-start; } }
+/* Deals with no customer email yet */
+.needs { background: var(--gold-lt); border: 1px solid #EED9A0; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+.needs h2 { margin: 0 0 4px; font-size: .95rem; }
+.needs p { margin: 0 0 8px; font-size: .85rem; color: var(--muted); }
+.needs-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid #EED9A0; font-size: .88rem; flex-wrap: wrap; }
+.needs-row:first-of-type { border-top: none; }
+.missing { color: var(--amber); font-weight: 600; }
+.needs details summary { cursor: pointer; font-size: .85rem; color: var(--navy); margin-top: 6px; }
+/* Editor */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: flex-start; justify-content: center; padding: 4vh 12px; z-index: 50; overflow: auto; }
+.overlay.open { display: flex; }
+.dialog { background: var(--surface); border-radius: 12px; width: 100%; max-width: 640px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.dialog-head h2 { margin: 0; font-size: 1.05rem; }
+.dialog-head .sub { font-size: .85rem; color: var(--muted); }
+.dialog-body { padding: 14px 18px 18px; }
+.close { background: none; border: none; font-size: 1.3rem; line-height: 1; cursor: pointer; color: var(--muted); }
+.cform { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.cform h3 { margin: 0 0 8px; font-size: .9rem; display: flex; justify-content: space-between; gap: 8px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.grid .full { grid-column: 1 / -1; }
+.grid .addr { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px 12px; grid-column: 1 / -1; }
+.field label { display: block; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+.field input { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: .9rem; }
+.field .hint { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.cform-foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; }
+.saved { font-size: .8rem; color: var(--green); }
+.err { font-size: .8rem; color: var(--red); }
+@media (max-width: 600px) {
+  .cust { grid-template-columns: 1fr; } .actions { justify-content: flex-start; }
+  .grid, .grid .addr { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
@@ -66,12 +105,23 @@ main { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 20
 <main id="app" hidden>
   <div class="intro">
     <p>Every customer you've represented gets a personal page about their home: you front and centre, where their deal stands, listing links and tour views, contract dates, and after closing, review and referral buttons.</p>
-    <p><strong>Preview</strong> shows you exactly what they see. <strong>Copy link</strong> copies their personal link to text or email them — it's the same link every time. Customers can also request their own link at johnadams.org/portal.html with the email on their deal.</p>
+    <p><strong>Preview</strong> shows you exactly what they see. <strong>Copy link</strong> copies their personal link to text or email them — it's the same link every time. <strong>Edit</strong> on a deal lets you add a seller or buyer, their email, phone and mailing address, and a nickname to greet them by (e.g. "John" for the Adams Family Trust). Customers without an email still get a link — text it to them. Customers with an email on their deal can also request their own link at johnadams.org/portal.html.</p>
   </div>
+  <div id="needs"></div>
   <input class="search" id="q" type="search" placeholder="Search by name, email or address" aria-label="Search customers">
   <div class="count" id="count"></div>
   <div id="list"><div class="msg">Loading…</div></div>
 </main>
+
+<div class="overlay" id="editor" onclick="if (event.target === this) closeEditor()">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ed-title">
+    <div class="dialog-head">
+      <div><h2 id="ed-title">Customers</h2><div class="sub" id="ed-sub"></div></div>
+      <button class="close" onclick="closeEditor()" aria-label="Close">&times;</button>
+    </div>
+    <div class="dialog-body" id="ed-body"><div class="msg">Loading…</div></div>
+  </div>
+</div>
 
 <script>
 const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
@@ -80,11 +130,16 @@ let userEmail = localStorage.getItem('ac_user_email') || '';
 let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
 let isStaff = false;
 let customers = [];
+let needsDetails = [];
+let editorDeal = null;      // { deal, roles, customers } from GET /portal/deals/:id/customers
+let editorChanged = false;  // reload the lists when the editor closes
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
 const fmtDate = d => { if (!d) return ''; const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); const dt = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(d); return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
 const STATUS = { under_contract: 'Under contract', active_listing: 'Active', coming_soon: 'Coming soon', temporarily_off_market: 'Off market', closed: 'Closed' };
+const ROLE = { seller: { one: 'seller', many: 'Sellers' }, buyer: { one: 'buyer', many: 'Buyers' } };
+const statusPill = (status, closedOn) => `<span class="pill ${status === 'closed' ? 'closed' : ''}">${esc(STATUS[status] || status)}${status === 'closed' && closedOn ? ' ' + esc(fmtDate(closedOn)) : ''}</span>`;
 
 // ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
 if (proxyKey && userEmail) start();
@@ -109,7 +164,10 @@ async function handleGoogleSignIn(resp) {
 }
 
 // ── Customers ───────────────────────────────────────────────────────────────
+let started = false;
 function start() {
+  if (started) return;
+  started = true;
   document.getElementById('app').hidden = false;
   load('');
   let timer = null;
@@ -119,6 +177,8 @@ function start() {
     // Agents filter their own list here; staff search everyone on the server.
     timer = setTimeout(() => isStaff ? load(q.length >= 3 ? q : '') : render(q), isStaff ? 350 : 0);
   });
+  const deal = new URLSearchParams(location.search).get('deal');
+  if (deal) openEditor(deal);
 }
 
 async function load(q) {
@@ -127,43 +187,73 @@ async function load(q) {
     const r = await fetch(`${PROXY_BASE}/portal/my-customers?q=${encodeURIComponent(q)}`, { headers: H() });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
-    isStaff = data.isStaff; customers = data.customers;
+    isStaff = data.isStaff; customers = data.customers; needsDetails = data.needsDetails || [];
     if (isStaff) document.getElementById('q').placeholder = 'Search all customers by name, email or address (3+ letters)';
-    render('');
+    render(isStaff ? '' : document.getElementById('q').value.trim());
   } catch (e) {
     list.innerHTML = `<div class="msg">Couldn't load customers: ${esc(e.message)}</div>`;
   }
 }
 
+function needsRowHtml(d) {
+  const who = `<span class="missing">No ${ROLE[d.role].one} on file</span>`;
+  return `<div class="needs-row">
+    <div style="min-width:0">${d.role === 'seller' ? 'Selling' : 'Buying'} ${esc(d.address)} ${statusPill(d.status)}<br><span style="font-size:.82rem">${who}</span></div>
+    <button class="btn" onclick="openEditor('${esc(d.id)}')">Add details</button>
+  </div>`;
+}
+
+function renderNeeds(f) {
+  const el = document.getElementById('needs');
+  const rows = needsDetails.filter(d => !f || [d.address, ...d.customers.map(c => c.name)].some(v => String(v || '').toLowerCase().includes(f)));
+  if (!rows.length) { el.innerHTML = ''; return; }
+  // Open deals first (the server sorts them that way); closed ones fold away.
+  const open = rows.filter(d => d.status !== 'closed');
+  const closed = rows.filter(d => d.status === 'closed');
+  el.innerHTML = `<div class="needs">
+    <h2>Missing customer details (${rows.length})</h2>
+    <p>These deals have no seller or buyer on file on your side yet, so there's no one to share a portal with. Add them — an email is optional; you can text the link.</p>
+    ${open.map(needsRowHtml).join('')}
+    ${closed.length ? `<details${open.length ? '' : ' open'}><summary>${closed.length} closed deal${closed.length === 1 ? '' : 's'}</summary>${closed.map(needsRowHtml).join('')}</details>` : ''}
+  </div>`;
+}
+
 function render(filter) {
   const f = filter.toLowerCase();
-  const rows = customers.filter(c => !f || [c.name, c.email, ...c.deals.map(d => d.address)].some(v => String(v || '').toLowerCase().includes(f)));
+  renderNeeds(f);
+  const rows = customers.filter(c => !f || [c.name, c.nickname, c.email, ...c.deals.map(d => d.address)].some(v => String(v || '').toLowerCase().includes(f)));
   document.getElementById('count').textContent = rows.length ? `${rows.length} customer${rows.length === 1 ? '' : 's'}` : '';
   document.getElementById('list').innerHTML = rows.length ? rows.map(c => `
     <div class="cust">
       <div style="min-width:0">
-        <div class="cust-name">${esc(c.name || c.email)}</div>
-        <div class="cust-email">${esc(c.email)}</div>
+        <div class="cust-name">${esc(c.name || c.email || '(no name)')}${c.nickname ? ` <span class="cust-nick">· greeted as “${esc(c.nickname)}”</span>` : ''}</div>
+        <div class="cust-email ${c.email ? '' : 'none'}">${c.email ? esc(c.email) : 'No email — text them the link (review requests need an email)'}</div>
         <ul class="deals">${c.deals.map(d => `<li>${d.role === 'seller' ? 'Selling' : 'Buying'} ${esc(d.address)}
-          <span class="pill ${d.status === 'closed' ? 'closed' : ''}">${esc(STATUS[d.status] || d.status)}${d.status === 'closed' && d.closedOn ? ' ' + esc(fmtDate(d.closedOn)) : ''}</span></li>`).join('')}</ul>
+          ${statusPill(d.status, d.closedOn)}<button class="btn small" onclick="openEditor('${esc(d.id)}')" title="Add or edit the ${d.role === 'seller' ? 'sellers' : 'buyers'} on this deal">Edit</button></li>`).join('')}</ul>
         <div class="opened ${c.lastOpened ? 'yes' : ''}">${c.lastOpened ? 'Last opened their portal ' + esc(fmtDate(c.lastOpened)) : 'Hasn\'t opened their portal yet'}</div>
       </div>
       <div class="actions">
-        <button class="btn" data-email="${esc(c.email)}" onclick="preview(this)">Preview</button>
-        <button class="btn primary" data-email="${esc(c.email)}" onclick="copyLink(this)">Copy link</button>
-        ${c.hasLink ? `<button class="btn link" data-email="${esc(c.email)}" onclick="revoke(this)" title="Stop the current link working if it went to the wrong person">Revoke</button>` : ''}
+        <button class="btn" data-key="${esc(c.key)}" onclick="preview(this)">Preview</button>
+        <button class="btn primary" data-key="${esc(c.key)}" onclick="copyLink(this)">Copy link</button>
+        ${c.hasLink ? `<button class="btn link" data-key="${esc(c.key)}" onclick="revoke(this)" title="Stop the current link working if it went to the wrong person">Revoke</button>` : ''}
       </div>
     </div>`).join('')
     : `<div class="empty">${isStaff
         ? (document.getElementById('q').value.trim().length < 3 ? 'Search for a customer by name, email or address.' : 'No customers match that search.')
-        : (f ? 'No customers match that search.' : 'No customers with an email on file yet. Their email needs to be on the deal in Daily Desk.')}</div>`;
+        : (f ? 'No customers match that search.' : 'No customers on file yet — add them with “Add details” above.')}</div>`;
 }
 
-async function agentLink(email) {
-  const r = await fetch(`${PROXY_BASE}/portal/agent-link`, { method: 'POST', headers: H(), body: JSON.stringify({ email }) });
+// A customer with an email is shared by email (one link for all their
+// deals); one without is shared by their customer record.
+const byKey = key => customers.find(x => x.key === key);
+const targetFor = c => c.email ? { email: c.email } : { customerId: c.customerId };
+
+async function agentLink(key) {
+  const c = byKey(key);
+  const r = await fetch(`${PROXY_BASE}/portal/agent-link`, { method: 'POST', headers: H(), body: JSON.stringify(targetFor(c)) });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
-  const c = customers.find(x => x.email === email); if (c) c.hasLink = true;
+  c.hasLink = true;
   return data.url;
 }
 
@@ -172,7 +262,7 @@ async function agentLink(email) {
 async function preview(btn) {
   const win = window.open('', '_blank'); // open now, before the await, so it isn't blocked as a pop-up
   try {
-    const url = await agentLink(btn.dataset.email);
+    const url = await agentLink(btn.dataset.key);
     if (win) win.location = url + '&preview=1'; else location.href = url + '&preview=1';
   } catch (e) { if (win) win.close(); alert("Couldn't open a preview: " + e.message); }
 }
@@ -181,7 +271,7 @@ async function copyLink(btn) {
   const label = btn.textContent;
   btn.disabled = true;
   try {
-    const url = await agentLink(btn.dataset.email);
+    const url = await agentLink(btn.dataset.key);
     try { await navigator.clipboard.writeText(url); btn.textContent = 'Copied ✓'; }
     catch (_) { prompt('Copy this link:', url); }
   } catch (e) { alert("Couldn't get a link: " + e.message); }
@@ -189,14 +279,137 @@ async function copyLink(btn) {
 }
 
 async function revoke(btn) {
-  if (!confirm(`Stop ${btn.dataset.email}'s current portal link from working?\n\nThe next "Copy link" makes a new one.`)) return;
+  const c = byKey(btn.dataset.key);
+  if (!confirm(`Stop ${c.name || c.email}'s current portal link from working?\n\nThe next "Copy link" makes a new one.`)) return;
   try {
-    const r = await fetch(`${PROXY_BASE}/portal/agent-link/revoke`, { method: 'POST', headers: H(), body: JSON.stringify({ email: btn.dataset.email }) });
+    const r = await fetch(`${PROXY_BASE}/portal/agent-link/revoke`, { method: 'POST', headers: H(), body: JSON.stringify(targetFor(c)) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
-    const c = customers.find(x => x.email === btn.dataset.email); if (c) c.hasLink = false;
+    c.hasLink = false;
     render(document.getElementById('q').value.trim());
   } catch (e) { alert("Couldn't revoke: " + e.message); }
 }
+
+// ── Customer editor (one deal) ──────────────────────────────────────────────
+// Only the customers on your side of the deal: sellers on your listing,
+// buyers you represent. Removing a customer is done by the office coordinator.
+const FIELDS = ['name', 'nickname', 'email', 'phone', 'address', 'city', 'state', 'zip'];
+
+async function openEditor(dealId) {
+  editorDeal = null;
+  editorChanged = false;
+  document.getElementById('ed-title').textContent = 'Customers';
+  document.getElementById('ed-sub').textContent = '';
+  document.getElementById('ed-body').innerHTML = '<div class="msg">Loading…</div>';
+  document.getElementById('editor').classList.add('open');
+  try {
+    const r = await fetch(`${PROXY_BASE}/portal/deals/${encodeURIComponent(dealId)}/customers`, { headers: H() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    editorDeal = data;
+    renderEditor();
+  } catch (e) {
+    document.getElementById('ed-body').innerHTML = `<div class="msg">${esc(e.message)}</div>`;
+  }
+}
+
+function closeEditor() {
+  document.getElementById('editor').classList.remove('open');
+  if (new URLSearchParams(location.search).has('deal')) history.replaceState(null, '', location.pathname);
+  if (editorChanged) load(isStaff ? document.getElementById('q').value.trim() : '');
+}
+
+function customerFormHtml(c, role) {
+  const key = c ? c.id : `new-${role}`;
+  const v = f => esc(c ? (c[f] ?? '') : '');
+  const input = (f, label, attrs = '', hint = '') => `<div class="field ${f === 'address' ? '' : ''}">
+      <label for="${f}-${key}">${label}</label>
+      <input id="${f}-${key}" data-field="${f}" value="${v(f)}" ${attrs}>
+      ${hint ? `<div class="hint">${hint}</div>` : ''}
+    </div>`;
+  return `<div class="cform" data-key="${esc(key)}" data-role="${role}" ${c ? `data-id="${esc(c.id)}"` : ''}>
+    <h3><span>${c ? esc(c.name || '(no name)') : `New ${ROLE[role].one}`}</span></h3>
+    <div class="grid">
+      ${input('name', 'Name on the deal', 'autocomplete="off"', 'As it appears on the paperwork — a person, couple, trust or company.')}
+      ${input('nickname', 'Nickname (greeting)', 'autocomplete="off" maxlength="80"', 'What to call them — e.g. "John" for the Adams Family Trust. Blank = first word of the name.')}
+      ${input('email', 'Email', 'type="email" autocomplete="off"', 'Optional — the portal link can be texted. Needed for review requests.')}
+      ${input('phone', 'Phone', 'type="tel" autocomplete="off"')}
+      <div class="addr">
+        ${input('address', 'Mailing address', 'autocomplete="off"')}
+        ${input('city', 'City', 'autocomplete="off"')}
+        <div class="grid" style="grid-template-columns:1fr 1.4fr;gap:8px">
+          ${input('state', 'State', 'maxlength="2" autocomplete="off"')}
+          ${input('zip', 'Zip', 'autocomplete="off"')}
+        </div>
+      </div>
+    </div>
+    <div class="cform-foot">
+      <span class="msg-slot"></span>
+      ${c ? '' : `<button class="btn link" onclick="this.closest('.cform').remove()">Cancel</button>`}
+      <button class="btn primary" onclick="saveCustomer(this)">${c ? 'Save' : `Add ${ROLE[role].one}`}</button>
+    </div>
+  </div>`;
+}
+
+function renderEditor() {
+  const { deal, roles, customers: list } = editorDeal;
+  document.getElementById('ed-title').textContent = deal.address || 'Deal';
+  document.getElementById('ed-sub').innerHTML = `${statusPill(deal.status)} · your ${roles.map(r => ROLE[r].many.toLowerCase()).join(' and ')}`;
+  document.getElementById('ed-body').innerHTML = roles.map(role => {
+    const people = list.filter(c => c.role === role);
+    return `<div data-section="${role}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 8px">
+        <strong>${ROLE[role].many}</strong>
+        <button class="btn" onclick="addCustomerForm('${role}')">+ Add ${ROLE[role].one}</button>
+      </div>
+      ${people.length ? people.map(c => customerFormHtml(c, role)).join('') : `<p class="missing" style="margin:0 0 10px;font-size:.85rem">No ${ROLE[role].one} on file yet.</p>`}
+    </div>`;
+  }).join('') + `<p style="font-size:.78rem;color:var(--muted);margin:4px 0 0">Changes show in Daily Desk's activity for the deal. To remove someone, ask your office coordinator.</p>`;
+}
+
+function addCustomerForm(role) {
+  const section = document.querySelector(`#ed-body [data-section="${role}"]`);
+  if (section.querySelector(`.cform[data-key="new-${role}"]`)) return;
+  section.querySelector('p.missing')?.remove();
+  section.insertAdjacentHTML('beforeend', customerFormHtml(null, role));
+  section.querySelector(`.cform[data-key="new-${role}"] input`).focus();
+}
+
+async function saveCustomer(btn) {
+  const form = btn.closest('.cform');
+  const slot = form.querySelector('.msg-slot');
+  const body = {};
+  form.querySelectorAll('input[data-field]').forEach(i => { body[i.dataset.field] = i.value.trim(); });
+  if (!body.name) { slot.innerHTML = '<span class="err">Name is required.</span>'; return; }
+  const id = form.dataset.id;
+  const dealId = editorDeal.deal.id;
+  btn.disabled = true;
+  slot.innerHTML = '';
+  try {
+    const r = await fetch(id
+        ? `${PROXY_BASE}/portal/deals/${encodeURIComponent(dealId)}/customers/${encodeURIComponent(id)}`
+        : `${PROXY_BASE}/portal/deals/${encodeURIComponent(dealId)}/customers`,
+      { method: id ? 'PUT' : 'POST', headers: H(), body: JSON.stringify(id ? body : { ...body, role: form.dataset.role }) });
+    const saved = await r.json();
+    if (!r.ok) throw new Error(saved.error || 'HTTP ' + r.status);
+    editorChanged = true;
+    if (id) {
+      const i = editorDeal.customers.findIndex(c => c.id === id);
+      if (i >= 0) editorDeal.customers[i] = saved;
+      FIELDS.forEach(f => { const el = form.querySelector(`[data-field="${f}"]`); if (el) el.value = saved[f] ?? ''; });
+      form.querySelector('h3 span').textContent = saved.name || '(no name)';
+      slot.innerHTML = `<span class="saved">${saved.changed && saved.changed.length ? 'Saved ✓' : 'No changes'}</span>`;
+    } else {
+      editorDeal.customers.push(saved);
+      renderEditor();
+    }
+  } catch (e) {
+    slot.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('editor').classList.contains('open')) closeEditor(); });
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Customer Portal',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
