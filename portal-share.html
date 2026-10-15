@@ -133,6 +133,7 @@ let customers = [];
 let needsDetails = [];
 let editorDeal = null;      // { deal, roles, customers } from GET /portal/deals/:id/customers
 let editorChanged = false;  // reload the lists when the editor closes
+let started = false;        // start() runs once (signed in on load, or after Google sign-in)
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
@@ -164,7 +165,6 @@ async function handleGoogleSignIn(resp) {
 }
 
 // ── Customers ───────────────────────────────────────────────────────────────
-let started = false;
 function start() {
   if (started) return;
   started = true;
