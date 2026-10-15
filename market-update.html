@@ -19,6 +19,7 @@
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
         /* ── Design system shared with foundation.html/feedback.html/
@@ -72,15 +73,17 @@
         .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
         .form-group { margin-bottom: 18px; }
         label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 6px; }
-        input[type="file"], input[type="number"] {
+        input[type="file"], input[type="number"], select {
             width: 100%; padding: 10px 12px; border: 1px solid var(--border);
             border-radius: 6px; font-size: .92em; font-family: inherit;
             background: var(--bg); color: var(--text); transition: border-color 0.15s;
         }
-        input[type="file"]:focus, input[type="number"]:focus {
+        input[type="file"]:focus, input[type="number"]:focus, select:focus {
             outline: none; border-color: var(--blue);
         }
         .input-hint { font-size: 0.8em; color: var(--muted); margin-top: 5px; }
+        .check-label { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: .92em; color: var(--text); font-weight: 600; cursor: pointer; }
+        .check-label input { width: auto; }
         .button-primary {
             background: var(--blue);
             color: white; border: none; padding: 12px 24px; font-family: inherit;
@@ -150,6 +153,19 @@
                 <input type="number" id="subjectPrice" placeholder="e.g., 425000">
                 <p class="input-hint">Enter numbers only (no dollar signs or commas)</p>
             </div>
+            <div class="form-group" id="zillowGroup">
+                <label class="check-label"><input type="checkbox" id="includeZillow" checked onchange="zgToggle()"> Include Zillow market pages</label>
+                <div id="zillowOptions" style="margin-top:10px">
+                    <label for="zillowArea">🏘️ Area for Zillow data</label>
+                    <select id="zillowArea" onchange="zgAreaChosen = true"><option value="">Loading areas…</option></select>
+                    <p class="input-hint" id="zillowAreaHint">Picked from the most common city or zip in your upload — change it if you like.</p>
+                    <div id="zillowSignin" style="display:none;margin-top:10px">
+                        <p class="input-hint" style="margin-bottom:6px">Sign in with your Adams Cameron Google account to include the Zillow pages.</p>
+                        <div id="g-signin-btn"></div>
+                    </div>
+                    <p class="input-hint">Adds three pages from Zillow: home values &amp; forecast, market pulse (Deltona–Daytona metro) and values by bedroom count. Zillow data is for client reports — don't post these pages on social media.</p>
+                </div>
+            </div>
             <button class="button-primary" onclick="generateReports()" id="generateBtn">🚀 Generate Reports</button>
         </div>
 
@@ -174,6 +190,9 @@
                 <li><strong>Days on Market Analysis</strong> — Color-coded by speed of sale</li>
                 <li><strong>Absorption Rate Calculation</strong> — Months of inventory</li>
                 <li><strong>Market Type Determination</strong> — Buyer's, Seller's, or Balanced</li>
+                <li><strong>Home Values &amp; Forecast (Zillow)</strong> — 10-year home value trend for the area, county and metro, with Zillow's 12-month forecast</li>
+                <li><strong>Market Pulse (Zillow)</strong> — Metro market temperature, sale-to-list, days to pending, price cuts and inventory over 24 months</li>
+                <li><strong>Values by Bedroom Count (Zillow)</strong> — Typical home value for 1–5+ bedrooms, with the change over a year</li>
             </ul>
             <p style="margin-top:15px;font-size:0.85em;color:var(--muted);"><strong>Troubleshooting:</strong> If you get an error, press <strong>F12</strong> to open your browser console for detailed debugging information.</p>
         </div>
@@ -223,9 +242,16 @@
             showStatus('📊 Generating report...', 'processing');
             const chartImageData    = await generateChart(subjectSqft, subjectPrice);
             const domChartImageData = await generateDOMChart(subjectPrice);
-            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData };
+            zgDetectArea(mlsData);
+            let zillow = null, zillowNote = '';
+            if (document.getElementById('includeZillow').checked) {
+                showStatus('🏘️ Getting Zillow market data...', 'processing');
+                try { zillow = await zgBuild(); }
+                catch (e) { zillowNote = '\n⚠️ Zillow pages left out: ' + e.message; }
+            }
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow };
             document.getElementById('downloadSection').style.display = 'block';
-            showStatus('✅ Report generated successfully!', 'success');
+            showStatus('✅ Report generated successfully!' + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + zillowNote, zillowNote ? 'error' : 'success');
         } catch (error) {
             console.error('Detailed error:', error);
             let errorMessage = error.message;
@@ -273,6 +299,9 @@
         const currentPriceIdx = findColumnIndex(headers, ['current price','currentprice']);
         const closeDateIdx    = findColumnIndex(headers, ['close date','closedate','sold date','solddate','sale date','saledate','closing date','closingdate']);
         const domIdx          = findColumnIndex(headers, ['days on market','daysonmarket','dom','days on mkt','cumulative days on market','cdom','market days']);
+        // City and zip, for picking the area of the Zillow pages.
+        const cityIdx         = findColumnIndex(headers, ['city']);
+        const zipIdx          = findColumnIndex(headers, ['postal code','postalcode','zip code','zipcode','zip']);
         if (sqftIdx === -1) throw new Error('REQUIRED FIELD MISSING: Square footage column not found. Need "Living Area", "Heated Area", "Square Feet", or "SqFt". Available columns: ' + headers.join(', '));
         if (listPriceIdx === -1 && soldPriceIdx === -1 && currentPriceIdx === -1) throw new Error('REQUIRED FIELD MISSING: Price column not found. Need "List Price", "Sold Price", "Close Price", or "Current Price". Available columns: ' + headers.join(', '));
         const hasStatus = statusIdx >= 0;
@@ -306,7 +335,9 @@
                 if (closeDateIdx !== -1 && values[closeDateIdx]) { const d = new Date(values[closeDateIdx]); if (!isNaN(d.getTime())) closeDate = d; }
                 let dom = null;
                 if (domIdx !== -1 && values[domIdx]) { const v = parseInt((values[domIdx]||'').replace(/["\s,]/g,''),10); if (!isNaN(v) && v >= 0) dom = v; }
-                data.push({ status, sqft, price, pricePerSqft: price/sqft, closeDate, dom });
+                const city = cityIdx !== -1 ? (values[cityIdx] || '').trim() : '';
+                const zip  = zipIdx  !== -1 ? ((values[zipIdx] || '').match(/\d{5}/) || [''])[0] : '';
+                data.push({ status, sqft, price, pricePerSqft: price/sqft, closeDate, dom, city, zip });
             } else { skippedRows++; }
         }
         console.log('Parsed', data.length, 'valid properties, skipped', skippedRows, 'rows');
@@ -584,7 +615,8 @@
             priceChartSection,
             pricePerSqftSection + absorptionSection,
             domSection
-        ].filter(Boolean).map(content => `<section class="print-page">${header}<div class="page-body">${content}</div>${footer}</section>`).join('');
+        ].filter(Boolean).map(content => `<section class="print-page">${header}<div class="page-body">${content}</div>${footer}</section>`).join('')
+          + (lastReportData && lastReportData.zillow ? zgPagesHTML(lastReportData.zillow, header) : '');
 
         return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Market Update Report</title>
@@ -619,6 +651,25 @@
     .gauge-pointer { position:absolute; top:-9px; width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:9px solid #1f4788; transform:translateX(-50%); }
     .gauge-labels { display:flex; justify-content:space-between; font-size:0.85em; color:#888; margin-top:6px; }
     .gauge-labels .active { color:#1f4788; font-weight:700; text-decoration:underline; }
+    /* Zillow pages — attribution per Zillow's Economic Data terms (§27.1) */
+    .zg-head { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+    .zg-head span { font-size:0.9em; color:#555; font-weight:600; }
+    /* The approved logo file is 3049×387; shown at a fixed height with its
+       proportions kept — the file itself is never edited (John, 2026-10-15). */
+    .zg-head img { height:30px; width:auto; display:block; }
+    .zg-temp { height:14px; border-radius:4px; background:linear-gradient(90deg,#4472C4 0%,#ADC5E8 50%,#ED7D31 100%); position:relative; margin:18px 0 6px; }
+    .zg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
+    table.zg-compact th, table.zg-compact td { padding:5px 9px; font-size:0.85em; }
+    .zg-grid img { width:100%; border:1px solid #ddd; border-radius:4px; }
+    .zg-note { font-size:0.82em; color:#666; margin:10px 0; line-height:1.5; }
+    .zg-disclaimer { font-size:0.8em; color:#555; border-top:1px solid #eee; padding-top:8px; margin-top:12px; }
+    .zg-footer { text-align:center; font-size:0.72em; color:#888; padding:0 0 10px; }
+    .page-body.zg-body { min-height:0; padding-top:16px; padding-bottom:6px; }
+    .zg-body .section-title { margin-bottom:10px; }
+    .zg-body table { margin-bottom:12px; }
+    .zg-temp { margin-top:10px; }
+    .zg-footer a { color:#888; }
+    .up { color:#1A7A4C; font-weight:600; } .down { color:#C0392B; font-weight:600; }
     @media print {
         body { background:#fff; }
         .toolbar { display:none; }
@@ -634,6 +685,298 @@
     ${pages}
 </body></html>`;
     }
+</script>
+<script>
+/* ── Zillow market pages ─────────────────────────────────────────────────────
+   Three extra report pages from Zillow's Economic Data API, through our server
+   (server/zillow-market-routes.js — GET /market-data/zillow/areas and
+   /market-data/zillow?regionID=…; the Bridge token stays on the server).
+   Zillow's terms (bridgedataoutput.com/zillowterms §27.1) require, on every
+   page showing the data: an approved Zillow logo, unedited and not resized,
+   linking to www.zillow.com with alt text "Real Estate on Zillow"; the label
+   "Provided via the Zillow Economic Data API" above the data; an "as is"
+   disclaimer; and the footer "© Zillow, Inc., 2006-2019. Use is subject to the
+   Zillow Terms of Use." The logo file is images/zillow-logo.png (an approved
+   logo from zillow.com/news/logos); without it the pages are left out. The
+   data isn't stored or cached anywhere (§5.18) — each report fetches it.
+   Approved by Zillow for client reports (2026-10-15), not for social media. */
+const ZG_PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+const ZG_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const ZG_LOGO_URL = new URL('images/zillow-logo.png', location.href).href;
+const ZG_TERMS_URL = 'https://www.zillow.com/corp/Terms.htm';
+let zgAreas = [];
+let zgAreaChosen = false;   // the agent picked an area themselves — don't overwrite it
+const zgCreds = () => ({ key: localStorage.getItem('ac_proxy_key') || '', email: localStorage.getItem('ac_user_email') || '' });
+const zgHeaders = () => { const c = zgCreds(); return { 'x-proxy-key': c.key, 'x-user-email': c.email }; };
+const zgEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function zgToggle() {
+  document.getElementById('zillowOptions').style.display = document.getElementById('includeZillow').checked ? '' : 'none';
+}
+
+// ── Sign-in (shared Workshop credentials; prompt only when missing) ─────────
+async function zgHandleSignIn(resp) {
+  try {
+    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
+    const r = await fetch(`${ZG_PROXY}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
+    localStorage.setItem('ac_user_email', (payload.email || '').toLowerCase());
+    localStorage.setItem('ac_proxy_key', data.proxyKey || '');
+    document.getElementById('zillowSignin').style.display = 'none';
+    zgLoadAreas();
+  } catch (e) { alert(e.message); }
+}
+
+async function zgLoadAreas() {
+  const sel = document.getElementById('zillowArea');
+  if (!zgCreds().key) {
+    sel.innerHTML = '<option value="">Sign in to choose an area</option>';
+    document.getElementById('zillowSignin').style.display = '';
+    return;
+  }
+  try {
+    const r = await fetch(`${ZG_PROXY}/market-data/zillow/areas`, { headers: zgHeaders() });
+    if (r.status === 401) { localStorage.removeItem('ac_proxy_key'); return zgLoadAreas(); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    zgAreas = data;
+    const group = (type, label) => {
+      const opts = zgAreas.filter(a => a.type === type).map(a => `<option value="${a.regionID}">${zgEsc(a.name)}</option>`).join('');
+      return opts ? `<optgroup label="${label}">${opts}</optgroup>` : '';
+    };
+    sel.innerHTML = group('metro', 'Metro') + group('county', 'County') + group('city', 'City') + group('zip', 'Zip code');
+    sel.value = String((zgAreas.find(a => a.name === 'Volusia County') || zgAreas[0] || {}).regionID || '');
+    if (mlsData) zgDetectArea(mlsData);
+  } catch (e) {
+    sel.innerHTML = `<option value="">Couldn't load areas: ${zgEsc(e.message)}</option>`;
+  }
+}
+
+window.addEventListener('load', () => {
+  zgLoadAreas();
+  if (window.google?.accounts?.id) {
+    google.accounts.id.initialize({ client_id: ZG_CLIENT_ID, callback: zgHandleSignIn });
+    google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
+  }
+});
+
+// Parse the chosen file as soon as it's picked, so the area is pre-selected
+// before the agent generates (and can be changed).
+document.getElementById('mlsFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try { zgDetectArea(parseMLSData(await readFile(file))); } catch (_) { /* reported on Generate */ }
+});
+
+// ── Area detection: most common city (≥60% of rows), else zip, else county ─
+function zgNorm(s) {
+  return String(s || '').toLowerCase().replace(/\bbch\b/g, 'beach').replace(/\bshrs\b/g, 'shores').replace(/[^a-z0-9]/g, '');
+}
+function zgDetectArea(rows) {
+  if (!zgAreas.length || zgAreaChosen || !rows || !rows.length) return;
+  const top = (key) => {
+    const counts = {};
+    for (const r of rows) { const v = key === 'city' ? zgNorm(r.city) : r.zip; if (v) counts[v] = (counts[v] || 0) + 1; }
+    const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return best ? { value: best[0], share: best[1] / rows.length } : null;
+  };
+  const byCity = new Map(zgAreas.filter(a => a.type === 'city').map(a => [zgNorm(a.name), a]));
+  const byZip  = new Map(zgAreas.filter(a => a.type === 'zip').map(a => [a.zip, a]));
+  let pick = null;
+  const c = top('city'), z = top('zip');
+  if (c && c.share >= 0.6 && byCity.get(c.value)) pick = byCity.get(c.value);
+  else if (z && z.share >= 0.6 && byZip.get(z.value)) pick = byZip.get(z.value);
+  else {
+    const votes = {};
+    for (const r of rows) {
+      const a = byCity.get(zgNorm(r.city)) || byZip.get(r.zip);
+      if (a && a.county) votes[a.county] = (votes[a.county] || 0) + 1;
+    }
+    const county = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+    pick = zgAreas.find(a => a.type === 'county' && a.county === (county ? county[0] : 'Volusia County'));
+  }
+  if (pick) {
+    document.getElementById('zillowArea').value = String(pick.regionID);
+    document.getElementById('zillowAreaHint').textContent = `Picked ${pick.name} from your upload — change it if you like.`;
+  }
+}
+
+// ── Fetch + charts ──────────────────────────────────────────────────────────
+function zgLogoLoads() {
+  return new Promise(resolve => { const img = new Image(); img.onload = () => resolve(true); img.onerror = () => resolve(false); img.src = ZG_LOGO_URL; });
+}
+
+async function zgBuild() {
+  if (!zgCreds().key) throw new Error('sign in (below the checkbox) to include them.');
+  const regionID = document.getElementById('zillowArea').value;
+  if (!regionID) throw new Error('choose an area for the Zillow data.');
+  if (!(await zgLogoLoads())) throw new Error('the Zillow logo file (images/zillow-logo.png) is missing — Zillow requires it on these pages.');
+  const r = await fetch(`${ZG_PROXY}/market-data/zillow?regionID=${encodeURIComponent(regionID)}`, { headers: zgHeaders() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+  const charts = {
+    values: await zgChart(1200, 330, zgValuesConfig(data)),
+    bedrooms: data.bedrooms.length ? await zgChart(1200, 400, zgBedroomsConfig(data)) : null,
+    pulse: await zgPulseCharts(data.pulse),
+  };
+  return { data, charts };
+}
+
+async function zgChart(w, h, config) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const chart = new Chart(canvas.getContext('2d'), { ...config, options: { responsive: false, animation: false, ...config.options } });
+  chart.update();
+  await new Promise(r => setTimeout(r, 50));
+  const url = canvas.toDataURL('image/png');
+  chart.destroy();
+  return url;
+}
+
+const zgMonthLabel = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+const zgMoney = (v) => v == null ? '—' : '$' + Math.round(v).toLocaleString();
+const zgPct = (v, digits = 1) => v == null || !isFinite(v) ? '—' : (v >= 0 ? '+' : '') + v.toFixed(digits) + '%';
+const zgArrow = (v) => v == null || !isFinite(v) ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
+
+function zgValuesConfig(data) {
+  const months = data.values.area.map(p => p.month);
+  const align = (series) => { const m = new Map((series || []).map(p => [p.month, p.value])); return months.map(x => m.has(x) ? m.get(x) : null); };
+  const sets = [
+    { label: data.area.name, data: align(data.values.area), borderColor: '#1f4788', borderWidth: 3 },
+    data.county && data.area.type !== 'county' && { label: data.county.name, data: align(data.values.county), borderColor: '#70AD47', borderWidth: 2 },
+    data.area.type !== 'metro' && { label: data.metro.name, data: align(data.values.metro), borderColor: '#ED7D31', borderWidth: 2, borderDash: [8, 5] },
+  ].filter(Boolean).map(d => ({ ...d, pointRadius: 0, fill: false, tension: 0.2 }));
+  return {
+    type: 'line',
+    data: { labels: months.map(zgMonthLabel), datasets: sets },
+    options: {
+      plugins: { title: { display: true, text: 'Zillow Home Value Index (ZHVI) — typical home value', font: { size: 20, weight: 'bold' } }, legend: { position: 'top' } },
+      scales: { x: { ticks: { maxTicksLimit: 11 } }, y: { ticks: { callback: v => '$' + Math.round(v / 1000) + 'K' } } },
+    },
+  };
+}
+
+function zgBedroomsConfig(data) {
+  return {
+    type: 'bar',
+    data: {
+      labels: data.bedrooms.map(b => b.bedrooms === 5 ? '5+ bedrooms' : b.bedrooms + (b.bedrooms === 1 ? ' bedroom' : ' bedrooms')),
+      datasets: [{ label: 'Typical home value', data: data.bedrooms.map(b => b.value), backgroundColor: '#4472C4' }],
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { title: { display: true, text: 'Typical home value by bedroom count (ZHVI)', font: { size: 20, weight: 'bold' } }, legend: { display: false } },
+      scales: { x: { ticks: { callback: v => '$' + Math.round(v / 1000) + 'K' } } },
+    },
+  };
+}
+
+async function zgPulseCharts(pulse) {
+  const line = (title, series, fmt) => ({
+    type: 'line',
+    data: { labels: series.map(p => zgMonthLabel(p.month)), datasets: [{ data: series.map(p => p.value), borderColor: '#1f4788', borderWidth: 3, pointRadius: 2, fill: false, tension: 0.2 }] },
+    options: { plugins: { title: { display: true, text: title, font: { size: 18, weight: 'bold' } }, legend: { display: false } },
+               scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { ticks: { callback: fmt } } } },
+  });
+  const pct = v => Math.round(v * 1000) / 10 + '%';
+  const out = [];
+  out.push(await zgChart(700, 255, line('Median sale-to-list ratio', pulse.median_sale_to_list, pct)));
+  out.push(await zgChart(700, 255, line('Share of homes sold below list', pulse.pct_sold_below_list, pct)));
+  out.push(await zgChart(700, 255, line('Median days to pending', pulse.med_doz_pending, v => v + ' days')));
+  out.push(await zgChart(700, 255, line('Share of listings with a price cut', pulse.perc_listings_price_cut, pct)));
+  return out;
+}
+
+// ── Report pages ────────────────────────────────────────────────────────────
+function zgChange(series, monthsBack) {
+  if (!series || series.length <= monthsBack) return null;
+  const last = series[series.length - 1].value, then = series[series.length - 1 - monthsBack].value;
+  return then ? (last / then - 1) * 100 : null;
+}
+function zgYoY(series) {
+  if (!series || !series.length) return { last: null, prev: null };
+  const last = series[series.length - 1];
+  const want = `${Number(last.month.slice(0, 4)) - 1}${last.month.slice(4, 7)}`;
+  const prev = series.find(p => p.month.slice(0, 7) === want);
+  return { last, prev: prev || null };
+}
+
+function zgPagesHTML(z, header) {
+  const { data, charts } = z;
+  const release = zgMonthLabel(data.asOf);
+  const head = `<div class="zg-head"><a href="http://www.zillow.com/"><img src="${ZG_LOGO_URL}" alt="Real Estate on Zillow"></a><span>Provided via the Zillow Economic Data API</span></div>`;
+  const disclaimer = `<p class="zg-disclaimer">Data provided “as is” via the Zillow Economic Data API. Zillow Home Value Index (ZHVI) and Zillow market data, ${zgEsc(release)} data.</p>`;
+  const zgFooter = `<div class="page-footer">© Adams, Cameron &amp; Co. 2026</div><div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div>`;
+  // No 900px minimum on these pages (the report's other pages keep it), so
+  // Zillow's required footer stays on the same sheet as the data.
+  const page = (content) => `<section class="print-page">${header}<div class="page-body zg-body">${head}${content}${disclaimer}</div>${zgFooter}</section>`;
+
+  // Page 1 — Home values & forecast
+  const rows = [
+    [data.area.name, data.values.area],
+    data.county && data.area.type !== 'county' ? [data.county.name, data.values.county] : null,
+    data.area.type !== 'metro' ? [data.metro.name, data.values.metro] : null,
+  ].filter(Boolean);
+  const valueRows = rows.map(([name, s]) => {
+    const now = s && s.length ? s[s.length - 1].value : null;
+    const y1 = zgChange(s, 12), y5 = zgChange(s, 60);
+    return `<tr><td>${zgEsc(name)}</td><td>${zgMoney(now)}</td><td class="${zgArrow(y1)}">${zgPct(y1)}</td><td class="${zgArrow(y5)}">${zgPct(y5)}</td></tr>`;
+  }).join('');
+  const fcScope = data.forecastScope === 'area' ? `for ${zgEsc(data.area.name)}` : `for the ${zgEsc(data.metro.name)}`;
+  const fcRows = (data.forecast || []).map(f => `<tr><td>Through ${zgEsc(zgMonthLabel(f.horizonEnd))}</td><td class="${zgArrow(f.pct)}">${zgPct(f.pct)}</td></tr>`).join('');
+  const page1 = page(`
+    <h2 class="section-title">Home Values &amp; Forecast — ${zgEsc(data.area.name)}</h2>
+    <table class="zg-compact"><tr><th>Area</th><th>Typical value (${zgEsc(release)})</th><th>1-year change</th><th>5-year change</th></tr>${valueRows}</table>
+    <img class="chart-img" src="${charts.values}">
+    ${fcRows ? `<table class="zg-compact"><tr><th>Zillow forecast ${fcScope}</th><th>Expected change</th></tr>${fcRows}</table>` : ''}
+    <p class="zg-note">ZHVI is a smoothed, seasonally adjusted typical home value (the middle third of homes), not a sale price.${data.forecastScope === 'metro' && data.area.type !== 'metro' ? ' Zillow forecasts zip codes and metro areas, so the metro forecast is shown.' : ''}</p>`);
+
+  // Page 2 — Market pulse (metro)
+  const p = data.pulse;
+  const temp = zgYoY(p.market_temp_index);
+  const kpi = (label, key, fmt, betterUp) => {
+    const { last, prev } = zgYoY(p[key]);
+    if (!last) return '';
+    const diff = prev ? last.value - prev.value : null;
+    const cls = diff == null || diff === 0 ? '' : (diff > 0) === betterUp ? 'up' : 'down';
+    return `<tr><td>${label}</td><td>${fmt(last.value)}</td><td>${prev ? fmt(prev.value) : '—'}</td><td class="${cls}">${diff == null ? '' : diff > 0 ? '▲' : diff < 0 ? '▼' : '='}</td><td>${zgEsc(zgMonthLabel(last.month))}</td></tr>`;
+  };
+  const pctF = v => (v * 100).toFixed(1) + '%', num = v => Math.round(v).toLocaleString(), days = v => Math.round(v) + ' days';
+  const page2 = page(`
+    <h2 class="section-title">Market Pulse — ${zgEsc(data.metro.name)}</h2>
+    <p class="zg-note" style="margin-top:-6px">Metro-wide figures, covering Volusia and Flagler counties.</p>
+    ${temp.last ? `<p class="market-type">Zillow Market Temperature: ${Math.round(temp.last.value)} of 100${temp.prev ? ` (a year ago: ${Math.round(temp.prev.value)})` : ''}</p>
+    <div class="zg-temp"><div class="gauge-pointer" style="left:${Math.max(0, Math.min(100, temp.last.value))}%"></div></div>
+    <div class="gauge-labels"><span>Favors buyers</span><span>Neutral</span><span>Favors sellers</span></div>` : ''}
+    <table class="zg-compact" style="margin-top:14px"><tr><th>Measure</th><th>Latest</th><th>A year earlier</th><th></th><th>Month</th></tr>
+      ${kpi('Median sale-to-list ratio', 'median_sale_to_list', pctF, true)}
+      ${kpi('Homes sold above list', 'pct_sold_above_list', pctF, true)}
+      ${kpi('Homes sold below list', 'pct_sold_below_list', pctF, false)}
+      ${kpi('Median days to pending', 'med_doz_pending', days, false)}
+      ${kpi('Listings with a price cut', 'perc_listings_price_cut', pctF, false)}
+      ${kpi('Homes for sale (inventory)', 'invt_fs', num, false)}
+      ${kpi('New listings in the month', 'new_listings', num, false)}
+      ${kpi('Newly pending in the month', 'new_pending', num, true)}
+    </table>
+    <div class="zg-grid">${charts.pulse.map(u => `<img src="${u}">`).join('')}</div>
+    <p class="zg-note">Arrows: change from a year earlier; green is the direction that favors sellers. The temperature index runs 0–100: lower favors buyers, higher favors sellers.</p>`);
+
+  // Page 3 — Values by bedroom count
+  const bedScope = data.bedroomsScope === 'county' && data.county ? data.county.name : data.area.name;
+  const bedRows = data.bedrooms.map(b => {
+    const ch = b.valueYearAgo ? (b.value / b.valueYearAgo - 1) * 100 : null;
+    return `<tr><td>${b.bedrooms === 5 ? '5+' : b.bedrooms}</td><td>${zgMoney(b.value)}</td><td>${zgMoney(b.valueYearAgo)}</td><td class="${zgArrow(ch)}">${zgPct(ch)}</td></tr>`;
+  }).join('');
+  const page3 = data.bedrooms.length ? page(`
+    <h2 class="section-title">Values by Bedroom Count — ${zgEsc(bedScope)}</h2>
+    ${data.bedroomsScope === 'county' ? `<p class="zg-note">Zillow doesn't publish bedroom-count values for ${zgEsc(data.area.name)}, so ${zgEsc(bedScope)} is shown.</p>` : ''}
+    <table><tr><th>Bedrooms</th><th>Typical value (${zgEsc(release)})</th><th>A year earlier</th><th>1-year change</th></tr>${bedRows}</table>
+    ${charts.bedrooms ? `<img class="chart-img" src="${charts.bedrooms}">` : ''}
+    <p class="zg-note">Typical home value (ZHVI) for homes with each number of bedrooms, all home types, middle third of values.</p>`) : '';
+
+  return page1 + page2 + page3;
+}
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Market Update',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
