@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiting & Presence Tools</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<!--
+  Sign-in and landing page for partner brokerages — people at another
+  company we share the Online Presence Audit and Recruiting Prep with
+  (partner-access.js on the server; first partner Terrie O'Connor Realtors,
+  2026-10-14). Not linked from index.html or brainstormers.html.
+
+  Sign-in is an emailed, single-use link (POST /partner/request-link →
+  ?code= → POST /partner/redeem) because our Google sign-in only accepts
+  Adams Cameron accounts. The 30-day token is kept under ac_partner_token,
+  and the brokerage profile (name, logo) under ac_partner_profile, which
+  recruit-prep.html and social-audit.html read to switch to partner mode.
+-->
+<style>
+:root {
+  --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c;
+  --cream: #faf8f3; --slate: #5a5a78; --muted: #8a8aa8;
+  --border: rgba(26,26,46,.10); --shadow: 0 2px 20px rgba(26,26,46,.08); --shadow-hover: 0 10px 34px rgba(26,26,46,.15);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.6; font-size: 15px; }
+h1, h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; text-wrap: balance; }
+
+.hero { background: var(--ink); color: var(--cream); padding: 48px 16px 64px; text-align: center; }
+.hero-inner { max-width: 720px; margin: 0 auto; }
+.logo-chip { display: inline-block; background: #fff; border-radius: 10px; padding: 10px 18px; margin-bottom: 18px; }
+.logo-chip img { display: block; height: 52px; width: auto; max-width: 100%; }
+.hero h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.08; margin-bottom: 12px; }
+.hero p { color: rgba(250,248,243,.78); max-width: 560px; margin: 0 auto; }
+.signed { margin-top: 22px; font-size: 14px; color: rgba(250,248,243,.85); }
+.signed button { background: none; border: none; color: var(--gold); font: inherit; cursor: pointer; text-decoration: underline; margin-left: 6px; }
+
+main { max-width: 900px; margin: -32px auto 0; padding: 0 16px 56px; }
+.panel { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 24px 22px; max-width: 480px; margin: 0 auto; }
+.panel h2 { font-size: 1.5rem; margin-bottom: 4px; }
+.panel p { font-size: 14px; color: var(--slate); margin-bottom: 14px; }
+.panel form { display: flex; gap: 10px; flex-wrap: wrap; }
+.panel input { font: inherit; padding: 10px 12px; border: 1px solid rgba(26,26,46,.18); border-radius: 8px; flex: 1 1 220px; min-width: 0; }
+.panel button { font: inherit; font-weight: 600; border: none; border-radius: 8px; padding: 10px 18px; background: var(--gold); color: var(--ink); cursor: pointer; }
+.panel button:disabled { opacity: .6; cursor: default; }
+.msg { margin-top: 12px; font-size: 13px; color: var(--slate); }
+.msg.err { color: #b3412f; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 24px 22px 22px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: inherit; transition: box-shadow .2s, transform .2s; min-width: 0; }
+.card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+.card-icon { font-size: 28px; }
+.card h2 { font-size: 1.55rem; line-height: 1.15; }
+.card p { color: var(--slate); font-size: 14px; }
+.card ul { padding-left: 18px; color: var(--ink-soft); font-size: 13px; }
+.card-go { margin-top: auto; font-weight: 600; font-size: 14px; padding-top: 6px; }
+.note { margin-top: 24px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; font-size: 13px; color: var(--slate); }
+.note h2 { font-size: 1.2rem; color: var(--ink); margin-bottom: 6px; }
+.note ul { padding-left: 18px; }
+footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 36px; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="logo-chip" id="logo" hidden><img id="logo-img" alt="" onerror="document.getElementById('logo').hidden = true"></div>
+    <h1 id="hero-title">Recruiting &amp; Online Presence Tools</h1>
+    <p id="hero-sub">Prepare for recruiting conversations and audit any agent's online presence.</p>
+    <div class="signed" id="signed" hidden></div>
+  </div>
+</section>
+
+<main>
+  <section class="panel" id="signin" hidden>
+    <h2>Sign in</h2>
+    <p>Enter your work email and we'll send you a sign-in link.</p>
+    <form onsubmit="requestLink(event)">
+      <input type="email" id="email" autocomplete="email" placeholder="you@company.com" required>
+      <button type="submit" id="send-btn">Email me a link</button>
+    </form>
+    <div class="msg" id="signin-msg"></div>
+  </section>
+
+  <div id="tools" hidden>
+    <div class="cards">
+      <a class="card" href="./recruit-prep.html">
+        <div class="card-icon">🤝</div>
+        <h2>Recruiting Prep</h2>
+        <p>Prepare for a recruiting conversation with an agent at another company.</p>
+        <ul>
+          <li>Talking points to open with</li>
+          <li>Pain and Pleasure: recent changes in their work and life</li>
+          <li>Production from public profiles, or from a Courted export you upload</li>
+          <li>Discovery questions, objections, the services that fit them, and a follow-up email</li>
+        </ul>
+        <span class="card-go">Open Recruiting Prep →</span>
+      </a>
+      <a class="card" href="./social-audit.html">
+        <div class="card-icon">🔎</div>
+        <h2>Online Presence Audit</h2>
+        <p>Score an agent's online presence: social media, reviews, platform profiles, local SEO, AI search visibility, brand consistency and compliance. Every finding links to its source.</p>
+        <ul>
+          <li>Category scores and red flags</li>
+          <li>Top 5 actions ranked by impact</li>
+        </ul>
+        <span class="card-go">Open the audit →</span>
+      </a>
+    </div>
+    <div class="note">
+      <h2>Good to know</h2>
+      <ul>
+        <li>Your briefings and audits are private to you. John Adams can see them only to keep the tools running well.</li>
+        <li>Everything comes from public information, plus anything you choose to add. Your personal notes and screenshots are never shown to anyone else, and files aren't saved.</li>
+        <li>In Recruiting Prep you can edit the list of what your company offers. The briefing claims only what's on that list.</li>
+        <li>This device stays signed in for 30 days.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<footer>Tools provided by John Adams · John's Workshop</footer>
+
+<script>
+const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+const $ = id => document.getElementById(id);
+const store = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  del: k => { try { localStorage.removeItem(k); } catch {} },
+};
+
+function tokenValid(t) {
+  try {
+    const b = t.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4))).exp > Date.now();
+  } catch { return false; }
+}
+
+function saveProfile(who) {
+  const p = who.partner || {};
+  store.set('ac_partner_profile', JSON.stringify({
+    name: who.name, partnerName: p.name, shortName: p.shortName, state: p.state, logoUrl: p.logoUrl,
+  }));
+}
+
+function showBrand(prof) {
+  if (!prof) return;
+  if (prof.logoUrl) { $('logo-img').src = prof.logoUrl; $('logo-img').alt = prof.partnerName || ''; $('logo').hidden = false; }
+  if (prof.partnerName) document.title = `${prof.partnerName} — Recruiting & Presence Tools`;
+}
+
+function showSignIn(message, isErr) {
+  $('tools').hidden = true; $('signed').hidden = true; $('signin').hidden = false;
+  if (message) { $('signin-msg').textContent = message; $('signin-msg').classList.toggle('err', !!isErr); }
+}
+
+function showTools(prof) {
+  showBrand(prof);
+  $('signin').hidden = true; $('tools').hidden = false; $('signed').hidden = false;
+  $('signed').innerHTML = `Signed in as ${esc(prof.name || '')}<button type="button" onclick="signOut()">Sign out</button>`;
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+async function requestLink(e) {
+  e.preventDefault();
+  const btn = $('send-btn');
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${PROXY}/partner/request-link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('email').value.trim() }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Something went wrong. Please try again.');
+    $('signin-msg').textContent = d.message;
+    $('signin-msg').classList.remove('err');
+  } catch (err) {
+    $('signin-msg').textContent = err.message;
+    $('signin-msg').classList.add('err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function signOut() {
+  store.del('ac_partner_token'); store.del('ac_partner_profile');
+  showSignIn('Signed out.');
+}
+
+async function boot() {
+  const code = new URLSearchParams(location.search).get('code');
+  if (code) {
+    history.replaceState(null, '', location.pathname);  // the link works once — don't leave it in the address bar
+    try {
+      const r = await fetch(`${PROXY}/partner/redeem`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return showSignIn(d.error || 'Sign-in failed.', true);
+      store.set('ac_partner_token', d.partnerToken);
+      saveProfile(d);
+    } catch {
+      return showSignIn("Couldn't reach the server. Please try the link again.", true);
+    }
+  }
+  const token = store.get('ac_partner_token');
+  let prof = null;
+  try { prof = JSON.parse(store.get('ac_partner_profile') || 'null'); } catch {}
+  showBrand(prof);
+  if (!token || !tokenValid(token)) return showSignIn(prof ? 'Your sign-in has expired. Enter your email for a new link.' : '');
+  showTools(prof || {});
+  // Refresh the profile, and catch a revoked sign-in.
+  try {
+    const r = await fetch(`${PROXY}/partner/me`, { headers: { 'x-partner-token': token } });
+    if (r.status === 401) { store.del('ac_partner_token'); return showSignIn('Please sign in again.'); }
+    if (r.ok) { const who = await r.json(); saveProfile(who); showTools(JSON.parse(store.get('ac_partner_profile') || '{}')); }
+  } catch {}
+}
+boot();
+</script>
+</body>
+</html>

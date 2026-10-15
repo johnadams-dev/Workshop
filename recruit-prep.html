@@ -32,6 +32,8 @@ a { color: var(--ink-soft); }
 h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; text-wrap: balance; }
 
 /* auth gate */
+.partner-logo { display: inline-block; background: #fff; border-radius: 6px; padding: 4px 8px; margin-bottom: 6px; }
+.partner-logo img { display: block; height: 30px; width: auto; }
 #auth-gate { position: fixed; inset: 0; background: var(--ink); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 16px; }
 #auth-gate .box { text-align: center; color: var(--cream); max-width: 420px; }
 #auth-gate h1 { font-size: 2rem; margin-bottom: .4rem; }
@@ -282,6 +284,20 @@ const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.goo
 let userEmail  = localStorage.getItem('ac_user_email') || '';
 let proxyKey   = localStorage.getItem('ac_proxy_key') || '';
 let guestToken = localStorage.getItem('ac_guest_token') || '';
+// Partner brokerage session (partner.html → partner-access.js): a person at
+// another brokerage we share these tools with. Used when there's no Adams
+// Cameron session; the page then speaks for their brokerage.
+let partnerToken = localStorage.getItem('ac_partner_token') || '';
+function partnerProfile() {
+  if (!partnerToken) return null;
+  try {
+    const b = partnerToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
+    if (!(p.exp > Date.now())) return null;
+    const prof = JSON.parse(localStorage.getItem('ac_partner_profile') || 'null');
+    return prof ? { ...prof, email: p.email } : null;
+  } catch { return null; }
+}
 
 function guestPayload() {
   try {
@@ -291,10 +307,15 @@ function guestPayload() {
   } catch { return null; }
 }
 const isAcc = () => !!(proxyKey && userEmail);
-const session = () => isAcc() ? { kind: 'acc', email: userEmail } : (guestPayload() ? { kind: 'guest', email: guestPayload().email } : null);
-const authHeaders = () => isAcc() ? { 'x-proxy-key': proxyKey, 'x-user-email': userEmail } : { 'x-guest-token': guestToken };
+const isPartner = () => !isAcc() && !!partnerProfile();
+const session = () => isAcc() ? { kind: 'acc', email: userEmail }
+  : isPartner() ? { kind: 'partner', email: partnerProfile().email }
+  : (guestPayload() ? { kind: 'guest', email: guestPayload().email } : null);
+const authHeaders = () => isAcc() ? { 'x-proxy-key': proxyKey, 'x-user-email': userEmail }
+  : isPartner() ? { 'x-partner-token': partnerToken } : { 'x-guest-token': guestToken };
 
 window.addEventListener('load', () => {
+  if (isPartner()) return;
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
   google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
   if (!session()) google.accounts.id.prompt();
@@ -341,6 +362,11 @@ async function guestStart() {
 }
 
 function signOut() {
+  if (isPartner()) {
+    localStorage.removeItem('ac_partner_token'); localStorage.removeItem('ac_partner_profile');
+    location.href = './partner.html';
+    return;
+  }
   if (isAcc()) {
     localStorage.removeItem('ac_proxy_key'); localStorage.removeItem('ac_user_email');
   }
@@ -352,7 +378,8 @@ function signOut() {
 async function api(path, opts = {}) {
   const res = await fetch(PROXY + path, { ...opts, headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) } });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && !isAcc()) { localStorage.removeItem('ac_guest_token'); guestToken = ''; }
+  if (res.status === 401 && isPartner()) { localStorage.removeItem('ac_partner_token'); location.href = './partner.html'; }
+  else if (res.status === 401 && !isAcc()) { localStorage.removeItem('ac_guest_token'); guestToken = ''; }
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
   return data;
 }
@@ -361,14 +388,37 @@ function start() {
   const s = session();
   if (!s) return;
   document.getElementById('auth-gate').style.display = 'none';
+  if (s.kind === 'partner') applyPartner(partnerProfile());
   // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
   if (s.kind === 'guest') document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
-  document.getElementById('who').innerHTML = (s.kind === 'guest' && guestPayload()?.anon ? '' : esc(s.email) + ' ') + (s.kind === 'guest' ? '<span class="guest-pill">Guest</span>' : '');
+  if (s.kind === 'partner') document.getElementById('who').textContent = partnerProfile().name || s.email;
+  else document.getElementById('who').innerHTML = (s.kind === 'guest' && guestPayload()?.anon ? '' : esc(s.email) + ' ') + (s.kind === 'guest' ? '<span class="guest-pill">Guest</span>' : '');
   loadHistory();
   loadSettings();
   const id = new URLSearchParams(location.search).get('id');
   if (id) openBriefing(id);
 }
+
+// Partner mode: their brokerage's name and logo, no Stellar MLS (manual
+// entry only), and their services in place of our tools.
+let partnerMode = null;
+function applyPartner(p) {
+  partnerMode = p;
+  const short = p.shortName || p.partnerName;
+  document.title = `Recruiting Prep — ${p.partnerName}`;
+  document.querySelector('header .header-sub').textContent = `Prepared for ${p.partnerName}`;
+  if (p.logoUrl) document.querySelector('header .header-inner > div').insertAdjacentHTML('afterbegin', `<span class="partner-logo"><img src="${esc(p.logoUrl)}" alt="${esc(p.partnerName)}" onerror="this.parentNode.remove()"></span>`);
+  document.querySelectorAll('header a[href="./index.html"]').forEach(a => { a.href = './partner.html'; a.textContent = '← Tools'; });
+  document.querySelector('a[href="./feedback.html?tool=recruit-prep"]')?.remove();
+  setMode('manual');
+  document.querySelector('#intake .seg').style.display = 'none';
+  document.getElementById('mode-hint').style.display = 'none';
+  document.getElementById('m-market').placeholder = 'e.g. Ridgewood, NJ';
+  document.querySelectorAll('#intake .input-block .hint').forEach(h => { h.textContent = h.textContent.replace(' Especially useful for agents outside Stellar MLS.', ''); });
+  document.querySelector('#settings summary').textContent = `"Why ${short}" — what the briefing may say ${short} offers`;
+  document.querySelector('footer').textContent = 'Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked "Courted export" comes from the file you uploaded; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.';
+}
+const offerLabel = () => partnerMode ? `What ${partnerMode.shortName || partnerMode.partnerName} offers them` : "What we'd give them";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -711,11 +761,11 @@ function renderReport(row) {
     <div class="card"><p class="section-label">Production over time</p><h2>Their business</h2>${productionHtml(mls, r)}</div>
 
     <div class="card">
-      <p class="section-label">What we'd give them</p>
-      <h2>Tools and resources that fit</h2>
+      <p class="section-label">${esc(offerLabel())}</p>
+      <h2>${partnerMode ? 'Services and programs that fit' : 'Tools and resources that fit'}</h2>
       ${r.tech_comfort ? `<p style="margin-bottom:10px"><span class="chip">Tech comfort: ${esc(r.tech_comfort.level || 'Unknown')}</span> <span class="hint">${esc(r.tech_comfort.evidence || '')}</span></p>` : ''}
       <div class="tools">${list(r.recommended_tools).map(t => `<div class="tool"><div class="tool-kind">${esc(t.kind || '')}</div><div class="tool-name">${esc(t.name)}</div><div class="hint" style="color:var(--slate)">${esc(t.why || '')}</div></div>`).join('') || '<p class="hint">—</p>'}</div>
-      ${r.workshop_demo && r.workshop_demo.tool ? `<div class="demo"><p class="section-label">Show them live</p><b>${esc(r.workshop_demo.tool)}</b><div style="margin-top:4px">${esc(r.workshop_demo.why || '')}</div>${r.workshop_demo.script ? `<blockquote>${esc(r.workshop_demo.script)}</blockquote>` : ''}</div>` : ''}
+      ${r.workshop_demo && r.workshop_demo.tool ? `<div class="demo"><p class="section-label">${partnerMode ? 'Walk them through' : 'Show them live'}</p><b>${esc(r.workshop_demo.tool)}</b><div style="margin-top:4px">${esc(r.workshop_demo.why || '')}</div>${r.workshop_demo.script ? `<blockquote>${esc(r.workshop_demo.script)}</blockquote>` : ''}</div>` : ''}
       ${list(r.value_alignment).length ? `<p class="section-label" style="margin-top:14px">Topics to explore</p>${list(r.value_alignment).map(v => `<div class="qa"><b>${esc(v.topic)}</b>${esc(v.why_for_this_agent || '')}</div>`).join('')}` : ''}
     </div>
 
@@ -780,8 +830,8 @@ function reportText() {
   sec('Production (Courted export)', list(r.courted_production).map(c => c.figure + (c.period ? ' (' + c.period + ')' : '') + (c.note ? ' — ' + c.note : '')));
   if (r.production_reading) L.push(r.production_reading);
   if (r.tech_comfort) L.push('', `Tech comfort: ${r.tech_comfort.level} — ${r.tech_comfort.evidence || ''}`);
-  sec("What we'd give them", list(r.recommended_tools).map(t => `${t.name}: ${t.why || ''}`));
-  if (r.workshop_demo && r.workshop_demo.tool) { L.push('', 'SHOW THEM LIVE', `${r.workshop_demo.tool} — ${r.workshop_demo.why || ''}`, `"${r.workshop_demo.script || ''}"`); }
+  sec(offerLabel(), list(r.recommended_tools).map(t => `${t.name}: ${t.why || ''}`));
+  if (r.workshop_demo && r.workshop_demo.tool) { L.push('', partnerMode ? 'WALK THEM THROUGH' : 'SHOW THEM LIVE', `${r.workshop_demo.tool} — ${r.workshop_demo.why || ''}`, `"${r.workshop_demo.script || ''}"`); }
   sec('Conversation starters', r.conversation_starters);
   sec('Discovery questions', r.discovery_questions);
   sec('Value alignment', list(r.value_alignment).map(v => `${v.topic}: ${v.why_for_this_agent || ''}`));
@@ -811,7 +861,7 @@ async function loadHistory() {
       ? rows.map(b => `<div class="history-item" onclick="openBriefing(${b.id})">
           <b>${esc(b.agent_name)}</b><span class="hint">${esc(b.brokerage || '')}${b.market_area ? ' · ' + esc(b.market_area) : ''}</span>
           <span class="status">${esc(b.status)}</span>
-          <span class="hint" style="margin-left:auto">${new Date(b.created_at).toLocaleDateString()}${d.showingAll ? ' · ' + (b.is_guest ? esc([b.guest_name, b.guest_brokerage].filter(Boolean).join(', ') || 'unnamed') + ' (guest)' : esc(b.created_by_email)) : ''}</span>
+          <span class="hint" style="margin-left:auto">${new Date(b.created_at).toLocaleDateString()}${d.showingAll ? ' · ' + (b.is_guest ? esc([b.guest_name, b.guest_brokerage].filter(Boolean).join(', ') || 'unnamed') + ' (guest)' : esc(b.created_by_email) + (b.partner_name ? ` (${esc(b.partner_name)})` : '')) : ''}</span>
         </div>`).join('')
       : 'No briefings yet.';
   } catch (e) {
@@ -836,6 +886,7 @@ async function saveSettings() {
 }
 
 if (session()) start();
+else if (localStorage.getItem('ac_partner_profile')) location.href = './partner.html';  // partner sign-in expired
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Recruiting Prep',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
