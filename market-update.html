@@ -150,7 +150,7 @@
                     <input type="text" id="subjectAddress" placeholder="e.g., 31 Park Pl, Ormond Beach, FL 32174" autocomplete="off" style="flex:1">
                     <input type="text" id="subjectUnit" placeholder="Unit" autocomplete="off" style="width:90px">
                 </div>
-                <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow. Leave blank to skip it. For a condo, add the unit.</p>
+                <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow and RPR's estimate. Leave blank to skip it. For a condo, add the unit.</p>
             </div>
             <div class="form-group">
                 <label for="subjectSqft">📐 Subject Property Square Feet <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
@@ -198,7 +198,7 @@
                 <li><strong>Days on Market Analysis</strong> — Color-coded by speed of sale</li>
                 <li><strong>Absorption Rate Calculation</strong> — Months of inventory</li>
                 <li><strong>Market Type Determination</strong> — Buyer's, Seller's, or Balanced</li>
-                <li><strong>Property Valuation (Zillow)</strong> — The subject property's Zestimate® home valuation and range, when you enter its address</li>
+                <li><strong>Property Valuation (Zillow &amp; RPR)</strong> — The subject property's Zestimate® home valuation and RPR's estimate, when you enter its address</li>
                 <li><strong>Home Values &amp; Forecast (Zillow)</strong> — 10-year home value trend for the area, county and metro, with Zillow's 12-month forecast</li>
                 <li><strong>Market Pulse (Zillow)</strong> — Metro market temperature, sale-to-list, days to pending, price cuts and inventory over 24 months</li>
                 <li><strong>Values by Bedroom Count (Zillow)</strong> — Typical home value for 1–5+ bedrooms, with the change over a year</li>
@@ -257,7 +257,7 @@
             if (subjectAddress) {
                 showStatus('🏡 Looking up the Zestimate® home valuation...', 'processing');
                 try { zestimate = await zestLookup(subjectAddress, document.getElementById('subjectUnit').value.trim()); }
-                catch (e) { zestNote = '\n⚠️ Property Valuation page left out: ' + e.message; }
+                catch (e) { zestNote = '\n⚠️ Zestimate left out of the Property Valuation page: ' + e.message; }
             }
             let zillow = null, zillowNote = '';
             if (document.getElementById('includeZillow').checked) {
@@ -265,11 +265,12 @@
                 try { zillow = await zgBuild(); }
                 catch (e) { zillowNote = '\n⚠️ Zillow pages left out: ' + e.message; }
             }
-            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate };
+            const subjectFull = subjectAddress ? rprQuery(subjectAddress, document.getElementById('subjectUnit').value.trim()) : '';
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate, subjectFull };
             document.getElementById('downloadSection').style.display = 'block';
             const notes = zestNote + zillowNote;
             showStatus('✅ Report generated successfully!'
-                + (zestimate ? `\n🏡 Property Valuation page included for ${zestimate.address}.` : '')
+                + (subjectFull ? `\n🏡 Property Valuation page included for ${subjectFull}.` : '')
                 + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + notes, notes ? 'error' : 'success');
         } catch (error) {
             console.error('Detailed error:', error);
@@ -635,7 +636,7 @@
             pricePerSqftSection + absorptionSection,
             domSection
         ].filter(Boolean).map(content => `<section class="print-page">${header}<div class="page-body">${content}</div>${footer}</section>`).join('')
-          + (lastReportData && lastReportData.zestimate ? zestPageHTML(lastReportData.zestimate, header, lastReportData.subjectPrice) : '')
+          + (lastReportData && lastReportData.subjectFull ? valuationPageHTML(lastReportData, header) : '')
           + (lastReportData && lastReportData.zillow ? zgPagesHTML(lastReportData.zillow, header) : '');
 
         return `<!DOCTYPE html>
@@ -703,6 +704,17 @@
         <button class="close-btn" onclick="window.close()">Close</button>
     </div>
     ${pages}
+<script>
+    // RPR's frame (rpr-frame.html) reports its height and status; RPR's
+    // figure itself stays inside the frame.
+    addEventListener('message', function (e) {
+        var f = document.getElementById('rpr-frame');
+        if (!f || e.source !== f.contentWindow || !e.data || e.data.rpr !== true) return;
+        if (e.data.status !== 0) { document.getElementById('rpr-block').style.display = 'none'; return; }
+        var h = Number(e.data.height);
+        if (h > 0 && h < 3000) f.style.height = Math.ceil(h) + 'px';
+    });
+<\/script>
 </body></html>`;
     }
 </script>
@@ -935,7 +947,35 @@ async function zestLookup(address, unit) {
   throw new Error(data.match ? 'Zillow has no Zestimate for that property.' : "Zillow couldn't find that address — check it and try again.");
 }
 
-function zestPageHTML(z, header, subjectPrice) {
+// RPR's estimate: RPR's own widget (rpr-frame.html, our token, co-branded)
+// in a sandboxed frame without same-origin, so RPR's script can't see the
+// Workshop sign-in in localStorage. Display only — never read, stored or
+// calculated with; the report hides the block if RPR has no estimate.
+const RPR_FRAME_URL = new URL('rpr-frame.html', location.href).href;
+
+// "31 Park Pl, Ormond Beach, FL 32174" + "478" -> "31 Park Pl #478, Ormond Beach, FL 32174"
+function rprQuery(address, unit) {
+  if (!unit) return address;
+  const u = '#' + unit.replace(/^(unit|apt|apartment|ste|suite|no)\.?\s*/i, '').replace(/^#\s*/, '');
+  const i = address.indexOf(',');
+  return i < 0 ? `${address} ${u}` : `${address.slice(0, i)} ${u}${address.slice(i)}`;
+}
+
+function valuationPageHTML(d, header) {
+  const zest = d.zestimate ? zestBlockHTML(d.zestimate, d.subjectPrice) : '';
+  const rpr = `
+    <div id="rpr-block" style="margin-top:${zest ? '22px' : '0'}">
+      ${zest ? '' : `<h2 class="section-title">Property Valuation — ${zgEsc(d.subjectFull)}</h2>`}
+      <h3 style="color:#1e3c72;margin:0 0 8px">RPR® estimate</h3>
+      <iframe id="rpr-frame" title="RPR's estimate for this home" src="${RPR_FRAME_URL}?q=${encodeURIComponent(d.subjectFull)}"
+              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+              style="width:100%;height:80px;border:0;display:block"></iframe>
+    </div>`;
+  const zillowFooter = zest ? `<div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div>` : '';
+  return `<section class="print-page">${header}<div class="page-body zg-body">${zest}${rpr}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>${zillowFooter}</section>`;
+}
+
+function zestBlockHTML(z, subjectPrice) {
   const asOf = z.asOf ? new Date(z.asOf).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
   const range = (lo, hi, sfx = '') => lo != null && hi != null ? `${zgMoney(lo)}${sfx} – ${zgMoney(hi)}${sfx}` : '—';
   const listRow = subjectPrice != null && z.zestimate
@@ -955,7 +995,7 @@ function zestPageHTML(z, header, subjectPrice) {
     ${z.zillowUrl ? `<p style="margin:6px 0 12px"><a href="${zgEsc(z.zillowUrl)}">See more details for ${zgEsc(z.address)} on Zillow</a></p>` : ''}
     <p class="zg-note">The Zestimate® home valuation is Zillow's automated estimate of this home's market value. It is not an appraisal.</p>
     <p class="zg-disclaimer">Zestimate® data provided “as is” via the Zestimate API.</p>`;
-  return `<section class="print-page">${header}<div class="page-body zg-body">${content}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div><div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div></section>`;
+  return content;
 }
 
 // ── Report pages ────────────────────────────────────────────────────────────

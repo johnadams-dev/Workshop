@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>RPR estimate</title>
+  <style>
+    /* Framed (sandboxed, no same-origin) by the Market Update report's Property
+       Valuation page. RPR's widget writes its own markup here. */
+    html, body { margin: 0; background: #fff; color: #333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; }
+    img { max-width: 100%; height: auto; }
+    .note { color: #666; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <script>
+    // RPR's AVM widget for Adams Cameron (brokerage tools, co-branded), as RPR
+    // gave it to us; the address comes from ?q=. Display only: Workshop never
+    // reads, stores or calculates with what it shows.
+    // RPR's script puts Query straight into its URL, so it's encoded here; and
+    // it reads showRprLinks (lowercase s), so both spellings are set.
+    var query = new URLSearchParams(location.search).get('q') || '';
+    var rprAvmWidgetOptions = {
+      Token: "1EE8D833-4E36-495D-B572-10B504573AA6",
+      Query: encodeURIComponent(query),
+      CoBrandCode: "btsadamscameron",
+      ShowRprLinks: true,
+      showRprLinks: true
+    };
+    // Tell the report how tall the frame needs to be, and whether RPR answered.
+    function report(status) {
+      parent.postMessage({ rpr: true, status: status, height: document.documentElement.scrollHeight }, '*');
+    }
+    window.rprAvmWidgetCompleteCallback = function (status) {
+      report(status);
+      setTimeout(function () { report(status); }, 800);   // after images load
+    };
+    if (!query) report(100);
+  </script>
+  <script src="//www.narrpr.com/widgets/avm-widget/widget.ashx/script"></script>
+</body>
+</html>
