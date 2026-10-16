@@ -150,11 +150,12 @@
                     <input type="text" id="subjectAddress" placeholder="e.g., 31 Park Pl, Ormond Beach, FL 32174" autocomplete="off" style="flex:1">
                     <input type="text" id="subjectUnit" placeholder="Unit" autocomplete="off" style="width:90px">
                 </div>
-                <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow and RPR's estimate. Leave blank to skip it. For a condo, add the unit.</p>
+                <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow, the county's values and RPR's estimate. Leave blank to skip it. For a condo, add the unit.</p>
             </div>
             <div class="form-group">
                 <label for="subjectSqft">📐 Subject Property Square Feet <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
                 <input type="number" id="subjectSqft" placeholder="e.g., 2100">
+                <p class="input-hint">Left blank, it's filled in from the Volusia County Property Appraiser when you enter a Volusia address.</p>
             </div>
             <div class="form-group">
                 <label for="subjectPrice">💰 Subject Property List Price <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
@@ -198,7 +199,7 @@
                 <li><strong>Days on Market Analysis</strong> — Color-coded by speed of sale</li>
                 <li><strong>Absorption Rate Calculation</strong> — Months of inventory</li>
                 <li><strong>Market Type Determination</strong> — Buyer's, Seller's, or Balanced</li>
-                <li><strong>Property Valuation (Zillow &amp; RPR)</strong> — The subject property's Zestimate® home valuation and RPR's estimate, when you enter its address</li>
+                <li><strong>Property Valuation (Zillow &amp; RPR)</strong> — The subject property's Zestimate® home valuation, county values and RPR's estimate, when you enter its address</li>
                 <li><strong>Home Values &amp; Forecast (Zillow)</strong> — 10-year home value trend for the area, county and metro, with Zillow's 12-month forecast</li>
                 <li><strong>Market Pulse (Zillow)</strong> — Metro market temperature, sale-to-list, days to pending, price cuts and inventory over 24 months</li>
                 <li><strong>Values by Bedroom Count (Zillow)</strong> — Typical home value for 1–5+ bedrooms, with the change over a year</li>
@@ -234,7 +235,7 @@
         const sqftInput = document.getElementById('subjectSqft');
         const priceInput = document.getElementById('subjectPrice');
         if (!fileInput.files.length) { showStatus('⚠️ Please upload an MLS data file', 'error'); return; }
-        const subjectSqft  = (sqftInput.value  && parseFloat(sqftInput.value)  > 0) ? parseFloat(sqftInput.value)  : null;
+        let subjectSqft    = (sqftInput.value  && parseFloat(sqftInput.value)  > 0) ? parseFloat(sqftInput.value)  : null;
         const subjectPrice = (priceInput.value && parseFloat(priceInput.value) > 0) ? parseFloat(priceInput.value) : null;
         const btn = document.getElementById('generateBtn');
         btn.disabled = true; btn.textContent = 'Processing...';
@@ -248,15 +249,27 @@
             const totalListings = activeListings.length + soldListings.length;
             if (totalListings === 0 && mlsData.length > 0) showStatus('⚠️ Warning: Status column not found and could not infer from price data. All properties will be plotted together.', 'error');
             if (soldListings.length === 0 && mlsData.length > 0) showStatus('⚠️ Warning: No sold properties found. Absorption rate analysis will be limited.', 'error');
+            const subjectAddress = document.getElementById('subjectAddress').value.trim();
+            const subjectUnit = document.getElementById('subjectUnit').value.trim();
+            let county = null, countyNote = '', sqftNote = '';
+            if (subjectAddress) {
+                showStatus('🏛️ Looking up the county property appraiser record...', 'processing');
+                try { county = await countyLookup(subjectAddress, subjectUnit); }
+                catch (e) { countyNote = '\n⚠️ County values left out: ' + e.message; }
+                if (county && !subjectSqft && county.livingArea) {
+                    subjectSqft = county.livingArea;
+                    sqftInput.value = county.livingArea;
+                    sqftNote = `\n📐 Square feet filled in from the county: ${county.livingArea.toLocaleString()}.`;
+                }
+            }
             showStatus('📊 Generating report...', 'processing');
             const chartImageData    = await generateChart(subjectSqft, subjectPrice);
             const domChartImageData = await generateDOMChart(subjectPrice);
             zgDetectArea(mlsData);
             let zestimate = null, zestNote = '';
-            const subjectAddress = document.getElementById('subjectAddress').value.trim();
             if (subjectAddress) {
                 showStatus('🏡 Looking up the Zestimate® home valuation...', 'processing');
-                try { zestimate = await zestLookup(subjectAddress, document.getElementById('subjectUnit').value.trim()); }
+                try { zestimate = await zestLookup(subjectAddress, subjectUnit); }
                 catch (e) { zestNote = '\n⚠️ Zestimate left out of the Property Valuation page: ' + e.message; }
             }
             let zillow = null, zillowNote = '';
@@ -265,11 +278,11 @@
                 try { zillow = await zgBuild(); }
                 catch (e) { zillowNote = '\n⚠️ Zillow pages left out: ' + e.message; }
             }
-            const subjectFull = subjectAddress ? rprQuery(subjectAddress, document.getElementById('subjectUnit').value.trim()) : '';
-            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate, subjectFull };
+            const subjectFull = subjectAddress ? rprQuery(subjectAddress, subjectUnit) : '';
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate, county, subjectFull };
             document.getElementById('downloadSection').style.display = 'block';
-            const notes = zestNote + zillowNote;
-            showStatus('✅ Report generated successfully!'
+            const notes = countyNote + zestNote + zillowNote;
+            showStatus('✅ Report generated successfully!' + sqftNote
                 + (subjectFull ? `\n🏡 Property Valuation page included for ${subjectFull}.` : '')
                 + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + notes, notes ? 'error' : 'success');
         } catch (error) {
@@ -963,16 +976,103 @@ function rprQuery(address, unit) {
 
 function valuationPageHTML(d, header) {
   const zest = d.zestimate ? zestBlockHTML(d.zestimate, d.subjectPrice) : '';
+  const title = zest ? '' : `<h2 class="section-title">Property Valuation — ${zgEsc(d.subjectFull)}</h2>`;
+  const county = d.county ? countyBlockHTML(d.county) : '';
   const rpr = `
-    <div id="rpr-block" style="margin-top:${zest ? '22px' : '0'}">
-      ${zest ? '' : `<h2 class="section-title">Property Valuation — ${zgEsc(d.subjectFull)}</h2>`}
+    <div id="rpr-block" style="margin-top:${zest || county ? '22px' : '0'}">
       <h3 style="color:#1e3c72;margin:0 0 8px">RPR® estimate</h3>
       <iframe id="rpr-frame" title="RPR's estimate for this home" src="${RPR_FRAME_URL}?q=${encodeURIComponent(d.subjectFull)}"
               sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
               style="width:100%;height:80px;border:0;display:block"></iframe>
     </div>`;
   const zillowFooter = zest ? `<div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div>` : '';
-  return `<section class="print-page">${header}<div class="page-body zg-body">${zest}${rpr}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>${zillowFooter}</section>`;
+  return `<section class="print-page">${header}<div class="page-body zg-body">${title}${zest}${county}${rpr}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>${zillowFooter}</section>`;
+}
+
+// ── County property appraiser ───────────────────────────────────────────────
+// The subject's parcel from the counties' public parcel layers (both allow
+// calls from johnadams.org). Volusia publishes living area, just value and
+// taxable value — no assessed value; Flagler publishes just, assessed and
+// exemptions but no living area (its TotalSq is the lot). Live each report.
+const VOLUSIA_PARCELS = 'https://maps2.vcgov.org/arcgis/rest/services/Pictometry_Parcels/MapServer/0/query';
+const FLAGLER_PARCELS = 'https://gis.palmcoast.gov/hosting/rest/services/External/Parcel_Basemap_External/MapServer/33/query';
+const FLAGLER_ZIPS = ['32110', '32135', '32136', '32137', '32142', '32143', '32164'];
+const STREET_SUFFIX = /^(ST|STREET|AVE?|AVENUE|RD|ROAD|DR|DRIVE|LN|LANE|CT|COURT|PL|PLACE|BLVD|BOULEVARD|WAY|TRL|TRAIL|CIR|CIRCLE|TER|TERRACE|PKWY|PARKWAY|HWY|HIGHWAY|LOOP|PT|POINT|RUN|PATH|SQ|XING|TRCE|TRACE|CV|COVE)$/;
+const DIRECTION = { NORTH: 'N', SOUTH: 'S', EAST: 'E', WEST: 'W', N: 'N', S: 'S', E: 'E', W: 'W', NE: 'NE', NW: 'NW', SE: 'SE', SW: 'SW' };
+const unitKey = u => String(u || '').toUpperCase().replace(/^(UNIT|APT|APARTMENT|STE|SUITE|NO)\.?\s*/, '').replace(/[^A-Z0-9]/g, '').replace(/^0+(?=.)/, '');
+
+// "2711 North Halifax Ave, Daytona Beach, FL 32118" -> { number: "2711", name: "HALIFAX", zip: "32118", city: "DAYTONA BEACH" }
+function parseSubjectAddress(address) {
+  const parts = address.split(',').map(x => x.trim());
+  const m = /^(\d+)\s+(.+)$/.exec((parts[0] || '').toUpperCase().replace(/[.#]/g, ' ').replace(/\s+/g, ' ').trim());
+  if (!m) return null;
+  const words = m[2].split(' ');
+  if (words.length > 1 && DIRECTION[words[0]]) words.shift();
+  if (words.length > 1 && STREET_SUFFIX.test(words[words.length - 1])) words.pop();
+  return { number: m[1], name: words.join(' '), zip: (/\b(\d{5})(?:-\d{4})?\s*$/.exec(address) || [])[1] || '', city: (parts[1] || '').toUpperCase() };
+}
+
+async function arcgisQuery(url, where, fields) {
+  const qs = new URLSearchParams({ where, outFields: fields, returnGeometry: 'false', resultRecordCount: '50', f: 'json' });
+  const r = await fetch(`${url}?${qs}`, { signal: AbortSignal.timeout(15000) });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error.message || 'county service error');
+  return (data.features || []).map(f => f.attributes);
+}
+
+// The street name without direction or suffix, as parseSubjectAddress gives it.
+function streetCore(street) {
+  const words = String(street || '').toUpperCase().trim().split(/\s+/);
+  if (words.length > 1 && DIRECTION[words[0]]) words.shift();
+  if (words.length > 1 && STREET_SUFFIX.test(words[words.length - 1])) words.pop();
+  return words.join(' ');
+}
+
+async function countyLookup(address, unit) {
+  const a = parseSubjectAddress(address);
+  if (!a) throw new Error('the address needs to start with a house number.');
+  const q = v => v.replace(/'/g, "''");
+  // The unit goes in the query (a tower has hundreds of parcels); the street
+  // name is matched exactly afterwards, so "Park Pl" isn't "Park Ridge Way".
+  const k = unitKey(unit);
+  const tryVolusia = async () => (await arcgisQuery(VOLUSIA_PARCELS,
+      `ADRNO = ${a.number} AND ADRSTR LIKE '${q(a.name)}%'` + (a.zip ? ` AND ZIP1 = '${a.zip}'` : a.city ? ` AND CITYNAME LIKE '${q(a.city)}%'` : '')
+        + (k ? ` AND UNITNO = '${q(k)}'` : ''),
+      'PARID,ADRSTR,ADDRFULL,UNITNO,CITYNAME,TOTJUST,COTXBL,RES_TOTAL_SFLA'))
+    .filter(r => streetCore(r.ADRSTR) === a.name)
+    .map(r => ({ county: 'Volusia', parcel: r.PARID, address: r.ADDRFULL, unit: r.UNITNO, justValue: r.TOTJUST, assessedValue: null, taxableValue: r.COTXBL, livingArea: r.RES_TOTAL_SFLA > 0 ? Math.round(r.RES_TOTAL_SFLA) : null }));
+  const tryFlagler = async () => (await arcgisQuery(FLAGLER_PARCELS,
+      `situs_num = '${a.number}' AND situs_street LIKE '${q(a.name)}%'` + (a.zip ? ` AND situs_zip = '${a.zip}'` : a.city ? ` AND situs_city LIKE '${q(a.city)}%'` : '')
+        + (k ? ` AND situs_unit = '${q(k)}'` : ''),
+      'parcelNum,situs_num,situs_street,situs_unit,JustVal,Assessed_val,coExmptAmt'))
+    .filter(r => streetCore(r.situs_street) === a.name)
+    .map(r => ({ county: 'Flagler', parcel: r.parcelNum, address: `${r.situs_num} ${r.situs_street}`, unit: r.situs_unit, justValue: r.JustVal, assessedValue: r.Assessed_val, taxableValue: r.Assessed_val != null ? Math.max(0, r.Assessed_val - (r.coExmptAmt || 0)) : null, livingArea: null }));
+  let rows;
+  if (FLAGLER_ZIPS.includes(a.zip)) rows = await tryFlagler();
+  else if (a.zip) rows = await tryVolusia();
+  else { rows = await tryVolusia(); if (!rows.length) rows = await tryFlagler(); }
+  if (!rows.length) throw new Error("the county has no parcel at that address — check it, or the county may list it differently.");
+  // A unit must match exactly; without one, take the parcel that has no unit.
+  const hits = k ? rows.filter(r => unitKey(r.unit) === k) : (rows.length === 1 ? rows : rows.filter(r => !unitKey(r.unit)));
+  if (hits.length === 1) return hits[0];
+  if (k) throw new Error(`the county has no unit "${unit}" at that address.`);
+  throw new Error('the county lists several parcels at that address — add the unit number.');
+}
+
+function countyBlockHTML(c) {
+  const row = (label, v) => v != null ? `<tr><td>${label}</td><td>${v}</td></tr>` : '';
+  return `
+    <div style="margin-top:22px">
+      <h3 style="color:#1e3c72;margin:0 0 8px">${zgEsc(c.county)} County Property Appraiser</h3>
+      <table class="zg-compact">
+        ${row('Just (market) value', c.justValue != null ? zgMoney(c.justValue) : null)}
+        ${row('Assessed value', c.assessedValue != null ? zgMoney(c.assessedValue) : null)}
+        ${row('County taxable value', c.taxableValue != null ? zgMoney(c.taxableValue) : null)}
+        ${row('Living area', c.livingArea ? c.livingArea.toLocaleString() + ' sq ft' : null)}
+        ${row('Parcel', zgEsc(c.parcel))}
+      </table>
+      <p class="zg-note">From the ${zgEsc(c.county)} County Property Appraiser's public parcel records, current tax roll. These values are set for property taxes, often lag the market and are not a sale price.${c.county === 'Volusia' ? ' Volusia publishes just and taxable values but not the assessed value.' : ''}</p>
+    </div>`;
 }
 
 function zestBlockHTML(z, subjectPrice) {
