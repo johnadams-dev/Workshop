@@ -73,12 +73,12 @@
         .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
         .form-group { margin-bottom: 18px; }
         label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 6px; }
-        input[type="file"], input[type="number"], select {
+        input[type="file"], input[type="number"], input[type="text"], select {
             width: 100%; padding: 10px 12px; border: 1px solid var(--border);
             border-radius: 6px; font-size: .92em; font-family: inherit;
             background: var(--bg); color: var(--text); transition: border-color 0.15s;
         }
-        input[type="file"]:focus, input[type="number"]:focus, select:focus {
+        input[type="file"]:focus, input[type="number"]:focus, input[type="text"]:focus, select:focus {
             outline: none; border-color: var(--blue);
         }
         .input-hint { font-size: 0.8em; color: var(--muted); margin-top: 5px; }
@@ -145,6 +145,14 @@
                 <p class="input-hint">Works with any MLS format — automatically detects columns like Living Area, Heated Area, Current Price, List Price, etc.</p>
             </div>
             <div class="form-group">
+                <label for="subjectAddress">🏡 Subject Property Address <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
+                <div style="display:flex;gap:8px">
+                    <input type="text" id="subjectAddress" placeholder="e.g., 31 Park Pl, Ormond Beach, FL 32174" autocomplete="off" style="flex:1">
+                    <input type="text" id="subjectUnit" placeholder="Unit" autocomplete="off" style="width:90px">
+                </div>
+                <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow. Leave blank to skip it. For a condo, add the unit.</p>
+            </div>
+            <div class="form-group">
                 <label for="subjectSqft">📐 Subject Property Square Feet <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
                 <input type="number" id="subjectSqft" placeholder="e.g., 2100">
             </div>
@@ -190,6 +198,7 @@
                 <li><strong>Days on Market Analysis</strong> — Color-coded by speed of sale</li>
                 <li><strong>Absorption Rate Calculation</strong> — Months of inventory</li>
                 <li><strong>Market Type Determination</strong> — Buyer's, Seller's, or Balanced</li>
+                <li><strong>Property Valuation (Zillow)</strong> — The subject property's Zestimate® home valuation and range, when you enter its address</li>
                 <li><strong>Home Values &amp; Forecast (Zillow)</strong> — 10-year home value trend for the area, county and metro, with Zillow's 12-month forecast</li>
                 <li><strong>Market Pulse (Zillow)</strong> — Metro market temperature, sale-to-list, days to pending, price cuts and inventory over 24 months</li>
                 <li><strong>Values by Bedroom Count (Zillow)</strong> — Typical home value for 1–5+ bedrooms, with the change over a year</li>
@@ -243,15 +252,25 @@
             const chartImageData    = await generateChart(subjectSqft, subjectPrice);
             const domChartImageData = await generateDOMChart(subjectPrice);
             zgDetectArea(mlsData);
+            let zestimate = null, zestNote = '';
+            const subjectAddress = document.getElementById('subjectAddress').value.trim();
+            if (subjectAddress) {
+                showStatus('🏡 Looking up the Zestimate® home valuation...', 'processing');
+                try { zestimate = await zestLookup(subjectAddress, document.getElementById('subjectUnit').value.trim()); }
+                catch (e) { zestNote = '\n⚠️ Property Valuation page left out: ' + e.message; }
+            }
             let zillow = null, zillowNote = '';
             if (document.getElementById('includeZillow').checked) {
                 showStatus('🏘️ Getting Zillow market data...', 'processing');
                 try { zillow = await zgBuild(); }
                 catch (e) { zillowNote = '\n⚠️ Zillow pages left out: ' + e.message; }
             }
-            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow };
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate };
             document.getElementById('downloadSection').style.display = 'block';
-            showStatus('✅ Report generated successfully!' + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + zillowNote, zillowNote ? 'error' : 'success');
+            const notes = zestNote + zillowNote;
+            showStatus('✅ Report generated successfully!'
+                + (zestimate ? `\n🏡 Property Valuation page included for ${zestimate.address}.` : '')
+                + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + notes, notes ? 'error' : 'success');
         } catch (error) {
             console.error('Detailed error:', error);
             let errorMessage = error.message;
@@ -616,6 +635,7 @@
             pricePerSqftSection + absorptionSection,
             domSection
         ].filter(Boolean).map(content => `<section class="print-page">${header}<div class="page-body">${content}</div>${footer}</section>`).join('')
+          + (lastReportData && lastReportData.zestimate ? zestPageHTML(lastReportData.zestimate, header, lastReportData.subjectPrice) : '')
           + (lastReportData && lastReportData.zillow ? zgPagesHTML(lastReportData.zillow, header) : '');
 
         return `<!DOCTYPE html>
@@ -886,6 +906,56 @@ async function zgPulseCharts(pulse) {
   out.push(await zgChart(700, 255, line('Median days to pending', pulse.med_doz_pending, v => v + ' days')));
   out.push(await zgChart(700, 255, line('Share of listings with a price cut', pulse.perc_listings_price_cut, pct)));
   return out;
+}
+
+// ── Property Valuation (Zestimate) ──────────────────────────────────────────
+// The subject property's Zestimate, from our server's /zestimates/agent-lookup
+// (zestimate-routes.js — Bridge's Zestimate API, token server-side), only when
+// the agent enters an address. Zillow's Zestimate terms (§26) for this page:
+// the Zillow logo linking to www.zillow.com (alt "Real Estate on Zillow");
+// "Provided via the Zestimate API" above the data; the label "Zestimate® home
+// valuation" (or "Rent Zestimate home valuation") next to each figure — never
+// "estimated value"; the link "See more details for [address] on Zillow" using
+// the API's URL; an "as is" disclaimer; the © Zillow footer; and nothing that
+// suggests it's an appraisal (§26.3). Looked up live for each report, never
+// stored.
+async function zestLookup(address, unit) {
+  if (!zgCreds().key) throw new Error('sign in first — tick "Include Zillow market pages" for the sign-in button.');
+  if (!(await zgLogoLoads())) throw new Error('the Zillow logo file (images/zillow-logo.png) is missing — Zillow requires it on this page.');
+  const qs = new URLSearchParams({ address });
+  if (unit) qs.set('unit', unit);
+  const r = await fetch(`${ZG_PROXY}/zestimates/agent-lookup?${qs}`, { headers: zgHeaders() });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+  if (data.match && data.match.zestimate != null) return data.match;
+  if (data.candidates && data.candidates.length) {
+    throw new Error(unit ? `Zillow has no unit "${unit}" at that address — check the unit number.`
+                         : 'Zillow lists several units at that address — add the unit number.');
+  }
+  throw new Error(data.match ? 'Zillow has no Zestimate for that property.' : "Zillow couldn't find that address — check it and try again.");
+}
+
+function zestPageHTML(z, header, subjectPrice) {
+  const asOf = z.asOf ? new Date(z.asOf).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+  const range = (lo, hi, sfx = '') => lo != null && hi != null ? `${zgMoney(lo)}${sfx} – ${zgMoney(hi)}${sfx}` : '—';
+  const listRow = subjectPrice != null && z.zestimate
+    ? `<tr><td>Subject list price</td><td>${zgMoney(subjectPrice)}</td><td colspan="2">${zgPct((subjectPrice / z.zestimate - 1) * 100)} compared with the Zestimate® home valuation</td></tr>`
+    : '';
+  const rentRow = z.rentalZestimate != null
+    ? `<tr><td>Rent Zestimate home valuation</td><td>${zgMoney(z.rentalZestimate)}/mo</td><td>${range(z.rentalLow, z.rentalHigh, '/mo')}</td><td>${z.rentalAsOf ? zgEsc(new Date(z.rentalAsOf).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })) : ''}</td></tr>`
+    : '';
+  const content = `
+    <div class="zg-head"><a href="http://www.zillow.com/"><img src="${ZG_LOGO_URL}" alt="Real Estate on Zillow"></a><span>Provided via the Zestimate API</span></div>
+    <h2 class="section-title">Property Valuation — ${zgEsc(z.address)}</h2>
+    <table class="zg-compact"><tr><th></th><th>Value</th><th>Range</th><th>As of</th></tr>
+      <tr><td><strong>Zestimate® home valuation</strong></td><td><strong>${zgMoney(z.zestimate)}</strong></td><td>${range(z.low, z.high)}</td><td>${zgEsc(asOf)}</td></tr>
+      ${rentRow}
+      ${listRow}
+    </table>
+    ${z.zillowUrl ? `<p style="margin:6px 0 12px"><a href="${zgEsc(z.zillowUrl)}">See more details for ${zgEsc(z.address)} on Zillow</a></p>` : ''}
+    <p class="zg-note">The Zestimate® home valuation is Zillow's automated estimate of this home's market value. It is not an appraisal.</p>
+    <p class="zg-disclaimer">Zestimate® data provided “as is” via the Zestimate API.</p>`;
+  return `<section class="print-page">${header}<div class="page-body zg-body">${content}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div><div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div></section>`;
 }
 
 // ── Report pages ────────────────────────────────────────────────────────────
