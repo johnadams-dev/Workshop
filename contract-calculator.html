@@ -19,6 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="auth.js"></script>
 
     <script>
         // ============================================================
@@ -27,10 +28,8 @@
         // ============================================================
         const PROXY_CONFIG = {
             geminiProxyUrl: 'https://mls-proxy-975684028597.us-east1.run.app/gemini',
-            // Only ever populated by a verified /config/init exchange (see the
-            // upload and Form Simplicity sign-in gates below) — never hardcoded,
-            // so this page's public source never carries the live shared secret.
-            proxyKey:       localStorage.getItem('ac_proxy_key') || '',
+            // Sign-in is the shared auth.js session (Auth.user / Auth.headers()),
+            // asked for only when the upload or Form Simplicity needs it.
             geminiModel:    'gemini-2.5-flash',
             // Google Calendar — users authenticate with their own Google account via OAuth
             calendarClientId: '113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com',
@@ -592,61 +591,29 @@
     // underlying /fs/* routes only check the shared proxy key, not who's
     // asking. Staff get a picker (populated from /fs/active-users, not
     // client-typed); agents are auto-scoped to their own verified email.
-    const PROXY_BASE      = 'https://mls-proxy-975684028597.us-east1.run.app';
-    const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+    const PROXY_BASE      = Auth.API;
     function fsHeaders() {
-        return {
-            'Content-Type': 'application/json',
-            'x-proxy-key':  PROXY_CONFIG.proxyKey,
-            'x-user-email': localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || '',
-        };
+        return Auth.headers();
     }
+
+    // This page works without signing in; a saved session is picked up
+    // quietly, and Google sign-in is shown only where a feature needs it.
+    const authChecked = Auth.ready({ optional: true });
 
     let _fsTrans      = [];
     let _fsTransId    = null;
     let _fsInitDone   = false;
-    let _fsGsiReady   = false;
 
     function fsGoogleSignInInit() {
-        if (_fsGsiReady) return;
-        if (typeof google === 'undefined' || !google.accounts) { setTimeout(fsGoogleSignInInit, 200); return; }
-        _fsGsiReady = true;
-        google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback:  fsHandleGoogleSignIn,
+        Auth.ready({
+            button: document.getElementById('fsGoogleBtnWrap'),
+            status: document.getElementById('fsAuthGateMsg'),
+        }).then(() => {
+            _fsInitDone = false;
+            fsInitSection();
+            // If the upload gate was also waiting on sign-in, let it proceed now.
+            document.getElementById('uploadAuthGate').style.display = 'none';
         });
-        google.accounts.id.renderButton(
-            document.getElementById('fsGoogleBtnWrap'),
-            { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
-        );
-    }
-
-    async function fsHandleGoogleSignIn(response) {
-        let email = '';
-        try { email = JSON.parse(atob(response.credential.split('.')[1])).email || ''; } catch {}
-        if (!email) { fsShowAuthGate('Sign-in failed. Please try again.', true); return; }
-        try {
-            const r = await fetch(`${PROXY_BASE}/config/init`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken: response.credential }),
-            });
-            const data = await r.json();
-            if (!r.ok) {
-                fsShowAuthGate(data.error || 'Sign-in failed. Make sure you\'re using your @adamscameron.com account.', true);
-                return;
-            }
-            localStorage.setItem('ac_user_email', email);
-            PROXY_CONFIG.proxyKey = data.proxyKey || '';
-            localStorage.setItem('ac_proxy_key', PROXY_CONFIG.proxyKey);
-        } catch (e) {
-            fsShowAuthGate('Sign-in error: ' + e.message, true);
-            return;
-        }
-        _fsInitDone = false;
-        fsInitSection();
-        // If the upload gate was also waiting on a proxy key, let it proceed now.
-        if (PROXY_CONFIG.proxyKey) document.getElementById('uploadAuthGate').style.display = 'none';
     }
 
     function fsShowAuthGate(message, showButton) {
@@ -664,17 +631,17 @@
         if (_fsInitDone) return;
         _fsInitDone = true;
 
-        const userEmail = localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || '';
-        const proxyKey   = localStorage.getItem('ac_proxy_key')  || sessionStorage.getItem('ac_proxy_key')  || '';
+        await authChecked;
+        const userEmail = Auth.email;
 
-        if (!userEmail || !proxyKey) {
+        if (!userEmail) {
             fsShowAuthGate('Sign in with your Adams Cameron Google account to access your Form Simplicity files.', true);
             return;
         }
 
         try {
             const r = await fetch(`${PROXY_BASE}/lockbox/me`, {
-                headers: { 'x-user-email': userEmail, 'x-proxy-key': PROXY_CONFIG.proxyKey },
+                headers: fsHeaders(),
             });
             const me = r.ok ? await r.json() : {};
             const role = me.role || 'unknown';
@@ -877,52 +844,21 @@
         if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
     });
 
-    // Shares the same Google client / /config/init exchange as the Form
-    // Simplicity gate above, just targeting the upload section's own gate
-    // div and re-invoking the caller once a real proxy key is in hand.
-    let _uploadGsiReady = false;
+    // Same shared sign-in as the Form Simplicity gate above, drawn into the
+    // upload section's own gate and re-invoking the caller once signed in.
     function ensureUploadSignIn(onSuccess) {
-        if (PROXY_CONFIG.proxyKey) { onSuccess(); return; }
+        if (Auth.user) { onSuccess(); return; }
         document.getElementById('uploadAuthGate').style.display = 'block';
-        if (typeof google === 'undefined' || !google.accounts) { setTimeout(() => ensureUploadSignIn(onSuccess), 200); return; }
-        if (!_uploadGsiReady) {
-            _uploadGsiReady = true;
-            google.accounts.id.initialize({
-                client_id: GOOGLE_CLIENT_ID,
-                callback: (response) => uploadHandleGoogleSignIn(response, onSuccess),
-            });
-        }
-        google.accounts.id.renderButton(
-            document.getElementById('uploadGoogleBtnWrap'),
-            { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
-        );
-    }
-
-    async function uploadHandleGoogleSignIn(response, onSuccess) {
-        try {
-            const r = await fetch(`${PROXY_BASE}/config/init`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken: response.credential }),
-            });
-            const data = await r.json();
-            if (!r.ok) { showNotification(data.error || 'Sign-in failed. Use your @adamscameron.com account.', 'error'); return; }
-            PROXY_CONFIG.proxyKey = data.proxyKey || '';
-            localStorage.setItem('ac_proxy_key', PROXY_CONFIG.proxyKey);
-            try {
-                const email = JSON.parse(atob(response.credential.split('.')[1])).email || '';
-                if (email) localStorage.setItem('ac_user_email', email);
-            } catch {}
+        Auth.ready({ button: document.getElementById('uploadGoogleBtnWrap') }).then(() => {
             document.getElementById('uploadAuthGate').style.display = 'none';
             if (onSuccess) onSuccess();
-        } catch (e) {
-            showNotification('Sign-in error: ' + e.message, 'error');
-        }
+        });
     }
 
     async function handleFileUpload(file) {
         if (!file.type.includes('pdf')) { showNotification('Please upload a PDF file.', 'error'); return; }
-        if (!PROXY_CONFIG.proxyKey) { ensureUploadSignIn(() => handleFileUpload(file)); return; }
+        await authChecked;
+        if (!Auth.user) { ensureUploadSignIn(() => handleFileUpload(file)); return; }
 
         document.getElementById('fileName').textContent = file.name;
         document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
@@ -1013,10 +949,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
         const response = await fetch(PROXY_CONFIG.geminiProxyUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-proxy-key':  PROXY_CONFIG.proxyKey,
-            },
+            headers: Auth.headers(),
             body: JSON.stringify({
                 model: PROXY_CONFIG.geminiModel,
                 contents: [{
@@ -1262,7 +1195,8 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
 
     async function loadLinkableTransactions(q = '') {
         const box = document.getElementById('linkTxnBox');
-        if (!PROXY_CONFIG.proxyKey || !(localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email'))) {
+        await authChecked;
+        if (!Auth.user) {
             box.style.display = 'none';
             return;
         }
@@ -1634,7 +1568,7 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
             insurance_evidence_due:       dates.insurance_evidence_due       || null,
             closing_disclosure_due:       dates.closing_disclosure_due       || null,
             final_walkthrough:            dates.final_walkthrough            || null,
-            created_by_email: localStorage.getItem('ac_user_email') || sessionStorage.getItem('ac_user_email') || null,
+            created_by_email: Auth.email || null,
         };
 
         try {

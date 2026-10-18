@@ -21,6 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -517,24 +518,8 @@
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY_BASE = 'https://mls-proxy-6fmkkxghwa-ue.a.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
-
-/* ─────────────────────── SESSION ────────────────────── */
-const AC_SESSION_KEY = 'ac_pathfinder_session';
-function saveSession(email, name, picture) {
-  try { localStorage.setItem(AC_SESSION_KEY, JSON.stringify({ email, name, picture, exp: Date.now() + 8 * 60 * 60 * 1000 })); } catch(_) {}
-}
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(AC_SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.email || s.exp < Date.now()) { localStorage.removeItem(AC_SESSION_KEY); return null; }
-    return s;
-  } catch(_) { return null; }
-}
+const PROXY_BASE = Auth.API;
+const TOOL = 'Pathfinder Check-in';
 
 /* ─────────────────────── STATE ──────────────────────── */
 const S = {
@@ -562,40 +547,41 @@ window.addEventListener('load', () => {
   // a shortcut for whoever's Google session already happens to be saved.
   const smsToken = new URLSearchParams(location.search).get('t');
   if (smsToken) { loginWithSmsToken(smsToken); return; }
-  const saved = loadSession();
-  if (saved && PROXY_KEY) { S.email = saved.email; loadAgent(); return; }
-  startGoogleAuthPoll();
+  googleSignIn();
 });
 
-function startGoogleAuthPoll() {
-  const poll = setInterval(() => {
-    if (!window.google?.accounts) return;
-    clearInterval(poll);
-    initAuth();
-  }, 200);
+// Shared sign-in (auth.js). The sign-in screen is built only when there's no
+// session; auth.js then draws the Google button into it.
+const AUTH_OPTS = {
+  tool: TOOL,
+  onSignInNeeded: () => showSignIn(),
+  button: () => document.getElementById('g-signin-btn'),
+  status: () => document.getElementById('auth-status'),
+};
+function googleSignIn() {
+  Auth.ready(AUTH_OPTS).then(user => { S.email = user.email; loadAgent(); });
 }
 
 // Auto-login from the link texted by sendAgentReminderSms() server-side
-// (GET /checkin/auth/:token). Produces the exact same session shape as the
-// Google sign-in path (saveSession + PROXY_KEY), so loadAgent() and
-// everything downstream can't tell the two apart. The token is stripped
-// from the address bar immediately, before it's even exchanged, so it
-// can't linger in browser history or be re-shared by copying the visible
-// URL — the link is meant to be used once per tap, not reread.
+// (GET /checkin/auth/:token), which now starts a per-person session just
+// like Google sign-in (Auth.adopt). The token is stripped from the address
+// bar immediately, before it's even exchanged, so it can't linger in
+// browser history or be re-shared by copying the visible URL — the link is
+// meant to be used once per tap, not reread.
 async function loginWithSmsToken(token) {
   history.replaceState(null, '', location.pathname);
   try {
     const r = await fetch(`${PROXY_BASE}/checkin/auth/${encodeURIComponent(token)}`);
     const data = await r.json();
     if (!r.ok || !data.email) throw new Error(data.error || 'Link expired');
-    PROXY_KEY = data.proxyKey || '';
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-    S.email = data.email;
-    saveSession(data.email, data.name || '', data.picture || '');
+    Auth.adopt(data);
+    if (!data.sessionToken) { S.email = Auth.email; await loadAgent(); return; } // server fell back to the shared key
+    const user = await Auth.ready(AUTH_OPTS);  // confirms the session and records the visit
+    S.email = user.email;
     await loadAgent();
   } catch (e) {
     toast('That link has expired — please sign in below.');
-    startGoogleAuthPoll();
+    googleSignIn();
   }
 }
 
@@ -609,70 +595,16 @@ function setWeekLabel() {
   document.getElementById('weekLabel').textContent = `Week of ${fmt(start)}`;
 }
 
-// Previously had two sign-in paths: this ID-token flow (One Tap) and a
-// separate OAuth access-token flow (tokenClient, wired to the "Sign in with
-// Google" / "Try Again" buttons) that fetched identity from Google's
-// userinfo endpoint directly and never went through /config/init — so the
-// manual sign-in buttons never validated the @adamscameron.com domain
-// server-side or obtained a real proxy key; PROXY_KEY was just hardcoded
-// instead. Collapsed onto the single ID-token flow (also used by every
-// other tool page) so there's one path that always goes through
-// /config/init.
-function initAuth() {
-  google.accounts.id.initialize({
-    client_id: OAUTH_CLIENT,
-    callback: handleCredential,
-  });
-  google.accounts.id.prompt((notification) => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) showSignIn();
-  });
-}
-
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { showAuthError(); return; }
-    PROXY_KEY = data.proxyKey || '';
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    if (payload.email) { S.email = payload.email; saveSession(payload.email, payload.name || '', payload.picture || ''); await loadAgent(); }
-    else showAuthError();
-  } catch(e) { showAuthError(); }
-}
-
-function renderGoogleButton() {
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
-}
-
+// The sign-in screen; auth.js draws the Google button into #g-signin-btn and
+// writes any sign-in error (e.g. a non-company account) into #auth-status.
 function showSignIn() {
   renderScreen(`
     <div class="auth-wrap">
       <div class="auth-icon">📋</div>
       <div class="auth-title">Weekly Check-in</div>
-      <div class="auth-sub">Sign in with your Adams, Cameron &amp; Co. Google account to begin your check-in.</div>
+      <div class="auth-sub" id="auth-status">Sign in with your Adams, Cameron &amp; Co. Google account to begin your check-in.</div>
       <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
     </div>`, false);
-  renderGoogleButton();
-}
-
-function showAuthError() {
-  renderScreen(`
-    <div class="auth-wrap">
-      <div class="auth-icon">⚠️</div>
-      <div class="auth-title">Access Restricted</div>
-      <div class="auth-sub">Please use your @adamscameron.com Google account to check in.</div>
-      <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
-    </div>`, false);
-  renderGoogleButton();
 }
 
 /* ─────────────────────── LOAD AGENT ─────────────────── */
@@ -686,7 +618,7 @@ async function loadAgent() {
   try {
     // Load agent profile
     const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+      headers: Auth.headers()
     });
     if (!profileRes.ok) throw new Error('Profile load failed');
     const profile = await profileRes.json();
@@ -727,7 +659,7 @@ async function loadAgent() {
 
     // Load strategies
     const stratRes = await fetch(`${PROXY_BASE}/agent/${S.agentId}/strategies`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+      headers: Auth.headers()
     });
     if (stratRes.ok) {
       const data = await stratRes.json();
@@ -1149,11 +1081,7 @@ async function submitCheckin() {
   try {
     const res = await fetch(`${PROXY_BASE}/checkin/flexible`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-proxy-key': PROXY_KEY,
-        'x-user-email': S.email,
-      },
+      headers: Auth.headers(),
       body: JSON.stringify({
         agentEmail:    S.email,
         responses:     S.responses,
@@ -1173,7 +1101,7 @@ async function submitCheckin() {
       await new Promise(r => setTimeout(r, 2500));
       try {
         const scRes = await fetch(`${PROXY_BASE}/checkin/history/${S.agentId}`, {
-          headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+          headers: Auth.headers()
         });
         if (scRes.ok) {
           const history = await scRes.json();
@@ -1242,6 +1170,5 @@ function toast(msg) {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Pathfinder Check-in',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

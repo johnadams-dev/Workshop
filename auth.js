@@ -15,6 +15,10 @@
 //                status: document.getElementById('auth-status') })
 //     .then(user => { hideGate(); start(user); });       // { email, name, picture }
 //
+// Pages usable without signing in: Auth.ready({ optional: true }) resolves
+// with the saved session's person or null, without prompting; call
+// Auth.ready({ button }) when a feature needs an account.
+//
 // onSignInNeeded (optional) runs only when there's no valid session, before
 // the Google button is drawn — for pages that show their sign-in screen only
 // when it's needed.
@@ -143,7 +147,10 @@
     });
   }
 
-  function setStatus(el, text) { if (el) el.textContent = text; }
+  // button / status may be elements or functions returning one (for pages
+  // that build their sign-in screen in onSignInNeeded).
+  const el = x => (typeof x === 'function' ? x() : x);
+  function setStatus(status, text) { const e = el(status); if (e) e.textContent = text; }
 
   // Shows Google sign-in in opts.button and resolves once signed in.
   function signIn(opts) {
@@ -176,8 +183,9 @@
         // Only reached when there's no session, so One Tap is wanted here
         // (see "Always gate google.accounts.id.prompt()" in CLAUDE.md).
         google.accounts.id.prompt();
-        if (opts.button) {
-          google.accounts.id.renderButton(opts.button, {
+        const button = el(opts.button);
+        if (button) {
+          google.accounts.id.renderButton(button, {
             theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
           });
         }
@@ -187,14 +195,39 @@
   }
 
   // Resolves with { email, name, picture } once the person is signed in.
+  // With { optional: true } it never prompts: it resolves with the saved
+  // session's person, or null — for pages usable without signing in, which
+  // call Auth.ready({ button }) later, when a feature needs an account.
   function ready(opts) {
     opts = opts || {};
+    if (opts.optional) {
+      if (readyPromise) return readyPromise;
+      return checkSession(opts.tool).then(profile => {
+        if (profile) { user = profile; readyPromise = Promise.resolve(profile); }
+        return profile;
+      });
+    }
     if (!readyPromise) {
       readyPromise = checkSession(opts.tool)
         .then(profile => profile || signIn(opts))
         .then(profile => { user = profile; return profile; });
     }
     return readyPromise;
+  }
+
+  // Takes on a sign-in the server granted another way — e.g. the texted
+  // check-in link (GET /checkin/auth/:token returns the same shape as
+  // POST /auth/session). Replaces any saved session; call Auth.ready()
+  // afterwards to confirm it. Without a sessionToken (server fell back),
+  // only the legacy keys are set.
+  function adopt(data) {
+    const profile = { email: String(data.email || '').toLowerCase(), name: data.name || '', picture: data.picture || null };
+    if (data.sessionToken) store.set(K.token, data.sessionToken); else store.del(K.token);
+    store.set(K.profile, JSON.stringify(profile));
+    writeLegacy(profile, data.proxyKey);
+    user = profile;
+    readyPromise = null;
+    return profile;
   }
 
   async function signOut() {
@@ -208,7 +241,9 @@
     ready,
     api,
     headers,
+    adopt,
     signOut,
+    get hasSession() { return !!store.get(K.token); },
     get user() { return user; },
     get email() { return user ? user.email : ''; },
     get proxyKey() { return store.get(K.proxyKey) || ''; },
