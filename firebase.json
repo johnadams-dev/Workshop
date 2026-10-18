@@ -1,0 +1,46 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "cloudbuild.yaml",
+      "**/.*",
+      "**/_*",
+      "**/node_modules/**",
+      "docs/**",
+      "*.pdf",
+      "*.code-workspace",
+      "CNAME"
+    ],
+    "cleanUrls": false,
+    "trailingSlash": false,
+    "redirects": [
+      { "regex": "^/(?P<page>[^./]+)$", "destination": "/:page.html", "type": 301 }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Cache-Control", "value": "max-age=600" },
+          { "key": "Access-Control-Allow-Origin", "value": "*" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000" }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/roster-sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/manifest.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

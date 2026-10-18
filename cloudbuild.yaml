@@ -1,0 +1,22 @@
+# Deploy the Workshop pages to Firebase Hosting (project mls-data-sync).
+# Run by the Cloud Build trigger on every push to main. firebase.json holds
+# the hosting config (redirects, headers, which files are left out).
+
+steps:
+  - id: Deploy
+    name: node:22
+    entrypoint: npx
+    args:
+      - -y
+      - firebase-tools@15.34.0
+      - deploy
+      - --only
+      - hosting
+      - --project
+      - $PROJECT_ID
+      - --non-interactive
+      - --message
+      - $SHORT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
