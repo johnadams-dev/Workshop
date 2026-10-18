@@ -61,8 +61,9 @@
   <button class="print-btn" onclick="window.print()">Print</button>
   <div id="content"><div class="loading">Loading…</div></div>
 
+<script src="auth.js"></script>
 <script>
-const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY = Auth.API;
 const CATEGORY_LABELS = {
   referral: 'Referral Fee',
   cancellation_fee: 'Listing Cancellation Fee',
@@ -74,9 +75,8 @@ async function load() {
   const id = new URLSearchParams(location.search).get('id');
   if (!id) { document.getElementById('content').innerHTML = '<div class="error">No record ID in URL.</div>'; return; }
 
-  const email = localStorage.getItem('ac_user_email') || '';
-  const proxyKey = localStorage.getItem('ac_proxy_key') || '';
-  const headers = { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': email };
+  await Auth.ready({ optional: true }); // opened from Misc Commission, so normally already signed in
+  const headers = Auth.headers();
 
   try {
     const res = await fetch(PROXY + `/daily-desk/misc-commissions/${encodeURIComponent(id)}`, { headers });

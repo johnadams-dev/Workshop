@@ -6,6 +6,7 @@
 <title>Miscellaneous Sale — Adams Cameron</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
@@ -74,12 +75,7 @@ td.amt{text-align:right;font-weight:600;white-space:nowrap}
     <h2>Miscellaneous Sale</h2>
     <p>Sign in with your Adams Cameron Google account to record a commission disbursement.</p>
     <div class="signin-google">
-      <div id="g_id_onload"
-        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
-        data-callback="handleGoogleSignIn"
-        data-auto_select="true">
-      </div>
-      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+      <div id="g-signin-btn"></div>
     </div>
   </div>
 </div>
@@ -151,8 +147,7 @@ td.amt{text-align:right;font-weight:600;white-space:nowrap}
 </div>
 
 <script>
-const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
-const CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY     = Auth.API;
 const CATEGORY_LABELS = {
   referral: 'Referral Fee',
   cancellation_fee: 'Cancellation Fee',
@@ -160,59 +155,22 @@ const CATEGORY_LABELS = {
   other: 'Other',
 };
 
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let userEmail = '';
 let agentsById = {};
 
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  window.addEventListener('load', init);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID, callback: handleGoogleSignIn,
-    auto_select: true, cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.querySelector('.g_id_signin'),
-    { theme: 'outline', size: 'large', width: 280 }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
+// Shared sign-in (auth.js).
+Auth.ready({ tool: 'Misc Commission', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    await init();
-  } catch (e) { alert('Authentication error: ' + e.message); }
-}
+    init();
+  });
 
 async function api(path, opts = {}) {
   const res = await fetch(PROXY + path, {
     ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-proxy-key':  proxyKey,
-      'x-user-email': userEmail,
-      ...(opts.headers || {}),
-    },
+    headers: Auth.headers(opts.headers),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -319,6 +277,5 @@ function esc(s) {
 function fmtMoney(v) { return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDate(v) { if (!v) return ''; const d = new Date(String(v).slice(0, 10) + 'T00:00:00'); return d.toLocaleDateString('en-US'); }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Misc Commission',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

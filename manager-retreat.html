@@ -172,14 +172,14 @@
     </div>
   </div>
 </div>
+<script src="auth.js"></script>
 <script>
 (function(){
   "use strict";
 
   var appEl = document.getElementById("app");
 
-  var PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
-  var GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+  var PROXY = Auth.API;
 
   var items = [];
   var itemsById = {};
@@ -191,8 +191,7 @@
   // never read from localStorage until the facilitator clicks the footer
   // link. Ordinary raters never trigger any of this.
   var isAdmin = false;
-  var facilitator = null; // { proxyKey, email }
-  var gsiLoaded = false;
+  var facilitator = null; // { email } — the signed-in admin (shared auth.js session)
 
   var activeTab = null;
   var resultsData = null;
@@ -259,10 +258,7 @@
   function apiFetch(path, opts){
     opts = opts || {};
     var headers = opts.headers || {};
-    if (opts.admin && facilitator) {
-      headers["x-proxy-key"] = facilitator.proxyKey;
-      headers["x-user-email"] = facilitator.email;
-    }
+    if (opts.admin && facilitator) headers = Auth.headers(headers);
     return fetch(PROXY + path, {
       method: opts.method || "GET",
       headers: opts.body ? Object.assign({ "Content-Type": "application/json" }, headers) : headers,
@@ -300,68 +296,25 @@
 
   // ---------------- facilitator sign-in (opt-in only) ----------------
 
+  // Shared sign-in (auth.js): only now, when the facilitator opts in, is any
+  // session checked; an existing one is used without a prompt.
   function openFacilitatorFlow(){
-    var cachedKey = null, cachedEmail = null;
-    try {
-      cachedKey = window.localStorage.getItem("ac_proxy_key");
-      cachedEmail = window.localStorage.getItem("ac_user_email");
-    } catch (e){}
-    if (cachedKey && cachedEmail) {
-      checkAdminWhoami(cachedKey, cachedEmail);
-      return;
-    }
-    document.getElementById("fac-overlay").classList.add("open");
-    loadGsi();
+    Auth.ready({ optional: true }).then(function(user){
+      if (user) { checkAdminWhoami(); return; }
+      document.getElementById("fac-overlay").classList.add("open");
+      Auth.ready({ button: document.getElementById("fac-signin-btn") }).then(checkAdminWhoami);
+    });
   }
 
   function closeFacilitatorOverlay(){
     document.getElementById("fac-overlay").classList.remove("open");
   }
 
-  function loadGsi(){
-    if (gsiLoaded) {
-      renderGsiButton();
-      return;
-    }
-    var s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.defer = true;
-    s.onload = function(){ gsiLoaded = true; renderGsiButton(); };
-    document.head.appendChild(s);
-  }
-
-  function renderGsiButton(){
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn });
-    google.accounts.id.renderButton(
-      document.getElementById("fac-signin-btn"),
-      { theme: "outline", size: "large", width: 240, text: "signin_with" }
-    );
-  }
-
-  function handleGoogleSignIn(response){
-    var email = "";
-    try { email = JSON.parse(atob(response.credential.split(".")[1])).email || ""; } catch (e){}
-    fetch(PROXY + "/config/init", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: response.credential })
-    }).then(function(r){ return r.json().then(function(d){ return { ok:r.ok, data:d }; }); })
-      .then(function(res){
-        if (!res.ok || !res.data.proxyKey) { window.alert("Sign-in failed."); return; }
-        try {
-          window.localStorage.setItem("ac_proxy_key", res.data.proxyKey);
-          window.localStorage.setItem("ac_user_email", email);
-        } catch (e){}
-        checkAdminWhoami(res.data.proxyKey, email);
-      }).catch(function(){ window.alert("Sign-in failed."); });
-  }
-
-  function checkAdminWhoami(proxyKey, email){
-    apiFetch("/retreat/admin/whoami", { headers: { "x-proxy-key": proxyKey, "x-user-email": email } }).then(function(res){
+  function checkAdminWhoami(){
+    apiFetch("/retreat/admin/whoami", { headers: Auth.headers() }).then(function(res){
       closeFacilitatorOverlay();
       if (res.ok && res.data.isAdmin){
-        facilitator = { proxyKey: proxyKey, email: email };
+        facilitator = { email: Auth.email };
         isAdmin = true;
         render();
       } else {

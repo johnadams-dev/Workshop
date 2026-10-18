@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
@@ -637,10 +638,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const PROXY_URL    = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY  = localStorage.getItem('ac_proxy_key')  || '';
-let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+const PROXY_URL    = Auth.API;
+let USER_EMAIL = '';
 let USER_ROLE  = null; // 'admin' | 'sales_manager' | 'office_coordinator' | null — loaded after sign-in
 const ROLE_LABELS = { admin: 'Admin', sales_manager: 'Sales Manager', office_coordinator: 'Office Coordinator' };
 
@@ -660,7 +659,7 @@ function loadGoogleUsers() {
   return _googleSnapPromise;
 }
 
-const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
+const H = () => Auth.headers();
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let allAgents = [], offices = [], currentId = null, currentFilter = 'all';
@@ -1832,47 +1831,16 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function fmtPhone(e){if(!e)return '';const d=e.replace(/\D/g,'');if(d.length===11&&d[0]==='1')return`(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;if(d.length===10)return`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;return e}
 function toast(msg,type){const a=document.getElementById('toasts');const el=document.createElement('div');el.className=`toast${type?' '+type:''}`;el.textContent=msg;a.appendChild(el);setTimeout(()=>el.remove(),3500)}
 
-// ── Sign-in (auto, falls back to Google prompt) ────────────────────────────────
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY_URL}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    USER_EMAIL = payload.email || '';
-    PROXY_KEY  = data.proxyKey || '';
-    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
+// ── Sign-in (shared auth.js; the modal shows only when needed) ──────────────────
+Auth.ready({
+  tool: 'Agent Records',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => { document.getElementById('signinModal').style.display = 'flex'; },
+}).then(user => {
+  USER_EMAIL = user.email;
   document.getElementById('signinModal').style.display = 'none';
-  if (USER_EMAIL && PROXY_KEY) load(); else toast('Sign-in failed', 'err');
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt((n) => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large', text:'signin_with', shape:'rectangular' });
-      document.getElementById('signinModal').style.display = 'flex';
-    }
-  });
-}
-
-if (USER_EMAIL && PROXY_KEY) {
   load();
-} else if (window.google?.accounts?.id) {
-  initGoogleSignIn();
-} else {
-  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
-}
+});
 
 // ── Foundation donation ───────────────────────────────────────────────────────
 async function loadFoundationDonation(agentId) {
@@ -2869,6 +2837,5 @@ async function saveFloorEligibility(agentId) {
   }
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Records',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

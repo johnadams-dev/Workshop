@@ -6,6 +6,7 @@
 <title>Broadcast Messaging — Adams Cameron</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
@@ -131,12 +132,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <h2>Broadcast Messaging</h2>
     <p>Sign in with your Adams Cameron Google account.</p>
     <div class="signin-google">
-      <div id="g_id_onload"
-        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
-        data-callback="handleGoogleSignIn"
-        data-auto_select="true">
-      </div>
-      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+      <div id="g-signin-btn"></div>
     </div>
   </div>
 </div>
@@ -244,8 +240,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
-const CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY     = Auth.API;
 
 const CATEGORIES = [
   { key: 'company_events',       label: 'Company Events' },
@@ -256,8 +251,7 @@ const CATEGORIES = [
 ];
 const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
 
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let userEmail = '';
 let myRole = null; // 'admin' | 'sales_manager' | 'office_coordinator'
 
 let currentScope = 'all';
@@ -267,48 +261,17 @@ let agentsCache = null; // from GET /roster/agents, fetched once
 let historyDetailCache = {}; // campaignId -> detail
 
 /* ─────────────────────── AUTH ───────────────────────── */
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  window.addEventListener('load', init);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID, callback: handleGoogleSignIn,
-    auto_select: true, cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.querySelector('.g_id_signin'),
-    { theme: 'outline', size: 'large', width: 280 }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
+// Shared sign-in (auth.js); it also records the Tool Usage visit.
+Auth.ready({ tool: 'Broadcast Messaging', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    await init();
-  } catch (e) { alert('Authentication error: ' + e.message); }
-}
+    init();
+  });
 
 function authHeaders(extra) {
-  return Object.assign({ 'x-proxy-key': proxyKey, 'x-user-email': userEmail }, extra || {});
+  return Auth.headers(extra);
 }
 
 /* ─────────────────────── INIT ───────────────────────── */
@@ -333,11 +296,6 @@ async function init() {
   if (myRole === 'admin' || myRole === 'sales_manager') loadApprovalQueue();
   loadReplies();
   setInterval(loadReplies, 45000);
-
-  fetch(`${PROXY}/log/visit`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool: 'Broadcast Messaging', email: userEmail }),
-  }).catch(() => {});
 }
 
 function setupForRole() {

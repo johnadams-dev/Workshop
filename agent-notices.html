@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 <style>
 :root{
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
@@ -267,11 +268,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div><!-- /page -->
 
 <script>
-const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY   = Auth.API;
 
-let PROXY_KEY  = localStorage.getItem('ac_proxy_key')  || '';
-let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+let USER_EMAIL = '';
 let isStaff = false;
 let agents  = [];
 
@@ -282,7 +281,7 @@ let editingBuyerId = null;
 let selectedAgentUpcoming = null; // { id, name } — staff view: whose items ul-mine-list shows
 let selectedAgentBuyer    = null; // { id, name } — staff view: whose items bn-mine-list shows
 
-const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL });
+const H = () => Auth.headers();
 
 function toast(msg, type) {
   const a = document.getElementById('toasts');
@@ -681,51 +680,18 @@ async function init() {
   loadMyNotices();
 }
 
-// ── Google Sign-In ────────────────────────────────────────────────────────────
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    USER_EMAIL = payload.email || '';
-    PROXY_KEY  = data.proxyKey || '';
-    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
-  document.getElementById('auth-gate').classList.remove('show');
-  if (USER_EMAIL && PROXY_KEY) init(); else toast('Sign-in failed', 'err');
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt(n => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large', text:'signin_with' });
-      document.getElementById('auth-gate').classList.add('show');
-    }
-  });
-}
-
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-if (USER_EMAIL && PROXY_KEY) {
+// ── Google Sign-In (shared auth.js; the gate shows only when needed) ─────────
+Auth.ready({
+  tool: 'Agent Notices',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => document.getElementById('auth-gate').classList.add('show'),
+}).then(user => {
+  USER_EMAIL = user.email;
   document.getElementById('auth-gate').classList.remove('show');
   init();
-} else if (window.google?.accounts?.id) {
-  initGoogleSignIn();
-} else {
-  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
-}
+});
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Notices',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

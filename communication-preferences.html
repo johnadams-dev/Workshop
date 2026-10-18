@@ -6,6 +6,7 @@
 <title>Communication Preferences — Adams Cameron</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
@@ -89,12 +90,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <h2>Communication Preferences</h2>
     <p>Sign in with your Adams Cameron Google account to manage what you receive by email and text.</p>
     <div class="signin-google">
-      <div id="g_id_onload"
-        data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
-        data-callback="handleGoogleSignIn"
-        data-auto_select="true">
-      </div>
-      <div class="g_id_signin" data-type="standard" data-theme="outline" data-size="large"></div>
+      <div id="g-signin-btn"></div>
     </div>
   </div>
 </div>
@@ -126,8 +122,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY      = 'https://mls-proxy-975684028597.us-east1.run.app';
-const CLIENT_ID   = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY      = Auth.API;
 
 // Topic metadata lives here, not in the database — see
 // migrations/add_agent_comms_prefs.sql. wiredEmail/wiredSms means a real
@@ -169,8 +164,7 @@ const TOPICS = [
 // kept for whenever a future topic ships with a channel not wired yet.
 const NOT_WIRED_NOTICE = 'Not yet active for this channel — check back soon.';
 
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let userEmail = '';
 
 // Present only when a manager/admin opened this page for a specific agent
 // from agent-master-form.html — everyone else edits their own preferences.
@@ -179,54 +173,19 @@ const targetAgentId = new URLSearchParams(location.search).get('agentId');
 let prefsByKey = {}; // "topic:channel" -> enabled
 
 /* ─────────────────────── AUTH ───────────────────────── */
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  window.addEventListener('load', init);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID, callback: handleGoogleSignIn,
-    auto_select: true, cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.querySelector('.g_id_signin'),
-    { theme: 'outline', size: 'large', width: 280 }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
+// Shared sign-in (auth.js); it also records the Tool Usage visit.
+Auth.ready({ tool: 'Communication Preferences', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    await init();
-  } catch (e) { alert('Authentication error: ' + e.message); }
-}
+    init();
+  });
 
 /* ─────────────────────── INIT ───────────────────────── */
 async function init() {
   document.getElementById('topbar-user').textContent = userEmail;
   await loadPreferences();
-  fetch(`${PROXY}/log/visit`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool: 'Communication Preferences', email: userEmail }),
-  }).catch(() => {});
 }
 
 async function loadPreferences() {
@@ -235,7 +194,7 @@ async function loadPreferences() {
   try {
     const qs = targetAgentId ? `?agentId=${encodeURIComponent(targetAgentId)}` : '';
     const r = await fetch(`${PROXY}/agent-comms/preferences${qs}`, {
-      headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+      headers: Auth.headers(),
     });
     const data = await r.json();
     if (!r.ok || !data.found) throw new Error(data.error || 'Could not load preferences');
@@ -322,7 +281,7 @@ async function togglePref(topic, channel) {
       if (targetAgentId) body.agentId = targetAgentId;
       const r = await fetch(`${PROXY}/agent-comms/preferences`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+        headers: Auth.headers(),
         body: JSON.stringify(body),
       });
       const data = await r.json();

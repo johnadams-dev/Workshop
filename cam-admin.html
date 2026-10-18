@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --ink:        #0d1117;
@@ -148,10 +149,7 @@ textarea { resize: vertical; min-height: 70px; }
     <div class="auth-card">
       <div class="auth-logo">Ask Cameron</div>
       <div class="auth-sub">Sign in with your @adamscameron.com account to continue</div>
-      <div id="g_id_onload" data-client_id="205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com"
-           data-callback="handleGoogleSignIn" data-auto_prompt="false"></div>
-      <div class="g_id_signin" data-type="standard" data-theme="filled_black"
-           data-text="signin_with" data-shape="rectangular" data-logo_alignment="left"></div>
+      <div id="g-signin-btn"></div>
     </div>
   </div>
 
@@ -511,59 +509,27 @@ textarea { resize: vertical; min-height: 70px; }
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
 ═══════════════════════════════════════════════════════════════════ */
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 
 /* ═══════════════════════════════════════════════════════════════════
-   AUTH
+   AUTH — shared auth.js
 ═══════════════════════════════════════════════════════════════════ */
-let userEmail = localStorage.getItem('ac_user_email') || "";
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || "";
+let userEmail = "";
 
-if (proxyKey && userEmail) {
-  document.getElementById("auth-gate").style.display = "none";
-  document.getElementById("app").style.display = "grid";
-  window.addEventListener("load", () => {
-    document.getElementById("topbar-user").textContent = userEmail;
-    Promise.all([loadTools(), loadApiDocs(), loadKnowledge(), loadLogs()]);
-  });
-}
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split(".")[1]));
-    userEmail = payload.email || "";
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ""; }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || "Sign-in failed."); return; }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
+Auth.ready({ tool: "Ask Cameron Admin", button: document.getElementById("g-signin-btn") })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display = "grid";
     document.getElementById("topbar-user").textContent = userEmail;
-    await Promise.all([loadTools(), loadApiDocs(), loadKnowledge(), loadLogs()]);
-  } catch (e) {
-    alert("Authentication error: " + e.message);
-  }
-}
+    Promise.all([loadTools(), loadApiDocs(), loadKnowledge(), loadLogs()]);
+  });
 
 /* ═══════════════════════════════════════════════════════════════════
    API HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 async function api(path, opts = {}) {
-  const headers = {
-    "Content-Type":  "application/json",
-    "x-proxy-key":   proxyKey,
-    "x-user-email":  userEmail,
-    ...(opts.headers || {}),
-  };
+  const headers = Auth.headers(opts.headers);
   const res = await fetch(PROXY + path, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -938,10 +904,6 @@ function renderLogs(rows) {
   }).join("");
 }
 
-// No programmatic google.accounts.id.initialize() call needed — the declarative
-// g_id_onload and g_id_signin divs tell the GSI library everything it needs when
-// it finishes loading (async). Calling initialize() inline risks "google is not
-// defined" if the async script hasn't arrived yet.
 </script>
 </body>
 </html>

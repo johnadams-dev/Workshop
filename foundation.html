@@ -257,14 +257,13 @@ tr:last-child td{border-bottom:none}
 <div class="toasts" id="toasts"></div>
 
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 <script>
-const PROXY_URL = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY  = localStorage.getItem('ac_proxy_key')  || '';
-let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+const PROXY_URL = Auth.API;
+let USER_EMAIL = '';
 let AGENT_ID = null;
 
-const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':PROXY_KEY, 'x-user-email':USER_EMAIL });
+const H = () => Auth.headers();
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
@@ -562,51 +561,16 @@ function renderDonations(rows) {
   return html;
 }
 
-// ── Google auth ────────────────────────────────────────────────────────────────
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY_URL}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    USER_EMAIL = payload.email || '';
-    PROXY_KEY  = data.proxyKey || '';
-    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
+// ── Google auth (shared auth.js; the modal shows only when needed) ─────────────
+Auth.ready({
+  tool: 'Adams Cameron Foundation',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => { document.getElementById('signinModal').style.display = 'flex'; },
+}).then(user => {
+  USER_EMAIL = user.email;
   document.getElementById('signinModal').style.display = 'none';
-  if (USER_EMAIL && PROXY_KEY) load(); else toast('Sign-in failed', 'err');
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt(n => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'),
-        { theme:'outline', size:'large', text:'signin_with', shape:'rectangular' });
-      document.getElementById('signinModal').style.display = 'flex';
-    }
-  });
-}
-
-if (USER_EMAIL && PROXY_KEY) {
   load();
-} else if (window.google?.accounts?.id) {
-  initGoogleSignIn();
-} else {
-  const t = setInterval(() => {
-    if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); }
-  }, 100);
-}
+});
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Adams Cameron Foundation',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

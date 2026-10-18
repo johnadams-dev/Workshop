@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -300,11 +301,9 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
 <div class="toast-area" id="toasts"></div>
 
 <script>
-const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY = Auth.API;
 
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key') || '';
+let userEmail = '';
 let offices = [];
 let leaderboard = null; // { month, monthLabel, isCurrentMonth, agents: [...] }
 let pcData = null;      // { year, yearLabel, agents: [...] }
@@ -336,11 +335,14 @@ function monthPhrase() {
   return leaderboard.isCurrentMonth ? 'this month' : `in ${leaderboard.monthLabel}`;
 }
 
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  window.addEventListener('load', load);
-}
+// Shared sign-in (auth.js).
+Auth.ready({ tool: 'Production Leaderboard', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    userEmail = user.email;
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    load();
+  });
 
 function toast(msg, type) {
   const a = document.getElementById('toasts');
@@ -545,7 +547,7 @@ function render() {
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
-const H = () => ({ 'Content-Type':'application/json', 'x-proxy-key':proxyKey, 'x-user-email':userEmail });
+const H = () => Auth.headers();
 
 async function loadProduction() {
   try {
@@ -590,43 +592,7 @@ async function load() {
   }
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-async function handleCredential(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    if (userEmail) localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
 
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed.', 'err'); return; }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
-    document.getElementById('auth-gate').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    await load();
-  } catch (e) {
-    toast('Authentication error: ' + e.message, 'err');
-  }
-}
-
-window.onload = () => {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  if (proxyKey && userEmail) return;
-  google.accounts.id.prompt(n => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large' });
-    }
-  });
-};
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Production Leaderboard',email:localStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
