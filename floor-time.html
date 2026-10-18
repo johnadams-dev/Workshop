@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -797,11 +798,9 @@
 </div>
 
 <script>
-const PROXY   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const GCLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY   = Auth.API;
 
-let KEY    = localStorage.getItem('ac_proxy_key') || '';
-let _email = localStorage.getItem('ac_user_email') || '';
+let _email = '';
 let _access = null;  // floorAccess object from /api/floor/my-access
 function isSelfService() { return !!_access && _access.role === 'agent'; }
 let _offices = [];
@@ -816,11 +815,7 @@ let _schedMonth = 0;  // 1-based
 let _periods    = [];
 let _eligCount  = 0;
 
-const H = () => ({
-  'Content-Type': 'application/json',
-  'x-proxy-key': KEY,
-  'x-user-email': _email
-});
+const H = () => Auth.headers();
 
 async function api(method, path, body) {
   const r = await fetch(PROXY + path, {
@@ -834,55 +829,16 @@ async function api(method, path, body) {
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
-if (_email && KEY) {
-  document.getElementById('auth-gate').style.display = 'none'; // skip the gate seamlessly
+// Shared sign-in (auth.js): resolves at once with a saved session, otherwise
+// after Google sign-in on the gate.
+Auth.ready({
+  tool: 'Floor Time',
+  button: document.getElementById('g-signin-btn'),
+  status: document.getElementById('auth-status'),
+}).then(user => {
+  _email = user.email;
   initApp();
-} else {
-  waitForGoogle();
-}
-
-function waitForGoogle() {
-  if (window.google?.accounts?.id) {
-    initGoogleSignIn();
-  } else {
-    const t = setInterval(() => {
-      if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); }
-    }, 100);
-  }
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: GCLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt();
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
-    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular'
-  });
-  document.getElementById('auth-status').textContent = 'Sign in with your @adamscameron.com account.';
-}
-
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { document.getElementById('auth-status').textContent = data.error || 'Sign-in failed'; return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    _email = payload.email || '';
-    KEY    = data.proxyKey || '';
-    if (_email) localStorage.setItem('ac_user_email', _email);
-    if (KEY)    localStorage.setItem('ac_proxy_key', KEY);
-    initApp();
-  } catch(e) {
-    document.getElementById('auth-status').textContent = 'Sign-in error: ' + e.message;
-  }
-}
+});
 
 async function initApp() {
   try {
@@ -893,10 +849,10 @@ async function initApp() {
       document.getElementById('no-access').style.display = 'flex';
       return;
     }
-    // Unexpected error (network, stale session, etc.) — re-show gate and offer sign-in
+    // Unexpected error (network, server) — show it on the gate. An expired
+    // session never gets here: auth.js sends the person back to sign-in.
     document.getElementById('auth-gate').style.display = '';
     document.getElementById('auth-status').textContent = 'Error: ' + e.message;
-    waitForGoogle();
     return;
   }
 
@@ -2577,6 +2533,5 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Floor Time',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
