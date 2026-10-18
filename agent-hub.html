@@ -8,6 +8,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -647,9 +648,7 @@
 
 <script src="./tools-directory.js"></script>
 <script>
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
+const PROXY_BASE   = Auth.API;
 
 // ── Tools & Links ─────────────────────────────────────────────────────────────
 // The sidebar menu, the More Tools cards and the FRED / MCFL / AC Social /
@@ -727,74 +726,21 @@ const S = {
   hubData: null,       // last-loaded full rollup — reused by checkbox handlers to re-render without a re-fetch
 };
 
-// ── Auth (ID-token flow) ─────────────────────────────────────────────────────
-// Standard shared-session convention (see docs/CLAUDE.md): every tool page
-// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
-// re-prompting if both are already present, so signing in once on any tool
-// works everywhere. This page previously gated on an additional, page-family-
-// specific ac_pathfinder_session key (still shared with pathfinder.html/
-// agent-dashboard.html/coach-dashboard.html, but not with the rest of the
-// site) — a user already signed in via Daily Desk, Hotsheet, etc. would still
-// get re-prompted here, since those pages never set that key. Fixed to gate
-// on the standard pair only; name (for the header chip) falls back to
-// /lockbox/me's `name` field on a returning visit where there's no fresh JWT
-// to decode. Picture has no such fallback source, so it's just omitted then.
-const poll = setInterval(() => {
-  if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
-}, 100);
-
-function initOAuth() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
-
-  const savedEmail = localStorage.getItem('ac_user_email');
-  if (savedEmail && PROXY_KEY) {
-    S.user = { email: savedEmail, name: null, picture: null };
+// ── Auth (shared auth.js) ────────────────────────────────────────────────────
+// One session for the whole site; the session's name and picture fill the
+// header chip on every visit.
+Auth.ready({ tool: 'Agent Hub', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    S.user = { email: user.email, name: user.name, picture: user.picture };
     onSignedIn();
-  } else {
-    google.accounts.id.prompt();
-  }
-}
+  });
 
-// Goes through /config/init (validates the ID token server-side, checks the
-// @adamscameron.com domain) rather than decoding the JWT locally.
-async function handleCredential(response) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account."); return; }
-    PROXY_KEY = data.proxyKey || '';
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { alert('Authentication error: ' + e.message); return; }
-  const payload = JSON.parse(atob(response.credential.split('.')[1]));
-  S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
-  localStorage.setItem('ac_user_email', S.user.email);
-  onSignedIn();
-}
-
-function signOut() {
-  google.accounts.id.disableAutoSelect();
-  // Clears the shared keys, not a page-specific one — since sign-in is
-  // shared site-wide, sign-out should be too (this previously only cleared
-  // this page's own session, leaving every other tool still "signed in").
-  localStorage.removeItem('ac_proxy_key');
-  localStorage.removeItem('ac_user_email');
+async function signOut() {
+  // Ends the session everywhere on this browser, not just this page, then
+  // reloads so the sign-in screen (and its Google button) comes back fresh.
+  await Auth.signOut();
   localStorage.removeItem('ac_home_page');
-  PROXY_KEY = '';
-  S.user = null;
-  S.isManager = false;
-  S.ownAgentId = null;
-  S.viewedAgentId = null;
-  S.allAgents = null;
-  document.getElementById('userChip').style.display = 'none';
-  document.getElementById('managerBar').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'none';
-  document.getElementById('loadingState').style.display = 'none';
-  document.getElementById('preAuth').style.opacity = '1';
-  document.querySelector('.hero').style.display = '';
+  location.reload();
 }
 
 // ── Home page choice ─────────────────────────────────────────────────────────
@@ -815,7 +761,7 @@ function renderHomePageBtn() {
 
 async function loadHomePageChoice() {
   try {
-    const r = await fetch(`${PROXY_BASE}/agent-comms/home-page`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } });
+    const r = await fetch(`${PROXY_BASE}/agent-comms/home-page`, { headers: Auth.headers() });
     if (!r.ok) return;
     const data = await r.json();
     if (!data.eligible) return;
@@ -832,7 +778,7 @@ async function toggleHomePage() {
   try {
     const r = await fetch(`${PROXY_BASE}/agent-comms/home-page`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      headers: Auth.headers(),
       body: JSON.stringify({ homePage: next }),
     });
     if (!r.ok) throw new Error();
@@ -860,9 +806,8 @@ async function onSignedIn() {
   document.getElementById('loadingState').style.display = 'block';
 
   try {
-    const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
-    // Returning visit with no fresh JWT to decode (see initOAuth) — S.user.name
-    // is null in that case, so fill it in from here instead.
+    const me = await fetch(`${PROXY_BASE}/lockbox/me`, { headers: Auth.headers() }).then(r => r.json());
+    // Fallback if the session has no name — fill it in from here instead.
     if (!S.user.name && me.name) {
       S.user.name = me.name;
       document.getElementById('userName').textContent = me.name;
@@ -913,7 +858,7 @@ async function loadHubFor(agentId) {
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('reminderBox').style.display = 'none';
 
-  const data = await fetch(`${PROXY_BASE}/agent-hub/${agentId}`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+  const data = await fetch(`${PROXY_BASE}/agent-hub/${agentId}`, { headers: Auth.headers() }).then(r => r.json());
   if (data.error) throw new Error(data.error);
 
   S.viewedAgentId = agentId;
@@ -988,7 +933,7 @@ function viewMyOwnHub() {
 // simple search-as-you-type, no dedicated search endpoint needed for this.
 async function loadAgentList() {
   try {
-    S.allAgents = await fetch(`${PROXY_BASE}/roster/agents`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email } }).then(r => r.json());
+    S.allAgents = await fetch(`${PROXY_BASE}/roster/agents`, { headers: Auth.headers() }).then(r => r.json());
     S.allAgents.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
   } catch (e) {
     S.allAgents = [];
@@ -1238,7 +1183,7 @@ async function toggleChecklistItem(progressId, txnId) {
   try {
     const res = await fetch(`${PROXY_BASE}/daily-desk/checklist-progress/${progressId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      headers: Auth.headers(),
       body: JSON.stringify({ status: 'completed' }),
     });
     const result = await res.json().catch(() => ({}));
@@ -1679,7 +1624,7 @@ async function previewPortal(btn) {
   try {
     const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      headers: Auth.headers(),
       body: JSON.stringify(portalTarget(btn)),
     });
     const data = await r.json().catch(() => ({}));
@@ -1699,7 +1644,7 @@ async function copyPortalLink(btn) {
   try {
     const r = await fetch(`${PROXY_BASE}/portal/agent-link`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email },
+      headers: Auth.headers(),
       body: JSON.stringify(portalTarget(btn)),
     });
     const data = await r.json().catch(() => ({}));
@@ -1797,6 +1742,5 @@ function portalCardHtml(title, desc, url, icon, badgeClass, badgeText, external)
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Hub',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
