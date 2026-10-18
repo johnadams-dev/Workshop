@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notification Preferences — Adams Cameron & Co.</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f4f2;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px 48px;
+    }
+
+    /* Header */
+    .header {
+      width: 100%;
+      background: linear-gradient(135deg, #0f2942 0%, #1a3d5c 100%);
+      padding: 20px 24px;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .header-brand { color: #c8a96e; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px; }
+    .header-title { color: white; font-size: 20px; font-weight: 700; font-family: Georgia, serif; }
+    .header-sub   { color: #8ab4cc; font-size: 13px; margin-top: 4px; }
+
+    /* Card */
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 28px;
+      width: 100%;
+      max-width: 540px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f2942;
+      font-family: Georgia, serif;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* Agent info */
+    .agent-name  { font-size: 22px; font-weight: 700; color: #0f2942; font-family: Georgia, serif; }
+    .agent-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #eff6ff; color: #1d4ed8;
+      border: 1px solid #bfdbfe; border-radius: 20px;
+      padding: 4px 12px; font-size: 12px; font-weight: 600;
+      margin: 4px 4px 0 0;
+    }
+
+    /* Form fields */
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: #374151; margin-bottom: 5px;
+    }
+    .field input[type="email"],
+    .field input[type="tel"],
+    .field select {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid #d1d5db; border-radius: 7px;
+      font-size: 14px; color: #111;
+      transition: border-color 0.15s;
+      appearance: auto;
+    }
+    .field input:focus, .field select:focus {
+      outline: none; border-color: #0f2942;
+      box-shadow: 0 0 0 3px rgba(15,41,66,0.1);
+    }
+    .field-hint { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; border-bottom: 1px solid #f1f5f9;
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-label { font-size: 14px; font-weight: 600; color: #1f2937; }
+    .toggle-sub   { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .toggle {
+      position: relative; width: 44px; height: 24px;
+      flex-shrink: 0; cursor: pointer;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: #d1d5db; border-radius: 12px;
+      transition: background 0.2s;
+    }
+    .toggle input:checked ~ .toggle-track { background: #16a34a; }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      background: white; border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(20px); }
+
+    /* Opt-out note */
+    .optout-note {
+      background: #fefce8; border: 1px solid #fde68a;
+      border-radius: 8px; padding: 12px 14px;
+      font-size: 12px; color: #92400e; line-height: 1.6;
+      margin-top: 4px;
+    }
+
+    /* Button */
+    .btn-save {
+      width: 100%; padding: 13px;
+      background: #c8a96e; color: #0f2942;
+      border: none; border-radius: 8px;
+      font-size: 15px; font-weight: 700;
+      font-family: Georgia, serif; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-save:hover { background: #b8966a; }
+    .btn-save:disabled { background: #d1d5db; color: #9ca3af; cursor: default; }
+
+    /* States */
+    .state-loading, .state-error, .state-success {
+      text-align: center; padding: 48px 20px;
+      max-width: 540px; width: 100%;
+    }
+    .state-icon  { font-size: 48px; margin-bottom: 16px; }
+    .state-title { font-size: 20px; font-weight: 700; color: #0f2942; font-family: Georgia, serif; margin-bottom: 8px; }
+    .state-body  { font-size: 14px; color: #6b7280; line-height: 1.6; }
+    .save-result {
+      background: #f0fdf4; border: 1px solid #86efac;
+      border-radius: 8px; padding: 14px;
+      color: #15803d; font-size: 14px; font-weight: 600;
+      text-align: center; margin-bottom: 12px; display: none;
+    }
+    .save-error {
+      background: #fef2f2; border: 1px solid #fca5a5;
+      border-radius: 8px; padding: 14px;
+      color: #b91c1c; font-size: 14px;
+      text-align: center; margin-bottom: 12px; display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-brand">Adams Cameron &amp; Co. Realtors</div>
+    <div class="header-title">Notification Preferences</div>
+    <div class="header-sub">Manage how you receive MLS listing gap alerts</div>
+  </div>
+
+  <!-- Loading state -->
+  <div class="state-loading" id="stateLoading">
+    <div class="state-icon">⟳</div>
+    <div class="state-title">Loading your preferences…</div>
+  </div>
+
+  <!-- Error state -->
+  <div class="state-error" id="stateError" style="display:none;">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Link Not Valid</div>
+    <div class="state-body" id="errorMsg">This link may have expired or been entered incorrectly. Please contact your office coordinator for a new link.</div>
+  </div>
+
+  <!-- Main content -->
+  <div id="mainContent" style="display:none; width:100%; max-width:540px;">
+
+    <!-- Agent info card -->
+    <div class="card">
+      <div class="card-title">👤 Your Profile</div>
+      <div class="agent-name" id="agentName">—</div>
+      <div style="margin-top: 8px;" id="agentBadges"></div>
+    </div>
+
+    <!-- Active gaps -->
+    <div class="card" id="gapsCard" style="display:none;">
+      <div class="card-title">⚠️ Your Active Listing Gaps</div>
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px;line-height:1.6;">
+        These listings appear in one MLS system but not the other. If a gap is intentional
+        (e.g. the property is only listed in one market by agreement), you can mark it as such
+        and your office coordinator will be notified.
+      </p>
+      <div id="gapsList"></div>
+    </div>
+
+    <!-- Notification settings card -->
+    <div class="card">
+      <div class="card-title">🔔 Notification Settings</div>
+
+      <!-- Opt-in toggle -->
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Receive gap alerts</div>
+          <div class="toggle-sub">Get notified when one of your listings is missing from the other MLS system</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="optIn" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+
+      <!-- Frequency -->
+      <div class="field" style="margin-top: 16px;">
+        <label for="frequency">Notification frequency</label>
+        <select id="frequency">
+          <option value="daily">Daily digest</option>
+          <option value="weekly">Weekly summary</option>
+          <option value="never">Never (opt out)</option>
+        </select>
+        <div class="field-hint">Daily sends every morning. Weekly sends on Monday mornings.</div>
+      </div>
+
+      <!-- Email -->
+      <div class="field">
+        <label for="notifyEmail">Notification email address</label>
+        <input type="email" id="notifyEmail" placeholder="your@email.com" />
+        <div class="field-hint">
+          This is the address gap alerts will be sent to. It may differ from your MLS login email —
+          update it to any address you prefer.
+        </div>
+      </div>
+
+      <!-- Phone -->
+      <div class="field">
+        <label for="notifyPhone">Mobile number for text alerts <span style="color:#9ca3af; font-weight:400;">(optional)</span></label>
+        <input type="tel" id="notifyPhone" placeholder="(386) 555-0100" />
+        <div class="field-hint">US numbers only. Standard message rates apply. Leave blank to receive email only.</div>
+      </div>
+
+      <div class="optout-note">
+        📋 You can opt out at any time by setting frequency to "Never" or replying STOP to any text message. Email unsubscribe links are included in every notification.
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="card">
+      <div class="save-result" id="saveResult">✅ Preferences saved successfully!</div>
+      <div class="save-error" id="saveError"></div>
+      <button class="btn-save" id="btnSave" onclick="savePrefs()">Save Preferences</button>
+    </div>
+
+  </div>
+
+  <!-- Success state (after save) -->
+  <div class="state-success" id="stateSaved" style="display:none;">
+    <div class="state-icon">✅</div>
+    <div class="state-title">Preferences Saved</div>
+    <div class="state-body">Your notification settings have been updated. You can close this page or <a href="#" onclick="showMain(); return false;" style="color:#0f2942; font-weight:600;">make more changes</a>.</div>
+  </div>
+
+  <script>
+    const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
+
+    // Parse token from URL
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get('token');
+
+    let agentData = null;
+
+    function showMain() {
+      document.getElementById('stateLoading').style.display = 'none';
+      document.getElementById('stateError').style.display   = 'none';
+      document.getElementById('stateSaved').style.display   = 'none';
+      document.getElementById('mainContent').style.display  = 'block';
+    }
+
+    function showError(msg) {
+      document.getElementById('stateLoading').style.display = 'none';
+      document.getElementById('mainContent').style.display  = 'none';
+      document.getElementById('stateSaved').style.display   = 'none';
+      document.getElementById('stateError').style.display   = 'block';
+      if (msg) document.getElementById('errorMsg').textContent = msg;
+    }
+
+    async function loadPrefs() {
+      if (!token) { showError('No token found in this link.'); return; }
+
+      try {
+        const r = await fetch(`${PROXY}/agent/prefs?token=${encodeURIComponent(token)}`);
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to load preferences');
+
+        agentData = data;
+        renderPrefs(data);
+        await loadGaps();
+        showMain();
+      } catch(e) {
+        showError(e.message);
+      }
+    }
+
+    async function loadGaps() {
+      try {
+        const r = await fetch(`${PROXY}/agent/gaps?token=${encodeURIComponent(token)}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        const gaps = data.gaps || [];
+        if (gaps.length === 0) return;
+
+        const MLS = { 1: 'Stellar MLS', 2: 'Daytona DBAR' };
+        document.getElementById('gapsCard').style.display = 'block';
+        document.getElementById('gapsList').innerHTML = gaps.map(g => `
+          <div id="gap-${g.id}" style="padding:12px;border:1px solid #fca5a5;border-radius:8px;margin-bottom:10px;background:#fef2f2;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div>
+                <div style="font-weight:600;font-size:14px;color:#1e293b;">${g.address || g.listing_id}</div>
+                <div style="font-size:12px;color:#dc2626;margin-top:2px;">Missing from ${MLS[g.missing_mls_id] || 'Unknown'}</div>
+              </div>
+              <button onclick="suppressGap('${g.listing_id}', ${g.id})"
+                style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                Mark intentional
+              </button>
+            </div>
+          </div>`).join('');
+      } catch(e) {
+        console.warn('Could not load gaps:', e.message);
+      }
+    }
+
+    async function suppressGap(listingId, gapId) {
+      const reason = prompt('Optional: briefly explain why this listing is only in one system (press Cancel to skip).');
+      if (reason === null) return; // user cancelled
+
+      try {
+        const r = await fetch(`${PROXY}/agent/suppress-gap`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, listing_id: listingId, reason: reason || '' }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to suppress gap');
+
+        // Remove the gap card from view
+        const el = document.getElementById(`gap-${gapId}`);
+        if (el) {
+          el.style.background = '#f0fdf4';
+          el.style.borderColor = '#86efac';
+          el.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;">✓ Marked as intentional — your coordinator has been notified.</div>`;
+        }
+      } catch(e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    function renderPrefs(data) {
+      // Agent name
+      document.getElementById('agentName').textContent = data.agent.name || 'Unknown Agent';
+
+      // MLS badges
+      const badgeContainer = document.getElementById('agentBadges');
+      badgeContainer.innerHTML = '';
+      (data.memberships || []).forEach(m => {
+        const badge = document.createElement('span');
+        badge.className = 'agent-badge';
+        badge.textContent = (m.code === 'STELLAR' ? '⭐ ' : '🌊 ') + m.mls_full_name;
+        badgeContainer.appendChild(badge);
+      });
+
+      // Prefs
+      const prefs = data.prefs || {};
+      document.getElementById('optIn').checked     = !!prefs.opt_in;
+      document.getElementById('frequency').value   = prefs.frequency || 'daily';
+      document.getElementById('notifyEmail').value = prefs.notify_email || data.agent.email || '';
+      document.getElementById('notifyPhone').value = prefs.notify_phone || '';
+    }
+
+    async function savePrefs() {
+      const btn = document.getElementById('btnSave');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      document.getElementById('saveResult').style.display = 'none';
+      document.getElementById('saveError').style.display  = 'none';
+
+      const payload = {
+        token,
+        opt_in:       document.getElementById('optIn').checked,
+        frequency:    document.getElementById('frequency').value,
+        notify_email: document.getElementById('notifyEmail').value.trim(),
+        notify_phone: document.getElementById('notifyPhone').value.trim(),
+      };
+
+      try {
+        const r = await fetch(`${PROXY}/agent/prefs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Save failed');
+
+        document.getElementById('saveResult').style.display = 'block';
+        setTimeout(() => {
+          document.getElementById('stateSaved').style.display  = 'block';
+          document.getElementById('mainContent').style.display = 'none';
+        }, 1200);
+      } catch(e) {
+        document.getElementById('saveError').textContent = '⚠️ ' + e.message;
+        document.getElementById('saveError').style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Preferences';
+      }
+    }
+
+    // Load on page ready
+    loadPrefs();
+  </script>
+</body>
+</html>
