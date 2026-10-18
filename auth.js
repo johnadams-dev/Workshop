@@ -15,6 +15,10 @@
 //                status: document.getElementById('auth-status') })
 //     .then(user => { hideGate(); start(user); });       // { email, name, picture }
 //
+// onSignInNeeded (optional) runs only when there's no valid session, before
+// the Google button is drawn — for pages that show their sign-in screen only
+// when it's needed.
+//
 // `tool` records the visit in the Tool Usage report (ac_activity_log) as
 // part of the session check, so a page on auth.js drops its separate
 // POST /log/visit script tag.
@@ -143,6 +147,7 @@
 
   // Shows Google sign-in in opts.button and resolves once signed in.
   function signIn(opts) {
+    if (opts.onSignInNeeded) opts.onSignInNeeded();
     return new Promise((resolve) => {
       loadGoogle().then(() => {
         google.accounts.id.initialize({

@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 /* Part 2 of the Open House tool: browse listings other agents have made
    available, reserve a date, and get a dated plan (open-house-event.html).
@@ -123,21 +124,19 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 2
 </main>
 
 <script>
-const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
-const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+const PROXY_BASE = Auth.API;
+let userEmail = '';
 
 const S = { slots: [], picked: {}, today: '' }; // picked: { transaction_id: Set(availability_date_id) }
 const params = new URLSearchParams(location.search);
 const rescheduleFrom = params.get('reschedule');
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail });
+const H = () => Auth.headers();
 const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
 // Listing photos go through the server's /photo-proxy, like the Hotsheet —
 // DeltaNet's images.php doesn't serve them reliably to a browser directly.
-const photoSrc = url => `${PROXY_BASE}/photo-proxy?key=${encodeURIComponent(proxyKey)}&url=${encodeURIComponent(url)}`;
+const photoSrc = url => `${PROXY_BASE}/photo-proxy?key=${encodeURIComponent(Auth.proxyKey)}&url=${encodeURIComponent(url)}`;
 function fmtDay(date) { const [y, m, d] = date.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
 // The host's open house time starts at the usual 1–4 pm, fitted inside the
@@ -167,27 +166,16 @@ async function api(path, opts = {}) {
   return data;
 }
 
-// ── Sign-in (shared ac_user_email / ac_proxy_key, prompt only when needed) ──
-if (proxyKey && userEmail) start();
-window.addEventListener('load', () => {
-  if (!window.google?.accounts?.id) return;
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
-  if (!proxyKey || !userEmail) { document.getElementById('gate').hidden = false; google.accounts.id.prompt(); }
+// ── Sign-in (shared auth.js; the gate shows only when needed) ──
+Auth.ready({
+  tool: 'Hold an Open House',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => { document.getElementById('gate').hidden = false; },
+}).then(user => {
+  userEmail = user.email;
+  document.getElementById('gate').hidden = true;
+  start();
 });
-async function handleGoogleSignIn(resp) {
-  try {
-    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
-    const r = await fetch(`${PROXY_BASE}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
-    userEmail = (payload.email || '').toLowerCase(); proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_user_email', userEmail);
-    localStorage.setItem('ac_proxy_key', proxyKey);
-    document.getElementById('gate').hidden = true;
-    start();
-  } catch (e) { alert(e.message); }
-}
 
 function start() {
   document.getElementById('app').hidden = false;
@@ -410,6 +398,5 @@ function evHtml(e) {
   </a>`;
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hold an Open House',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

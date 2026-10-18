@@ -15,6 +15,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="images/roster-favicon-16x16.png">
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root{
   --navy:#0f2942; --navy-2:#1a3d5c; --gold:#c8a96e;
@@ -207,8 +208,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
 ═══════════════════════════════════════════════════════════════════ */
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 
 // Top-level tabs, in display order. The last four ids double as partner
 // `category` values — renderCurrentTab() routes any id not 'agents'/'offices'
@@ -224,74 +224,29 @@ const TABS = [
 const PARTNER_TAB_IDS = new Set(['title', 'mortgage', 'association', 'property_management']);
 
 /* ═══════════════════════════════════════════════════════════════════
-   AUTH STATE — shared ac_proxy_key / ac_user_email keys, per repo convention
+   AUTH — shared sign-in (auth.js)
 ═══════════════════════════════════════════════════════════════════ */
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
-
 let STATE = { agents: [], staff: [], partners: [], offices: [], activeOffice: null, activeTab: 'agents', selectedOfficeName: null, canSendText: false, detailTarget: null, pendingReplies: [] };
 
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display       = 'block';
-  window.addEventListener('load', init);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleSignIn,
-    auto_select: true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.getElementById('g-signin-btn'),
-    { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
-
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
-      return;
-    }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
+Auth.ready({ tool: 'Agent Roster', button: document.getElementById('g-signin-btn') })
+  .then(() => {
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display       = 'block';
-    await init();
-  } catch (e) {
-    alert('Authentication error: ' + e.message);
-  }
-}
+    init();
+  });
 
 /* ═══════════════════════════════════════════════════════════════════
    API HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 async function api(path) {
-  const r = await fetch(PROXY + path, { headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail } });
+  const r = await fetch(PROXY + path, { headers: Auth.headers() });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
 async function apiPost(path, body) {
   const r = await fetch(PROXY + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    headers: Auth.headers(),
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
@@ -301,7 +256,7 @@ async function apiPost(path, body) {
 async function apiPatch(path) {
   const r = await fetch(PROXY + path, {
     method: 'PATCH',
-    headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    headers: Auth.headers(),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
@@ -737,6 +692,5 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <!-- Visit logging (Tool Usage report) — independent of the auth flow above -->
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Roster',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

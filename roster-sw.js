@@ -6,10 +6,11 @@
 // — is deliberately network-only, never cached: the entire point of
 // replacing the AppSheet/Google-Sheet directory is that this data can't go
 // stale, so a cached API response would defeat the purpose.
-const CACHE_NAME = "roster-shell-v2";
+const CACHE_NAME = "roster-shell-v3";
 const API_HOST   = "mls-proxy-975684028597.us-east1.run.app";
 const SHELL_URLS = [
   "/roster.html",
+  "/auth.js",       // shared sign-in, loaded by roster.html (v3, 2026-10-18)
   "/manifest.json",
   "/images/roster-android-chrome-192x192.png",
   "/images/roster-android-chrome-512x512.png",

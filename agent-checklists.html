@@ -6,6 +6,7 @@
 <title>Agent Onboarding &amp; Offboarding — Adams Cameron</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
@@ -245,16 +246,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
-const CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY     = Auth.API;
 
 const ROLE_LABELS  = { office_coordinator: 'Office Coordinator', sales_manager: 'Sales Manager', admin: 'Admin' };
 const SCOPE_LABELS = { agent_onboarding: 'Onboarding', agent_offboarding: 'Offboarding' };
 const STATUS_LABELS = { pending: 'Open', completed: 'Completed', skipped: 'Skipped', not_applicable: 'N/A' };
 const FILTER_KEY = 'agent_checklists_filters';
 
-let userEmail = localStorage.getItem('ac_user_email') || '';
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || '';
+let userEmail = '';
 
 const STATE = {
   filters: { view: 'task', scope: '', role: '', office_id: '', agent_id: '', status: 'open' },
@@ -265,41 +264,17 @@ const STATE = {
 try { Object.assign(STATE.filters, JSON.parse(localStorage.getItem(FILTER_KEY) || '{}')); } catch {}
 
 /* ─────────────────────── AUTH ───────────────────────── */
-if (proxyKey && userEmail) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  window.addEventListener('load', init);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleGoogleSignIn, auto_select: true });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280 });
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    userEmail = payload.email || '';
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ''; }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
-    proxyKey = data.proxyKey || '';
-    localStorage.setItem('ac_proxy_key', proxyKey);
+// Shared sign-in (auth.js).
+Auth.ready({ tool: 'Agent Onboarding & Offboarding', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById('auth-gate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    await init();
-  } catch (e) { alert('Authentication error: ' + e.message); }
-}
+    init();
+  });
 
 function H(extra) {
-  return Object.assign({ 'x-proxy-key': proxyKey, 'x-user-email': userEmail, 'Content-Type': 'application/json' }, extra || {});
+  return Auth.headers(extra);
 }
 async function api(method, path, body) {
   const r = await fetch(`${PROXY}${path}`, { method, headers: H(), body: body ? JSON.stringify(body) : undefined });
@@ -585,6 +560,5 @@ function toast(msg, isErr) {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Agent Onboarding & Offboarding',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
