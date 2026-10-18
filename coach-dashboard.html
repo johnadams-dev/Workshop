@@ -18,6 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -573,14 +574,14 @@
     </div>
   </div>
   <div class="hdr-right">
-    <a href="./feedback.html?tool=coach-dashboard" class="btn-sm btn-ghost">Feedback</a>
+    <a href="./index.html" class="btn-sm btn-ghost">← Tools</a>
     <a href="./pathfinder.html" class="btn-sm btn-ghost">← Pathfinder</a>
+    <a href="./feedback.html?tool=coach-dashboard" class="btn-sm btn-ghost">Feedback</a>
     <div class="user-pill" id="userPill" style="display:none">
       <div class="user-avatar" id="userInitials">?</div>
       <span id="userName">Loading…</span>
     </div>
     <button class="btn-sm btn-ghost" id="signOutBtn" onclick="signOut()" style="display:none">Sign Out</button>
-    <div id="signInBtn"></div>
   </div>
 </header>
 
@@ -698,22 +699,7 @@
 
 <script>
 /* ─────────────────────── CONFIG ─────────────────────── */
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
-
-// Standard shared-session convention (see docs/CLAUDE.md): every tool page
-// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
-// re-prompting if both are already present, so signing in once on any tool
-// works everywhere. This page previously gated on an additional, page-family-
-// specific ac_pathfinder_session key (also shared with pathfinder.html/
-// agent-hub.html/agent-dashboard.html, but not with the rest of the site) —
-// a user already signed in via Daily Desk, Hotsheet, etc. would still get
-// re-prompted here, since those pages never set that key. Fixed to gate on
-// the standard pair only; no dedicated name-source endpoint here, so a
-// returning visit with no fresh JWT to decode falls back to the same
-// email-prefix convention this file already used elsewhere (saved.name ||
-// saved.email?.split('@')[0]).
+const PROXY_BASE   = Auth.API;
 
 /* ─────────────────────── STATE ──────────────────────── */
 const S = {
@@ -728,83 +714,19 @@ const S = {
 };
 
 /* ─────────────────────── AUTH ───────────────────────── */
-// Previously had two sign-in paths: an ID-token flow (One Tap) and a
-// separate OAuth access-token flow (tokenClient, wired to the "Sign In with
-// Google" / "Try Again" buttons) that fetched identity from Google's
-// userinfo endpoint directly and never went through /config/init — so the
-// manual sign-in buttons never validated the @adamscameron.com domain
-// server-side or obtained a real proxy key; PROXY_KEY was just hardcoded
-// instead. Collapsed onto the single ID-token flow (also used by every
-// other tool page) so there's one path that always goes through
-// /config/init. Also drops a call to an undefined clearCredential() that
-// used to sit in signOut() (dead reference, threw on every sign-out).
-function requestSignIn() {
-  google.accounts.id.prompt();
-}
-
-function signOut() {
-  S.email = null; S.name = null;
-  document.getElementById('userPill').style.display    = 'none';
-  document.getElementById('signOutBtn').style.display  = 'none';
-  document.getElementById('signInBtn').style.display   = 'block';
-  document.getElementById('dashApp').style.display     = 'none';
-  document.getElementById('authGate').style.display    = 'flex';
-  // Clears the shared keys, not a page-specific one — since sign-in is
-  // shared site-wide, sign-out should be too.
-  localStorage.removeItem('ac_proxy_key');
-  localStorage.removeItem('ac_user_email');
-  PROXY_KEY = '';
-  if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
-}
-
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(credentialResponse) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: credentialResponse.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-    PROXY_KEY = data.proxyKey || '';
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-    const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
-    S.email = payload.email;
-    S.name  = payload.name || payload.email.split('@')[0];
-    localStorage.setItem('ac_user_email', S.email);
+// Shared sign-in (auth.js); the Google button is drawn on the sign-in screen.
+Auth.ready({ tool: 'Pathfinder Coach', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    S.email = user.email;
+    S.name  = user.name || user.email.split('@')[0];
     onSignedIn();
-  } catch(e) {
-    console.warn('Sign-in failed:', e);
-    toast('Sign-in failed: ' + e.message, 'err');
-  }
+  });
+
+async function signOut() {
+  // Ends the session site-wide, then reloads so the sign-in screen comes back.
+  await Auth.signOut();
+  location.reload();
 }
-
-window.addEventListener('load', () => {
-  const poll = setInterval(() => {
-    if (!window.google?.accounts) return;
-    clearInterval(poll);
-
-    google.accounts.id.initialize({
-      client_id: OAUTH_CLIENT,
-      callback: handleCredential,
-    });
-    google.accounts.id.renderButton(document.getElementById('signInBtn'), { theme: 'outline', size: 'medium', text: 'signin_with' });
-    google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
-
-    const savedEmail = localStorage.getItem('ac_user_email');
-    if (savedEmail && PROXY_KEY) {
-      S.email = savedEmail;
-      S.name  = savedEmail.split('@')[0];
-      onSignedIn();
-    } else {
-      google.accounts.id.prompt();
-    }
-  }, 200);
-});
 
 function onSignedIn() {
   if (!S.email?.endsWith('@adamscameron.com')) {
@@ -815,9 +737,6 @@ function onSignedIn() {
         <div class="auth-sub">This dashboard is for Adams, Cameron &amp; Co. staff only. Please sign in with your @adamscameron.com Google account.</div>
         <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
       </div>`;
-    if (window.google?.accounts?.id) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
-    }
     return;
   }
 
@@ -826,7 +745,6 @@ function onSignedIn() {
   document.getElementById('userInitials').textContent = initials;
   document.getElementById('userName').textContent = S.name.split(' ')[0];
   document.getElementById('userPill').style.display = 'flex';
-  document.getElementById('signInBtn').style.display   = 'none';
   document.getElementById('signOutBtn').style.display  = 'block';
 
   // Show dashboard
@@ -846,7 +764,7 @@ async function loadDashboard() {
 
   try {
     const res = await fetch(`${PROXY_BASE}/coach/dashboard`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+      headers: Auth.headers()
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -1006,7 +924,7 @@ async function openDetail(agentId) {
 
   try {
     const res = await fetch(`${PROXY_BASE}/coach/agent/${agentId}`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.email }
+      headers: Auth.headers()
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     S.activeDetail = await res.json();
@@ -1335,11 +1253,7 @@ async function submitNotes() {
     await Promise.all(saves.map(payload =>
       fetch(`${PROXY_BASE}/coach/feedback`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-proxy-key': PROXY_KEY,
-          'x-user-email': S.email,
-        },
+        headers: Auth.headers(),
         body: JSON.stringify({ agentId: S.activeDetail.agent.id, ...payload })
       }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
     ));
@@ -1364,6 +1278,5 @@ function toast(msg, type = 'ok') {
   setTimeout(() => el.classList.remove('show'), 3500);
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Pathfinder Coach',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

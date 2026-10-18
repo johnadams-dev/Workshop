@@ -18,6 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -205,8 +206,9 @@
   </div>
   <div class="hdr-right">
     <div id="g-signin-btn"></div>
-    <a href="./feedback.html?tool=business-plan-generator" class="btn-icon">Feedback</a>
+    <a href="./index.html" class="btn-icon">← Tools</a>
     <a href="./pathfinder.html" class="btn-icon">← Pathfinder</a>
+    <a href="./feedback.html?tool=business-plan-generator" class="btn-icon">Feedback</a>
   </div>
 </header>
 
@@ -467,9 +469,9 @@
 /* ── CONSTANTS ──────────────────────────────────────────────────── */
 const ADMIN_PW_DEFAULT = 'ac2025admin';
 // FIX 1: Updated to current Cloud Run service URL
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_BASE   = Auth.API;
+// Google Gmail/Drive permission for sending and saving the plan (separate from sign-in).
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
 const CONFIG_URL   = PROXY_BASE + '/config/public';
 
 /* ── STATE ──────────────────────────────────────────────────────── */
@@ -486,40 +488,17 @@ const S = {
 
 /* Settings removed — prompt config managed server-side via admin panel */
 
-/* ── GOOGLE OAUTH ─────────────────────────────────────────────────── */
-/* ── SHARED SESSION AUTH ────────────────────────────────────────────
-   Uses localStorage so sign-in persists across tabs and page refreshes.
-   8-hour expiry — reasonable for a work day.
-   Same key on every page so signing in anywhere covers all pages.
+/* ── SIGN-IN (shared auth.js) ───────────────────────────────────────
+   The page can be used before signing in; the header button stays until
+   the person signs in, then their agent profile loads.
    ────────────────────────────────────────────────────────────────── */
-const AC_SESSION_KEY = 'ac_pathfinder_session';
+Auth.ready({ tool: 'Pathfinder Business Plan', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    document.getElementById('g-signin-btn').style.display = 'none';
+    loadAgentProfile(user.email);
+  });
 
-function saveSession(email, name, picture) {
-  try {
-    localStorage.setItem(AC_SESSION_KEY, JSON.stringify({
-      email, name, picture,
-      exp: Date.now() + 8 * 60 * 60 * 1000
-    }));
-  } catch(_) {}
-}
-
-function clearSession() {
-  try { localStorage.removeItem(AC_SESSION_KEY); } catch(_) {}
-}
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(AC_SESSION_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.email || s.exp < Date.now()) {
-      localStorage.removeItem(AC_SESSION_KEY);
-      return null;
-    }
-    return s;
-  } catch(_) { return null; }
-}
-
+/* ── GOOGLE GMAIL / DRIVE PERMISSION ─────────────────────────────── */
 function initOAuth() {
   if (!window.google?.accounts?.oauth2) return;
   S.tokenClient = google.accounts.oauth2.initTokenClient({
@@ -528,62 +507,11 @@ function initOAuth() {
     callback: async (res) => {
       if (res.error) { toast('Google sign-in failed: ' + res.error, 'err'); return; }
       S.accessToken = res.access_token;
-      try {
-        const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: `Bearer ${S.accessToken}` } });
-        if (userRes.ok) {
-          const u = await userRes.json();
-          if (u.email) {
-            saveSession(u.email, u.name, u.picture);
-            await loadAgentProfile(u.email);
-          }
-        }
-      } catch(e) {}
       if (S.pendingAction === 'email') doEmail();
       if (S.pendingAction === 'docs')  doDocs();
       S.pendingAction = null;
     }
   });
-  try {
-    google.accounts.id.initialize({
-      client_id: OAUTH_CLIENT,
-      // Goes through /config/init (validates the ID token server-side and
-      // checks the @adamscameron.com domain) rather than just decoding the
-      // JWT locally, so the proxy key is only ever handed to a verified
-      // account instead of being hardcoded in this page's source for
-      // anyone to read.
-      callback: async (cr) => {
-        try {
-          const r = await fetch(`${PROXY_BASE}/config/init`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ idToken: cr.credential }),
-          });
-          const data = await r.json();
-          if (r.ok) {
-            PROXY_KEY = data.proxyKey || '';
-            if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-          }
-        } catch (e) {}
-        const p = JSON.parse(atob(cr.credential.split('.')[1]));
-        if (p.email) {
-          saveSession(p.email, p.given_name || p.name, p.picture);
-          await loadAgentProfile(p.email);
-        }
-        const btn = document.getElementById('g-signin-btn');
-        if (btn && PROXY_KEY) btn.style.display = 'none';
-      }
-    });
-    google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
-
-    // Check localStorage session before prompting Google
-    const saved = loadSession();
-    if (saved && PROXY_KEY) {
-      document.getElementById('g-signin-btn').style.display = 'none';
-      loadAgentProfile(saved.email);
-    } else {
-      google.accounts.id.prompt();
-    }
-  } catch(e) {}
 }
 
 /* ── NAVIGATION ──────────────────────────────────────────────────── */
@@ -676,7 +604,7 @@ Incorporate: Global reach via LeadingRE, AC Social automated marketing, personal
 async function geminiCall(prompt, maxTokens = 8192, model = 'gemini-2.5-flash') {
   const res = await fetch(`${PROXY_BASE}/gemini`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+    headers: Auth.headers(),
     body: JSON.stringify({ model, contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.72, maxOutputTokens: maxTokens } })
   });
   if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error?.message || `HTTP ${res.status}`); }
@@ -857,9 +785,10 @@ async function loadAgentProfile(email) {
   const emailField = document.getElementById('f_email');
   if (emailField && !emailField.value) emailField.value = email;
   try {
-    const res = await fetch(`${PROXY_BASE}/agent/profile`, { headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email } });
+    // The typed email is used only when there's no session; with one, the server uses the session's.
+    const res = await fetch(`${PROXY_BASE}/agent/profile`, { headers: Auth.headers({ 'x-user-email': email }) });
     if (!res.ok) return; const profile = await res.json();
-    if (!profile.found) { await fetch(`${PROXY_BASE}/agent/register`, { method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY}, body:JSON.stringify({email}) }); return; }
+    if (!profile.found) { await fetch(`${PROXY_BASE}/agent/register`, { method:'POST', headers:Auth.headers(), body:JSON.stringify({email}) }); return; }
     S.agentProfile = profile;
     const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
     const nameField = document.getElementById('f_name'); if (nameField && !nameField.value && name) nameField.value = name;
@@ -867,7 +796,7 @@ async function loadAgentProfile(email) {
     if (profile.plan_id) prefillFromExistingPlan(profile);
     if (profile.dmg_id) {
       try {
-        const bioRes = await fetch(`${PROXY_BASE}/agent/deltanet-bio?dmg_id=${encodeURIComponent(profile.dmg_id)}`, { headers: { 'x-proxy-key': PROXY_KEY } });
+        const bioRes = await fetch(`${PROXY_BASE}/agent/deltanet-bio?dmg_id=${encodeURIComponent(profile.dmg_id)}`, { headers: Auth.headers() });
         if (bioRes.ok) {
           const bioData = await bioRes.json();
           const bioField = document.getElementById('f_bio');
@@ -1063,7 +992,7 @@ function confirmGoalsAndContinue() {
 async function loadStrategyLibrary() {
   if (Array.isArray(S.strategies) && S.strategies.length) return;
   try {
-    const res = await fetch(`${PROXY_BASE}/strategies`, { headers: {'x-proxy-key': PROXY_KEY} });
+    const res = await fetch(`${PROXY_BASE}/strategies`, { headers: Auth.headers() });
     if (res.ok) {
       const data = await res.json();
       S.strategies = Array.isArray(data) ? data : [];
@@ -1077,7 +1006,7 @@ async function loadStrategyLibrary() {
 async function suggestStrategies() {
   try {
     const res = await fetch(`${PROXY_BASE}/agent/suggest-strategies`, {
-      method: 'POST', headers: {'Content-Type':'application/json','x-proxy-key':PROXY_KEY},
+      method: 'POST', headers: Auth.headers(),
       body: JSON.stringify({ planText: S.plan, agentData: { market:S.data.market, time:S.data.time, soi:S.data.soi, experience:S.data.exp, list:S.data.list, why:S.data.why } })
     });
     if (!res.ok) throw new Error('Suggestion failed');
@@ -1312,7 +1241,7 @@ async function doEnroll() {
       planText:S.plan, planHtml:S.planHtml,
     };
     const res = await fetch(`${PROXY_BASE}/agent/enroll`, {
-      method:'POST', headers:{'Content-Type':'application/json','x-proxy-key':PROXY_KEY,'x-user-email':S.userEmail||S.data.email||''},
+      method:'POST', headers:Auth.headers({ 'x-user-email': S.userEmail||S.data.email||'' }),
       body:JSON.stringify(payload)
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||`HTTP ${res.status}`); }
@@ -1323,14 +1252,14 @@ async function doEnroll() {
       try {
         const email = S.userEmail || S.data.email;
         const profileRes2 = await fetch(`${PROXY_BASE}/agent/profile`, {
-          headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': email }
+          headers: Auth.headers({ 'x-user-email': email })
         });
         if (profileRes2.ok) {
           const p2 = await profileRes2.json();
           if (p2.found && p2.id) {
             await fetch(`${PROXY_BASE}/agent/${p2.id}/strategies`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+              headers: Auth.headers(),
               body: JSON.stringify({ planId: S.planId, enrollmentId: S.enrollmentId, strategies: S.selectedStrategies })
             });
           }
@@ -1353,6 +1282,5 @@ async function doEnroll() {
   }
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Pathfinder Business Plan',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

@@ -17,6 +17,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -425,8 +426,8 @@
       <span class="logo-sub">Adams, Cameron & Co.</span>
     </div>
     <div class="header-right">
-      <a href="./feedback.html?tool=pathfinder" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">Feedback</a>
       <a href="./index.html" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">← Tools</a>
+      <a href="./feedback.html?tool=pathfinder" style="font-size:12px;color:#8a8aa8;text-decoration:none;margin-right:16px;letter-spacing:.03em">Feedback</a>
       <div id="userChip">
         <img id="userAvatar" src="" alt="">
         <span id="userName"></span>
@@ -571,9 +572,7 @@
 </footer>
 
 <script>
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
+const PROXY_BASE   = Auth.API;
 
 const S = {
   user:        null,   // { email, name, picture }
@@ -585,89 +584,17 @@ const S = {
   totalSteps:  8,
 };
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-// Standard shared-session convention (see docs/CLAUDE.md): every tool page
-// checks the shared ac_proxy_key + ac_user_email localStorage keys and skips
-// re-prompting if both are already present, so signing in once on any tool
-// works everywhere. This page previously gated on an additional, page-family-
-// specific ac_pathfinder_session key (also shared with agent-hub.html/
-// agent-dashboard.html/coach-dashboard.html, but not with the rest of the
-// site) — a user already signed in via Daily Desk, Hotsheet, etc. would still
-// get re-prompted here, since those pages never set that key. Fixed to gate
-// on the standard pair only; name/picture (for the header chip) fall back to
-// the agent-profile fetch below on a returning visit where there's no fresh
-// JWT to decode.
-// ── Google Auth ────────────────────────────────────────────────────────────────
-// Previously had two sign-in paths: this ID-token flow (handleCredential,
-// used for One Tap / auto_select), and a separate OAuth access-token flow
-// (tokenClient, wired to the explicit "Sign in with Google" button) that
-// fetched identity from Google's userinfo endpoint directly and never went
-// through /config/init at all — so the manual sign-in button never actually
-// validated the @adamscameron.com domain server-side or obtained a real
-// proxy key; PROXY_KEY was just hardcoded instead. Collapsed onto the single
-// ID-token flow (also used by every other tool page) so there's one path
-// that always goes through /config/init.
-const poll = setInterval(() => {
-  if (window.google?.accounts?.id) { clearInterval(poll); initOAuth(); }
-}, 100);
-
-function initOAuth() {
-  google.accounts.id.initialize({
-    client_id: OAUTH_CLIENT,
-    callback: handleCredential,
-    auto_select: true,
-  });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', text: 'signin_with' });
-
-  // Check the standard shared session before prompting Google
-  const savedEmail = localStorage.getItem('ac_user_email');
-  if (savedEmail && PROXY_KEY) {
-    S.user = { email: savedEmail, name: null, picture: null };
+// ── Auth (shared auth.js) ─────────────────────────────────────────────────────
+Auth.ready({ tool: 'Pathfinder', button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    S.user = { email: user.email, name: user.name, picture: user.picture };
     onSignedIn();
-  } else {
-    google.accounts.id.prompt();
-  }
-}
+  });
 
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read. Also fixes a
-// pre-existing bug: this used to call an undefined saveCredential(), which
-// threw on every sign-in that went through this path.
-async function handleCredential(response) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account."); return; }
-    PROXY_KEY = data.proxyKey || '';
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { alert('Authentication error: ' + e.message); return; }
-  const payload = JSON.parse(atob(response.credential.split('.')[1]));
-  S.user = { email: payload.email, name: payload.given_name || payload.name, picture: payload.picture };
-  localStorage.setItem('ac_user_email', S.user.email);
-  onSignedIn();
-}
-
-function signOut() {
-  google.accounts.id.disableAutoSelect();
-  // Clears the shared keys, not a page-specific one — since sign-in is
-  // shared site-wide, sign-out should be too.
-  localStorage.removeItem('ac_proxy_key');
-  localStorage.removeItem('ac_user_email');
-  PROXY_KEY = '';
-  S.user = null;
-  S.agentProfile = null;
-  document.getElementById('userChip').style.display = 'none';
-  document.getElementById('greeting').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'none';
-  document.getElementById('loadingState').style.display = 'none';
-  document.getElementById('notFound').style.display = 'none';
-  document.getElementById('preAuth').style.opacity = '1';
+async function signOut() {
+  // Ends the session site-wide, then reloads so the sign-in button is drawn again.
+  await Auth.signOut();
+  location.reload();
 }
 
 // ── Post sign-in ───────────────────────────────────────────────────────────────
@@ -686,12 +613,11 @@ async function onSignedIn() {
   try {
     // Check agent profile
     const profileRes = await fetch(`${PROXY_BASE}/agent/profile`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email }
+      headers: Auth.headers()
     });
     const profile = await profileRes.json();
 
-    // Returning visit with no fresh JWT to decode (see initOAuth) — S.user.name
-    // is null in that case, so fill in name/picture from the profile fetch.
+    // If the session has no name/picture, fill them in from the profile.
     if (!S.user.name && profile.found) {
       const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
       if (name) { S.user.name = name; document.getElementById('userName').textContent = name; }
@@ -704,7 +630,7 @@ async function onSignedIn() {
 
     // Check coach/staff access
     const coachRes = await fetch(`${PROXY_BASE}/coach/dashboard`, {
-      headers: { 'x-proxy-key': PROXY_KEY, 'x-user-email': S.user.email }
+      headers: Auth.headers()
     });
     if (coachRes.ok) {
       const coachData = await coachRes.json();
@@ -787,6 +713,5 @@ function showCoachSection() {
 }
 
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Pathfinder',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
