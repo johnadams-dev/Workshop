@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <!-- Loaded eagerly (not lazily via foundationEnsureLibs on click) so Foundation
      Letters' first PDF doesn't stall for minutes waiting on a cold cdnjs fetch --
      by the time anyone reaches that screen and clicks Generate, the page has
@@ -2505,21 +2506,19 @@ tbody tr.clickable { cursor: pointer; }
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
 ═══════════════════════════════════════════════════════════════════ */
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 
 /* ═══════════════════════════════════════════════════════════════════
    AUTH STATE
 ═══════════════════════════════════════════════════════════════════ */
-let userEmail   = localStorage.getItem('ac_user_email')   || "";
-let userDisplay = localStorage.getItem('dd_user_display') || userEmail;
-let proxyKey    = localStorage.getItem('ac_proxy_key')  || "";
+let userEmail   = "";
+let userDisplay = "";
 
 // Hotsheet report link used to be a static <a href> with the shared proxy
 // key baked into the query string in this page's public source — built
 // dynamically now so the key only ever comes from the signed-in session.
 function openHotsheetReport() {
-  window.open(`${PROXY}/hotsheet/report?key=${encodeURIComponent(proxyKey)}`, '_blank');
+  window.open(`${PROXY}/hotsheet/report?key=${encodeURIComponent(Auth.proxyKey)}`, '_blank');
 }
 
 let STATE = {
@@ -2535,70 +2534,22 @@ let STATE = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   GOOGLE SIGN-IN
+   GOOGLE SIGN-IN — shared auth.js
 ═══════════════════════════════════════════════════════════════════ */
-if (proxyKey && userEmail) {
-  document.getElementById("auth-gate").style.display = "none";
-  document.getElementById("app").style.display       = "grid";
-  window.addEventListener("load", init);
-}
-
-window.addEventListener("load", () => {
-  google.accounts.id.initialize({
-    client_id:             GOOGLE_CLIENT_ID,
-    callback:              handleGoogleSignIn,
-    auto_select:           true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.getElementById("g-signin-btn"),
-    { theme: "outline", size: "large", width: 280, text: "signin_with" }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split(".")[1]));
-    userEmail   = payload.email || "";
-    userDisplay = payload.name  || userEmail;
-    localStorage.setItem('ac_user_email',   userEmail);
-    localStorage.setItem('dd_user_display', userDisplay);
-  } catch { userEmail = ""; }
-
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
-      return;
-    }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
+Auth.ready({ tool: "Daily Desk", button: document.getElementById("g-signin-btn") })
+  .then(user => {
+    userEmail   = user.email;
+    userDisplay = user.name || user.email;
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display       = "grid";
-
-    await init();
-  } catch (e) {
-    alert("Authentication error: " + e.message);
-  }
-}
+    init();
+  });
 
 /* ═══════════════════════════════════════════════════════════════════
    API HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 async function api(path, opts = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    "x-proxy-key":  proxyKey,
-    "x-user-email": userEmail,
-    ...(opts.headers || {}),
-  };
+  const headers = Auth.headers(opts.headers);
   const res = await fetch(PROXY + path, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -6126,7 +6077,7 @@ async function removeNotice(type, id) {
   const label = type === 'upcoming' ? 'upcoming listing' : 'buyer need';
   if (!confirm(`Remove this ${label} from the hotsheet?`)) return;
   try {
-    const r = await fetch(`${PROXY}/notices/${type}/${id}`, { method: 'DELETE', headers: { 'x-proxy-key': proxyKey, 'x-user-email': userEmail } });
+    const r = await fetch(`${PROXY}/notices/${type}/${id}`, { method: 'DELETE', headers: Auth.headers() });
     if (!r.ok) { const d = await r.json(); throw new Error(d.error || 'HTTP '+r.status); }
     await renderAll();
   } catch (e) {
@@ -6849,11 +6800,7 @@ async function adminSaveTemplate(templateId, btn) {
 ═══════════════════════════════════════════════════════════════════ */
 
 function cvHeaders() {
-  return {
-    'Accept':       'application/json',
-    'x-proxy-key':  proxyKey,
-    'x-user-email': userEmail,
-  };
+  return Auth.headers({ 'Accept': 'application/json' });
 }
 
 // Quick-fill for the Entry / Showing Instructions field (used by all 3 add-to-caravan entry points)
@@ -6949,7 +6896,7 @@ async function cvFetchPhotoAsDataUrl(photoUrl) {
   if (!photoUrl) return null;
   try {
     const res = await fetch(`${PROXY}/photo-proxy?url=${encodeURIComponent(photoUrl)}`, {
-      headers: { 'x-proxy-key': proxyKey }
+      headers: Auth.headers()
     });
     if (!res.ok) return null;
     const blob = await res.blob();
@@ -7003,7 +6950,7 @@ function cvSetStatus(state, msg) {
 function cvSendNotify(caravanDate) {
   fetch(`${PROXY}/daily-desk/caravan-notify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-proxy-key': proxyKey, 'x-user-email': userEmail },
+    headers: Auth.headers(),
     body: JSON.stringify({ caravanDate: caravanDate || '' }),
   }).catch(e => console.warn('[caravan-notify]', e.message));
 }
@@ -8409,6 +8356,5 @@ async function foundationGeneratePDFs() {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Daily Desk',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -480,75 +481,27 @@
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG / AUTH — same pattern as daily-desk.html
 ═══════════════════════════════════════════════════════════════════ */
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 const PROPERTY_BASE    = "https://adamscameron.com/";
 
-let userEmail = localStorage.getItem('ac_user_email')   || "";
-let proxyKey  = localStorage.getItem('ac_proxy_key')  || "";
+let userEmail = "";
 
 let STATE = { data: null, offices: [], userRole: "unknown", activeCategory: "all" };
 
-if (proxyKey && userEmail) {
-  document.getElementById("auth-gate").style.display = "none";
-  document.getElementById("app").style.display       = "block";
-  window.addEventListener("load", init);
-}
-
-window.addEventListener("load", () => {
-  google.accounts.id.initialize({
-    client_id:             GOOGLE_CLIENT_ID,
-    callback:              handleGoogleSignIn,
-    auto_select:           true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.getElementById("g-signin-btn"),
-    { theme: "outline", size: "large", width: 280, text: "signin_with" }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split(".")[1]));
-    userEmail = payload.email || "";
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ""; }
-
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
-      return;
-    }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
+// Shared sign-in (auth.js).
+Auth.ready({ tool: "Hotsheet v2", button: document.getElementById("g-signin-btn") })
+  .then(user => {
+    userEmail = user.email;
     document.getElementById("auth-gate").style.display = "none";
-    document.getElementById("app").style.display       = "block";
-
-    await init();
-  } catch (e) {
-    alert("Authentication error: " + e.message);
-  }
-}
+    document.getElementById("app").style.display = "block";
+    init();
+  });
 
 /* ═══════════════════════════════════════════════════════════════════
    API HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 async function api(path, opts = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    "x-proxy-key":  proxyKey,
-    "x-user-email": userEmail,
-    ...(opts.headers || {}),
-  };
+  const headers = Auth.headers(opts.headers);
   const res = await fetch(PROXY + path, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -597,7 +550,7 @@ function propLink(mlsIds, text) {
 function photoEl(item, size = "card") {
   const rawUrl = item.photoUrl || item.primary_photo_url;
   if (!rawUrl) return `<div class="photo-placeholder photo-${size}"><span>No Photo</span></div>`;
-  const url = `${PROXY}/photo-proxy?key=${encodeURIComponent(proxyKey)}&url=${encodeURIComponent(rawUrl)}`;
+  const url = `${PROXY}/photo-proxy?key=${encodeURIComponent(Auth.proxyKey)}&url=${encodeURIComponent(rawUrl)}`;
   return `<img src="${url}" alt="Property photo" class="photo-img photo-${size}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=\\'photo-placeholder photo-${size}\\'><span>No Photo</span></div>'">`;
 }
 
@@ -1262,6 +1215,5 @@ async function init() {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Hotsheet v2',email:localStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
