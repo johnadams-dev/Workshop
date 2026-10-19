@@ -165,7 +165,8 @@ const S = {
   vendors: [],         // browse list (approved + my pending)
   all: null,           // admin: every vendor, for Review
   open: new Set(),     // expanded vendor ids
-  editing: null,       // vendor id being edited in Review
+  editing: null,       // vendor id being edited
+  editingIn: null,     // where its form is open: 'review', or 'browse:<category heading>'
 };
 const RECHECK_DAYS = 730;
 
@@ -295,7 +296,11 @@ function renderBrowse() {
     [...groups.keys()].sort().map(k =>
       `<h2 class="cat-h">${esc(k)} · ${groups.get(k).length}</h2>` + groups.get(k).map(v => vendorHtml(v, false, k)).join('')
     ).join('');
+  if (S.editingIn?.startsWith('browse:')) bindForm(el.querySelector('form'), S.vendors.find(v => v.id === S.editing));
 }
+
+// Admins can edit any vendor; whoever added one can edit it until it's reviewed.
+const canEdit = v => S.me.isAdmin || (v.status === 'pending' && v.submitted_by_email === S.me.email);
 
 function actionsHtml(v) {
   const a = [];
@@ -319,8 +324,9 @@ function needsRecheck(v) {
   return v.status === 'approved' && (!v.last_verified_at || Date.now() - new Date(v.last_verified_at) > RECHECK_DAYS * 864e5);
 }
 
-function vendorHtml(v, review) {
+function vendorHtml(v, review, group) {
   const open = S.open.has(v.id);
+  const where = review ? 'review' : 'browse:' + group;
   const meta = [review ? v.categories.join(', ') : null, v.specialty, v.contact_name, v.city ? 'based in ' + v.city : null].filter(Boolean).map(esc).join(' · ');
   const rows = [
     ['Categories', v.categories.join(', ')], ['Specialty', v.specialty], ['Covers', v.areas.join(', ')],
@@ -338,7 +344,8 @@ function vendorHtml(v, review) {
   );
   const body = open ? `<dl class="v-body">${rows.filter(r => r[1]).map(([k, val]) =>
       `<dt>${k}</dt><dd>${k === 'Website' ? val : esc(val)}</dd>`).join('')}
-      ${review ? `<div class="row-acts">${reviewActs(v)}</div>` : ''}</dl>` : '';
+      ${review ? `<div class="row-acts">${reviewActs(v)}</div>`
+        : canEdit(v) ? `<div class="row-acts"><button class="btn" onclick="editVendor(${v.id}, ${esc(JSON.stringify(where))})">Edit</button></div>` : ''}</dl>` : '';
   const dupe = review && v.status === 'pending' ? dupeNote(v) : '';
   return `<div class="vendor" ${review ? `id="r-${v.id}"` : `data-v="${v.id}"`}>
     <div class="v-head">
@@ -351,13 +358,13 @@ function vendorHtml(v, review) {
         ? `<button class="btn green" onclick="review(${v.id},'approve')">Approve</button><button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`
         : actionsHtml(v)}</div>
     </div>
-    ${review && S.editing === v.id ? `<div style="padding:0 14px 14px">${formHtml(v)}</div>` : body}
+    ${S.editing === v.id && S.editingIn === where ? `<div style="padding:0 14px 14px">${formHtml(v)}</div>` : body}
   </div>`;
 }
 
 function toggle(id) {
   S.open.has(id) ? S.open.delete(id) : S.open.add(id);
-  if (S.editing === id) S.editing = null;
+  if (S.editing === id) S.editing = S.editingIn = null;
   renderBrowse(); if (S.all) renderReview();
 }
 
@@ -373,7 +380,7 @@ function dupeNote(v) {
 }
 
 function reviewActs(v) {
-  const b = [`<button class="btn" onclick="editVendor(${v.id})">Edit</button>`];
+  const b = [`<button class="btn" onclick="editVendor(${v.id}, 'review')">Edit</button>`];
   if (v.status === 'pending') b.unshift(`<button class="btn green" onclick="review(${v.id},'approve')">Approve</button>`, `<button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`);
   if (v.status === 'approved') b.push(`<button class="btn" onclick="review(${v.id},'verify')" title="Still in business and the details are right">Mark verified</button>`, `<button class="btn danger" onclick="review(${v.id},'archive')">Archive</button>`);
   if (v.status === 'rejected' || v.status === 'archived') b.push(`<button class="btn" onclick="review(${v.id},'reopen')">Back to review</button>`);
@@ -391,7 +398,7 @@ function renderReview() {
   document.getElementById('rlist').innerHTML = list.length
     ? `<p class="note">${list.length} vendor${list.length === 1 ? '' : 's'}. Open one to see everything and edit it.</p>` + list.map(v => vendorHtml(v, true)).join('')
     : `<div class="empty">${status === 'pending' ? 'Nothing waiting for review.' : 'None.'}</div>`;
-  if (S.editing) bindForm(document.querySelector(`#r-${S.editing} form`), S.all.find(v => v.id === S.editing));
+  if (S.editingIn === 'review') bindForm(document.querySelector(`#r-${S.editing} form`), S.all.find(v => v.id === S.editing));
 }
 
 async function review(id, action) {
@@ -407,7 +414,10 @@ async function review(id, action) {
   } catch (e) { toast(e.message, true); }
 }
 
-function editVendor(id) { S.editing = id; S.open.add(id); renderReview(); }
+function editVendor(id, where) {
+  S.editing = id; S.editingIn = where; S.open.add(id);
+  renderBrowse(); renderReview();
+}
 
 function replace(v) {
   if (S.all) { const i = S.all.findIndex(x => x.id === v.id); i >= 0 ? S.all[i] = v : S.all.push(v); }
@@ -530,7 +540,7 @@ function bindForm(form, v) {
     } catch (e) { toast(e.message, true); }
   });
 
-  form.querySelector('[data-cancel]')?.addEventListener('click', () => { S.editing = null; renderReview(); });
+  form.querySelector('[data-cancel]')?.addEventListener('click', () => { S.editing = S.editingIn = null; renderBrowse(); renderReview(); });
 
   form.onsubmit = async ev => {
     ev.preventDefault();
@@ -548,7 +558,7 @@ function bindForm(form, v) {
       const saved = v
         ? await Auth.api(`/vendors/${v.id}`, { method: 'PUT', body })
         : await Auth.api('/vendors', { body });
-      if (v) { S.editing = null; replace(saved); toast('Saved.'); }
+      if (v) { S.editing = S.editingIn = null; replace(saved); toast('Saved.'); }
       else {
         resetAddForm();
         replace(saved);
