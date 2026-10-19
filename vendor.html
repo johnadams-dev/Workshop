@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Vendor List — Adams, Cameron &amp; Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+/* The vendor's own page: opened from the welcome or renewal email
+   (vendor.html?t=<token>). The vendor confirms their details and accepts the
+   vendor agreement, or asks to be removed. No staff sign-in. ?preview=1
+   shows it with a sample vendor and saves nothing (linked from the Vendor
+   Directory's Review tab). Backed by server/vendor-routes.js: GET /vendors/self,
+   POST /vendors/self, GET /vendors/agreement, GET /vendors/lists.
+   Rules: server/docs/business-rules.md, "Vendor agreement and annual renewal". */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --green-lt:#E3F5EC;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 16px; }
+header .in { max-width: 760px; margin: 0 auto; }
+header .brand { font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: #d6e2ef; }
+header h1 { margin: 2px 0 0; font-size: 1.25rem; }
+main { max-width: 760px; margin: 0 auto; padding: 18px 16px 56px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.card h2 { margin: 0 0 4px; font-size: 1.05rem; color: var(--navy); }
+.card > p:first-of-type { margin-top: 4px; }
+.banner { border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: .9rem; }
+.banner.gold { background: var(--gold-lt); border: 1px solid var(--gold); color: #5c4a12; }
+.banner.green { background: var(--green-lt); border: 1px solid var(--green); color: #14532d; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; margin-top: 12px; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; font-weight: 600; }
+label.f .hint { font-weight: 400; color: var(--muted); }
+input[type=text], input[type=tel], input[type=email], textarea { padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; width: 100%; background: #fff; }
+textarea { min-height: 60px; resize: vertical; }
+.wide { grid-column: 1 / -1; }
+fieldset { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 0; min-width: 0; }
+legend { font-size: .85rem; font-weight: 600; padding: 0 4px; }
+legend .hint { font-weight: 400; color: var(--muted); }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 12px; }
+.checks.scroll { max-height: 240px; overflow-y: auto; }
+.checks label, .county > label { display: flex; align-items: center; gap: 6px; font-size: .9rem; padding: 2px 0; }
+.county { margin-bottom: 8px; }
+.county > label { font-weight: 600; }
+.county .checks { margin-left: 22px; }
+.county.all .checks { opacity: .45; }
+ol.agreement { margin: 10px 0 0; padding-left: 22px; }
+ol.agreement li { margin-bottom: 10px; }
+ol.agreement strong { display: block; }
+.accept { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+.accept .tick { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; }
+.accept .tick input { margin-top: 4px; }
+.acts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn { border: 1px solid var(--navy); background: var(--navy); color: #fff; border-radius: 8px; padding: 11px 20px; font: inherit; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .55; cursor: default; }
+.link-btn { background: none; border: none; color: var(--red); font: inherit; font-size: .9rem; text-decoration: underline; cursor: pointer; padding: 6px 0; }
+.btn:focus-visible, .link-btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.msg { text-align: center; color: var(--muted); padding: 40px 12px; }
+.err { color: var(--red); font-size: .9rem; min-height: 1.2em; }
+footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 16px 24px; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <div class="brand">Adams, Cameron &amp; Co. Realtors</div>
+  <h1>Vendor List</h1>
+</div></header>
+
+<main id="main"><div class="msg">Loading…</div></main>
+<footer>Questions? Reply to the email that brought you here.</footer>
+
+<script>
+const API = 'https://mls-proxy-975684028597.us-east1.run.app/vendors';
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('t');
+const PREVIEW = params.has('preview');
+const S = { vendor: null, purpose: null, agreement: null, cats: [], areas: [] };
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+const main = document.getElementById('main');
+
+async function api(path, body) {
+  const r = await fetch(API + path, body
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Something went wrong. Please try again.');
+  return j;
+}
+
+// What the preview shows in place of a real vendor.
+const SAMPLE = {
+  name: 'Sample Plumbing Co.', contact_name: 'Pat Sample', specialty: 'Repairs, water heaters, repiping',
+  phone: '(386) 555-0100', cell: '(386) 555-0101', email: 'pat@sampleplumbing.com', website: 'https://sampleplumbing.com',
+  google_url: '', address: '100 Main St\nDeLand, FL 32720', city: 'DeLand', category_ids: [], areas: ['All of Volusia County'],
+  agreement_current: false,
+};
+
+(async function start() {
+  try {
+    const lists = await api('/lists');
+    S.cats = lists.categories; S.areas = lists.areas;
+    if (PREVIEW) {
+      S.agreement = await api('/agreement');
+      const plumbing = S.cats.find(c => c.name === 'Plumbing');
+      S.vendor = { ...SAMPLE, category_ids: plumbing ? [plumbing.id] : [] };
+      S.purpose = params.get('preview') === 'welcome' ? 'welcome' : 'renewal';
+    } else if (TOKEN) {
+      const r = await api('/self?t=' + encodeURIComponent(TOKEN));
+      S.vendor = r.vendor; S.purpose = r.purpose; S.agreement = r.agreement;
+    } else {
+      throw new Error("This page opens from the link in our email. Please use that link.");
+    }
+    render();
+  } catch (e) {
+    main.innerHTML = `<div class="card"><h2>We couldn't open your listing</h2><p>${esc(e.message)}</p>
+      <p>If your link has expired, reply to our email and we'll send you a new one.</p></div>`;
+  }
+})();
+
+function counties() { return [...new Set(S.areas.map(a => a.county))]; }
+
+function areaChecks(sel) {
+  return counties().map(county => {
+    const all = S.areas.find(a => a.is_county && a.county === county);
+    const cities = S.areas.filter(a => !a.is_county && a.county === county);
+    const whole = all && sel.has(all.name);
+    return `<div class="county ${whole ? 'all' : ''}">
+      ${all ? `<label><input type="checkbox" name="areas" value="${esc(all.name)}" data-county-all ${whole ? 'checked' : ''}>${esc(all.name)}</label>` : `<strong>${esc(county)} County</strong>`}
+      <div class="checks">${cities.map(a => `<label><input type="checkbox" name="areas" value="${esc(a.name)}" ${sel.has(a.name) ? 'checked' : ''} ${whole ? 'disabled' : ''}>${esc(a.name)}</label>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function render() {
+  const v = S.vendor, a = S.agreement;
+  const val = k => esc(v[k] ?? '');
+  const f = (k, label, type = 'text', hint = '') =>
+    `<label class="f">${label}${hint ? ` <span class="hint">${hint}</span>` : ''}<input type="${type}" name="${k}" value="${val(k)}"></label>`;
+  const cats = new Set(v.category_ids || []), areas = new Set(v.areas || []);
+  const intro = S.purpose === 'welcome'
+    ? `<h2>Congratulations, ${esc(v.name)}!</h2>
+       <p>You've been added to the Adams, Cameron &amp; Co. vendor list, which our agents and their customers use when they need a trusted vendor. Please check your details below and accept our vendor agreement to finish setting up your listing.</p>`
+    : `<h2>${esc(v.name)}</h2>
+       <p>You are on the Adams, Cameron &amp; Co. vendor list. We would like to keep you there, but we need to make sure the information is correct. Please check your details below and confirm.</p>`;
+
+  main.innerHTML = `
+    ${PREVIEW ? `<div class="banner gold"><strong>Preview.</strong> This is what a vendor sees after clicking the link in the ${S.purpose} email, shown with a sample vendor. Nothing here is saved.
+      <a href="?preview=${S.purpose === 'welcome' ? 'renewal' : 'welcome'}">Show the ${S.purpose === 'welcome' ? 'renewal' : 'welcome'} version</a>.</div>` : ''}
+    ${String(a.version).startsWith('draft') ? `<div class="banner gold"><strong>Draft agreement.</strong> The wording below is being reviewed and may change before vendors see it.</div>` : ''}
+    <div class="card">${intro}</div>
+
+    <form id="form" novalidate>
+      <div class="card">
+        <h2>Your details</h2>
+        <p class="hint" style="color:var(--muted);margin:0">This is what our agents and their customers will see.</p>
+        <div class="grid">
+          ${f('name', 'Business name *')}
+          ${f('contact_name', 'Contact person')}
+          ${f('phone', 'Phone', 'tel')}
+          ${f('cell', 'Cell', 'tel', 'for texts')}
+          ${f('email', 'Email', 'email')}
+          ${f('website', 'Website')}
+          <label class="f wide">What you do <span class="hint">e.g. repairs, water heaters, repiping</span><input type="text" name="specialty" value="${val('specialty')}"></label>
+          ${f('google_url', 'Google Business page', 'text', 'link to your Google reviews, if you have one')}
+          ${f('city', 'City your office is in')}
+          <label class="f wide">Address <span class="hint">optional</span><textarea name="address">${val('address')}</textarea></label>
+          <fieldset>
+            <legend>What you do * <span class="hint">tick every category that applies</span></legend>
+            <div class="checks scroll">${S.cats.map(c => `<label><input type="checkbox" name="category_ids" value="${c.id}" ${cats.has(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('')}</div>
+          </fieldset>
+          <fieldset>
+            <legend>Areas you serve * <span class="hint">a whole county, or the cities you serve</span></legend>
+            <div data-areas>${areaChecks(areas)}</div>
+          </fieldset>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Vendor agreement</h2>
+        <ol class="agreement">${a.sections.map(s => `<li><strong>${esc(s.title)}</strong>${esc(s.text)}</li>`).join('')}</ol>
+        <div class="accept">
+          ${v.agreement_current
+            ? `<div class="banner green" style="margin:0">You accepted this agreement on ${esc(fmtDate(v.agreement_accepted_at))}${v.agreement_accepted_name ? ` (${esc(v.agreement_accepted_name)})` : ''}.</div>`
+            : `<label class="tick"><input type="checkbox" id="accept"> I have read and agree to the vendor agreement above, on behalf of this business.</label>
+               <label class="f" style="max-width:360px">Your full name *<input type="text" id="signer" autocomplete="name"></label>`}
+          <div class="err" id="err" role="alert"></div>
+          <div class="acts">
+            <button class="btn" type="submit">Keep me on the list</button>
+            <button class="link-btn" type="button" id="removeBtn">Remove me from the list</button>
+          </div>
+        </div>
+      </div>
+    </form>`;
+
+  const form = document.getElementById('form');
+  form.querySelector('[data-areas]').addEventListener('change', ev => {
+    if (!ev.target.matches('[data-county-all]')) return;
+    const box = ev.target.closest('.county');
+    box.classList.toggle('all', ev.target.checked);
+    box.querySelectorAll('.checks input').forEach(i => i.disabled = ev.target.checked);
+  });
+  form.onsubmit = ev => { ev.preventDefault(); keep(form); };
+  document.getElementById('removeBtn').onclick = remove;
+}
+
+const showErr = m => { document.getElementById('err').textContent = m || ''; };
+
+async function keep(form) {
+  showErr('');
+  const checked = n => [...form.querySelectorAll(`[name="${n}"]:checked:not(:disabled)`)].map(x => x.value);
+  const fields = {};
+  for (const k of ['name', 'contact_name', 'phone', 'cell', 'email', 'website', 'specialty', 'google_url', 'city', 'address']) fields[k] = form.elements[k].value;
+  fields.category_ids = checked('category_ids').map(Number);
+  fields.areas = checked('areas');
+  if (!fields.name.trim()) return showErr('Please enter your business name.');
+  if (!fields.category_ids.length) return showErr('Please tick at least one category.');
+  if (!fields.areas.length) return showErr('Please tick at least one area you serve.');
+  const accept = document.getElementById('accept'), signer = document.getElementById('signer');
+  if (accept && (!accept.checked || !signer.value.trim())) return showErr('Please tick the box and type your name to accept the vendor agreement.');
+  if (PREVIEW) return done('Preview: in real use, the details and acceptance are saved here and John gets an email listing anything the vendor changed.');
+  const btn = form.querySelector('[type="submit"]'); btn.disabled = true;
+  try {
+    await api('/self', { t: TOKEN, action: 'keep', fields, accept: !!accept?.checked, signer_name: signer?.value || '' });
+    done(S.purpose === 'welcome'
+      ? "Thank you! Your listing is set up. We'll ask you to confirm your details once a year."
+      : "Thank you! Your details are confirmed and you'll stay on our vendor list. We'll check in again next year.");
+  } catch (e) { showErr(e.message); btn.disabled = false; }
+}
+
+async function remove() {
+  if (!confirm('Remove your business from the Adams, Cameron & Co. vendor list?')) return;
+  if (PREVIEW) return done('Preview: in real use, the vendor is archived here (no longer shown) and John gets an email.');
+  try {
+    await api('/self', { t: TOKEN, action: 'remove' });
+    done("You've been removed from our vendor list. If that was a mistake, just reply to our email.");
+  } catch (e) { showErr(e.message); }
+}
+
+function done(msg) {
+  main.innerHTML = `<div class="card"><h2>All set</h2><p>${esc(msg)}</p></div>`;
+  scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

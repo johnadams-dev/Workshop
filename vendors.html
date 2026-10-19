@@ -152,6 +152,7 @@ form.vform { background: var(--surface); border: 1px solid var(--border); border
       </select>
       <input type="search" id="rq" placeholder="Search…" aria-label="Search review list" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;flex:1 1 180px">
       <button class="btn" id="importBtn" title="Brings in rows from the AppSheet's Vendor List sheet that haven't been imported yet, as waiting for review">Import from AppSheet sheet</button>
+      <a class="btn" href="./vendor.html?preview=welcome" target="_blank" rel="noopener" style="text-decoration:none" title="The page vendors see from the welcome and renewal emails, with the vendor agreement">Preview vendor page</a>
     </div>
     <div id="rlist"></div>
   </section>
@@ -340,6 +341,9 @@ function vendorHtml(v, review, group) {
     ['Service area (AppSheet)', v.service_area],
     ['Added by', [v.submitted_by_email, fmtDate(v.submitted_at), v.source === 'appsheet' ? 'from AppSheet' : ''].filter(Boolean).join(' · ')],
     ['Last verified', fmtDate(v.last_verified_at) || 'Never'],
+    ['Vendor confirmed', fmtDate(v.confirmed_at) || 'Not yet'],
+    ['Agreement', v.agreement_accepted_at ? `Accepted ${fmtDate(v.agreement_accepted_at)} by ${v.agreement_accepted_name || '?'} (${v.agreement_version})` : 'Not accepted yet'],
+    ['Emails sent', [v.welcome_sent_at ? 'Welcome ' + fmtDate(v.welcome_sent_at) : '', v.renewal_sent_at ? 'Renewal ' + fmtDate(v.renewal_sent_at) : ''].filter(Boolean).join(' · ')],
     ['Review note', v.review_note],
   );
   const body = open ? `<dl class="v-body">${rows.filter(r => r[1]).map(([k, val]) =>
@@ -383,8 +387,21 @@ function reviewActs(v) {
   const b = [`<button class="btn" onclick="editVendor(${v.id}, 'review')">Edit</button>`];
   if (v.status === 'pending') b.unshift(`<button class="btn green" onclick="review(${v.id},'approve')">Approve</button>`, `<button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`);
   if (v.status === 'approved') b.push(`<button class="btn" onclick="review(${v.id},'verify')" title="Still in business and the details are right">Mark verified</button>`, `<button class="btn danger" onclick="review(${v.id},'archive')">Archive</button>`);
+  if (v.status === 'pending' || v.status === 'approved') b.push(
+    `<button class="btn" onclick="sendEmail(${v.id},'welcome')" title="Congratulations email with the link to confirm details and accept the agreement">Send welcome email</button>`,
+    `<button class="btn" onclick="sendEmail(${v.id},'renewal')" title="&quot;You are on the vendor list… please confirm your details&quot; with the link">Send renewal email</button>`);
   if (v.status === 'rejected' || v.status === 'archived') b.push(`<button class="btn" onclick="review(${v.id},'reopen')">Back to review</button>`);
   return b.join('');
+}
+
+async function sendEmail(id, purpose) {
+  const v = S.all.find(x => x.id === id);
+  if (!confirm(`Send the ${purpose} email for ${v.name}?\n\nWhile testing, vendor emails go to you instead of the vendor.`)) return;
+  try {
+    const r = await Auth.api(`/vendors/${id}/send`, { body: { purpose } });
+    replace(r.vendor);
+    toast(`${purpose === 'welcome' ? 'Welcome' : 'Renewal'} email sent to ${r.sentTo}${r.test ? ' (test)' : ''}.`);
+  } catch (e) { toast(e.message, true); }
 }
 
 function renderReview() {
@@ -408,9 +425,11 @@ async function review(id, action) {
     if (note === null) return;
   }
   try {
-    const v = await Auth.api(`/vendors/${id}/review`, { body: { action, note } });
+    const { welcome, ...v } = await Auth.api(`/vendors/${id}/review`, { body: { action, note } });
     replace(v);
-    toast({ approve: 'Approved — everyone can see it now.', reject: 'Rejected.', archive: 'Archived.', verify: 'Marked verified.', reopen: 'Back in the review queue.' }[action]);
+    if (welcome?.error) toast(`Approved, but the welcome email failed: ${welcome.error}`, true);
+    else toast(welcome ? `Approved — everyone can see it now. Welcome email sent to ${welcome.sentTo}${welcome.test ? ' (test)' : ''}.`
+      : { approve: 'Approved — everyone can see it now.', reject: 'Rejected.', archive: 'Archived.', verify: 'Marked verified.', reopen: 'Back in the review queue.' }[action]);
   } catch (e) { toast(e.message, true); }
 }
 
