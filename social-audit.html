@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;color:#1a1a2e;min-height:100vh}
@@ -171,7 +172,6 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
     <div class="auth-title">Online Presence Audit</div>
     <div class="auth-sub">Sign in with your Adams Cameron account to run an agent audit.</div>
     <div id="g-signin-btn"></div>
-    <div><button type="button" onclick="guestStartClick()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
   </div>
 </div>
 
@@ -357,46 +357,20 @@ body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#f5f3ee;
 </div>
 
 <script>
-const PROXY     = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY = Auth.API;
 const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
-
-let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
-if (!USER_EMAIL) {
-  // Also recognize a session from the separate Pathfinder-family pages
-  // (checkin.html, agent-dashboard.html, coach-dashboard.html, etc.), which
-  // store their own { email, name, picture, exp } blob under
-  // ac_pathfinder_session instead of the shared ac_user_email key — without
-  // this, being signed in there didn't count as signed in here, forcing a
-  // redundant Google sign-in even with an active, unexpired session.
-  try {
-    const s = JSON.parse(localStorage.getItem('ac_pathfinder_session') || 'null');
-    if (s && s.email && s.exp > Date.now()) {
-      USER_EMAIL = s.email;
-      localStorage.setItem('ac_user_email', USER_EMAIL);
-    }
-  } catch(_) {}
-}
+// OAUTH_CLIENT above is only for the Google Docs permission behind "Export to Google Doc".
+let USER_EMAIL = '';
 let currentAuditId = null;
 let pollTimer = null;
 let currentAgentId = null;
 let allAgents = [];
 let userRole = null; // 'manager' | 'staff' | 'agent' | 'unknown'
 
-// Guests (any Google account, Business Growth — guest-access.js on the
-// server) can run outside-agent audits only. Adams Cameron accounts keep the
-// shared ac_* keys.
-let GUEST_TOKEN = localStorage.getItem('ac_guest_token') || '';
-function guestPayload() {
-  try {
-    const b = GUEST_TOKEN.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
-    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
-    return p.exp > Date.now() ? p : null;
-  } catch(_) { return null; }
-}
-// Partner brokerage session (partner.html → partner-access.js): someone at
-// another brokerage we share this tool with. Used when there's no Adams
-// Cameron session; outside-agent audits only, branded for their company.
+// Invited outside users (partner.html → partner-access.js): their token under
+// ac_partner_token, used when this device has no staff session; outside-agent
+// audits only, branded for their organization. (The Brainstormers guest
+// sign-in was retired 2026-10-18.) Staff use the shared auth.js session.
 let PARTNER_TOKEN = localStorage.getItem('ac_partner_token') || '';
 function partnerProfile() {
   if (!PARTNER_TOKEN) return null;
@@ -408,13 +382,10 @@ function partnerProfile() {
     return prof ? { ...prof, email: p.email } : null;
   } catch(_) { return null; }
 }
-const isPartner = () => !(PROXY_KEY && USER_EMAIL) && !!partnerProfile();
-const isGuest = () => !(PROXY_KEY && USER_EMAIL) && (isPartner() || !!guestPayload());
+const isPartner = () => !Auth.hasSession && !!partnerProfile();
 const H = () => isPartner()
   ? { 'Content-Type':'application/json', 'x-partner-token': PARTNER_TOKEN }
-  : isGuest()
-  ? { 'Content-Type':'application/json', 'x-guest-token': GUEST_TOKEN }
-  : { 'Content-Type':'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL };
+  : Auth.headers();
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 function toast(msg, type) {
@@ -1066,75 +1037,7 @@ function exportDoc() {
   tokenClient.requestAccessToken();
 }
 
-// ── Sign-in ───────────────────────────────────────────────────────────────────
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than just decoding the JWT locally,
-// so the proxy key is only ever handed to a verified account instead of
-// being hardcoded in this page's source for anyone to read.
-async function handleCredential(cred) {
-  let credEmail = '';
-  try { credEmail = (JSON.parse(atob(cred.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || '').toLowerCase(); } catch(_) {}
-  if (credEmail && !credEmail.endsWith('@adamscameron.com')) {
-    // Guest: a session for the outside-agent audit only.
-    try {
-      const r = await fetch(`${PROXY}/guest/session`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: cred.credential, tool: 'social-audit' }),
-      });
-      const data = await r.json();
-      if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-      GUEST_TOKEN = data.guestToken;
-      localStorage.setItem('ac_guest_token', GUEST_TOKEN);
-    } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
-    startGuest();
-    return;
-  }
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast(data.error || 'Sign-in failed', 'err'); return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    USER_EMAIL = payload.email || '';
-    PROXY_KEY  = data.proxyKey || '';
-    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { toast('Sign-in failed: ' + e.message, 'err'); return; }
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('header-user').textContent = USER_EMAIL;
-  init();
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt(n => {
-    if (n.isNotDisplayed() || n.isSkippedMoment()) {
-      google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme:'outline', size:'large' });
-    }
-  });
-}
-
-// Guests see only the External Agent tab and their own audits.
-// No-login guest session (guest-access.js POST /guest/anonymous) — outside
-// visitors can't use our Google sign-in, which only accepts Adams Cameron
-// accounts. Keeps the same guest id when renewing an earlier session.
-async function continueAsGuest(tool) {
-  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
-  const d = await r.json();
-  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
-  localStorage.setItem('ac_guest_token', d.guestToken);
-  return d.guestToken;
-}
-async function guestStartClick() {
-  const t = await continueAsGuest('social-audit');
-  if (t) { GUEST_TOKEN = t; startGuest(); }
-}
-
+// ── Sign-in: staff through auth.js (see the end of this script); invited users through partner.html. ──
 function startPartner() {
   const p = partnerProfile();
   document.getElementById('auth-gate').style.display = 'none';
@@ -1157,20 +1060,6 @@ function startPartner() {
   document.getElementById('f-ext-city').placeholder = 'Ridgewood, NJ';
   document.getElementById('f-ext-brokerage').placeholder = p.partnerName;
   document.getElementById('export-btn').textContent = 'Print / Save as PDF';
-  setMode('external');
-  showView('list');
-  loadAuditList();
-}
-
-function startGuest() {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('header-user').textContent = guestPayload()?.anon ? 'Guest' : (guestPayload()?.email || '') + ' (guest)';
-  userRole = 'guest';
-  // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
-  document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
-  document.getElementById('tab-internal').style.display = 'none';
-  document.getElementById('tab-team').style.display = 'none';
   setMode('external');
   showView('list');
   loadAuditList();
@@ -1221,22 +1110,17 @@ function applyRoleRestrictions() {
 
 if (isPartner()) {
   startPartner();
-} else if (!(USER_EMAIL && PROXY_KEY) && localStorage.getItem('ac_partner_profile')) {
-  location.href = './partner.html';  // partner sign-in expired
-} else if (isGuest()) {
-  startGuest();
-} else if (USER_EMAIL && PROXY_KEY) {
-  document.getElementById('auth-gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('header-user').textContent = USER_EMAIL;
-  if (window.google?.accounts?.id) init();
-  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); init(); } }, 100); }
-} else if (window.google?.accounts?.id) {
-  initGoogleSignIn();
+} else if (!Auth.hasSession && localStorage.getItem('ac_partner_profile')) {
+  location.href = './partner.html';  // invited sign-in expired
 } else {
-  const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100);
+  Auth.ready({ tool: 'Online Audit', button: document.getElementById('g-signin-btn') }).then(user => {
+    USER_EMAIL = user.email;
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('header-user').textContent = USER_EMAIL;
+    init();
+  });
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Online Audit',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

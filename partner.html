@@ -3,15 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Recruiting & Presence Tools</title>
+<title>Your Tools</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <!--
-  Sign-in and landing page for partner brokerages — people at another
-  company we share the Online Presence Audit and Recruiting Prep with
-  (partner-access.js on the server; first partner Terrie O'Connor Realtors,
-  2026-10-14). Not linked from index.html or brainstormers.html.
+  Sign-in and landing page for invited outside users — people outside
+  Adams Cameron we share selected tools with (partner-access.js on the
+  server; invited from Agent Records → Invited Users; first: Terrie O'Connor
+  Realtors, 2026-10-14). Shows a card for each tool on the person's
+  invitation (GET /partner/me → tools, from server/invite-tools.js).
+  Not linked from index.html.
 
   Sign-in is an emailed, single-use link (POST /partner/request-link →
   ?code= → POST /partner/redeem) because our Google sign-in only accepts
@@ -69,8 +71,8 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
 <section class="hero">
   <div class="hero-inner">
     <div class="logo-chip" id="logo" hidden><img id="logo-img" alt="" onerror="document.getElementById('logo').hidden = true"></div>
-    <h1 id="hero-title">Recruiting &amp; Online Presence Tools</h1>
-    <p id="hero-sub">Prepare for recruiting conversations and audit any agent's online presence.</p>
+    <h1 id="hero-title">Your Tools</h1>
+    <p id="hero-sub">Tools shared with you by Adams, Cameron &amp; Co.</p>
     <div class="signed" id="signed" hidden></div>
   </div>
 </section>
@@ -87,36 +89,13 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16
   </section>
 
   <div id="tools" hidden>
-    <div class="cards">
-      <a class="card" href="./recruit-prep.html">
-        <div class="card-icon">🤝</div>
-        <h2>Recruiting Prep</h2>
-        <p>Prepare for a recruiting conversation with an agent at another company.</p>
-        <ul>
-          <li>Talking points to open with</li>
-          <li>Pain and Pleasure: recent changes in their work and life</li>
-          <li>Production from public profiles, or from a Courted export you upload</li>
-          <li>Discovery questions, objections, the services that fit them, and a follow-up email</li>
-        </ul>
-        <span class="card-go">Open Recruiting Prep →</span>
-      </a>
-      <a class="card" href="./social-audit.html">
-        <div class="card-icon">🔎</div>
-        <h2>Online Presence Audit</h2>
-        <p>Score an agent's online presence: social media, reviews, platform profiles, local SEO, AI search visibility, brand consistency and compliance. Every finding links to its source.</p>
-        <ul>
-          <li>Category scores and red flags</li>
-          <li>Top 5 actions ranked by impact</li>
-        </ul>
-        <span class="card-go">Open the audit →</span>
-      </a>
-    </div>
+    <div class="cards" id="cards"></div>
     <div class="note">
       <h2>Good to know</h2>
       <ul>
-        <li>Your briefings and audits are private to you. John Adams can see them only to keep the tools running well.</li>
+        <li>What you create (briefings, audits, tours) is private to you. John Adams can see it only to keep the tools running well.</li>
         <li>Everything comes from public information, plus anything you choose to add. Your personal notes and screenshots are never shown to anyone else, and files aren't saved.</li>
-        <li>In Recruiting Prep you can edit the list of what your company offers. The briefing claims only what's on that list.</li>
+        <li id="note-recruit" hidden>In Recruiting Prep you can edit the list of what your company offers. The briefing claims only what's on that list.</li>
         <li>This device stays signed in for 30 days.</li>
       </ul>
     </div>
@@ -145,13 +124,14 @@ function saveProfile(who) {
   const p = who.partner || {};
   store.set('ac_partner_profile', JSON.stringify({
     name: who.name, partnerName: p.name, shortName: p.shortName, state: p.state, logoUrl: p.logoUrl,
+    tools: who.tools || [],
   }));
 }
 
 function showBrand(prof) {
   if (!prof) return;
   if (prof.logoUrl) { $('logo-img').src = prof.logoUrl; $('logo-img').alt = prof.partnerName || ''; $('logo').hidden = false; }
-  if (prof.partnerName) document.title = `${prof.partnerName} — Recruiting & Presence Tools`;
+  if (prof.partnerName) { document.title = `${prof.partnerName} — Your Tools`; $('hero-title').textContent = `${prof.partnerName} Tools`; }
 }
 
 function showSignIn(message, isErr) {
@@ -159,8 +139,20 @@ function showSignIn(message, isErr) {
   if (message) { $('signin-msg').textContent = message; $('signin-msg').classList.toggle('err', !!isErr); }
 }
 
+function renderCards(tools) {
+  $('cards').innerHTML = (tools || []).map(t => `
+      <a class="card" href="./${esc(t.page)}">
+        <div class="card-icon">${esc(t.icon || '')}</div>
+        <h2>${esc(t.name)}</h2>
+        <p>${esc(t.description || '')}</p>
+        <span class="card-go">Open ${esc(t.name)} →</span>
+      </a>`).join('') || '<p class="msg">No tools are on your invitation right now.</p>';
+  $('note-recruit').hidden = !(tools || []).some(t => t.key === 'recruit-prep');
+}
+
 function showTools(prof) {
   showBrand(prof);
+  renderCards(prof.tools);
   $('signin').hidden = true; $('tools').hidden = false; $('signed').hidden = false;
   $('signed').innerHTML = `Signed in as ${esc(prof.name || '')}<button type="button" onclick="signOut()">Sign out</button>`;
 }

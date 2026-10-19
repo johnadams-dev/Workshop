@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c; --gold-soft: rgba(201,168,76,.12);
@@ -172,7 +173,6 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
     <h1>Recruiting Prep</h1>
     <p>Prepare for a recruiting conversation: talking points, recent changes in the agent's work and life, production over time, and what we'd offer them.</p>
     <div id="g-signin-btn" style="display:inline-block"></div>
-    <div><button type="button" onclick="guestStart()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
     <div><a href="./index.html">← Back to John's Workshop</a></div>
   </div>
 </div>
@@ -274,19 +274,13 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
 <div id="toast"></div>
 
 <script>
-const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
-const GOOGLE_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY = Auth.API;
 
-// ── Sign-in: Adams Cameron accounts use the shared ac_* keys like every
-// tool; any other Google account gets a guest session (guest-access.js on
-// the server), kept under ac_guest_token, that only works for the Business
-// Growth tools. ─────────────────────────────────────────────────────────
-let userEmail  = localStorage.getItem('ac_user_email') || '';
-let proxyKey   = localStorage.getItem('ac_proxy_key') || '';
-let guestToken = localStorage.getItem('ac_guest_token') || '';
-// Partner brokerage session (partner.html → partner-access.js): a person at
-// another brokerage we share these tools with. Used when there's no Adams
-// Cameron session; the page then speaks for their brokerage.
+// ── Sign-in. Adams Cameron staff: the shared auth.js session. Invited
+// outside users (partner.html → partner-access.js): their own token under
+// ac_partner_token, used when this device has no staff session — the page
+// then speaks for their organization. (The Brainstormers guest sign-in was
+// retired 2026-10-18.) ────────────────────────────────────────────────────
 let partnerToken = localStorage.getItem('ac_partner_token') || '';
 function partnerProfile() {
   if (!partnerToken) return null;
@@ -299,79 +293,19 @@ function partnerProfile() {
   } catch { return null; }
 }
 
-function guestPayload() {
-  try {
-    const b = guestToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
-    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
-    return p.exp > Date.now() ? p : null;
-  } catch { return null; }
-}
-const isAcc = () => !!(proxyKey && userEmail);
-const isPartner = () => !isAcc() && !!partnerProfile();
-const session = () => isAcc() ? { kind: 'acc', email: userEmail }
-  : isPartner() ? { kind: 'partner', email: partnerProfile().email }
-  : (guestPayload() ? { kind: 'guest', email: guestPayload().email } : null);
-const authHeaders = () => isAcc() ? { 'x-proxy-key': proxyKey, 'x-user-email': userEmail }
-  : isPartner() ? { 'x-partner-token': partnerToken } : { 'x-guest-token': guestToken };
+const isAcc = () => !!Auth.user;
+const isPartner = () => !Auth.hasSession && !!partnerProfile();
+const session = () => isAcc() ? { kind: 'acc', email: Auth.email }
+  : isPartner() ? { kind: 'partner', email: partnerProfile().email } : null;
+const authHeaders = () => isAcc() ? Auth.headers() : { 'x-partner-token': partnerToken };
 
-window.addEventListener('load', () => {
-  if (isPartner()) return;
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
-  if (!session()) google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  let email = '';
-  try { email = (JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || '').toLowerCase(); } catch {}
-  try {
-    if (email.endsWith('@adamscameron.com')) {
-      const r = await fetch(`${PROXY}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
-      proxyKey = d.proxyKey || ''; userEmail = email;
-      localStorage.setItem('ac_proxy_key', proxyKey);
-      localStorage.setItem('ac_user_email', userEmail);
-    } else {
-      const r = await fetch(`${PROXY}/guest/session`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: response.credential, tool: 'recruit-prep' }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Sign-in failed');
-      guestToken = d.guestToken;
-      localStorage.setItem('ac_guest_token', guestToken);
-    }
-    start();
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-// No-login guest session (guest-access.js POST /guest/anonymous) — outside
-// visitors can't use our Google sign-in, which only accepts Adams Cameron
-// accounts. Keeps the same guest id when renewing an earlier session.
-async function continueAsGuest(tool) {
-  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
-  const d = await r.json();
-  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
-  localStorage.setItem('ac_guest_token', d.guestToken);
-  return d.guestToken;
-}
-async function guestStart() {
-  const t = await continueAsGuest('recruit-prep');
-  if (t) { guestToken = t; start(); }
-}
-
-function signOut() {
+async function signOut() {
   if (isPartner()) {
     localStorage.removeItem('ac_partner_token'); localStorage.removeItem('ac_partner_profile');
     location.href = './partner.html';
     return;
   }
-  if (isAcc()) {
-    localStorage.removeItem('ac_proxy_key'); localStorage.removeItem('ac_user_email');
-  }
-  localStorage.removeItem('ac_guest_token');
-  try { google.accounts.id.disableAutoSelect(); } catch {}
+  await Auth.signOut();
   location.reload();
 }
 
@@ -379,7 +313,6 @@ async function api(path, opts = {}) {
   const res = await fetch(PROXY + path, { ...opts, headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) } });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && isPartner()) { localStorage.removeItem('ac_partner_token'); location.href = './partner.html'; }
-  else if (res.status === 401 && !isAcc()) { localStorage.removeItem('ac_guest_token'); guestToken = ''; }
   if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { data });
   return data;
 }
@@ -389,10 +322,7 @@ function start() {
   if (!s) return;
   document.getElementById('auth-gate').style.display = 'none';
   if (s.kind === 'partner') applyPartner(partnerProfile());
-  // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
-  if (s.kind === 'guest') document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
-  if (s.kind === 'partner') document.getElementById('who').textContent = partnerProfile().name || s.email;
-  else document.getElementById('who').innerHTML = (s.kind === 'guest' && guestPayload()?.anon ? '' : esc(s.email) + ' ') + (s.kind === 'guest' ? '<span class="guest-pill">Guest</span>' : '');
+  document.getElementById('who').textContent = s.kind === 'partner' ? (partnerProfile().name || s.email) : s.email;
   loadHistory();
   loadSettings();
   const id = new URLSearchParams(location.search).get('id');
@@ -885,9 +815,9 @@ async function saveSettings() {
   } catch (e) { st.textContent = e.message; }
 }
 
-if (session()) start();
-else if (localStorage.getItem('ac_partner_profile')) location.href = './partner.html';  // partner sign-in expired
+if (isPartner()) start();
+else if (!Auth.hasSession && localStorage.getItem('ac_partner_profile')) location.href = './partner.html';  // invited sign-in expired
+else Auth.ready({ tool: 'Recruiting Prep', button: document.getElementById('g-signin-btn') }).then(start);
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Recruiting Prep',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

@@ -16,6 +16,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 
 <style>
 :root {
@@ -207,7 +208,6 @@ header {
   <div class="box">
     <h1>Cameron's <span style="color:var(--gold)">Stage</span></h1>
     <div id="g-signin-btn" style="display:flex;justify-content:center;"></div>
-    <div><button type="button" onclick="guestStartClick()" style="margin-top:14px;font:inherit;font-size:13px;background:transparent;color:inherit;border:1px solid rgba(250,248,243,.4);border-radius:8px;padding:8px 14px;cursor:pointer">Not with Adams Cameron? Continue as a guest</button></div>
     <a href="./index.html">← Tools</a>
   </div>
 </div>
@@ -367,96 +367,32 @@ header {
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG / AUTH
 ═══════════════════════════════════════════════════════════════════ */
-const PROXY = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY = Auth.API;
 
-let userEmail = localStorage.getItem('ac_user_email') || "";
-let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
-// Guests (any Google account, Business Growth — guest-access.js on the
-// server) can build tours for outside listings, saved under their own email.
-// Their session lives under ac_guest_token, never the shared ac_* keys.
-let guestToken = localStorage.getItem('ac_guest_token') || "";
-function guestPayload() {
+// Staff (managers and admins) use the shared auth.js session. Invited outside
+// users (partner.html → partner-access.js) use their own token under
+// ac_partner_token when this device has no staff session; the server limits
+// them to the outside-listing routes and saves their tours under their own
+// email. (The Brainstormers guest sign-in was retired 2026-10-18.)
+let partnerToken = localStorage.getItem('ac_partner_token') || "";
+function partnerProfile() {
+  if (!partnerToken) return null;
   try {
-    const b = guestToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+    const b = partnerToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
     const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
-    return p.exp > Date.now() ? p : null;
+    if (!(p.exp > Date.now())) return null;
+    const prof = JSON.parse(localStorage.getItem('ac_partner_profile') || 'null');
+    return prof ? { ...prof, email: p.email } : null;
   } catch { return null; }
 }
-const isGuest = () => !(proxyKey && userEmail) && !!guestPayload();
-
-if ((proxyKey && userEmail) || isGuest()) {
-  document.getElementById('auth-gate').style.display = 'none';
-  window.addEventListener('load', boot);
-}
-
-window.addEventListener('load', () => {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleSignIn, auto_select: true, cancel_on_tap_outside: false });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large', width: 280, text: 'signin_with' });
-  if (!(proxyKey && userEmail) && !isGuest()) google.accounts.id.prompt();
-});
-
-// No-login guest session (guest-access.js POST /guest/anonymous) — outside
-// visitors can't use our Google sign-in, which only accepts Adams Cameron
-// accounts. Keeps the same guest id when renewing an earlier session.
-async function continueAsGuest(tool) {
-  const r = await fetch(PROXY + '/guest/anonymous', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tool, previousToken: localStorage.getItem('ac_guest_token') || undefined }) });
-  const d = await r.json();
-  if (!r.ok) { alert(d.error || 'Guest access is unavailable right now.'); return false; }
-  localStorage.setItem('ac_guest_token', d.guestToken);
-  return d.guestToken;
-}
-async function guestStartClick() {
-  const t = await continueAsGuest('camerons-stage-external');
-  if (t) { guestToken = t; document.getElementById('auth-gate').style.display = 'none'; await boot(); }
-}
-
-async function handleGoogleSignIn(response) {
-  let email = "";
-  try { email = (JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || "").toLowerCase(); } catch {}
-
-  if (email && !email.endsWith('@adamscameron.com')) {
-    try {
-      const r = await fetch(`${PROXY}/guest/session`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: response.credential, tool: 'camerons-stage-external' }),
-      });
-      const data = await r.json();
-      if (!r.ok) { alert(data.error || 'Sign-in failed.'); return; }
-      guestToken = data.guestToken;
-      localStorage.setItem('ac_guest_token', guestToken);
-      document.getElementById('auth-gate').style.display = 'none';
-      await boot();
-    } catch (e) {
-      alert('Authentication error: ' + e.message);
-    }
-    return;
-  }
-
-  userEmail = email;
-  localStorage.setItem('ac_user_email', userEmail);
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { alert(data.error || 'Sign-in failed. Use your @adamscameron.com account.'); return; }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
-    document.getElementById('auth-gate').style.display = 'none';
-    await boot();
-  } catch (e) {
-    alert('Authentication error: ' + e.message);
-  }
-}
+const isPartner = () => !Auth.hasSession && !!partnerProfile();
 
 async function api(path, opts = {}) {
-  const auth = isGuest() ? { 'x-guest-token': guestToken } : { 'x-proxy-key': proxyKey, 'x-user-email': userEmail };
+  const auth = isPartner() ? { 'x-partner-token': partnerToken } : Auth.headers();
   const headers = { 'Content-Type': 'application/json', ...auth, ...(opts.headers || {}) };
   const res = await fetch(PROXY + path, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && isPartner()) { localStorage.removeItem('ac_partner_token'); location.href = './partner.html'; }
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
@@ -470,14 +406,22 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2600);
 }
 
+// Start-up: invited user, expired invited sign-in, or staff sign-in (auth.js).
+window.addEventListener('load', () => {
+  if (isPartner()) { document.getElementById('auth-gate').style.display = 'none'; boot(); return; }
+  if (!Auth.hasSession && localStorage.getItem('ac_partner_profile')) { location.href = './partner.html'; return; }
+  Auth.ready({ tool: "Cameron's Stage — Outside Listings", button: document.getElementById('g-signin-btn') })
+    .then(() => { document.getElementById('auth-gate').style.display = 'none'; boot(); });
+});
+
 /* ═══════════════════════════════════════════════════════════════════
    ROLE GATE — manager/admin only
 ═══════════════════════════════════════════════════════════════════ */
 async function boot() {
-  if (isGuest()) {
-    // The server limits guests to the outside-listing endpoints.
-    // Guests came from brainstormers.html — send "← Tools" back there, not to the agent Tools page.
-    document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './brainstormers.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Brainstormers'); }); });
+  if (isPartner()) {
+    // The server limits invited users to the outside-listing routes; their
+    // "← Tools" goes back to their own landing page.
+    document.querySelectorAll('a[href="./index.html"], a[href="index.html"]').forEach(a => { a.href = './partner.html'; a.childNodes.forEach(n => { if (n.nodeType === 3) n.textContent = n.textContent.replace(/Tools|Back to John's Workshop/, 'Your tools'); }); });
     document.getElementById('app').style.display = 'block';
     init();
     return;
@@ -848,6 +792,5 @@ function copyUrl(id) {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:"Cameron's Stage — Outside Listings",email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

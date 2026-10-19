@@ -14,208 +14,34 @@
 <title>Brainstormers — John's Workshop</title>
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
 <!--
-  Guest landing page for the Brainstormers group (October 2026). It is the
-  ONLY place outside guests are pointed to: the same three tools are
-  manager-only on index.html. No sign-in: opening this page starts a guest
-  session (POST /guest/anonymous — guest-access.js on the server; runs are
-  logged and capped per connection; ends after
-  system_config.guest_access_until), kept under ac_guest_token so the tool
-  pages open without asking. Our Google sign-in only accepts Adams Cameron
-  accounts, so outside visitors couldn't use it anyway.
+  The Brainstormers guest preview (2026-10-08, any visitor could try the
+  Business Growth tools) ended 2026-10-17 (John Adams, 2026-10-18). This page
+  stays so the shared johnadams.org/brainstormers link explains that, and
+  points invited people to their sign-in page (partner.html). Outside access
+  is now by invitation: Agent Records → Invited Users.
 -->
 <style>
-:root {
-  --ink: #1a1a2e; --ink-soft: #2d2d4a; --gold: #c9a84c; --gold-soft: rgba(201,168,76,.14);
-  --cream: #faf8f3; --cream-dark: #f0ece0; --slate: #5a5a78; --muted: #8a8aa8;
-  --border: rgba(26,26,46,.10); --shadow: 0 2px 20px rgba(26,26,46,.08); --shadow-hover: 0 10px 34px rgba(26,26,46,.15);
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.6; font-size: 15px; }
-h1, h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; text-wrap: balance; }
-
-.hero { background: var(--ink); color: var(--cream); padding: 56px 16px 64px; text-align: center; }
-.hero-inner { max-width: 760px; margin: 0 auto; }
-.eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
-.hero h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05; margin-bottom: 14px; }
-.hero p { color: rgba(250,248,243,.78); max-width: 600px; margin: 0 auto; }
-.signin { margin-top: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.signed { font-size: 14px; color: rgba(250,248,243,.85); }
-.signed button { background: none; border: none; color: var(--gold); font: inherit; cursor: pointer; text-decoration: underline; margin-left: 6px; }
-
-main { max-width: 1040px; margin: -32px auto 0; padding: 0 16px 56px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
-.card { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 24px 22px 22px; display: flex; flex-direction: column; gap: 10px; text-decoration: none; color: inherit; transition: box-shadow .2s, transform .2s; min-width: 0; }
-.card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
-.card-icon { font-size: 28px; }
-.card h2 { font-size: 1.55rem; line-height: 1.15; }
-.card p { color: var(--slate); font-size: 14px; }
-.card ul { padding-left: 18px; color: var(--ink-soft); font-size: 13px; }
-.card ul li { margin: 3px 0; }
-.card-go { margin-top: auto; font-weight: 600; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; padding-top: 6px; }
-.card.locked { pointer-events: none; opacity: .55; }
-
-.whoami { background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 18px; }
-.whoami h2 { font-size: 1.35rem; margin-bottom: 2px; }
-.whoami p { font-size: 13px; color: var(--slate); margin-bottom: 10px; }
-.whoami form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.whoami label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--slate); flex: 1 1 200px; min-width: 0; }
-.whoami input { font: inherit; font-weight: 400; padding: 9px 11px; border: 1px solid rgba(26,26,46,.16); border-radius: 8px; width: 100%; }
-.whoami button { font: inherit; font-weight: 600; border-radius: 8px; padding: 9px 16px; border: none; cursor: pointer; }
-.whoami .save { background: var(--gold); color: var(--ink); }
-.whoami .skip { background: transparent; color: var(--slate); text-decoration: underline; padding: 9px 4px; }
-.note { margin-top: 26px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; font-size: 13px; color: var(--slate); }
-.note h2 { font-size: 1.2rem; color: var(--ink); margin-bottom: 6px; }
-.note ul { padding-left: 18px; }
-footer { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 36px; }
+  :root { --ink: #1a1a2e; --gold: #c9a84c; --cream: #faf8f3; --slate: #5a5a78; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream); min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; padding: 24px 16px; line-height: 1.6; }
+  .box { max-width: 520px; text-align: center; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.1; margin-bottom: 14px; }
+  p { color: rgba(250,248,243,.8); margin-bottom: 14px; }
+  a.btn { display: inline-block; margin-top: 8px; background: var(--gold); color: var(--ink); font-weight: 600;
+          padding: 10px 20px; border-radius: 8px; text-decoration: none; }
+  .small { font-size: 13px; color: rgba(250,248,243,.6); margin-top: 22px; }
 </style>
 </head>
 <body>
-
-<section class="hero">
-  <div class="hero-inner">
-    <p class="eyebrow">Adams, Cameron &amp; Co. · Brainstormers</p>
-    <h1>Recruiting tools from John's Workshop</h1>
-    <p>Three tools we use to grow our company, open for you to try — no sign-in needed. What you create stays private to you on this device.</p>
-    <div class="signin">
-      <div class="signed" id="signed">Getting things ready…</div>
-    </div>
+  <div class="box">
+    <h1>The Brainstormers preview has ended</h1>
+    <p>Thanks to everyone who tried Recruiting Prep, the Online Presence Audit and Cameron's Stage during the preview.</p>
+    <p>If you've been invited to keep using the tools, sign in with your email:</p>
+    <a class="btn" href="./partner.html">Sign in to your tools</a>
+    <p class="small">Interested in access? Contact John Adams at Adams, Cameron &amp; Co.</p>
   </div>
-</section>
-
-<main>
-  <!-- Optional "who are you" — no sign-in, just so we know who tried the
-       tools. Sent with the guest session (POST /guest/anonymous name /
-       brokerage) and shown in the activity log; asked once per device. -->
-  <section class="whoami" id="whoami" hidden>
-    <h2>Who's visiting?</h2>
-    <p>Optional — it helps us follow up and see who found the tools useful.</p>
-    <form onsubmit="saveWho(event)">
-      <label>Your name <input type="text" id="who-name" autocomplete="name" maxlength="100"></label>
-      <label>Brokerage <input type="text" id="who-brokerage" autocomplete="organization" maxlength="100"></label>
-      <button class="save" type="submit">Save</button>
-      <button class="skip" type="button" onclick="skipWho()">Skip</button>
-    </form>
-  </section>
-
-  <div class="cards">
-    <a class="card locked" href="./recruit-prep.html">
-      <div class="card-icon">🤝</div>
-      <h2>Recruiting Prep</h2>
-      <p>Prepare for a recruiting conversation with an agent at another company.</p>
-      <ul>
-        <li>Talking points to open with</li>
-        <li>Pain and Pleasure: recent changes in their work and life</li>
-        <li>Production over time — MLS-verified in Stellar MLS, public-profile estimates elsewhere</li>
-        <li>Discovery questions, objections, a demo and a follow-up email</li>
-      </ul>
-      <span class="card-go">Open Recruiting Prep →</span>
-    </a>
-    <a class="card locked" href="./social-audit.html?mode=external">
-      <div class="card-icon">🔎</div>
-      <h2>Online Presence Audit</h2>
-      <p>Score an agent's online presence — social media, reviews, platform profiles, local SEO and AI search visibility — with every finding linked to its source.</p>
-      <ul>
-        <li>Category scores and red flags</li>
-        <li>Top 5 actions ranked by impact</li>
-      </ul>
-      <span class="card-go">Open the audit →</span>
-    </a>
-    <a class="card locked" href="./camerons-stage-external.html">
-      <div class="card-icon">🎬</div>
-      <h2>Cameron's Stage</h2>
-      <p>Build a branded virtual tour, with an AI-composed song, for any listing in Stellar or Daytona MLS — a link that can go in the MLS or on social media.</p>
-      <ul>
-        <li>Pick photos and a music style</li>
-        <li>Share the tour link</li>
-      </ul>
-      <span class="card-go">Open Cameron's Stage →</span>
-    </a>
-  </div>
-
-  <div class="note">
-    <h2>Good to know</h2>
-    <ul>
-      <li>Open through October 31, 2026.</li>
-      <li>Each connection can run 3 briefings, 3 audits and 3 tours a day.</li>
-      <li>We keep a record of what's run. Your briefings and audits are visible only to you (on this device) and to Adams, Cameron &amp; Co. managers.</li>
-      <li>Everything comes from public information, plus anything you choose to add.</li>
-    </ul>
-  </div>
-</main>
-
-<footer>Adams, Cameron &amp; Co., Realtors · John's Workshop</footer>
-
-<script>
-const PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
-
-let guestToken = localStorage.getItem('ac_guest_token') || '';
-const accSignedIn = !!(localStorage.getItem('ac_proxy_key') && localStorage.getItem('ac_user_email'));
-
-function guestPayload() {
-  try {
-    const b = guestToken.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
-    const p = JSON.parse(atob(b + '='.repeat((4 - b.length % 4) % 4)));
-    return p.exp > Date.now() ? p : null;
-  } catch { return null; }
-}
-
-function ready(text) {
-  document.getElementById('signed').textContent = text;
-  document.querySelectorAll('.card.locked').forEach(c => c.classList.remove('locked'));
-  const p = guestPayload();
-  let asked = false;
-  try { asked = localStorage.getItem('ac_guest_who_asked') === '1'; } catch {}
-  if (p && p.name && p.name !== 'Guest') {
-    document.getElementById('signed').textContent = `Welcome, ${p.name}.`;
-  } else if (!accSignedIn && !asked) {
-    document.getElementById('whoami').hidden = false;
-  }
-}
-
-async function saveWho(e) {
-  e.preventDefault();
-  const name = document.getElementById('who-name').value.trim();
-  const brokerage = document.getElementById('who-brokerage').value.trim();
-  if (!name && !brokerage) return skipWho();
-  try {
-    const r = await fetch(`${PROXY}/guest/anonymous`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool: 'brainstormers', previousToken: guestToken || undefined, name, brokerage }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Could not save');
-    guestToken = d.guestToken;
-    localStorage.setItem('ac_guest_token', guestToken);
-  } catch { /* optional — never block the tools on it */ }
-  skipWho();
-  if (name) document.getElementById('signed').textContent = `Welcome, ${name}.`;
-}
-
-function skipWho() {
-  try { localStorage.setItem('ac_guest_who_asked', '1'); } catch {}
-  document.getElementById('whoami').hidden = true;
-}
-
-// Adams Cameron staff already signed in use their own session; everyone
-// else gets a guest session, renewed when it's close to expiring.
-async function start() {
-  if (accSignedIn) return ready('Signed in with your Adams Cameron account.');
-  const p = guestPayload();
-  if (p && p.exp - Date.now() > 2 * 3600 * 1000) return ready("You're browsing as a guest.");
-  try {
-    const r = await fetch(`${PROXY}/guest/anonymous`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'brainstormers', previousToken: guestToken || undefined }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Guest access is unavailable right now.');
-    guestToken = d.guestToken;
-    localStorage.setItem('ac_guest_token', guestToken);
-    ready("You're browsing as a guest.");
-  } catch (e) {
-    document.getElementById('signed').textContent = e.message;
-  }
-}
-start();
-</script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Brainstormers',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

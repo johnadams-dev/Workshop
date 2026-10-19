@@ -210,6 +210,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="tab-btn" id="tab-partners" onclick="switchMode('partners')">Partners</button>
     <button class="tab-btn" id="tab-offices" onclick="switchMode('offices')">Offices</button>
     <button class="tab-btn" id="tab-tools" onclick="switchMode('tools')">Tools &amp; Links</button>
+    <button class="tab-btn" id="tab-invited" onclick="switchMode('invited')" style="display:none">Invited Users</button>
   </div>
   <div class="topbar-right">
     <a href="./feedback.html?tool=agent-master-form" style="font-size:12px;color:rgba(255,255,255,.5);text-decoration:none;letter-spacing:.03em">Feedback</a>
@@ -219,6 +220,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="btn btn-secondary btn-sm" id="add-staff-btn" onclick="openNewStaff()" style="display:none">+ Add Staff</button>
     <button class="btn btn-secondary btn-sm" id="add-partner-btn" onclick="openNewPartner()" style="display:none">+ Add Partner</button>
     <button class="btn btn-secondary btn-sm" id="add-tool-btn" onclick="openNewTool()" style="display:none">+ Add Resource</button>
+    <button class="btn btn-secondary btn-sm" id="add-invite-btn" onclick="openInvite()" style="display:none">+ Invite person</button>
+    <button class="btn btn-secondary btn-sm" id="add-org-btn" onclick="openOrg()" style="display:none">+ Organization</button>
     <button class="btn btn-secondary btn-sm" id="sync-pp-btn" onclick="syncProfitPowerIds()" style="display:none">Sync PP IDs</button>
     <button class="btn btn-secondary btn-sm" id="export-btn" onclick="exportCsv()">Export</button>
   </div>
@@ -579,6 +582,86 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Invited Users Panel (admins) — outside people invited to selected tools
+     (server: partner-access.js /partner/admin/*, tool list: invite-tools.js).
+     Sign-in is an emailed link to partner.html; usage comes from
+     guest_access_log. -->
+<div id="invited-panel" style="display:none;height:calc(100vh - 50px);overflow:auto;padding:24px 28px;background:var(--bg);box-sizing:border-box">
+  <div style="max-width:1000px;margin:0 auto">
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6">
+      People outside Adams Cameron you've invited to use selected tools. They sign in with an emailed link at
+      <b>johnadams.org/partner.html</b> and see only the tools ticked for them, branded for their organization, until the end date.
+      Turning someone off or signing them out takes effect within a minute.
+    </p>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">Invited people</div>
+      <div class="card-body" style="padding:0" id="invited-people">
+        <div style="padding:24px;text-align:center;color:var(--muted)"><div class="spin" style="width:22px;height:22px;border-width:3px;margin:0 auto 8px"></div>Loading…</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">Organizations</div>
+      <div class="card-body" style="padding:0" id="invited-orgs"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="invite-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-head"><span id="invite-modal-title">Invite person</span> <button onclick="closeInvite()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body">
+      <div class="fg">
+        <div class="field"><label>Name</label><input type="text" id="iv-name" placeholder="First Last"></div>
+        <div class="field"><label>Email</label><input type="email" id="iv-email" placeholder="name@company.com"></div>
+      </div>
+      <div class="field"><label>Organization</label><select id="iv-org"></select><span class="field-hint">Brands the tools (their company name, state and services). Add one with “+ Organization”.</span></div>
+      <div class="field"><label>Tools</label><div id="iv-tools" style="display:flex;flex-direction:column;gap:5px;padding-top:2px"></div></div>
+      <div class="fg">
+        <div class="field"><label>Access ends</label><input type="date" id="iv-expires"><span class="field-hint">Leave blank for ongoing access.</span></div>
+        <div class="field" style="display:flex;align-items:flex-end;padding-bottom:6px">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text)"><input type="checkbox" id="iv-active" checked> Access on</label>
+        </div>
+      </div>
+      <div class="field"><label>Note (staff only)</label><textarea id="iv-note" rows="2" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box" placeholder="Why they're invited, who asked…"></textarea></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="iv-send" checked> Email them a sign-in link now</label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeInvite()">Cancel</button>
+      <button class="btn btn-primary" id="iv-save-btn" onclick="saveInvite()">Invite</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="org-modal">
+  <div class="modal" style="width:620px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-head"><span id="org-modal-title">Add organization</span> <button onclick="closeOrg()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✕</button></div>
+    <div class="modal-body" style="overflow:auto">
+      <div class="fg">
+        <div class="field"><label>Name</label><input type="text" id="og-name" placeholder="Terrie O'Connor Realtors"></div>
+        <div class="field"><label>Short name</label><input type="text" id="og-short" placeholder="TOCR"></div>
+      </div>
+      <div class="fg">
+        <div class="field"><label>State</label><input type="text" id="og-state" placeholder="New Jersey"></div>
+        <div class="field"><label>Daily limit per person per tool</label><input type="number" id="og-cap" min="1" max="200" value="25"></div>
+      </div>
+      <div class="field"><label>Market area</label><input type="text" id="og-market" placeholder="Counties or cities they work in"></div>
+      <div class="field"><label>License lookup (for the audit's compliance check)</label><input type="text" id="og-license" placeholder="State real estate commission licensee search"></div>
+      <div class="field"><label>About (one line for the recruiting prompt)</label><input type="text" id="og-about"></div>
+      <div class="field"><label>“Why this company” points (they can edit these in Recruiting Prep)</label><textarea id="og-values" rows="5" style="width:100%;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box"></textarea></div>
+      <div class="field"><label>Services catalog (JSON list)</label><textarea id="og-catalog" rows="4" style="width:100%;font:12px/1.4 monospace;padding:8px 10px;border:1px solid var(--border);border-radius:7px;box-sizing:border-box" placeholder='[{"name": "...", "kind": "service", "description": "...", "tags": []}]'></textarea><span class="field-hint">What Recruiting Prep may recommend for them, in place of our Workshop catalog. Leave as [] if none.</span></div>
+      <div class="fg">
+        <div class="field"><label>Logo URL (white on transparent)</label><input type="text" id="og-logo" placeholder="https://…/logo.png"></div>
+        <div class="field"><label>Short code</label><input type="text" id="og-slug" placeholder="tocr"><span class="field-hint">Set from the name if blank.</span></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="og-active" checked> Active (turning it off stops everyone in it)</label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeOrg()">Cancel</button>
+      <button class="btn btn-primary" id="og-save-btn" onclick="saveOrg()">Add organization</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tools & Links edit modal -->
 <div class="modal-overlay" id="tool-modal">
   <div class="modal" style="max-width:600px;width:100%;max-height:92vh;display:flex;flex-direction:column">
@@ -692,8 +775,9 @@ async function load() {
     offices   = await officesRes.json();
     if (roleRes.ok) { const rd = await roleRes.json(); USER_ROLE = rd.role || null; }
 
-    // Show "+ Add Agent" only to admins
+    // Show "+ Add Agent" and the Invited Users tab only to admins
     document.getElementById('add-agent-btn').style.display = USER_ROLE === 'admin' ? '' : 'none';
+    document.getElementById('tab-invited').style.display = USER_ROLE === 'admin' ? '' : 'none';
     document.getElementById('sync-pp-btn').style.display = (USER_ROLE === 'admin' || USER_ROLE === 'sales_manager') ? '' : 'none';
 
     const sel = document.getElementById('na-office');
@@ -1976,6 +2060,186 @@ async function saveFoundationDonation(agentId, turningOff) {
   }
 }
 
+// ── Invited Users tab (admins) ───────────────────────────────────────────────
+// Outside people invited to selected tools: server partner-access.js
+// (/partner/admin/*), tool list from invite-tools.js, usage from
+// guest_access_log.
+let INV = { tools: [], organizations: [], people: [] }, editingInviteEmail = null, editingOrgId = null;
+
+async function loadInvited() {
+  try {
+    const r = await fetch(`${PROXY_URL}/partner/admin/overview`, { headers: H() });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    INV = d;
+    renderInvited();
+  } catch (e) {
+    document.getElementById('invited-people').innerHTML = `<div style="padding:24px;text-align:center;color:var(--muted)">Couldn't load invited users: ${esc(e.message)}</div>`;
+  }
+}
+
+const invDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+// The end date as YYYY-MM-DD in Eastern time (the server stores the end of that day, Eastern).
+const invDay = d => d ? new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) : null;
+const invToolName = k => (INV.tools.find(t => t.key === k) || { name: k }).name;
+
+function renderInvited() {
+  const orgName = id => (INV.organizations.find(o => o.id === id) || {}).name || '—';
+  const now = Date.now();
+  const people = INV.people.map(p => {
+    const ended = p.expires_at && new Date(p.expires_at).getTime() < now;
+    const status = !p.active ? '<span class="badge badge-inactive">Off</span>'
+      : ended ? '<span class="badge badge-inactive">Ended</span>' : '<span class="badge badge-active">Active</span>';
+    const u = p.usage || { runs: {} };
+    const runs = Object.entries(u.runs || {}).map(([k, r]) => `${esc(invToolName(k))}: ${r.last30} in 30 days, ${r.total} total`).join('<br>') || 'No runs yet';
+    const em = esc(JSON.stringify(p.email));
+    return `
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:14px;align-items:flex-start">
+        <div style="min-width:0">
+          <div style="font-weight:700;font-size:13px;color:var(--navy)">${esc(p.name || p.email)} ${status}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(p.email)} · ${esc(orgName(p.partner_id))}${p.expires_at ? ` · ends ${esc(invDate(p.expires_at))}` : ' · ongoing'}</div>
+          <div style="font-size:12px;margin-top:4px">${(p.tools || []).map(k => `<span class="badge badge-office" style="margin-right:4px">${esc(invToolName(k))}</span>`).join('')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">${runs}<br>
+            Last used: ${u.lastUsed ? esc(invDate(u.lastUsed)) : 'never'} · Sign-ins: ${u.signIns || 0}${u.lastSignIn ? ` (last ${esc(invDate(u.lastSignIn))})` : ''}
+            ${p.invited_by ? ` · invited by ${esc(p.invited_by)}` : ''}</div>
+          ${p.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">${esc(p.note)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <button class="btn btn-secondary btn-sm" onclick='openInvite(${em})'>Edit</button>
+          <button class="btn btn-secondary btn-sm" onclick='sendInviteLink(${em})'>Email sign-in link</button>
+          <button class="btn btn-secondary btn-sm" onclick='signOutInvited(${em})'>Sign out everywhere</button>
+          <button class="btn ${p.active ? 'btn-danger' : 'btn-secondary'} btn-sm" onclick='toggleInvited(${em})'>${p.active ? 'Turn off' : 'Turn on'}</button>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('invited-people').innerHTML = people || `<div style="padding:24px;text-align:center;color:var(--muted)">No one invited yet — use “+ Invite person”.</div>`;
+
+  document.getElementById('invited-orgs').innerHTML = INV.organizations.map(o => {
+    const n = INV.people.filter(p => p.partner_id === o.id).length;
+    return `<div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div><div style="font-weight:700;font-size:13px;color:var(--navy)">${esc(o.name)}${o.short_name ? ` (${esc(o.short_name)})` : ''} ${o.active ? '' : '<span class="badge badge-inactive">Inactive</span>'}</div>
+        <div style="font-size:12px;color:var(--muted)">${esc(o.state || '')} · ${n} ${n === 1 ? 'person' : 'people'} · limit ${o.daily_cap}/day per tool</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="openOrg(${o.id})">Edit</button>
+    </div>`;
+  }).join('') || `<div style="padding:16px;color:var(--muted);font-size:13px">No organizations yet — use “+ Organization”.</div>`;
+}
+
+function openInvite(email) {
+  const p = email ? INV.people.find(x => x.email === email) : null;
+  if (!INV.organizations.length) { alert('Add an organization first (“+ Organization”) — it brands the tools for them.'); return; }
+  editingInviteEmail = p ? p.email : null;
+  document.getElementById('invite-modal-title').textContent = p ? 'Edit invitation' : 'Invite person';
+  document.getElementById('iv-save-btn').textContent = p ? 'Save' : 'Invite';
+  document.getElementById('iv-name').value = p?.name || '';
+  const emailEl = document.getElementById('iv-email');
+  emailEl.value = p?.email || ''; emailEl.readOnly = !!p;
+  document.getElementById('iv-org').innerHTML = INV.organizations.filter(o => o.active || o.id === p?.partner_id)
+    .map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+  if (p) document.getElementById('iv-org').value = String(p.partner_id);
+  document.getElementById('iv-tools').innerHTML = INV.tools.map(t => `
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text);text-transform:none;letter-spacing:0;font-weight:400">
+      <input type="checkbox" value="${esc(t.key)}" ${p ? ((p.tools || []).includes(t.key) ? 'checked' : '') : ''}> ${esc(t.icon || '')} ${esc(t.name)}</label>`).join('');
+  document.getElementById('iv-expires').value = p?.expires_at ? invDay(p.expires_at) : '';
+  document.getElementById('iv-active').checked = p ? !!p.active : true;
+  document.getElementById('iv-note').value = p?.note || '';
+  document.getElementById('iv-send').checked = !p;
+  document.getElementById('invite-modal').classList.add('open');
+}
+function closeInvite() { document.getElementById('invite-modal').classList.remove('open'); }
+
+async function postInvite(body) {
+  const r = await fetch(`${PROXY_URL}/partner/admin/users`, { method: 'POST', headers: H(), body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+  return d;
+}
+
+async function saveInvite() {
+  const body = {
+    email: document.getElementById('iv-email').value.trim(),
+    name: document.getElementById('iv-name').value.trim(),
+    partner_id: parseInt(document.getElementById('iv-org').value, 10),
+    tools: [...document.querySelectorAll('#iv-tools input:checked')].map(i => i.value),
+    expires_at: document.getElementById('iv-expires').value || null,
+    active: document.getElementById('iv-active').checked,
+    note: document.getElementById('iv-note').value.trim(),
+    sendLink: document.getElementById('iv-send').checked,
+  };
+  if (!body.tools.length) { alert('Tick at least one tool.'); return; }
+  const btn = document.getElementById('iv-save-btn'); btn.disabled = true;
+  try {
+    const d = await postInvite(body);
+    closeInvite();
+    toast(d.linkSent ? 'Saved — sign-in link emailed.' : 'Saved.', 'ok');
+    await loadInvited();
+  } catch (e) { alert(e.message); }
+  finally { btn.disabled = false; }
+}
+
+async function sendInviteLink(email) {
+  const p = INV.people.find(x => x.email === email);
+  if (!p) return;
+  if (!p.active) { alert('Turn their access on first.'); return; }
+  try {
+    const d = await postInvite({ ...p, expires_at: p.expires_at ? invDay(p.expires_at) : null, sendLink: true });
+    toast(d.linkSent ? `Sign-in link emailed to ${email}.` : 'Not sent — their access has ended or is off.', d.linkSent ? 'ok' : 'err');
+    await loadInvited();
+  } catch (e) { alert(e.message); }
+}
+
+async function toggleInvited(email) {
+  const p = INV.people.find(x => x.email === email);
+  if (!p) return;
+  if (p.active && !confirm(`Turn off ${p.name || email}'s access? They're signed out within a minute.`)) return;
+  try {
+    await postInvite({ ...p, expires_at: p.expires_at ? invDay(p.expires_at) : null, active: !p.active, sendLink: false });
+    await loadInvited();
+  } catch (e) { alert(e.message); }
+}
+
+async function signOutInvited(email) {
+  if (!confirm(`Sign ${email} out on every device? Their access stays on; they sign in again with a new link.`)) return;
+  try {
+    const r = await fetch(`${PROXY_URL}/partner/admin/users/sign-out`, { method: 'POST', headers: H(), body: JSON.stringify({ email }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
+    toast('Signed out everywhere.', 'ok');
+  } catch (e) { alert(e.message); }
+}
+
+function openOrg(id) {
+  const o = id ? INV.organizations.find(x => x.id === id) : null;
+  editingOrgId = o ? o.id : null;
+  document.getElementById('org-modal-title').textContent = o ? 'Edit organization' : 'Add organization';
+  document.getElementById('og-save-btn').textContent = o ? 'Save' : 'Add organization';
+  const set = (el, v) => { document.getElementById(el).value = v ?? ''; };
+  set('og-name', o?.name); set('og-short', o?.short_name); set('og-state', o?.state); set('og-cap', o?.daily_cap ?? 25);
+  set('og-market', o?.market_area); set('og-license', o?.license_lookup); set('og-about', o?.about);
+  set('og-values', o?.value_points); set('og-catalog', JSON.stringify(o?.services_catalog || [], null, 2));
+  set('og-logo', o?.logo_url); set('og-slug', o?.slug);
+  document.getElementById('og-active').checked = o ? !!o.active : true;
+  document.getElementById('org-modal').classList.add('open');
+}
+function closeOrg() { document.getElementById('org-modal').classList.remove('open'); }
+
+async function saveOrg() {
+  const v = id => document.getElementById(id).value;
+  const body = {
+    id: editingOrgId, name: v('og-name').trim(), short_name: v('og-short').trim(), state: v('og-state').trim(),
+    daily_cap: v('og-cap'), market_area: v('og-market'), license_lookup: v('og-license'), about: v('og-about'),
+    value_points: v('og-values'), services_catalog: v('og-catalog'), logo_url: v('og-logo').trim(), slug: v('og-slug').trim(),
+    active: document.getElementById('og-active').checked,
+  };
+  const btn = document.getElementById('og-save-btn'); btn.disabled = true;
+  try {
+    const r = await fetch(`${PROXY_URL}/partner/admin/organizations`, { method: 'POST', headers: H(), body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    closeOrg(); toast('Saved.', 'ok');
+    await loadInvited();
+  } catch (e) { alert(e.message); }
+  finally { btn.disabled = false; }
+}
+
 // ── Staff tab ─────────────────────────────────────────────────────────────────
 let staffMode = false, allStaff = [], currentStaffId = null, staffDirtyFlag = false;
 
@@ -1985,18 +2249,22 @@ async function switchMode(mode) {
   const partnersMode = (mode === 'partners');
   const officesMode = (mode === 'offices');
   const toolsMode = (mode === 'tools');
-  const otherPanel = rosterMode || partnersMode || officesMode || toolsMode;
+  const invitedMode = (mode === 'invited');
+  const otherPanel = rosterMode || partnersMode || officesMode || toolsMode || invitedMode;
   document.getElementById('tab-agents').classList.toggle('active', mode === 'agents');
   document.getElementById('tab-staff').classList.toggle('active', mode === 'staff');
   document.getElementById('tab-roster').classList.toggle('active', mode === 'roster');
   document.getElementById('tab-partners').classList.toggle('active', mode === 'partners');
   document.getElementById('tab-offices').classList.toggle('active', mode === 'offices');
   document.getElementById('tab-tools').classList.toggle('active', mode === 'tools');
-  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : officesMode ? 'Offices' : toolsMode ? 'Tools & Links' : staffMode ? 'Staff Records' : 'Agent Records';
+  document.getElementById('tab-invited').classList.toggle('active', mode === 'invited');
+  document.getElementById('topbar-title').textContent = rosterMode ? 'Roster Changes' : partnersMode ? 'Partners' : officesMode ? 'Offices' : toolsMode ? 'Tools & Links' : invitedMode ? 'Invited Users' : staffMode ? 'Staff Records' : 'Agent Records';
   document.getElementById('add-agent-btn').style.display = !staffMode && !otherPanel && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-staff-btn').style.display =  staffMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-partner-btn').style.display = partnersMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('add-tool-btn').style.display = toolsMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('add-invite-btn').style.display = invitedMode && USER_ROLE === 'admin' ? '' : 'none';
+  document.getElementById('add-org-btn').style.display = invitedMode && USER_ROLE === 'admin' ? '' : 'none';
   document.getElementById('sync-pp-btn').style.display = !staffMode && !otherPanel && (USER_ROLE === 'admin' || USER_ROLE === 'sales_manager') ? '' : 'none';
   document.getElementById('export-btn').style.display   = (staffMode || otherPanel) ? 'none' : '';
   document.getElementById('issue-summary').style.display = (staffMode || otherPanel) ? 'none' : '';
@@ -2007,6 +2275,7 @@ async function switchMode(mode) {
   document.getElementById('partners-panel').style.display = partnersMode ? 'block' : 'none';
   document.getElementById('offices-panel').style.display = officesMode ? 'block' : 'none';
   document.getElementById('tools-panel').style.display = toolsMode ? 'block' : 'none';
+  document.getElementById('invited-panel').style.display = invitedMode ? 'block' : 'none';
 
   if (rosterMode) {
     loadRosterReport();
@@ -2022,6 +2291,10 @@ async function switchMode(mode) {
   }
   if (toolsMode) {
     loadTools();
+    return;
+  }
+  if (invitedMode) {
+    loadInvited();
     return;
   }
 
