@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Your Home | Adams, Cameron &amp; Co.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Customer Portal (prototype) — customer-facing, so Adams Cameron's navy and
@@ -115,6 +116,14 @@ details.plan p { margin: 0; color: var(--ink); }
   .timeline { grid-auto-flow: row; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Virtual tour activity (same charts agents see in Cameron's Stage) */
+.tour-activity { margin-top: 14px; }
+.tour-activity .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.tour-activity .chart { background: var(--bg); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.tour-activity .chart.wide { grid-column: 1 / -1; }
+.tour-activity .chart h4 { margin: 0 0 6px; font: 600 .9rem var(--sans); color: var(--ink); }
+.tour-activity .chart .box { position: relative; height: 220px; }
+.tour-activity .note { margin: 6px 0 0; color: var(--slate); font-size: .85rem; }
 </style>
 </head>
 <body>
@@ -213,6 +222,7 @@ async function load() {
     if (r.status === 401) { if (!previewToken) storeToken(''); return showSignIn(data.error); }
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
     render(data);
+    loadTourActivity(token);
     if (previewToken) {
       document.getElementById('signout').hidden = true;
       document.getElementById('app').insertAdjacentHTML('afterbegin',
@@ -220,6 +230,92 @@ async function load() {
     }
   } catch (e) {
     app(`<div class="msg err" role="alert">${esc(e.message)}</div>`);
+  }
+}
+
+// ── Virtual tour activity ────────────────────────────────────────────────────
+// For each listing with tour views: views over time by source, where views came
+// from, top locations and devices — the same data and chart types agents see in
+// Cameron's Stage (GET /portal/tour-activity). Sources get plain names.
+const TOUR_COLORS = ['#1a1a2e', '#c9a84c', '#5b7fa6', '#2f7a3e', '#a65b5b', '#7a5ba6', '#5ba6a0', '#a68a5b', '#8a8a9e', '#d9a6a6'];
+// Most views arrive with no referring site: the MLS (unbranded) tour link opened from the MLS or a
+// listing site, or a shared (branded) link opened from a text, email or app. Any site not named
+// below is almost always another brokerage's website showing the listing.
+function tourSourceLabel(host, branded) {
+  const h = String(host || '').toLowerCase();
+  if (!h || h === 'direct/unknown') return branded === true ? 'Shared link (text, email or app)'
+    : branded === false ? 'MLS & listing sites (site not reported)' : 'Site not reported';
+  const known = [[/facebook|fb\.com|fb\.me/, 'Facebook'], [/instagram/, 'Instagram'], [/zillow/, 'Zillow'], [/realtor\.com/, 'Realtor.com'],
+    [/redfin/, 'Redfin'], [/trulia/, 'Trulia'], [/homes\.com/, 'Homes.com'], [/movoto/, 'Movoto'], [/youtube/, 'YouTube'],
+    [/linkedin/, 'LinkedIn'], [/twitter|^t\.co$|^x\.com$/, 'X (Twitter)'], [/mail\.|outlook|gmail/, 'Email'],
+    [/google|bing|baidu|yahoo|duckduckgo/, 'Search engines'],
+    [/mlsmatrix|mfrmls|flexmls|sparkplatform|stellarmls|daytonarealtors/, 'MLS'],
+    [/adamscameron\.com/, 'Adams Cameron website'], [/johnadams\.org/, 'Adams Cameron (agent previews and this portal)']];
+  const k = known.find(([re]) => re.test(h));
+  return k ? k[1] : 'Other real estate websites';
+}
+// Cameron's Stage records mobile (phones and tablets) or desktop.
+const DEVICE_LABEL = { mobile: 'Phone or tablet', desktop: 'Computer', unknown: 'Unknown' };
+function tourChart(el, config) {
+  if (!window.Chart) return;
+  new Chart(el, { ...config, options: { responsive: true, maintainAspectRatio: false, ...config.options } });
+}
+async function loadTourActivity(token) {
+  const boxes = [...document.querySelectorAll('.tour-activity[data-deal]')];
+  if (!boxes.length) return;
+  // Chart.js loads deferred; wait for it briefly.
+  for (let i = 0; i < 50 && !window.Chart; i++) await new Promise(r => setTimeout(r, 100));
+  for (const box of boxes) {
+    try {
+      const r = await fetch(`${PROXY}/portal/tour-activity?deal=${encodeURIComponent(box.dataset.deal)}`, { headers: { 'x-portal-token': token } });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+      if (!data.total_views || !window.Chart) { box.remove(); continue; }
+      // Sources: plain names, added up (several web addresses can be one source, e.g. Facebook).
+      const label = row => tourSourceLabel(row.referrer_host, row.branded);
+      const totals = {};
+      data.source_breakdown.forEach(row => { totals[label(row)] = (totals[label(row)] || 0) + row.count; });
+      const sources = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+      // Views over time, stacked by source — the series has no branded flag, so unknown referrers are grouped as one.
+      // Every day from the first view to today, so days with no views show as zero.
+      const seen = [...new Set(data.series.map(x => x.day))].sort();
+      const days = [];
+      if (seen.length) {
+        const ymd = dt => dt.toISOString().slice(0, 10);
+        const end = ymd(new Date(Date.now() - 4 * 3600e3));   // today in Florida (close enough for a day label)
+        for (let dt = new Date(seen[0] + 'T12:00:00Z'); ymd(dt) <= end && days.length < 800; dt.setUTCDate(dt.getUTCDate() + 1)) days.push(ymd(dt));
+      }
+      const seriesLabel = h => tourSourceLabel(h);
+      const names = [...new Set(data.series.map(x => seriesLabel(x.referrer_host)))];
+      const datasets = names.map((n, i) => ({
+        label: n, fill: true, tension: 0.3,
+        backgroundColor: TOUR_COLORS[i % TOUR_COLORS.length] + '99', borderColor: TOUR_COLORS[i % TOUR_COLORS.length],
+        data: days.map(day => data.series.filter(x => x.day === day && seriesLabel(x.referrer_host) === n).reduce((t, x) => t + x.count, 0)),
+      }));
+      const fmtDay = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const hasLoc = data.location_breakdown.length > 0;
+      box.innerHTML = `<div class="charts">
+        <div class="chart wide"><h4>Views by day</h4><div class="box"><canvas></canvas></div></div>
+        <div class="chart"><h4>Where views came from</h4><div class="box"><canvas></canvas></div></div>
+        ${hasLoc ? `<div class="chart"><h4>Top locations</h4><div class="box"><canvas></canvas></div></div>` : ''}
+        <div class="chart"><h4>Device</h4><div class="box"><canvas></canvas></div></div>
+      </div>${hasLoc ? `<p class="note">Top locations are based on the ${data.located_views} view${data.located_views === 1 ? '' : 's'} with a known location (we started recording locations in late September 2026). They're approximate — from the viewer's internet connection — and shown by city only.</p>` : ''}`;
+      const canvases = [...box.querySelectorAll('canvas')];
+      const [cDays, cSrc] = canvases, cLoc = hasLoc ? canvases[2] : null, cDev = canvases[canvases.length - 1];
+      tourChart(cDays, { type: 'line', data: { labels: days.map(fmtDay), datasets },
+        options: { scales: { y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, x: { stacked: true } }, plugins: { legend: { position: 'bottom' } } } });
+      const bar = (el, rows) => tourChart(el, { type: 'bar',
+        data: { labels: rows.map(x => x[0]), datasets: [{ data: rows.map(x => x[1]), backgroundColor: TOUR_COLORS[0] }] },
+        options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } } });
+      bar(cSrc, sources);
+      if (cLoc) bar(cLoc, data.location_breakdown.map(x => [[x.city, x.region || x.country].filter(Boolean).join(', '), x.count]));
+      tourChart(cDev, { type: 'pie',
+        data: { labels: data.device_breakdown.map(x => DEVICE_LABEL[x.device_type] || x.device_type),
+                datasets: [{ data: data.device_breakdown.map(x => x.count), backgroundColor: TOUR_COLORS }] },
+        options: { plugins: { legend: { position: 'bottom' } } } });
+    } catch (e) {
+      box.innerHTML = `<p class="note">Tour activity isn't available right now.</p>`;
+    }
   }
 }
 
@@ -288,7 +384,8 @@ function dealHtml(d, agentsById) {
         <div class="fact"><div class="k">Last 30 days</div><div class="v">${T.views30d}</div></div>
         <div class="fact"><div class="k">From the MLS</div><div class="v">${T.viewsMls}</div></div>
         <div class="fact"><div class="k">From shared links</div><div class="v">${T.viewsShared}</div></div>
-      </div><p style="margin:8px 0 0;color:var(--slate);font-size:.9rem">${T.lastViewed ? `Last viewed ${esc(fmtDate(T.lastViewed))}. ` : 'No views yet. '}"From the MLS" counts buyers opening it from your listing; "shared links" counts views from social media, Zillow, email and texts.</p></div>`);
+      </div><p style="margin:8px 0 0;color:var(--slate);font-size:.9rem">${T.lastViewed ? `Last viewed ${esc(fmtDate(T.lastViewed))}. ` : 'No views yet. '}"From the MLS" counts buyers opening it from your listing; "shared links" counts views from social media, Zillow, email and texts.</p>
+        ${T.views ? `<div class="tour-activity" data-deal="${esc(d.id)}"><p class="note">Loading tour activity…</p></div>` : ''}</div>`);
     }
     const links = [
       L.companyUrl ? `<a class="btn" href="${esc(L.companyUrl)}" target="_blank" rel="noopener">See it on adamscameron.com</a>` : '',
