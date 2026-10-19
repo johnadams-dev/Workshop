@@ -25,6 +25,7 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Shared Workshop sign-in -->
   <script src="auth.js"></script>
+  <script src="mls-magic-choices.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -110,7 +111,7 @@ const RESO_TO_FORM = {
   DirectionFaces: "frontExposure",
   PropertySubType: "propertySubType",
   PropertyType: "propertyType",
-  AttachedGarageYN: "propertyAttached",
+  AttachedGarageYN: "attachedGarage",  // was mapped to Property Attached by mistake (fixed 2026-10-19)
   NewConstructionYN: "newConstruction",
   GarageYN: "garage",
   GarageSpaces: "garageSpaces",
@@ -148,6 +149,7 @@ const RESO_TO_FORM = {
   ParcelNumber: "parcelNumber",
   TaxYear: "taxYear",
   TaxAnnualAmount: "taxAnnualAmount",
+  ZoningDescription: "zoning",  // Daytona (Spark) sends zoning here; Stellar's Zoning (below) wins when both are set
   Zoning: "zoning",
   LegalDescription: "legalDescription",
   Homestead: "homestead",
@@ -205,6 +207,37 @@ const RESO_TO_FORM = {
   CddFeeAmount: "cddFeeAmount",
   // Stories may come as either field name depending on system
   Stories: "stories",
+  // Fields the official input forms require (added 2026-10-19). Where both MLSs fill the same
+  // sheet field from differently named feed fields, each is listed; whichever has a value is used.
+  PublicSurveySection: "section",
+  PublicSurveyTownship: "township",
+  PublicSurveyRange: "range",
+  TaxLot: "lotNumber",
+  TaxBlock: "blockParcel",
+  STELLAR_TotalAcreage: "totalAcreage",
+  LandLeaseYN: "landLease",
+  AdditionalParcelsYN: "additionalParcels",
+  STELLAR_FloodZoneCode: "floodZoneCode",
+  Ownership: "ownership",
+  LeaseConsideredYN: "canBeLeasedYN",
+  STELLAR_GreenEnergyGenerationYN: "greenEnergyGeneration",
+  STELLAR_WaterAccessYN: "waterAccessYN",
+  STELLAR_WaterAccess: "waterAccessFeatures",
+  STELLAR_WaterViewYN: "waterViewYN",
+  STELLAR_WaterView: "waterViewFeatures",
+  STELLAR_WaterExtras: "waterExtras",
+  ShowingRequirements: "showingInstructions",
+  Showing_sp_Requirements_co_Showing_sp_Requirements: "showingInstructions",
+  STELLAR_ShowingRequirements: "showingInstructions",
+  ShowingConsiderations: "showingConsiderations",
+  STELLAR_ShowingConsiderations: "showingConsiderations",
+  AccessibilityFeatures: "accessibilityFeatures",
+  General_sp_Property_sp_Information_co_Accessibility_sp_Features_sp_YN: "accessibilityFeaturesYN",
+  // Listing distribution (Stellar requires each)
+  STELLAR_ThirdPartyYN: "thirdParty",
+  InternetConsumerCommentYN: "idxComments",
+  InternetAutomatedValuationDisplayYN: "idxAvm",
+  STELLAR_CreateAutomaticVirtualTourYN: "autoVirtualTour",
 };
 
 // ─── Mock data for demo when API key not set ──────────────────────────────
@@ -311,8 +344,10 @@ const resoToForm = (data) => {
     if (v === undefined || v === null || v === "") continue;
 
     if (Array.isArray(v)) {
-      // Already an array — join for display
-      form[formKey] = v.length ? v : null;
+      // Already an array — join for display. An empty list is skipped so it can't wipe out a
+      // value another feed field already supplied for the same sheet field.
+      if (!v.length) continue;
+      form[formKey] = v;
     } else if (typeof v === "boolean") {
       form[formKey] = v ? "Yes" : "No";
     } else {
@@ -324,6 +359,29 @@ const resoToForm = (data) => {
     }
   }
   return form;
+};
+
+// Room details: Stellar sends them with the listing ($expand=Rooms — type, level, dimensions);
+// Daytona only sends a level per room type, in Spark custom fields "Room_sp_Types_co_<Room>_sp_Level".
+const roomsFrom = (listing) => {
+  if (!listing) return [];
+  if (Array.isArray(listing.Rooms) && listing.Rooms.length)
+    return listing.Rooms.map(r => ({ type: r.RoomType || "", level: r.RoomLevel || "",
+      size: r.RoomDimensions || (r.RoomLength && r.RoomWidth ? `${r.RoomLength}x${r.RoomWidth}` : "") }));
+  return Object.keys(listing).map(k => /^Room_sp_Types_co_(.+)_sp_Level$/.exec(k))
+    .filter(m => m && listing[m[0]] && String(listing[m[0]]).trim())
+    .map(m => ({ type: m[1].replace(/_sp_/g, " "), level: [].concat(listing[m[0]]).join(", "), size: "" }));
+};
+
+// Stellar's Total Acreage is a size band; work it out from the lot size when the feed doesn't send it.
+const acreageBand = (acres) => {
+  const a = parseFloat(acres);
+  if (!(a >= 0)) return null;
+  const bands = [[0.25, "0 to less than 1/4"], [0.5, "1/4 to less than 1/2"], [1, "1/2 to less than 1"], [2, "1 to less than 2"],
+    [5, "2 to less than 5"], [10, "5 to less than 10"], [20, "10 to less than 20"], [50, "20 to less than 50"],
+    [100, "50 to less than 100"], [200, "100 to less than 200"], [500, "200 to less than 500"]];
+  const b = bands.find(([max]) => a < max);
+  return (b ? b[1] : "500+ Acres") + " (from lot size — verify)";
 };
 
 // ─── API service factories ─────────────────────────────────────────────
@@ -345,14 +403,14 @@ const bridgeAPI = {
     const streetName = parts.slice(1).join(" ").toUpperCase();
     const officeFilter = STELLAR_OFFICE_KEYS.map(k => `ListOfficeMlsId eq '${k}'`).join(" or ");
     const filter = `StreetNumber eq '${parts[0]}' and contains(StreetName,'${streetName}') and (${officeFilter})`;
-    const url = `${this.base(proxyUrl)}/${dataSystem}/Properties?$filter=${encodeURIComponent(filter)}&$top=25&access_token=${token}`;
+    const url = `${this.base(proxyUrl)}/${dataSystem}/Properties?$filter=${encodeURIComponent(filter)}&$top=25&$expand=Rooms&access_token=${token}`;
     const r = await fetch(url, { headers: proxyHeaders(proxySecret) });
     if (!r.ok) throw new Error(`Bridge ${r.status}`);
     return (await r.json()).value || [];
   },
 
   async searchByMlsId(token, dataSystem, mlsId, proxyUrl, proxySecret) {
-    const url = `${this.base(proxyUrl)}/${dataSystem}/Properties?$filter=${encodeURIComponent(`ListingId eq '${mlsId}'`)}&$top=1&access_token=${token}`;
+    const url = `${this.base(proxyUrl)}/${dataSystem}/Properties?$filter=${encodeURIComponent(`ListingId eq '${mlsId}'`)}&$top=1&$expand=Rooms&access_token=${token}`;
     const r = await fetch(url, { headers: proxyHeaders(proxySecret) });
     if (!r.ok) throw new Error(`Bridge ${r.status}`);
     return (await r.json()).value?.[0] || null;
@@ -713,6 +771,8 @@ function SearchImport({ settings, onImport, onOpenSheets }) {
     // Open the input sheet for the other MLS — the one it's being entered into
     // (same rule as the Cross-System Report). Public records start on Stellar.
     formData._defaultFormTab = sys === "stellar" ? "daytona" : "stellar";
+    formData._sourceSystem = sys;            // stellar | daytona | public — the sheets check choices against it
+    formData.rooms = roomsFrom(listing);
     setImported(formData);
     onImport(formData, listing);
   };
@@ -925,7 +985,7 @@ function CrossSystemReport({ settings, onImport, onViewForm }) {
     if (!onImport || !onViewForm) return;
     setFetchingRow(row.addrKey);
     try {
-      let fullRecord = null;
+      let fullRecord = null, fromSystem = null;
 
       // Fetch full record from whichever system has it — prefer DBAR when available
       // since the use case is usually "DBAR has it, need to enter into Stellar"
@@ -935,6 +995,7 @@ function CrossSystemReport({ settings, onImport, onViewForm }) {
             settings.sparkToken, row.daytonaId,
             settings.proxyUrl, settings.proxySecret, settings.sparkFeedId
           );
+          if (fullRecord) fromSystem = "daytona";
         } catch(e) {
           console.warn("Spark full-record fetch failed, falling back to Bridge:", e.message);
         }
@@ -946,6 +1007,7 @@ function CrossSystemReport({ settings, onImport, onViewForm }) {
             row.stellarId, settings.proxyUrl, settings.proxySecret
           );
           fullRecord = Array.isArray(results) ? results[0] : results;
+          if (fullRecord) fromSystem = "stellar";
         } catch(e) {
           console.warn("Bridge full-record fetch failed:", e.message);
         }
@@ -954,6 +1016,8 @@ function CrossSystemReport({ settings, onImport, onViewForm }) {
       // Fall back to the summary data already in the row if both fetches fail
       const source = fullRecord || row.data;
       const mapped = resoToForm(source);
+      mapped._sourceSystem = fromSystem;
+      mapped.rooms = roomsFrom(fullRecord);
 
       // Set system-specific IDs
       if (row.stellarId && row.stellarId !== "—") mapped.stellarListingId = row.stellarId;
@@ -1363,330 +1427,401 @@ function FormsOutput({ formData }) {
     return v;
   };
 
+  // An answer copied from the other MLS that isn't one of this MLS's choices (MLS_CHOICES, from each
+  // feed's Lookup list — mls-magic-choices.js) is flagged next to the value and listed above the sheet.
+  const fromSystem = ["stellar", "daytona"].includes(formData._sourceSystem) ? formData._sourceSystem
+    : formData.dbarListingId && !formData.stellarListingId ? "daytona"
+    : formData.stellarListingId && !formData.dbarListingId ? "stellar" : null;
+  const SHEET_NAME = { stellar: "Stellar", daytona: "Daytona" };
+  const checkChoice = (sheet, key, text) => {
+    const list = text && fromSystem && fromSystem !== sheet && ((window.MLS_CHOICES || {})[sheet] || {})[key];
+    if (!list) return text;
+    const ok = new Set(list.map(v => v.toLowerCase()));
+    const bad = [].concat(formData[key]).map(v => String(v ?? "").trim()).filter(v => v && !ok.has(v.toLowerCase()));
+    return bad.length ? `${text} ⚠️ not a ${SHEET_NAME[sheet]} choice: ${bad.join("; ")} — pick the closest` : text;
+  };
+  const fs = (key) => checkChoice("stellar", key, fmt(key));
+  const fd = (key) => checkChoice("daytona", key, fmt(key));
+  const room = (pattern) => {
+    const r = (formData.rooms || []).find(x => pattern.test(x.type));
+    return r ? [r.type, r.level, r.size].filter(Boolean).join(" · ") : null;
+  };
+
+  // Required marks (third item) follow the official input forms in server/docs/MLS Input/ (2026-10-19).
   const sections = {
     stellar: [
       // ── Page 1: Listing Information ──────────────────────────────────────
       { title: "LISTING INFORMATION", color: colors.stellar, fields: [
-        ["Office Exclusive", fmt("officeExclusive")],
-        ["Listing Contract Date", fmt("listingContractDate"), true],
-        ["List Price", fmt("listPrice"), true],
-        ["Expiration Date", fmt("expirationDate"), true],
-        ["Listing Type", fmtWithFlag("listingType", "_listingTypeAssumed"), true],
-        ["Listing Service Type", fmt("listingServiceType"), true],
-        ["Seller Representation", fmt("sellerRepresentation"), true],
-        ["Special Sale Provision", fmt("specialSaleProvision"), true],
-        ["Occupant Type", fmt("occupantType"), true],
-        ["Owner Name", fmt("ownerName")],
-        ["Owner Phone", fmt("ownerPhone")],
-        ["Stellar MLS ID", fmt("stellarListingId")],
+        ["Office Exclusive", fs("officeExclusive"), true],
+        ["Office Exclusive w/ Temporary Exclusion", fs("officeExclusiveTempExclusion"), true],
+        ["Listing Contract Date", fs("listingContractDate"), true],
+        ["List Price", fs("listPrice"), true],
+        ["Expiration Date", fs("expirationDate"), true],
+        ["Listing Type", checkChoice("stellar", "listingType", fmtWithFlag("listingType", "_listingTypeAssumed")), true],
+        ["Listing Service Type", fs("listingServiceType"), true],
+        ["Seller Representation", fs("sellerRepresentation"), true],
+        ["Special Sale Provision", fs("specialSaleProvision"), true],
+        ["Owner Name", fs("ownerName")],
+        ["Owner Phone", fs("ownerPhone")],
+        ["Stellar MLS ID", fs("stellarListingId")],
       ]},
       // ── Page 1: Address ──────────────────────────────────────────────────
       { title: "ADDRESS", color: colors.stellar, fields: [
-        ["Street Number", fmt("streetNumber"), true],
-        ["Street Dir Prefix", fmt("streetDirPre")],
-        ["Street Name", fmt("streetName"), true],
-        ["Street Type (Suffix)", fmt("streetType")],
-        ["Street Dir Post", fmt("streetDirPost")],
-        ["Unit Number", fmt("unitNumber")],
-        ["City", fmt("city"), true],
-        ["State", fmt("state"), true],
-        ["Zip", fmt("zip"), true],
-        ["County", fmt("county"), true],
-        ["Country", fmt("country")],
-        ["Floors in Unit/Home", fmt("stories"), true],
-        ["Building Name/Number", fmt("buildingName")],
-        ["Building Elevator", fmt("buildingElevator")],
-        ["Development", fmt("development")],
-        ["Subdivision/Condo Name", fmt("subdivisionName")],
+        ["Street Number", fs("streetNumber"), true],
+        ["Street Dir Prefix", fs("streetDirPre")],
+        ["Street Name", fs("streetName"), true],
+        ["Street Type (Suffix)", fs("streetType")],
+        ["Street Dir Post", fs("streetDirPost")],
+        ["Unit Number", fs("unitNumber")],
+        ["City", fs("city"), true],
+        ["State", fs("state"), true],
+        ["Zip", fs("zip"), true],
+        ["County", fs("county"), true],
+        ["Country", fs("country"), true],
+        ["Floors in Unit/Home", fs("levels"), true],
+        ["Total # of Floors", fs("stories")],
+        ["Building Name/Number", fs("buildingName")],
+        ["Building Elevator", fs("buildingElevator")],
+        ["Development", fs("development")],
+        ["Subdivision/Condo Name", fs("subdivisionName")],
       ]},
       // ── Page 1: Schools ──────────────────────────────────────────────────
       { title: "SCHOOLS", color: colors.stellar, fields: [
-        ["Elementary School", fmt("elementarySchool")],
-        ["Middle School", fmt("middleSchool")],
-        ["High School", fmt("highSchool")],
+        ["Elementary School", fs("elementarySchool")],
+        ["Middle School", fs("middleSchool")],
+        ["High School", fs("highSchool")],
       ]},
       // ── Pages 2–3: Exterior ──────────────────────────────────────────────
       { title: "EXTERIOR INFORMATION", color: colors.stellar, fields: [
-        ["Property Style", fmt("propertySubType"), true],
-        ["Front Exposure", fmt("frontExposure"), true],
-        ["Property Attached", fmt("propertyAttached")],
-        ["New Construction", fmt("newConstruction"), true],
-        ["Property Condition", fmt("propertyCondition")],
-        ["View", fmt("view")],
-        ["Lot Features", fmt("lotFeatures")],
-        ["Lot Size Acres", fmt("lotSizeAcres")],
-        ["Lot Dimensions", fmt("lotDimensions")],
-        ["Levels", fmt("levels"), true],
-        ["Other Structures", fmt("otherStructures")],
-        ["Private Pool", fmt("poolPrivate"), true],
-        ["Pool Features", fmt("poolFeatures")],
-        ["Spa Features", fmt("spaFeatures")],
-        ["Garage", fmt("garage"), true],
-        ["Garage Spaces", fmt("garageSpaces")],
-        ["Carport", fmt("carport"), true],
-        ["Carport Spaces", fmt("carportSpaces")],
-        ["Garage/Parking Features", fmt("parkingFeatures")],
-        ["Architectural Style", fmt("architecturalStyle")],
-        ["Patio and Porch Features", fmt("patioAndPorchFeatures")],
-        ["Foundation", fmt("foundationType"), true],
-        ["Roof", fmt("roofType"), true],
-        ["Exterior Construction", fmt("exteriorConstruction"), true],
-        ["Exterior Features", fmt("exteriorFeatures"), true],
-        ["Fencing", fmt("fencing")],
-        ["Road Surface Type", fmt("roadSurfaceType"), true],
+        ["Property Style", fs("propertySubType"), true],
+        ["Front Exposure", fs("frontExposure"), true],
+        ["Property Attached", fs("propertyAttachedYN")],
+        ["New Construction", fs("newConstruction"), true],
+        ["Property Condition", fs("propertyCondition")],
+        ["View", fs("view")],
+        ["Lot Features", fs("lotFeatures")],
+        ["Lot Dimensions", fs("lotDimensions")],
+        ["Other Structures", fs("otherStructures")],
+        ["Private Pool", fs("poolPrivate"), true],
+        ["Pool Features", fs("poolFeatures")],
+        ["Spa Features", fs("spaFeatures")],
+        ["Garage", fs("garage"), true],
+        ["Attached Garage", fs("attachedGarage")],
+        ["Garage Spaces", fs("garageSpaces")],
+        ["Carport", fs("carport"), true],
+        ["Carport Spaces", fs("carportSpaces")],
+        ["Garage/Parking Features", fs("parkingFeatures")],
+        ["Architectural Style", fs("architecturalStyle")],
+        ["Patio and Porch Features", fs("patioAndPorchFeatures")],
+        ["Foundation", fs("foundationType"), true],
+        ["Roof", fs("roofType"), true],
+        ["Exterior Construction", fs("exteriorConstruction"), true],
+        ["Exterior Features", fs("exteriorFeatures"), true],
+        ["Fencing", fs("fencing")],
+        ["Road Surface Type", fs("roadSurfaceType"), true],
       ]},
       // ── Page 4: Legal & Parcel ───────────────────────────────────────────
       { title: "LEGAL & PARCEL", color: colors.stellar, fields: [
-        ["Tax ID (Parcel Number)", fmt("parcelNumber"), true],
-        ["Tax Year", fmt("taxYear"), true],
-        ["Taxes (Annual Amount)", fmt("taxAnnualAmount"), true],
-        ["Additional Parcels", fmt("additionalParcels")],
-        ["Year Built", fmt("yearBuilt"), true],
-        ["Zoning", fmt("zoning"), true],
-        ["Legal Description", fmt("legalDescription"), true],
-        ["Section / Township / Range", [fmt("section"), fmt("township"), fmt("range")].filter(Boolean).join(" / ") || null],
-        ["Plat Book/Page", fmt("platBook")],
-        ["Homestead", fmt("homestead"), true],
-        ["CDD", fmt("cddYN"), true],
-        ["Annual CDD Fee", fmt("cddFeeAmount")],
-        ["Flood Zone Code", fmt("floodZoneCode"), true],
-        ["Lot Size Sq Ft", fmt("lotSizeSqft")],
-        ["MLS Area Major", fmt("mlsAreaMajor")],
+        ["Tax ID (Parcel Number)", fs("parcelNumber"), true],
+        ["Tax Year", fs("taxYear"), true],
+        ["Taxes (Annual Amount)", fs("taxAnnualAmount"), true],
+        ["Additional Parcels", fs("additionalParcels"), true],
+        ["Year Built", fs("yearBuilt"), true],
+        ["Zoning", fs("zoning"), true],
+        ["Legal Description", fs("legalDescription"), true],
+        ["Section", fs("section"), true],
+        ["Township", fs("township"), true],
+        ["Range", fs("range"), true],
+        ["Lot #", fs("lotNumber"), true],
+        ["Block/Parcel", fs("blockParcel"), true],
+        ["Plat Book/Page", fs("platBook"), true],
+        ["Legal Subdivision Name", fs("legalSubdivisionName"), true],
+        ["MLS Area Major", fs("mlsAreaMajor")],
+      ]},
+      // ── Pages 4–5: Lot & Parcel ──────────────────────────────────────────
+      { title: "LOT & PARCEL", color: colors.stellar, fields: [
+        ["Flood Zone Code", fs("floodZoneCode"), true],
+        ["Total Acreage", fs("totalAcreage") || acreageBand(formData.lotSizeAcres), true],
+        ["Lot Size Sq Ft", fs("lotSizeSqft"), true],
+        ["Lot Size Acres", fs("lotSizeAcres"), true],
+        ["Homestead", fs("homestead"), true],
+        ["CDD", fs("cddYN"), true],
+        ["Annual CDD Fee", fs("cddFeeAmount")],
+        ["Land Lease", fs("landLease"), true],
       ]},
       // ── Pages 5–6: Interior ──────────────────────────────────────────────
       { title: "INTERIOR INFORMATION", color: colors.stellar, fields: [
-        ["Beds", fmt("bedrooms"), true],
-        ["Full Baths", fmt("fullBaths"), true],
-        ["Half Baths", fmt("halfBaths")],
-        ["SqFt Heated", fmt("sqftHeated"), true],
-        ["SqFt Total", fmt("sqftTotal")],
-        ["SqFt Heated Source", fmt("sqftHeatedSource"), true],
-        ["Fireplace", fmt("fireplaceYN"), true],
-        ["Fireplace Description", fmt("fireplaceFeatures")],
-        ["Additional Rooms", fmt("additionalRooms")],
-        ["Appliances Included", fmt("appliances"), true],
-        ["Interior Features", fmt("interiorFeatures"), true],
-        ["Furnishings", fmt("furnished"), true],
-        ["Accessibility Features", fmt("accessibilityFeatures")],
-        ["Floor Covering", fmt("floorCovering"), true],
-        ["Window Features", fmt("windowFeatures")],
-        ["Laundry Features", fmt("laundryFeatures"), true],
-        ["Security Features", fmt("securityFeatures")],
-        ["Water", fmt("waterSource"), true],
-        ["Utilities", fmt("utilities"), true],
-        ["Heating and Fuel", fmt("heating"), true],
-        ["Air Conditioning", fmt("cooling"), true],
-        ["Sewer", fmt("sewer"), true],
+        ["Beds", fs("bedrooms"), true],
+        ["Full Baths", fs("fullBaths"), true],
+        ["Half Baths", fs("halfBaths"), true],
+        ["SqFt Heated", fs("sqftHeated"), true],
+        ["SqFt Total", fs("sqftTotal"), true],
+        ["SqFt Heated Source", fs("sqftHeatedSource"), true],
+        ["Fireplace", fs("fireplaceYN"), true],
+        ["Fireplace Description", fs("fireplaceFeatures")],
+        ["Additional Rooms", fs("additionalRooms")],
+        ["Appliances Included", fs("appliances"), true],
+        ["Interior Features", fs("interiorFeatures"), true],
+        ["Furnishings", fs("furnished"), true],
+        ["Accessibility Features", fs("accessibilityFeatures")],
+        ["Floor Covering", fs("floorCovering"), true],
+        ["Window Features", fs("windowFeatures")],
+        ["Laundry Features", fs("laundryFeatures"), true],
+        ["Security Features", fs("securityFeatures")],
+        ["Water", fs("waterSource"), true],
+        ["Utilities", fs("utilities"), true],
+        ["Heating and Fuel", fs("heating"), true],
+        ["Air Conditioning", fs("cooling"), true],
+        ["Sewer", fs("sewer"), true],
+      ]},
+      // ── Page 7: Room Details (type · level · size) ───────────────────────
+      { title: "ROOM DETAILS", color: colors.stellar, fields: [
+        ["Kitchen", room(/kitchen/i), true],
+        ["Living / Family / Great Room", room(/living|family|great/i), true],
+        ["Primary Bedroom", room(/primary bed|master bed/i), true],
       ]},
       // ── Page 8: Water Information ────────────────────────────────────────
       { title: "WATER INFORMATION", color: colors.stellar, fields: [
-        ["Water Access", fmt("waterAccessYN"), true],
-        ["Water Access Features", fmt("waterAccessFeatures")],
-        ["Water View", fmt("waterViewYN"), true],
-        ["Water View Features", fmt("waterViewFeatures")],
-        ["Water Frontage", fmt("waterFrontageYN"), true],
-        ["Water Frontage Features", fmt("waterFrontageFeatures")],
-        ["Water Extras", fmt("waterExtras"), true],
-        ["Water Name(s)", fmt("waterName")],
-        ["Skiing Allowed", fmt("skiingAllowed")],
+        ["Water Access", fs("waterAccessYN"), true],
+        ["Water Access Features", fs("waterAccessFeatures")],
+        ["Water View", fs("waterViewYN"), true],
+        ["Water View Features", fs("waterViewFeatures")],
+        ["Water Frontage", fs("waterFrontageYN"), true],
+        ["Water Frontage Features", fs("waterFrontageFeatures")],
+        ["Water Extras", fs("waterExtras"), true],
+        ["Water Name(s)", fs("waterName")],
+        ["Skiing Allowed", fs("skiingAllowed")],
+      ]},
+      // ── Page 10: Green Information ───────────────────────────────────────
+      { title: "GREEN INFORMATION", color: colors.stellar, fields: [
+        ["Green Energy Generation Y/N", fs("greenEnergyGeneration"), true],
       ]},
       // ── Page 10: Owner & Occupancy ───────────────────────────────────────
       { title: "OWNER & OCCUPANCY", color: colors.stellar, fields: [
-        ["Ownership", fmt("ownership")],
-        ["Home Warranty", fmt("homeWarranty")],
-        ["Existing Lease / Tenant", fmt("existingLease")],
-        ["Can Property Be Leased", fmt("canBeLeasedYN")],
-        ["Minimum Lease Period", fmt("minLeasePeriod")],
-        ["Pets Allowed", fmt("petsAllowed")],
-        ["Pet Restrictions", fmt("petRestrictions")],
+        ["Ownership", fs("ownership"), true],
+        ["Home Warranty", fs("homeWarranty")],
+        ["Existing Lease / Tenant", fs("existingLease"), true],
+        ["Can Property Be Leased", fs("canBeLeasedYN"), true],
+        ["Minimum Lease Period", fs("minLeasePeriod")],
+        ["Lease Restrictions", fs("leaseRestrictions")],
+        ["Pets Allowed", fs("petsAllowed")],
+        ["Pet Restrictions", fs("petRestrictions")],
       ]},
       // ── Page 11: HOA / Community ─────────────────────────────────────────
       { title: "HOA / COMMUNITY", color: colors.stellar, fields: [
-        ["HOA/Comm Assn YN", fmt("hoaYN"), true],
-        ["HOA Fee Requirement", fmt("hoaFeeRequirement")],
-        ["HOA Fee", fmt("hoaFee")],
-        ["HOA Payment Schedule", fmt("hoaFeeFrequency")],
-        ["Master Assoc YN", fmt("masterAssocYN"), true],
-        ["Master Assoc Fee", fmt("masterAssocFee")],
-        ["Master Assoc Fee Frequency", fmt("masterAssocFeeFrequency")],
-        ["Association/Manager Name", fmt("hoaName")],
-        ["Association/Manager Phone", fmt("hoaPhone")],
-        ["Association/Manager Email", fmt("hoaEmail")],
-        ["Fee Includes", fmt("feeIncludes")],
-        ["Association Amenities", fmt("associationAmenities")],
-        ["Community Features", fmt("communityFeatures")],
-        ["Housing for Older Persons", fmt("seniorCommunity"), true],
+        ["HOA/Comm Assn YN", fs("hoaYN"), true],
+        ["HOA Fee Requirement", fs("hoaFeeRequirement")],
+        ["HOA Fee", fs("hoaFee")],
+        ["HOA Payment Schedule", fs("hoaFeeFrequency")],
+        ["Master Assoc YN", fs("masterAssocYN"), true],
+        ["Master Assoc Fee", fs("masterAssocFee")],
+        ["Master Assoc Fee Frequency", fs("masterAssocFeeFrequency")],
+        ["Association/Manager Name", fs("hoaName")],
+        ["Association/Manager Phone", fs("hoaPhone")],
+        ["Association/Manager Email", fs("hoaEmail")],
+        ["Fee Includes", fs("feeIncludes")],
+        ["Association Amenities", fs("associationAmenities")],
+        ["Community Features", fs("communityFeatures")],
+        ["Housing for Older Persons", fs("seniorCommunity"), true],
       ]},
       // ── Page 12: Realtor Information ─────────────────────────────────────
       { title: "REALTOR INFORMATION", color: colors.stellar, fields: [
-        ["Financing Available / Listing Terms", fmt("listingTerms")],
-        ["Realtor Information / Disclosures", fmt("realtorInfo")],
-        ["Can Property Be Leased", fmt("canBeLeasedYN")],
-        ["Lease Restrictions", fmt("leaseRestrictions")],
-        ["Association Approval Required", fmt("assocApprovalRequired")],
-        ["Current Use", fmt("currentUse")],
-      ]},
-      // ── Page 13: Showing ─────────────────────────────────────────────────
-      { title: "SHOWING INFORMATION", color: colors.stellar, fields: [
-        ["Occupant Type", fmt("occupantType"), true],
-        ["Showing Instructions", fmt("showingInstructions"), true],
-        ["Showing Considerations", fmt("showingConsiderations")],
-        ["Lock Box Type", fmt("lockBoxType")],
-        ["Possession", fmt("possession")],
+        ["Financing Available / Listing Terms", fs("listingTerms")],
+        ["Realtor Information / Disclosures", fs("realtorInfo")],
+        ["Association Approval Required", fs("assocApprovalRequired")],
+        ["Current Use", fs("currentUse")],
+        ["Possession", fs("possession")],
       ]},
       // ── Page 13: Agent & Office ──────────────────────────────────────────
       { title: "AGENT & OFFICE", color: colors.stellar, fields: [
-        ["List Agent Name", fmt("listAgentName")],
-        ["List Agent Email", fmt("listAgentEmail")],
-        ["List Agent Phone", fmt("listAgentPhone")],
-        ["List Agent Stellar ID", fmt("stellarAgentId")],
-        ["Office Name", fmt("officeName")],
-        ["Office Phone", fmt("stellarOfficePhone")],
-        ["Office Stellar ID", fmt("stellarOfficeId")],
+        ["List Agent Name", fs("listAgentName"), true],
+        ["List Agent Email", fs("listAgentEmail")],
+        ["List Agent Phone", fs("listAgentPhone")],
+        ["List Agent Stellar ID", fs("stellarAgentId"), true],
+        ["Office Name", fs("officeName"), true],
+        ["Office Phone", fs("stellarOfficePhone")],
+        ["Office Stellar ID", fs("stellarOfficeId"), true],
+      ]},
+      // ── Page 13: Showing ─────────────────────────────────────────────────
+      { title: "SHOWING INFORMATION", color: colors.stellar, fields: [
+        ["Occupant Type", fs("occupantType"), true],
+        ["Showing Instructions", fs("showingInstructions"), true],
+        ["Showing Considerations", fs("showingConsiderations")],
+        ["Lock Box Type", fs("lockBoxType")],
+      ]},
+      // ── Page 14: Listing Distribution ────────────────────────────────────
+      { title: "LISTING DISTRIBUTION", color: colors.stellar, fields: [
+        ["Internet", fs("idxDisplay"), true],
+        ["Third Party", fs("thirdParty"), true],
+        ["Show Prop Address on Internet", fs("internetAddressDisplay"), true],
+        ["IDX/VOW Display Comments", fs("idxComments"), true],
+        ["IDX/VOW AVM", fs("idxAvm"), true],
+        ["Create Free Automatic Virtual Tour", fs("autoVirtualTour"), true],
       ]},
       // ── Page 14: Remarks & Marketing ────────────────────────────────────
       { title: "REMARKS & MARKETING", color: colors.stellar, fields: [
-        ["Public Remarks", fmt("publicRemarks"), true],
-        ["Realtor Only Remarks", fmt("privateRemarks")],
-        ["Driving Directions", fmt("drivingDirections"), true],
-        ["Virtual Tour Link", fmt("virtualTourLink")],
-        ["IDX / Internet Display", fmt("internetAddressDisplay")],
-        ["IDX Entire Listing Display", fmt("idxDisplay")],
+        ["Virtual Tour Link", fs("virtualTourLink")],
+        ["Public Remarks", fs("publicRemarks"), true],
+        ["Realtor Only Remarks", fs("privateRemarks")],
+        ["Driving Directions", fs("drivingDirections"), true],
       ]},
     ],
     daytona: [
-      { title: "CONTRACT INFORMATION", color: colors.daytona, fields: [
-        ["List Price", fmt("listPrice"), true],
-        ["Listing Agreement", fmt("listingType"), true],
-        ["Listing Service", fmt("listingServiceType"), true],
-        ["Listing Contract Date", fmt("listingContractDate")],
-        ["Expiration Date", fmt("expirationDate")],
-        ["Seller Concessions Offered", fmt("sellerConcessions")],
-        ["Special Listing Conditions", fmt("specialSaleProvision"), true],
-        ["Owner Name", fmt("ownerName")],
-        ["Owner Phone", fmt("ownerPhone")],
-        ["Occupant Type", fmt("occupantType"), true],
-        ["Unit Type", fmt("unitType")],
-        ["DBAR MLS ID", fmt("dbarListingId")],
+      { title: "LISTING INFORMATION", color: colors.daytona, fields: [
+        ["Property Type", fd("propertyType"), true],
+        ["Property Sub Type", fd("propertySubType"), true],
+        ["List Agent (Listing Member) DBAR ID", fd("dbarAgentId"), true],
+        ["DBAR MLS ID", fd("dbarListingId")],
       ]},
       { title: "ADDRESS", color: colors.daytona, fields: [
-        ["Street Number", fmt("streetNumber")],
-        ["Street Direction Prefix", fmt("streetDirPre")],
-        ["Street Name", fmt("streetName")],
-        ["Street Suffix", fmt("streetType")],
-        ["Unit Number", fmt("unitNumber")],
-        ["City", fmt("city"), true],
-        ["State", fmt("state"), true],
-        ["Postal Code", fmt("zip"), true],
-        ["County", fmt("county"), true],
-        ["Country", fmt("country")],
-        ["Parcel Number", fmt("parcelNumber")],
-        ["Subdivision Name", fmt("subdivisionName"), true],
-        ["MLS Area Major", fmt("mlsAreaMajor"), true],
+        ["Street Number", fd("streetNumber"), true],
+        ["Street Direction Prefix", fd("streetDirPre")],
+        ["Street Name", fd("streetName"), true],
+        ["Street Suffix", fd("streetType")],
+        ["Street Direction Suffix", fd("streetDirPost")],
+        ["Unit Number", fd("unitNumber")],
+        ["City", fd("city"), true],
+        ["State", fd("state")],
+        ["Postal Code", fd("zip"), true],
+        ["County", fd("county"), true],
+        ["Country", fd("country")],
+        ["Parcel Number", fd("parcelNumber"), true],
+        ["Directions", fd("drivingDirections"), true],
       ]},
-      { title: "GENERAL PROPERTY INFORMATION", color: colors.daytona, fields: [
-        ["Property Sub Type", fmt("propertySubType"), true],
-        ["Property Attached YN", fmt("propertyAttachedYN") || fmt("propertyAttached"), true],
-        ["New Construction YN", fmt("newConstruction"), true],
-        ["Property Condition", fmt("propertyCondition")],
-        ["Bedrooms Total", fmt("bedrooms")],
-        ["Bathrooms Full", fmt("fullBaths")],
-        ["Bathrooms Half", fmt("halfBaths")],
-        ["Living Area (SqFt Heated)", fmt("sqftHeated")],
-        ["Building Area Total", fmt("sqftTotal")],
-        ["Living Area Source", fmt("sqftHeatedSource"), true],
-        ["Year Built", fmt("yearBuilt")],
-        ["Stories", fmt("stories")],
-        ["Direction Faces", fmt("frontExposure"), true],
-        ["Furnished", fmt("furnished")],
-        ["Homestead YN", fmt("homestead"), true],
-        ["Senior Community YN", fmt("seniorCommunity"), true],
-        ["Accessibility Features YN", fmt("accessibilityFeaturesYN"), true],
-        ["Garage YN", fmt("garage"), true],
-        ["Garage Spaces", fmt("garageSpaces")],
-        ["Carport YN", fmt("carport"), true],
-        ["Carport Spaces", fmt("carportSpaces")],
-        ["Pool Private YN", fmt("poolPrivate")],
-        ["Pool Features", fmt("poolFeatures")],
-        ["Lot Size Acres", fmt("lotSizeAcres")],
-        ["Lot Size Dimensions", fmt("lotDimensions")],
-        ["Accessory Dwelling Unit YN", fmt("accessoryDwellingUnit"), true],
-        ["Association YN", fmt("hoaYN"), true],
-        ["Association Fee", fmt("hoaFee")],
-        ["Association Fee Frequency", fmt("hoaFeeFrequency")],
-        ["Association Name", fmt("hoaName")],
-        ["Association Phone", fmt("hoaPhone")],
-        ["CDD Fee YN", fmt("cddYN"), true],
-        ["CDD Fee Amount", fmt("cddFeeAmount")],
+      { title: "CONTRACT", color: colors.daytona, fields: [
+        ["Status", fd("status"), true],
+        ["List Price", fd("listPrice"), true],
+        ["Listing Agreement", fd("listingType"), true],
+        ["Listing Service", fd("listingServiceType"), true],
+        ["Listing Contract Date", fd("listingContractDate"), true],
+        ["Expiration Date", fd("expirationDate"), true],
+        ["Listing Terms", fd("listingTerms"), true],
+        ["Special Listing Conditions", fd("specialSaleProvision"), true],
+        ["Possession", fd("possession"), true],
+        ["Owner Name", fd("ownerName")],
+        ["Owner Phone", fd("ownerPhone")],
+        ["Occupant Type", fd("occupantType")],
+        ["Seller Concessions Offered", fd("sellerConcessions")],
       ]},
-      { title: "INTERIOR FEATURES", color: colors.daytona, fields: [
-        ["Flooring", fmt("floorCovering")],
-        ["Appliances", fmt("appliances")],
-        ["Interior Features", fmt("interiorFeatures")],
-        ["Fireplace Features", fmt("fireplaceFeatures")],
-        ["Laundry Features", fmt("laundryFeatures")],
-        ["Cooling", fmt("cooling"), true],
-        ["Heating", fmt("heating"), true],
-        ["Utilities", fmt("utilities"), true],
-        ["Water Source", fmt("waterSource"), true],
-        ["Sewer", fmt("sewer")],
+      { title: "LOCATION, TAX, & LEGAL", color: colors.daytona, fields: [
+        ["MLS Area Major", fd("mlsAreaMajor"), true],
+        ["Subdivision Name", fd("subdivisionName"), true],
+        ["Elementary School", fd("elementarySchool")],
+        ["Middle School", fd("middleSchool")],
+        ["High School", fd("highSchool")],
+        ["Tax Annual Amount", fd("taxAnnualAmount")],
+        ["Tax Year", fd("taxYear")],
+        ["Tax Legal Description", fd("legalDescription"), true],
+        ["Homestead YN", fd("homestead")],
+        ["Flood Zone", fd("floodZoneCode")],
+        ["Zoning Description", fd("zoning")],
       ]},
-      { title: "EXTERIOR FEATURES", color: colors.daytona, fields: [
-        ["Architectural Style", fmt("architecturalStyle")],
-        ["Roof", fmt("roofType")],
-        ["Construction Materials", fmt("exteriorConstruction")],
-        ["Foundation Details", fmt("foundationType")],
-        ["Exterior Features", fmt("exteriorFeatures")],
-        ["Patio And Porch Features", fmt("patioAndPorchFeatures")],
-        ["Other Structures", fmt("otherStructures")],
-        ["Fencing", fmt("fencing")],
-        ["Parking Features", fmt("parkingFeatures"), true],
-        ["Lot Features", fmt("lotFeatures")],
-        ["View", fmt("view")],
-        ["Road Surface Type", fmt("roadSurfaceType")],
+      { title: "ASSOCIATION / COMMUNITY", color: colors.daytona, fields: [
+        ["Association YN", fd("hoaYN"), true],
+        ["Association Fee", fd("hoaFee")],
+        ["Association Fee Frequency", fd("hoaFeeFrequency")],
+        ["Association Name", fd("hoaName")],
+        ["Association Phone", fd("hoaPhone")],
+        ["Association Fee 2", fd("masterAssocFee")],
+        ["Association Fee 2 Frequency", fd("masterAssocFeeFrequency")],
+        ["Association Fee Includes", fd("feeIncludes")],
+        ["Association Amenities", fd("associationAmenities")],
+        ["Community Features", fd("communityFeatures")],
+        ["Senior Community YN", fd("seniorCommunity"), true],
+        ["CDD Fee YN", fd("cddYN"), true],
+        ["CDD Fee Amount", fd("cddFeeAmount")],
+        ["Pets Allowed", fd("petsAllowed")],
       ]},
-      { title: "LOCATION, TAX, AND LEGAL", color: colors.daytona, fields: [
-        ["Tax Annual Amount", fmt("taxAnnualAmount")],
-        ["Tax Year", fmt("taxYear")],
-        ["Zoning Description", fmt("zoning"), true],
-        ["Tax Legal Description", fmt("legalDescription")],
-        ["Elementary School", fmt("elementarySchool"), true],
-        ["Middle School", fmt("middleSchool"), true],
-        ["High School", fmt("highSchool"), true],
+      { title: "BUILDING", color: colors.daytona, fields: [
+        ["New Construction YN", fd("newConstruction"), true],
+        ["Property Attached YN", fd("propertyAttachedYN")],
+        ["Direction Faces", fd("frontExposure")],
+        ["Year Built", fd("yearBuilt")],
+        ["Property Condition", fd("propertyCondition")],
+        ["Stories", fd("stories"), true],
+        ["Levels", fd("levels")],
+        ["Unit Type", fd("unitType")],
+        ["Architectural Style", fd("architecturalStyle")],
+        ["Construction Materials", fd("exteriorConstruction")],
+        ["Foundation Details", fd("foundationType")],
+        ["Roof", fd("roofType")],
+        ["Accessory Dwelling Unit YN", fd("accessoryDwellingUnit")],
+      ]},
+      { title: "INTERIOR", color: colors.daytona, fields: [
+        ["Bedrooms Total", fd("bedrooms"), true],
+        ["Bathrooms Full", fd("fullBaths"), true],
+        ["Bathrooms Half", fd("halfBaths"), true],
+        ["Living Area", fd("sqftHeated"), true],
+        ["Living Area Source", fd("sqftHeatedSource"), true],
+        ["Building Area Total", fd("sqftTotal")],
+        ["Flooring", fd("floorCovering")],
+        ["Furnished", fd("furnished")],
+        ["Appliances", fd("appliances"), true],
+        ["Accessibility Features YN", fd("accessibilityFeaturesYN") || ((formData.accessibilityFeatures || []).length ? "Yes (has accessibility features)" : null), true],
+        ["Accessibility Features", fd("accessibilityFeatures")],
+        ["Interior Features", fd("interiorFeatures")],
+        ["Fireplace Features", fd("fireplaceFeatures")],
+        ["Laundry Features", fd("laundryFeatures")],
+        ["Security Features", fd("securityFeatures")],
+      ]},
+      { title: "ROOMS (type · level · size)", color: colors.daytona, fields: [
+        ["Kitchen", room(/kitchen/i)],
+        ["Primary Bedroom", room(/primary bed|master bed/i)],
+      ]},
+      { title: "EXTERIOR & PARKING", color: colors.daytona, fields: [
+        ["Exterior Features", fd("exteriorFeatures")],
+        ["Patio And Porch Features", fd("patioAndPorchFeatures")],
+        ["Garage YN", fd("garage"), true],
+        ["Garage Spaces", fd("garageSpaces")],
+        ["Carport YN", fd("carport"), true],
+        ["Carport Spaces", fd("carportSpaces")],
+        ["Parking Features", fd("parkingFeatures"), true],
+      ]},
+      { title: "LOT", color: colors.daytona, fields: [
+        ["Lot Size Acres", fd("lotSizeAcres")],
+        ["Lot Size Dimensions", fd("lotDimensions")],
+        ["Pool Private YN", fd("poolPrivate"), true],
+        ["Pool Features", fd("poolFeatures")],
+        ["Spa Features", fd("spaFeatures")],
+        ["View", fd("view")],
+        ["Lot Features", fd("lotFeatures")],
+        ["Current Use", fd("currentUse"), true],
+        ["Fencing", fd("fencing")],
+        ["Road Surface Type", fd("roadSurfaceType")],
+        ["Other Structures", fd("otherStructures")],
       ]},
       { title: "WATER", color: colors.daytona, fields: [
-        ["Water Body Access YN", fmt("waterAccessYN"), true],
-        ["Waterfront YN", fmt("waterFrontageYN"), true],
-        ["Water Frontage Feet", fmt("waterFrontageFootage")],
-        ["Waterfront Features", fmt("waterFrontageFeatures")],
-        ["View (Water)", fmt("waterViewFeatures")],
-        ["Water Extras", fmt("waterExtras")],
-        ["Water Body Access Type", fmt("waterAccessFeatures")],
+        ["Waterfront YN", fd("waterFrontageYN"), true],
+        ["Waterfront Features", fd("waterFrontageFeatures")],
+        ["Water Frontage Feet", fd("waterFrontageFootage")],
+        ["Water Body Access YN", fd("waterAccessYN")],
+        ["Water Body Access Type", fd("waterAccessFeatures")],
+        ["View (Water)", fd("waterViewFeatures")],
       ]},
-      { title: "SHOWING & REMARKS", color: colors.daytona, fields: [
-        ["Showing Requirements", fmt("showingInstructions"), true],
-        ["Showing Considerations", fmt("showingConsiderations")],
-        ["Occupant Type", fmt("occupantType"), true],
-        ["Public Remarks", fmt("publicRemarks")],
-        ["Private Remarks", fmt("privateRemarks")],
-        ["Directions", fmt("drivingDirections")],
-        ["Office Remarks", fmt("officeRemarks")],
-        ["Lock Box Type", fmt("lockBoxType")],
-        ["Pets Allowed", fmt("petsAllowed")],
-        ["Current Use", fmt("currentUse"), true],
-        ["Listing Terms", fmt("listingTerms"), true],
-        ["Possession", fmt("possession"), true],
+      { title: "UTILITIES", color: colors.daytona, fields: [
+        ["Cooling", fd("cooling"), true],
+        ["Heating", fd("heating"), true],
+        ["Sewer", fd("sewer")],
+        ["Water Source", fd("waterSource"), true],
+        ["Utilities", fd("utilities"), true],
+      ]},
+      { title: "REMARKS", color: colors.daytona, fields: [
+        ["Public Remarks", fd("publicRemarks"), true],
+        ["Private Remarks", fd("privateRemarks")],
+        ["Office Remarks", fd("officeRemarks")],
+      ]},
+      { title: "SHOWINGS", color: colors.daytona, fields: [
+        ["Showing Requirements", fd("showingInstructions"), true],
+        ["Showing Considerations", fd("showingConsiderations")],
+        ["Lock Box Type", fd("lockBoxType")],
       ]},
       { title: "AGENT & OFFICE", color: colors.daytona, fields: [
-        ["List Agent Name", fmt("listAgentName")],
-        ["List Agent Email", fmt("listAgentEmail")],
-        ["List Agent Phone", fmt("listAgentPhone")],
-        ["List Agent DBAR ID", fmt("dbarAgentId")],
-        ["Office Name", fmt("officeName")],
-        ["Office Phone", fmt("dbarOfficePhone")],
-        ["Office DBAR ID", fmt("dbarOfficeId")],
-        ["Seller Concessions Offered", fmt("sellerConcessions")],
-        ["Accessibility Features YN", fmt("accessibilityFeaturesYN")],
+        ["List Agent Name", fd("listAgentName")],
+        ["List Agent Email", fd("listAgentEmail")],
+        ["List Agent Phone", fd("listAgentPhone")],
+        ["Office Name", fd("officeName")],
+        ["Office Phone", fd("dbarOfficePhone")],
+        ["Office DBAR ID", fd("dbarOfficeId")],
       ]},
     ],
   };
@@ -1697,6 +1832,8 @@ function FormsOutput({ formData }) {
   // Compute missing required fields for the active tab
   const missingRequired = (sections[tab] || [])
     .flatMap(s => s.fields.filter(([, v, req]) => req && !v).map(([label]) => label));
+  const offChoice = (sections[tab] || [])
+    .flatMap(s => s.fields.filter(([, v]) => typeof v === "string" && v.includes("⚠️ not a ")).map(([label]) => label));
 
   const sourceSystem = formData.dbarListingId && !formData.stellarListingId ? "DBAR"
     : formData.stellarListingId && !formData.dbarListingId ? "Stellar"
@@ -1750,6 +1887,22 @@ function FormsOutput({ formData }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {missingRequired.map(label => (
               <span key={label} style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: "4px", padding: "2px 8px", fontSize: "11px", color: "#78350f", fontWeight: "600" }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Answers copied from the other MLS that aren't this MLS's choices */}
+      {offChoice.length > 0 && (
+        <div style={{ marginBottom: "16px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: "10px", padding: "12px 16px" }}>
+          <div style={{ fontWeight: "700", color: "#9a3412", fontSize: "12px", marginBottom: "6px" }}>
+            ⚠️ {offChoice.length} answer{offChoice.length > 1 ? "s" : ""} copied from {SHEET_NAME[fromSystem]} {offChoice.length > 1 ? "aren't" : "isn't"} {SHEET_NAME[tab]} choices — pick the closest {SHEET_NAME[tab]} option for:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {offChoice.map(label => (
+              <span key={label} style={{ background: "#ffedd5", border: "1px solid #fdba74", borderRadius: "4px", padding: "2px 8px", fontSize: "11px", color: "#7c2d12", fontWeight: "600" }}>
                 {label}
               </span>
             ))}
