@@ -131,7 +131,7 @@ const H = () => Auth.headers();
 const money = n => n ? '$' + Number(n).toLocaleString('en-US') : '';
 // Listing photos go through the server's /photo-proxy, like the Hotsheet —
 // DeltaNet's images.php doesn't serve them reliably to a browser directly.
-const photoSrc = url => `${PROXY_BASE}/photo-proxy?key=${encodeURIComponent(Auth.proxyKey)}&url=${encodeURIComponent(url)}`;
+const photoSrc = url => `${PROXY_BASE}/photo-proxy?url=${encodeURIComponent(url)}`;
 function fmtDay(date, long) { const [y, m, d] = date.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', long ? { weekday: 'long', month: 'long', day: 'numeric' } : { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmtTime(t) { const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}${m ? ':' + String(m).padStart(2, '0') : ''} ${h >= 12 ? 'pm' : 'am'}`; }
 function fmtWindow(s, e) { const a = fmtTime(s), b = fmtTime(e); return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`; }
