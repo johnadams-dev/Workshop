@@ -1357,7 +1357,7 @@ tbody tr.clickable { cursor: pointer; }
             <div class="report-card-icon">🏠</div>
             <div>
               <div class="report-card-title">Hotsheet Report</div>
-              <div class="report-card-desc">Live feed of MLS activity — new listings, price changes, status updates.</div>
+              <div class="report-card-desc">New listings, contracts, closings, changes, upcoming listings, buyer needs and open houses.</div>
             </div>
           </div>
         </div>
@@ -1425,13 +1425,13 @@ tbody tr.clickable { cursor: pointer; }
           <div class="report-card-icon">🏠</div>
           <div>
             <div class="report-card-title">Hotsheet Report</div>
-            <div class="report-card-desc">Live feed of MLS activity — new listings, price changes, status updates.</div>
+            <div class="report-card-desc">New listings, contracts, closings, changes, upcoming listings, buyer needs and open houses.</div>
           </div>
         </div>
         <div class="report-card-body">
           <div class="hotsheet-row">
-            <div class="hotsheet-desc">Opens the live DeltaNet hotsheet report in a new tab. Shows recent MLS activity across all offices.</div>
-            <button type="button" class="btn btn-primary" onclick="openHotsheetReport()">Open Hotsheet →</button>
+            <div class="hotsheet-desc">Opens the Adams Cameron Hotsheet (built from Daily Desk's transactions) in a new tab.</div>
+            <a class="btn btn-primary" href="./hotsheet-v2.html" target="_blank" rel="noopener">Open Hotsheet →</a>
           </div>
         </div>
       </div>
@@ -2513,21 +2513,6 @@ const PROXY            = Auth.API;
 ═══════════════════════════════════════════════════════════════════ */
 let userEmail   = "";
 let userDisplay = "";
-
-// The Hotsheet report opens in a new tab, which can't send a session, so the
-// server hands back a 12-hour signed link for this person. The tab is opened
-// first (browsers block tabs opened after waiting on a request), then sent
-// to the link.
-async function openHotsheetReport() {
-  const tab = window.open('', '_blank');
-  try {
-    const { path } = await POST('/hotsheet/report-link', {});
-    if (tab) tab.location = PROXY + path; else window.location = PROXY + path;
-  } catch (e) {
-    if (tab) tab.close();
-    alert("Couldn't open the Hotsheet report: " + e.message);
-  }
-}
 
 let STATE = {
   listings:          [],
