@@ -146,6 +146,7 @@ form.vform { background: var(--surface); border: 1px solid var(--border); border
         <option value="pending">Waiting for review</option>
         <option value="recheck">Needs renewal (vendor hasn't confirmed in the last year)</option>
         <option value="approved">Approved</option>
+        <option value="lapsed">Lapsed (didn't answer their renewal)</option>
         <option value="rejected">Rejected</option>
         <option value="archived">Archived</option>
         <option value="all">Everything</option>
@@ -318,6 +319,7 @@ function statusPill(v) {
   if (v.status === 'pending') return ' <span class="pill gold">Waiting for review</span>';
   if (v.status === 'rejected') return ' <span class="pill red">Rejected</span>';
   if (v.status === 'archived') return ' <span class="pill">Archived</span>';
+  if (v.status === 'lapsed') return ' <span class="pill red">Lapsed</span>';
   return '';
 }
 
@@ -391,16 +393,18 @@ function reviewActs(v) {
   const b = [`<button class="btn" onclick="editVendor(${v.id}, 'review')">Edit</button>`];
   if (v.status === 'pending') b.unshift(`<button class="btn green" onclick="review(${v.id},'approve')">Approve</button>`, `<button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`);
   if (v.status === 'approved') b.push(`<button class="btn" onclick="review(${v.id},'verify')" title="You checked yourself (e.g. by phone) that they're in business and the details are right. Sends no email and doesn't replace the vendor's yearly confirmation.">Mark verified</button>`, `<button class="btn danger" onclick="review(${v.id},'archive')">Archive</button>`);
-  if (v.status === 'pending' || v.status === 'approved') b.push(
+  if (v.status === 'lapsed') b.push(`<button class="btn green" onclick="review(${v.id},'approve')" title="Back on the list; sends them the renewal email again">Restore and re-send</button>`);
+  if (v.status === 'pending' || v.status === 'approved' || v.status === 'lapsed') b.push(
     `<button class="btn" onclick="sendEmail(${v.id},'welcome')" title="Congratulations email with the link to confirm details and accept the agreement">Send welcome email</button>`,
     `<button class="btn" onclick="sendEmail(${v.id},'renewal')" title="&quot;You are on the vendor list… please confirm your details&quot; with the link">Send renewal email</button>`);
-  if (v.status === 'rejected' || v.status === 'archived') b.push(`<button class="btn" onclick="review(${v.id},'reopen')">Back to review</button>`);
+  if (v.status === 'rejected' || v.status === 'archived' || v.status === 'lapsed') b.push(`<button class="btn" onclick="review(${v.id},'reopen')">Back to review</button>`);
   return b.join('');
 }
 
 async function sendEmail(id, purpose) {
   const v = S.all.find(x => x.id === id);
-  if (!confirm(`Send the ${purpose} email for ${v.name}?\n\nWhile testing, vendor emails go to you instead of the vendor.`)) return;
+  if (!v.email) { toast(`${v.name} has no email address. Edit the vendor to add one first.`, true); return; }
+  if (!confirm(`Send the ${purpose} email to ${v.name} at ${v.email}?`)) return;
   try {
     const r = await Auth.api(`/vendors/${id}/send`, { body: { purpose } });
     replace(r.vendor);
@@ -429,10 +433,19 @@ async function review(id, action) {
     if (note === null) return;
   }
   try {
-    const { welcome, ...v } = await Auth.api(`/vendors/${id}/review`, { body: { action, note } });
+    // Approving emails the vendor (welcome or renewal), so ask for an email
+    // address first if there isn't one, e.g. one staff got on the phone.
+    const cur = S.all.find(x => x.id === id);
+    if (action === 'approve' && cur && !cur.email) {
+      const email = prompt(`${cur.name} has no email address, so they can't be sent the email to confirm their details.\n\nEnter their email address, or leave it blank to approve without emailing:`);
+      if (email === null) return;
+      if (email.trim()) replace(await Auth.api(`/vendors/${id}`, { method: 'PUT', body: { email: email.trim() } }));
+    }
+    const { emailed, ...v } = await Auth.api(`/vendors/${id}/review`, { body: { action, note } });
     replace(v);
-    if (welcome?.error) toast(`Approved, but the welcome email failed: ${welcome.error}`, true);
-    else toast(welcome ? `Approved — everyone can see it now. Welcome email sent to ${welcome.sentTo}${welcome.test ? ' (test)' : ''}.`
+    const what = emailed?.purpose === 'welcome' ? 'Welcome' : 'Renewal';
+    if (emailed?.error) toast(`Approved, but no ${what.toLowerCase()} email was sent: ${emailed.error}.`, true);
+    else toast(emailed ? `Approved — everyone can see it now. ${what} email sent to ${emailed.sentTo}${emailed.test ? ' (test)' : ''}.`
       : { approve: 'Approved — everyone can see it now.', reject: 'Rejected.', archive: 'Archived.', verify: 'Marked verified.', reopen: 'Back in the review queue.' }[action]);
   } catch (e) { toast(e.message, true); }
 }
