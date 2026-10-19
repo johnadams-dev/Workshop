@@ -710,6 +710,9 @@ function SearchImport({ settings, onImport, onOpenSheets }) {
       if (listing.ListOfficePhone) formData.dbarOfficePhone = String(listing.ListOfficePhone);
     }
     // Shared agent fields (name, email, phone are the same person regardless of system)
+    // Open the input sheet for the other MLS — the one it's being entered into
+    // (same rule as the Cross-System Report). Public records start on Stellar.
+    formData._defaultFormTab = sys === "stellar" ? "daytona" : "stellar";
     setImported(formData);
     onImport(formData, listing);
   };
