@@ -397,6 +397,8 @@
     .gap-row:last-child { border-bottom: none; }
     .gap-address { font-family: 'Cormorant Garamond', serif; font-size: 1rem; font-weight: 600; color: var(--ink); line-height: 1.25; }
     .gap-detail { font-size: .78rem; color: var(--slate); margin-top: .2rem; }
+    .gap-link { color: var(--ink); font-weight: 600; text-decoration: none; white-space: nowrap; }
+    .gap-link:hover { text-decoration: underline; }
     .gap-pill {
       font-size: .64rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
       padding: .12rem .5rem; border-radius: 100px; display: inline-block; flex-shrink: 0; white-space: nowrap;
@@ -1229,6 +1231,7 @@ function describeDnStatusChange(dnStatus) {
 // daily-desk-routes.js's transaction_id_links) — confirmed live against a
 // real gap. scheduler.js's own MLS_IDS constant is { STELLAR: 1, DBAR: 2 }.
 const MLS_BOARD_NAMES = { 1: 'Stellar MLS', 2: 'Daytona MLS' };
+const MLS_MAGIC_SOURCE = { 1: 'stellar', 2: 'daytona' };  // mls-magic.html ?source=
 function mlsBoardLabel(id) {
   return MLS_BOARD_NAMES[id] || `MLS #${id}`;
 }
@@ -1288,11 +1291,15 @@ function renderComplianceGapsSection(gaps, mlsGaps) {
     const missingBoard = mlsBoardLabel(g.missing_mls_id);
     const price = g.list_price ? fmtGapPrice(g.list_price) : null;
     const detail = `Listed on ${onBoard}${price ? ` at ${price}` : ''}, but not showing on ${missingBoard} — worth checking whether it should be there too.`;
+    // MLS Magic looks the listing up and opens its input sheet for the other MLS.
+    const sheetUrl = g.listing_id && MLS_MAGIC_SOURCE[g.source_mls_id]
+      ? `./mls-magic.html?search=${encodeURIComponent(g.listing_id)}&source=${MLS_MAGIC_SOURCE[g.source_mls_id]}` : '';
+    const sheetLink = sheetUrl ? ` <a class="gap-link" href="${escapeHtml(sheetUrl)}">Make the ${escapeHtml(missingBoard)} input sheet →</a>` : '';
     return `
     <div class="gap-row">
       <div>
         <div class="gap-address">${escapeHtml(g.address || 'Address unknown')}</div>
-        <div class="gap-detail">${detail}</div>
+        <div class="gap-detail">${detail}${sheetLink}</div>
       </div>
       <span class="gap-pill mlsgap">MLS Gap</span>
     </div>`;

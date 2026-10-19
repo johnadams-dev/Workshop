@@ -615,17 +615,23 @@ const FieldRow = ({ label, value, daytona, stellar }) => (
 );
 
 // ─── TAB: Search & Import ─────────────────────────────────────────────────
-function SearchImport({ settings, onImport }) {
-  const [mode, setMode] = useState("address"); // address | mlsid | parcel
-  const [query, setQuery] = useState("");
-  const [system, setSystem] = useState("stellar");
+function SearchImport({ settings, onImport, onOpenSheets }) {
+  const [modeState, setMode] = useState("address"); // address | mlsid | parcel
+  const [queryState, setQuery] = useState("");
+  const [systemState, setSystem] = useState("stellar");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
   const [imported, setImported] = useState(null);
+  const mode = modeState, query = queryState, system = systemState;
 
-  const handleSearch = async () => {
+  // opts lets the deep link (?search=…&source=…) search before its state has rendered;
+  // returns the listing found by MLS ID, if any.
+  const handleSearch = async (opts = {}) => {
+    const system = opts.system || systemState, mode = opts.mode || modeState;
+    const query = opts.query != null ? opts.query : queryState;
+    let found = null;
     setLoading(true);
     setError("");
     setResults([]);
@@ -663,7 +669,7 @@ function SearchImport({ settings, onImport }) {
           if (r.length > 0) setResults(r); else setError("No Stellar MLS listings found for that address.");
         } else if (mode === "mlsid") {
           const r = await bridgeAPI.searchByMlsId(settings.bridgeToken, dsKey, query, settings.proxyUrl, settings.proxySecret);
-          if (r) setSelected(r); else setError("MLS ID not found in Stellar MLS.");
+          if (r) { setSelected(r); found = r; } else setError("MLS ID not found in Stellar MLS.");
         }
       } else {
         // DBAR via Spark API (Flexmls)
@@ -672,7 +678,7 @@ function SearchImport({ settings, onImport }) {
           if (r.length > 0) setResults(r); else setError("No DBAR listings found for that address.");
         } else if (mode === "mlsid") {
           const r = await sparkAPI.searchByMlsId(settings.sparkToken, query, settings.proxyUrl, settings.proxySecret, settings.sparkFeedId);
-          if (r) setSelected(r); else setError("MLS ID not found in Daytona DBAR.");
+          if (r) { setSelected(r); found = r; } else setError("MLS ID not found in Daytona DBAR.");
         } else {
           setError("Parcel search is not available for DBAR via Spark API. Try searching by address instead.");
         }
@@ -681,13 +687,14 @@ function SearchImport({ settings, onImport }) {
       setError(`API Error: ${e.message}`);
     }
     setLoading(false);
+    return found;
   };
 
-  const handleImport = (listing) => {
+  const handleImport = (listing, sys = system) => {
     const formData = resoToForm(listing);
     // Stamp system-specific IDs — these vary per MLS and must not be shared
     // ListingAgreement is not returned by Bridge API — default to most common value
-    if (system === "stellar" || system === "public") {
+    if (sys === "stellar" || sys === "public") {
       if (!formData.listingType) {
         formData.listingType = "Exclusive Right to Sell";
         formData._listingTypeAssumed = "true";
@@ -706,6 +713,22 @@ function SearchImport({ settings, onImport }) {
     setImported(formData);
     onImport(formData, listing);
   };
+
+  // Deep link from the nightly crosscheck email and Agent Hub's MLS Gap rows:
+  // ?search=<MLS#>&source=stellar|daytona — look it up, import it, open the input sheets.
+  // The parameters are cleared so returning to this tab doesn't import it again.
+  useEffect(() => {
+    const p = new URLSearchParams(location.search);
+    const q = (p.get("search") || "").trim();
+    if (!q) return;
+    const sys = p.get("source") === "daytona" ? "daytona" : "stellar";
+    p.delete("search"); p.delete("source");
+    history.replaceState(null, "", location.pathname + (p.toString() ? "?" + p : "") + location.hash);
+    setMode("mlsid"); setSystem(sys); setQuery(q);
+    handleSearch({ mode: "mlsid", system: sys, query: q }).then(listing => {
+      if (listing) { handleImport(listing, sys); if (onOpenSheets) onOpenSheets(); }
+    });
+  }, []);
 
   const placeholders = {
     address: "e.g. 835 Halifax",
@@ -777,7 +800,7 @@ function SearchImport({ settings, onImport }) {
             />
           </div>
           <div style={{ marginBottom: "16px" }}>
-            <Btn onClick={handleSearch} disabled={loading || !query}>
+            <Btn onClick={() => handleSearch()} disabled={loading || !query}>
               {loading ? "⏳ Searching..." : "Search"}
             </Btn>
           </div>
@@ -2430,7 +2453,7 @@ const DEFAULT_SETTINGS = {
 
       {/* Content */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 24px" }}>
-        {tab === "search" && <SearchImport settings={settings} onImport={handleImport} />}
+        {tab === "search" && <SearchImport settings={settings} onImport={handleImport} onOpenSheets={() => setTab("output")} />}
         <div style={{ display: tab === "report" ? "block" : "none" }}>
           <CrossSystemReport settings={settings} onImport={handleImport} onViewForm={() => setTab("output")} />
         </div>
