@@ -60,6 +60,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
 
   <!-- Structured Data -->
   <script type="application/ld+json">
@@ -1340,43 +1341,23 @@
 
 <script src="./tools-directory.js"></script>
 <script>
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY_BASE   = Auth.API;
 
-async function handleCredential(cred) {
-  // Close the fallback sign-in modal if it was open
+// ── Sign-in (shared auth.js) ────────────────────────────────────────────────
+// The Tools page is usable signed out. With no session, auth.js offers
+// Google's quick sign-in (as this page always has) and draws the button in
+// the fallback modal; with one, it resolves at once.
+async function onSignedIn(user) {
   document.getElementById('signinModal').style.display = 'none';
-
-  const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-  sessionStorage.setItem('ac_user_email', payload.email || '');
-  localStorage.setItem('ac_user_email', payload.email || '');
-  localStorage.setItem('ac_user_name', payload.name || '');
+  localStorage.setItem('ac_user_name', user.name || '');
   renderAuthStatus();
 
-  // Check manager status on sign-in
+  // Manager-only sections: any active staff level, as before.
   try {
-    const r = await fetch(PROXY_BASE + '/auth/is-manager', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    localStorage.setItem('ac_is_manager', data.isManager ? '1' : '0');
-    showManagerOnly(data.isManager);
-  } catch (_) {}
-
-  // Shared proxy key, same /config/init exchange every tool page does — this
-  // page never needed one until the home-page check below.
-  try {
-    const r = await fetch(PROXY_BASE + '/config/init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: cred.credential }),
-    });
-    if (r.ok) {
-      const { proxyKey } = await r.json();
-      if (proxyKey) localStorage.setItem('ac_proxy_key', proxyKey);
-    }
+    const me = await Auth.api('/lockbox/me');
+    const isManager = me.role === 'manager' || me.role === 'staff';
+    localStorage.setItem('ac_is_manager', isManager ? '1' : '0');
+    showManagerOnly(isManager);
   } catch (_) {}
   checkHomePage();
 }
@@ -1392,12 +1373,10 @@ function wantsToolsPage() {
 }
 
 async function checkHomePage() {
-  const email = localStorage.getItem('ac_user_email');
-  const key = localStorage.getItem('ac_proxy_key');
-  if (!email || !key) return;
+  if (!Auth.user) return;
   let data;
   try {
-    const r = await fetch(PROXY_BASE + '/agent-comms/home-page', { headers: { 'x-proxy-key': key, 'x-user-email': email } });
+    const r = await fetch(PROXY_BASE + '/agent-comms/home-page', { headers: Auth.headers() });
     if (!r.ok) return;
     data = await r.json();
   } catch (_) { return; }
@@ -1419,11 +1398,7 @@ async function chooseHomePage(homePage) {
   try {
     const r = await fetch(PROXY_BASE + '/agent-comms/home-page', {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-proxy-key': localStorage.getItem('ac_proxy_key') || '',
-        'x-user-email': localStorage.getItem('ac_user_email') || '',
-      },
+      headers: Auth.headers(),
       body: JSON.stringify({ homePage }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Request failed');
@@ -1470,34 +1445,11 @@ function renderAuthStatus() {
   }
 }
 
-function signOut() {
-  localStorage.removeItem('ac_user_email');
-  localStorage.removeItem('ac_user_name');
-  localStorage.removeItem('ac_is_manager');
-  localStorage.removeItem('ac_home_page');
-  sessionStorage.removeItem('ac_user_email');
-  showManagerOnly(false);
-  if (window.google?.accounts?.id) { google.accounts.id.disableAutoSelect(); }
-  renderAuthStatus();
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({
-    client_id: OAUTH_CLIENT,
-    callback: handleCredential,
-    auto_select: true,   // silently sign in if only one account is available
-  });
-  // Only prompt if we don't already have a cached session — otherwise this
-  // fires on every visit and eventually trips Google's One Tap/FedCM
-  // dismissal cooldown, which is what was causing the repeated sign-in screens.
-  if (!localStorage.getItem('ac_user_email')) {
-    google.accounts.id.prompt();
-  }
-  // Pre-render a visible Sign-In button as a fallback for when the silent
-  // prompt is blocked or skipped (third-party cookies disabled, FedCM, etc.)
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
-    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
-  });
+async function signOut() {
+  // Ends the session site-wide, then reloads so the sign-in button is drawn again.
+  await Auth.signOut();
+  ['ac_user_name', 'ac_is_manager', 'ac_home_page'].forEach(k => localStorage.removeItem(k));
+  location.reload();
 }
 
 // Immediately restore sign-in state and manager section from last known role — no
@@ -1510,11 +1462,7 @@ function showManagerOnly(isManager) {
   document.querySelectorAll('.manager-card, .manager-section').forEach(el => el.style.display = isManager ? '' : 'none');
 }
 if (localStorage.getItem('ac_is_manager') === '1') showManagerOnly(true);
-checkHomePage();
-
-// Initialize as soon as the Google SDK loads
-if (window.google?.accounts?.id) { initGoogleSignIn(); }
-else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
+Auth.ready({ button: document.getElementById('g-signin-btn') }).then(onSignedIn);
 
 // ── Tool + resource search ──────────────────────────────────────────────────
 // Reads WORKSHOP_RESOURCES (tools-directory.js). Workshop tools filter the

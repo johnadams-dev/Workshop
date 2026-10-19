@@ -20,6 +20,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="auth.js"></script>
 
     <style>
         /* ── Design system shared with foundation.html/feedback.html/
@@ -745,44 +746,41 @@
    logo from zillow.com/news/logos); without it the pages are left out. The
    data isn't stored or cached anywhere (§5.18) — each report fetches it.
    Approved by Zillow for client reports (2026-10-15), not for social media. */
-const ZG_PROXY = 'https://mls-proxy-975684028597.us-east1.run.app';
-const ZG_CLIENT_ID = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const ZG_PROXY = Auth.API;
 const ZG_LOGO_URL = new URL('images/zillow-logo.png', location.href).href;
 const ZG_TERMS_URL = 'https://www.zillow.com/corp/Terms.htm';
 let zgAreas = [];
 let zgAreaChosen = false;   // the agent picked an area themselves — don't overwrite it
-const zgCreds = () => ({ key: localStorage.getItem('ac_proxy_key') || '', email: localStorage.getItem('ac_user_email') || '' });
-const zgHeaders = () => { const c = zgCreds(); return { 'x-proxy-key': c.key, 'x-user-email': c.email }; };
+const zgHeaders = () => Auth.headers();
 const zgEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function zgToggle() {
   document.getElementById('zillowOptions').style.display = document.getElementById('includeZillow').checked ? '' : 'none';
 }
 
-// ── Sign-in (shared Workshop credentials; prompt only when missing) ─────────
-async function zgHandleSignIn(resp) {
-  try {
-    const payload = JSON.parse(atob(resp.credential.split('.')[1]));
-    const r = await fetch(`${ZG_PROXY}/config/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: resp.credential }) });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'Sign-in failed');
-    localStorage.setItem('ac_user_email', (payload.email || '').toLowerCase());
-    localStorage.setItem('ac_proxy_key', data.proxyKey || '');
+// ── Sign-in (shared auth.js; asked for only when the Zillow pages need it) ──
+let zgSigningIn = false;
+function zgSignIn() {
+  document.getElementById('zillowSignin').style.display = '';
+  if (zgSigningIn) return;
+  zgSigningIn = true;
+  Auth.ready({ button: document.getElementById('g-signin-btn') }).then(() => {
+    zgSigningIn = false;
     document.getElementById('zillowSignin').style.display = 'none';
     zgLoadAreas();
-  } catch (e) { alert(e.message); }
+  });
 }
 
 async function zgLoadAreas() {
   const sel = document.getElementById('zillowArea');
-  if (!zgCreds().key) {
+  if (!Auth.user) {
     sel.innerHTML = '<option value="">Sign in to choose an area</option>';
-    document.getElementById('zillowSignin').style.display = '';
+    zgSignIn();
     return;
   }
   try {
     const r = await fetch(`${ZG_PROXY}/market-data/zillow/areas`, { headers: zgHeaders() });
-    if (r.status === 401) { localStorage.removeItem('ac_proxy_key'); return zgLoadAreas(); }
+    if (r.status === 401) { await Auth.signOut(); return zgLoadAreas(); } // session no longer valid
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
     zgAreas = data;
@@ -798,12 +796,10 @@ async function zgLoadAreas() {
   }
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  // Usable without signing in; a saved session is picked up quietly.
+  await Auth.ready({ optional: true });
   zgLoadAreas();
-  if (window.google?.accounts?.id) {
-    google.accounts.id.initialize({ client_id: ZG_CLIENT_ID, callback: zgHandleSignIn });
-    google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'outline', size: 'large' });
-  }
 });
 
 // Parse the chosen file as soon as it's picked, so the area is pre-selected
@@ -853,7 +849,7 @@ function zgLogoLoads() {
 }
 
 async function zgBuild() {
-  if (!zgCreds().key) throw new Error('sign in (below the checkbox) to include them.');
+  if (!Auth.user) throw new Error('sign in (below the checkbox) to include them.');
   const regionID = document.getElementById('zillowArea').value;
   if (!regionID) throw new Error('choose an area for the Zillow data.');
   if (!(await zgLogoLoads())) throw new Error('the Zillow logo file (images/zillow-logo.png) is missing — Zillow requires it on these pages.');
@@ -945,7 +941,7 @@ async function zgPulseCharts(pulse) {
 // suggests it's an appraisal (§26.3). Looked up live for each report, never
 // stored.
 async function zestLookup(address, unit) {
-  if (!zgCreds().key) throw new Error('sign in first — tick "Include Zillow market pages" for the sign-in button.');
+  if (!Auth.user) throw new Error('sign in first — tick "Include Zillow market pages" for the sign-in button.');
   if (!(await zgLogoLoads())) throw new Error('the Zillow logo file (images/zillow-logo.png) is missing — Zillow requires it on this page.');
   const qs = new URLSearchParams({ address });
   if (unit) qs.set('unit', unit);

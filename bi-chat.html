@@ -8,6 +8,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="auth.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -220,13 +221,9 @@
 </div>
 
 <script>
-const PROXY_BASE   = 'https://mls-proxy-975684028597.us-east1.run.app';
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
+const PROXY_BASE   = Auth.API;
 
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
-let _email    = localStorage.getItem('ac_user_email') || '';
-
-const H = () => ({ 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': _email });
+const H = () => Auth.headers();
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -287,40 +284,11 @@ function md2html(text) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-if (_email && PROXY_KEY) {
-  enterApp();
-} else {
-  if (window.google?.accounts?.id) { initGoogleSignIn(); }
-  else { const t = setInterval(() => { if (window.google?.accounts?.id) { clearInterval(t); initGoogleSignIn(); } }, 100); }
-}
-
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { document.getElementById('signin-status').textContent = data.error || 'Sign-in failed'; return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    _email    = payload.email || '';
-    PROXY_KEY = data.proxyKey || '';
-    if (_email)    localStorage.setItem('ac_user_email', _email);
-    if (PROXY_KEY) localStorage.setItem('ac_proxy_key', PROXY_KEY);
-    enterApp();
-  } catch (e) {
-    document.getElementById('signin-status').textContent = 'Sign-in error: ' + e.message;
-  }
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.prompt();
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
-    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular',
-  });
-}
+Auth.ready({
+  tool: 'Mr. Johnson from Accounts',
+  button: document.getElementById('g-signin-btn'),
+  status: document.getElementById('signin-status'),
+}).then(enterApp);
 
 function enterApp() {
   document.getElementById('signin-screen').style.display = 'none';
@@ -561,6 +529,5 @@ async function loadHistory() {
 }
 </script>
 
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Mr. Johnson from Accounts',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

@@ -9,6 +9,7 @@
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="auth.js"></script>
 
   <style>
     /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -679,15 +680,13 @@
 // ═══════════════════════════════════════════════════════════════
 // Configuration
 // ═══════════════════════════════════════════════════════════════
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 const DRIVE_CLIENT_ID  = "113661094773-9k0e8b6nju9f4nn0h0lmgcuvqag7o4dv.apps.googleusercontent.com";
 
 // ═══════════════════════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════════════════════
-let userEmail        = localStorage.getItem('ac_user_email') || "";
-let proxyKey         = localStorage.getItem('ac_proxy_key') || "";
+let userEmail        = "";
 let agentDmgId       = null;
 let profileData      = {};   // combined { pathfinder, deltanet }
 let currentStep      = 1;
@@ -697,30 +696,18 @@ let driveAccessToken = null;
 // ═══════════════════════════════════════════════════════════════
 // Google Sign-In
 // ═══════════════════════════════════════════════════════════════
-if (proxyKey && userEmail) {
-  document.getElementById("auth-gate").style.display = "none";
-  document.getElementById("app").style.display        = "block";
-  window.addEventListener("load", () => {
+Auth.ready({ tool: "Bio Creator", button: document.getElementById("g-signin-btn") })
+  .then(user => {
+    userEmail = user.email;
+    document.getElementById("auth-gate").style.display = "none";
+    document.getElementById("app").style.display        = "block";
     document.getElementById("header-user-email").textContent = userEmail;
     loadProfile();
   });
-}
 
+// Google Drive permission for "Save to Drive" (separate from sign-in).
 window.addEventListener("load", () => {
-  google.accounts.id.initialize({
-    client_id:         GOOGLE_CLIENT_ID,
-    callback:          handleGoogleSignIn,
-    auto_select:       true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.getElementById("g-signin-btn"),
-    { theme: "outline", size: "large", width: 280, text: "signin_with" }
-  );
-  if (!proxyKey || !userEmail) google.accounts.id.prompt();
-
-  // Drive token client (same pattern as contract calculator calendar)
-  if (google.accounts.oauth2) {
+  if (window.google?.accounts?.oauth2) {
     driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: DRIVE_CLIENT_ID,
       scope:     "https://www.googleapis.com/auth/drive.file",
@@ -738,54 +725,13 @@ window.addEventListener("load", () => {
   }
 });
 
-async function handleGoogleSignIn(response) {
-  const idToken = response.credential;
-  // Decode email from JWT payload (no signature verification needed client-side)
-  try {
-    const payload = JSON.parse(atob(idToken.split(".")[1]));
-    userEmail = payload.email || "";
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ""; }
-
-  try {
-    // Exchange Google token for proxy key
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ idToken }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      alert(data.error || "Sign-in failed. Make sure you're using your @adamscameron.com account.");
-      return;
-    }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
-    // Show app, hide gate
-    document.getElementById("auth-gate").style.display = "none";
-    document.getElementById("app").style.display        = "block";
-    document.getElementById("header-user-email").textContent = userEmail;
-
-    // Load agent profile
-    await loadProfile();
-
-  } catch (e) {
-    alert("Authentication error: " + e.message);
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════
 // API helper
 // ═══════════════════════════════════════════════════════════════
 async function api(method, path, body) {
   const opts = {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-proxy-key":  proxyKey,
-      "x-user-email": userEmail,
-    },
+    headers: Auth.headers(),
   };
   if (body) opts.body = JSON.stringify(body);
   const res  = await fetch(`${PROXY}${path}`, opts);
@@ -1153,6 +1099,5 @@ function hideAlert(id) {
   if (el) el.className = "alert";
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Bio Creator',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

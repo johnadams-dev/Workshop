@@ -77,6 +77,7 @@
   function clearAll() {
     Object.values(K).forEach(store.del);
     user = null;
+    readyPromise = null; // the next Auth.ready() signs in afresh
   }
 
   function headers(extra) {

@@ -241,6 +241,7 @@ textarea.fi.tall{min-height:130px}
 <body>
 
 <script src="https://accounts.google.com/gsi/client" async></script>
+<script src="auth.js"></script>
 <div id="auth-gate" style="position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;">
   <div style="background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:48px 40px;text-align:center;width:340px;">
     <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;margin-bottom:8px">Cameron's <span style="background:var(--gr);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic">Lens</span></div>
@@ -621,61 +622,23 @@ textarea.fi.tall{min-height:130px}
 
 // ── STATE ────────────────────────────────────────────────────────
 // Gemini API key is stored server-side — no client key needed
-const PROXY_BASE = 'https://mls-proxy-975684028597.us-east1.run.app';
+const PROXY_BASE = Auth.API;
 const GEMINI_PROXY_URL = `${PROXY_BASE}/gemini`;
-const OAUTH_CLIENT = '205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com';
-let PROXY_KEY = localStorage.getItem('ac_proxy_key') || '';
-// mlsProxyUrl/mlsProxySecret used to be a separate sessionStorage-backed pair
-// duplicating PROXY_BASE/PROXY_KEY (same server, same secret) — collapsed
-// onto the one shared pair rather than keeping two copies in sync.
 const mlsProxyUrl = PROXY_BASE;
 
-// ── SIGN-IN GATE ────────────────────────────────────────────────────────────
-// Goes through /config/init (validates the ID token server-side and checks
-// the @adamscameron.com domain) rather than a hardcoded key, so the proxy
-// key is only ever handed to a verified account instead of sitting in this
-// page's public source for anyone to read.
-let USER_EMAIL = localStorage.getItem('ac_user_email') || '';
+// ── SIGN-IN GATE (shared auth.js) ─────────────────────────────────
+let USER_EMAIL = '';
 
 function hideAuthGate() {
   document.getElementById('auth-gate').style.display = 'none';
 }
 
-async function handleCredential(cred) {
-  try {
-    const r = await fetch(`${PROXY_BASE}/config/init`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ idToken: cred.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) { toast('⚠', data.error || 'Sign-in failed'); return; }
-    const payload = JSON.parse(atob(cred.credential.split('.')[1]));
-    USER_EMAIL = payload.email || '';
-    PROXY_KEY  = data.proxyKey || '';
-    if (USER_EMAIL) localStorage.setItem('ac_user_email', USER_EMAIL);
-    if (PROXY_KEY)  localStorage.setItem('ac_proxy_key', PROXY_KEY);
-  } catch (e) { toast('⚠', 'Sign-in failed: ' + e.message); return; }
-  hideAuthGate();
-  maybeDeepLinkFromTransactionId();
-}
-
-function initGoogleSignIn() {
-  google.accounts.id.initialize({ client_id: OAUTH_CLIENT, callback: handleCredential, auto_select: true });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), { theme: 'filled_black', size: 'large', text: 'signin_with' });
-  google.accounts.id.prompt();
-}
-
-if (USER_EMAIL && PROXY_KEY) {
-  hideAuthGate();
-  maybeDeepLinkFromTransactionId();
-} else if (window.google?.accounts?.id) {
-  initGoogleSignIn();
-} else {
-  const _gsiPoll = setInterval(() => {
-    if (window.google?.accounts?.id) { clearInterval(_gsiPoll); initGoogleSignIn(); }
-  }, 100);
-}
+Auth.ready({ tool: "Cameron's Lens", button: document.getElementById('g-signin-btn') })
+  .then(user => {
+    USER_EMAIL = user.email;
+    hideAuthGate();
+    maybeDeepLinkFromTransactionId();
+  });
 
 // Supports checklist links like camerons-lens.html?transactionId=<uuid>&mode=desc
 // (or &mode=photo) — resolves the transaction to an MLS# via
@@ -700,7 +663,7 @@ async function maybeDeepLinkFromTransactionId() {
   const mode = params.get('mode') === 'photo' ? 'photo' : 'desc';
   try {
     const res = await fetch(`${mlsProxyUrl}/daily-desk/transactions/${encodeURIComponent(txnId)}`, {
-      headers: { 'Accept': 'application/json', 'x-proxy-key': PROXY_KEY, 'x-user-email': USER_EMAIL },
+      headers: Auth.headers({ 'Accept': 'application/json' }),
     });
     const txn = await res.json().catch(() => ({}));
     const mlsLink = (txn.id_links || []).find(l => l.id_type === 'listing' && String(l.system).startsWith('mls_'));
@@ -869,7 +832,7 @@ async function runDescription(panelSuffix) {
       GEMINI_PROXY_URL,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+        headers: Auth.headers(),
         body: JSON.stringify({
           model: 'gemini-2.5-flash',
           contents: [{ parts: [{ text: prompt }] }],
@@ -1201,7 +1164,7 @@ async function runPhotoEnhancement() {
       GEMINI_PROXY_URL,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+        headers: Auth.headers(),
         body: JSON.stringify({
           model: 'gemini-2.5-flash-image',
           contents: [{ parts: [{ text: promptText }, { inline_data: { mime_type: mime, data: b64 } }] }],
@@ -1340,7 +1303,7 @@ function initSlider() {
 
 // Standard auth headers for the proxy
 function mlsHeaders() {
-  return { 'Accept': 'application/json', 'x-proxy-key': PROXY_KEY };
+  return Auth.headers({ 'Accept': 'application/json' });
 }
 
 // Detect if input looks like an MLS number (digits only, or short alphanumeric, no spaces)
@@ -1703,7 +1666,7 @@ async function mlsLoadPhoto(regKey, idx) {
   toast('⏳', 'Loading photo ' + num + '…');
   try {
     const proxyUrl = `${mlsProxyUrl}/photo-proxy?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { headers: { 'x-proxy-key': PROXY_KEY } });
+    const res = await fetch(proxyUrl, { headers: Auth.headers() });
     if (!res.ok) throw new Error(`Proxy returned ${res.status} for photo ${num}`);
     const blob = await res.blob();
     const file = new File([blob], 'listing-photo-' + num + '.jpg', { type: blob.type || 'image/jpeg' });
@@ -1759,7 +1722,7 @@ async function generateSpanish(sfx, englishText, key) {
     const prompt = 'Translate the following real estate listing description into natural, professional Spanish as it would appear in a Florida MLS listing. Keep the same tone and marketing appeal. Return only the translated text, no preamble:\n\n' + englishText;
     const res = await fetch(
       GEMINI_PROXY_URL,
-      { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-proxy-key': PROXY_KEY },
+      { method: 'POST', headers: Auth.headers(),
         body: JSON.stringify({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } }) }
     );
     const data = await res.json();
@@ -1784,7 +1747,6 @@ async function generateSpanish(sfx, englishText, key) {
 });
 
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:"Cameron's Lens",email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
 

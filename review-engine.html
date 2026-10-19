@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
 <style>
 :root {
   --ink:        #0d1117;
@@ -858,89 +859,32 @@ th.sortable.sort-active .sort-arrow { opacity: 1; }
 </div>
 
 <script>
-const PROXY            = "https://mls-proxy-975684028597.us-east1.run.app";
-const GOOGLE_CLIENT_ID = "205198562122-ruhu1eemehs3nfgss3d1jdah47m8eadf.apps.googleusercontent.com";
+const PROXY            = Auth.API;
 
-let proxyKey  = localStorage.getItem('ac_proxy_key') || "";
-let userEmail = localStorage.getItem('ac_user_email') || "";
+let userEmail = "";
 let _pendingConfirmRecipientId = null;
 
-// ── Auth ────────────────────────────────────────────────────────────────────────
-
-if (proxyKey && userEmail && localStorage.getItem("ac_is_manager") === "1") {
-  document.getElementById("auth-gate").style.display = "none";
-  document.getElementById("app").style.display       = "block";
-  window.addEventListener("load", initApp);
-}
-
-window.addEventListener("load", () => {
-  google.accounts.id.initialize({
-    client_id:             GOOGLE_CLIENT_ID,
-    callback:              handleGoogleSignIn,
-    auto_select:           true,
-    cancel_on_tap_outside: false,
-  });
-  google.accounts.id.renderButton(
-    document.getElementById("g-signin-btn"),
-    { theme: "outline", size: "large", width: 280, text: "signin_with" }
-  );
-  if (!proxyKey || !userEmail || localStorage.getItem("ac_is_manager") !== "1") google.accounts.id.prompt();
-});
-
-async function handleGoogleSignIn(response) {
-  try {
-    const payload = JSON.parse(atob(response.credential.split(".")[1]));
-    userEmail = payload.email || "";
-    localStorage.setItem('ac_user_email', userEmail);
-  } catch { userEmail = ""; }
-
-  try {
-    const r = await fetch(`${PROXY}/config/init`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ idToken: response.credential }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      alert(data.error || "Sign-in failed. Use your @adamscameron.com account.");
+// ── Auth (shared auth.js) ──────────────────────────────────────
+// Staff only — any staff level, as before. The role comes from
+// /lockbox/me (active staff), not a flag cached in this browser.
+Auth.ready({ tool: "Review Engine", button: document.getElementById("g-signin-btn") })
+  .then(async user => {
+    userEmail = user.email;
+    const me = await GET("/lockbox/me").catch(() => ({}));
+    if (me.role !== "manager" && me.role !== "staff") {
+      alert("This tool requires manager or admin access.");
+      window.location.href = "index.html";
       return;
     }
-    proxyKey = data.proxyKey || "";
-    localStorage.setItem('ac_proxy_key', proxyKey);
-
-    // Check manager role
-    if (localStorage.getItem("ac_is_manager") !== "1") {
-      const mr = await fetch(`${PROXY}/auth/is-manager`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ idToken: response.credential }),
-      });
-      const md = await mr.json();
-      if (!md.isManager) {
-        alert("This tool requires manager or admin access.");
-        window.location.href = "index.html";
-        return;
-      }
-      localStorage.setItem("ac_is_manager", "1");
-    }
-
     document.getElementById("auth-gate").style.display = "none";
     document.getElementById("app").style.display       = "block";
     initApp();
-  } catch (e) {
-    alert("Authentication error: " + e.message);
-  }
-}
+  });
 
 // ── API helpers ─────────────────────────────────────────────────────────────────
 
 async function api(path, opts = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    "x-proxy-key":  proxyKey,
-    "x-user-email": userEmail,
-    ...(opts.headers || {}),
-  };
+  const headers = Auth.headers(opts.headers);
   const res = await fetch(PROXY + path, { ...opts, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -1943,7 +1887,7 @@ async function downloadTestimonialsCsv() {
   const status = document.getElementById("testimonial-pull-status");
   try {
     const res = await fetch(`${PROXY}/review/testimonials/export.csv`, {
-      headers: { "x-proxy-key": proxyKey, "x-user-email": userEmail },
+      headers: Auth.headers(),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -2188,6 +2132,5 @@ async function submitConfirm() {
   }
 }
 </script>
-<script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Review Engine',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>
