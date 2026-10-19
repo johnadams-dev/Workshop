@@ -65,7 +65,7 @@ const WORKSHOP_RESOURCES = [
   { kind: "workshop", slug: "market-update", name: "Comprehensive Market Update", shortName: "Market Update", url: "./market-update.html", icon: "📊",
     description: "Upload an active and sold listing export from your MLS (Excel, CSV, and more) to generate a full market analysis — days on market, absorption rate, price per square foot, and beyond.",
     feedbackGroup: "Day to Day", hubSidebarCategory: "Listing Marketing" },
-  { kind: "workshop", slug: "mls-magic", name: "MLS Magic", url: "https://mls-data-sync.web.app/", icon: "✨",
+  { kind: "workshop", slug: "mls-magic", name: "MLS Magic", url: "./mls-magic.html", icon: "✨",
     description: "Cross-reference listings between Daytona MLS and Stellar MLS effortlessly. It reads listings from one system and auto-fills the data entry sheet for the other — eventually entering them for you.",
     feedbackGroup: "Day to Day", hubSidebarCategory: "Listing Marketing" },
   { kind: "workshop", slug: "camerons-lens", name: "Cameron's Lens", url: "./camerons-lens.html", icon: "📸",
