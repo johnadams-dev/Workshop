@@ -233,6 +233,15 @@ async function load() {
   }
 }
 
+// Contract dates with a link to the Contract Date Calculator's full timeline page (contract-status.html).
+function contractDatesHtml(title, deadlines, url, intro) {
+  return `<div class="section"><h3>${esc(title)}</h3>
+    ${intro ? `<p style="margin:0 0 8px;color:var(--slate);font-size:.9rem">${esc(intro)}</p>` : ''}
+    ${deadlines.length ? `<ul class="rows">${deadlines.map(x =>
+      `<li><span>${esc(x.label)}</span><span>${esc(fmtDate(x.date))}</span></li>`).join('')}</ul>` : ''}
+    ${url ? `<div class="links" style="margin-top:10px"><a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">More information — full contract timeline</a></div>` : ''}</div>`;
+}
+
 // ── Virtual tour activity ────────────────────────────────────────────────────
 // For each listing with tour views: views over time by source, where views came
 // from, top locations and devices — the same data and chart types agents see in
@@ -414,9 +423,15 @@ function dealHtml(d, agentsById) {
       ${C.titleCompany ? `<div class="fact"><div class="k">Title company</div><div class="v">${esc(C.titleCompany)}</div></div>` : ''}
       ${C.lender ? `<div class="fact"><div class="k">Lender</div><div class="v">${esc(C.lender)}</div></div>` : ''}
     </div></div>`);
-    if (C.deadlines.length) parts.push(`<div class="section"><h3>Key dates</h3><ul class="rows">${C.deadlines.map(x =>
-      `<li><span>${esc(x.label)}</span><span>${esc(fmtDate(x.date))}</span></li>`).join('')}</ul>
-      ${C.timelineUrl ? `<p style="margin:10px 0 0"><a href="${esc(C.timelineUrl)}" target="_blank" rel="noopener">See the full contract timeline →</a></p>` : ''}</div>`);
+    if (C.deadlines.length || C.timelineUrl) parts.push(contractDatesHtml(C.deadlines.length ? 'Key dates' : 'Contract timeline', C.deadlines, C.timelineUrl));
+  }
+  // The agent is tracking contract dates (Contract Date Calculator) but Daily Desk doesn't show the
+  // deal as under contract — an accepted offer not recorded yet, or a closed deal's past timeline.
+  if (d.contractTimeline) {
+    const T = d.contractTimeline;
+    parts.push(d.status === 'closed'
+      ? contractDatesHtml('Your contract timeline', [], T.timelineUrl, 'Every date from your contract, as your agent tracked it.')
+      : contractDatesHtml('Contract dates', T.deadlines, T.timelineUrl, 'Your agent is tracking the dates for an accepted offer on this home.'));
   }
 
   if (d.closing) {
