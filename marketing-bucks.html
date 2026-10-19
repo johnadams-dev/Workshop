@@ -67,6 +67,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:8px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--border);background:var(--bg)}
 td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+/* Sortable report columns (same look as Daily Desk) */
+thead th[data-sort]{cursor:pointer;user-select:none;white-space:nowrap}
+thead th[data-sort]:hover{color:var(--navy)}
+thead th[data-sort]::after{content:' \2195';opacity:.3}
+thead th.sort-asc::after{content:' \2191';opacity:1;color:var(--gold)}
+thead th.sort-desc::after{content:' \2193';opacity:1;color:var(--gold)}
 tfoot td{font-weight:700;background:var(--bg);border-top:2px solid var(--border)}
 tr:last-child td{border-bottom:none}
 .empty-state{padding:24px;color:var(--muted);text-align:center;font-size:13px}
@@ -274,7 +280,7 @@ tr:last-child td{border-bottom:none}
         <div class="card-head"><span>By Office</span></div>
         <div class="overflow-x">
           <table id="report-office-table">
-            <thead><tr><th>Office</th><th>Eligible</th><th>Issued</th><th>Redeemed</th><th>Expired</th><th>Void</th><th>Outstanding $</th><th>Redeemed $</th></tr></thead>
+            <thead><tr><th data-sort="office_name" onclick="sortReport('office', 'office_name')">Office</th><th data-sort="eligible_count" onclick="sortReport('office', 'eligible_count')">Eligible</th><th data-sort="issued_count" onclick="sortReport('office', 'issued_count')">Issued</th><th data-sort="redeemed_count" onclick="sortReport('office', 'redeemed_count')">Redeemed</th><th data-sort="expired_count" onclick="sortReport('office', 'expired_count')">Expired</th><th data-sort="void_count" onclick="sortReport('office', 'void_count')">Void</th><th data-sort="total_outstanding_amount" onclick="sortReport('office', 'total_outstanding_amount')">Outstanding $</th><th data-sort="total_redeemed_amount" onclick="sortReport('office', 'total_redeemed_amount')">Redeemed $</th></tr></thead>
             <tbody><tr><td colspan="8" class="empty-state">Loading&hellip;</td></tr></tbody>
             <tfoot></tfoot>
           </table>
@@ -285,7 +291,7 @@ tr:last-child td{border-bottom:none}
         <div class="card-head"><span>By Agent</span></div>
         <div class="overflow-x">
           <table id="report-agent-table">
-            <thead><tr><th>Agent</th><th>Eligible</th><th>Issued</th><th>Redeemed</th><th>Expired</th><th>Void</th><th>Outstanding $</th><th>Redeemed $</th><th></th></tr></thead>
+            <thead><tr><th data-sort="agent_name" onclick="sortReport('agent', 'agent_name')">Agent</th><th data-sort="eligible_count" onclick="sortReport('agent', 'eligible_count')">Eligible</th><th data-sort="issued_count" onclick="sortReport('agent', 'issued_count')">Issued</th><th data-sort="redeemed_count" onclick="sortReport('agent', 'redeemed_count')">Redeemed</th><th data-sort="expired_count" onclick="sortReport('agent', 'expired_count')">Expired</th><th data-sort="void_count" onclick="sortReport('agent', 'void_count')">Void</th><th data-sort="total_outstanding_amount" onclick="sortReport('agent', 'total_outstanding_amount')">Outstanding $</th><th data-sort="total_redeemed_amount" onclick="sortReport('agent', 'total_redeemed_amount')">Redeemed $</th><th></th></tr></thead>
             <tbody><tr><td colspan="9" class="empty-state">Loading&hellip;</td></tr></tbody>
           </table>
         </div>
@@ -339,6 +345,9 @@ let AGENTS = [];     // [{id, first_name, last_name, office_id}]
 let OFFICES = [];    // [{id, name}]
 let activeTab = 'issue';
 let _reportAgentCache = null; // last /reporting/by-agent response, for the drill-down toggle
+// Reporting tables: the rows on screen and each table's sort (header click; numbers sort high-first).
+const _reportRows = { office: [], agent: [] };
+const _reportSort = { office: { col: null, dir: 'asc' }, agent: { col: null, dir: 'asc' } };
 
 // A Daily Desk checklist task can link here as
 // marketing-bucks.html?transaction_id=<uuid> (see daily-desk.html's
@@ -790,21 +799,12 @@ async function loadReportByOffice() {
     const filtered = document.getElementById('filter-office').value
       ? rows.filter(r => String(r.office_id) === document.getElementById('filter-office').value)
       : rows;
+    _reportRows.office = filtered;
     if (!filtered.length) {
       tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No data yet.</td></tr>';
       return;
     }
-    tbody.innerHTML = filtered.map(r => `
-      <tr>
-        <td>${esc(r.office_name || 'Unassigned')}</td>
-        <td>${r.eligible_count}</td>
-        <td>${r.issued_count}</td>
-        <td>${r.redeemed_count}</td>
-        <td>${r.expired_count}</td>
-        <td>${r.void_count}</td>
-        <td>${fmtMoney(r.total_outstanding_amount)}</td>
-        <td>${fmtMoney(r.total_redeemed_amount)}</td>
-      </tr>`).join('');
+    renderReportOffice();
     // Counts and amounts arrive as strings (Postgres COUNT/SUM), hence Number().
     const sum = k => filtered.reduce((n, r) => n + Number(r[k] || 0), 0);
     tfoot.innerHTML = `
@@ -823,6 +823,21 @@ async function loadReportByOffice() {
   }
 }
 
+function renderReportOffice() {
+  const tbody = document.querySelector('#report-office-table tbody');
+  tbody.innerHTML = sortedReportRows('office').map(r => `
+      <tr>
+        <td>${esc(r.office_name || 'Unassigned')}</td>
+        <td>${r.eligible_count}</td>
+        <td>${r.issued_count}</td>
+        <td>${r.redeemed_count}</td>
+        <td>${r.expired_count}</td>
+        <td>${r.void_count}</td>
+        <td>${fmtMoney(r.total_outstanding_amount)}</td>
+        <td>${fmtMoney(r.total_redeemed_amount)}</td>
+      </tr>`).join('');
+}
+
 async function loadReportByAgent() {
   const tbody = document.querySelector('#report-agent-table tbody');
   try {
@@ -832,11 +847,20 @@ async function loadReportByAgent() {
     const filtered = document.getElementById('filter-agent').value
       ? rows.filter(r => String(r.agent_id) === document.getElementById('filter-agent').value)
       : rows;
+    _reportRows.agent = filtered;
     if (!filtered.length) {
       tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No data yet.</td></tr>';
       return;
     }
-    tbody.innerHTML = filtered.map(r => `
+    renderReportAgent();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderReportAgent() {
+  const tbody = document.querySelector('#report-agent-table tbody');
+  tbody.innerHTML = sortedReportRows('agent').map(r => `
       <tr>
         <td>${agentName(r.agent_first_name, r.agent_last_name)}</td>
         <td>${r.eligible_count}</td>
@@ -849,9 +873,37 @@ async function loadReportByAgent() {
         <td><button class="breakdown-toggle" onclick="toggleAgentBreakdown(this, ${r.agent_id})">Details &#9662;</button></td>
       </tr>
       <tr class="breakdown-row" id="bd-agent-${r.agent_id}" style="display:none"><td colspan="9"></td></tr>`).join('');
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</td></tr>`;
-  }
+}
+
+// Names sort Last, First (as shown); counts and dollar amounts arrive as strings, so compare as numbers.
+function reportSortValue(r, col) {
+  if (col === 'agent_name')  return ((r.agent_last_name || '') + ', ' + (r.agent_first_name || '')).toLowerCase();
+  if (col === 'office_name') return (r.office_name || 'Unassigned').toLowerCase();
+  return Number(r[col] || 0);
+}
+
+function sortedReportRows(table) {
+  const { col, dir } = _reportSort[table];
+  const rows = _reportRows[table].slice();
+  if (!col) return rows;
+  const sign = dir === 'asc' ? 1 : -1;
+  return rows.sort((a, b) => {
+    const x = reportSortValue(a, col), y = reportSortValue(b, col);
+    return (typeof x === 'number' ? x - y : x.localeCompare(y)) * sign;
+  });
+}
+
+// First click: names A→Z, numbers high→low; clicking the same header again reverses it.
+function sortReport(table, col) {
+  const st = _reportSort[table];
+  const isText = col === 'agent_name' || col === 'office_name';
+  st.dir = st.col === col ? (st.dir === 'asc' ? 'desc' : 'asc') : (isText ? 'asc' : 'desc');
+  st.col = col;
+  if (_reportRows[table].length) { if (table === 'office') renderReportOffice(); else renderReportAgent(); }
+  document.querySelectorAll(`#report-${table}-table thead th[data-sort]`).forEach(th => {
+    th.classList.toggle('sort-asc',  th.dataset.sort === st.col && st.dir === 'asc');
+    th.classList.toggle('sort-desc', th.dataset.sort === st.col && st.dir === 'desc');
+  });
 }
 
 function toggleAgentBreakdown(btn, agentId) {
