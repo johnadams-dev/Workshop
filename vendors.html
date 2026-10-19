@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Directory — Adams Cameron Workshop</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+/* Vendor Directory — replaces the AppSheet "Vendors" app. Agents and staff
+   browse approved vendors and add new ones; any admin reviews them first.
+   Backed by server/vendor-routes.js (GET/POST /vendors, PUT /vendors/:id,
+   POST /vendors/:id/review, POST /vendors/admin/import-sheet).
+   Plan: server/docs/web-hosting-and-agent-app-plan.md, "Vendor list". */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626; --green:#16A34A; --green-lt:#E3F5EC; --blue-lt:#E8F1FA;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr nav { display: flex; gap: 16px; font-size: .85rem; }
+.hdr nav a { color: #d6e2ef; text-decoration: none; }
+main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 48px; }
+.notice { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: .85rem; color: var(--muted); }
+.notice summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.notice p { margin: 8px 0 0; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.tab .count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: var(--gold); color: #fff; font-size: .72rem; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.filters input, .filters select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; background: var(--surface); min-width: 0; }
+.filters input { flex: 1 1 220px; }
+.filters select { flex: 0 1 220px; }
+.cat-h { margin: 18px 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.vendor { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.v-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; align-items: center; }
+.v-main { min-width: 0; cursor: pointer; }
+.v-name { font-weight: 700; }
+.v-meta { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.v-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ic { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--navy); text-decoration: none; font-size: 1rem; }
+.ic:hover { background: var(--blue-lt); }
+.v-body { border-top: 1px solid var(--border); padding: 10px 14px 12px; font-size: .9rem; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 4px 12px; }
+.v-body dt { color: var(--muted); }
+.v-body dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.v-body .row-acts { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--blue-lt); color: var(--blue); vertical-align: 1px; }
+.pill.gold { background: var(--gold-lt); color: #8a6d1d; }
+.pill.red { background: #FDE8E8; color: var(--red); }
+.pill.green { background: var(--green-lt); color: var(--green); }
+.btn { border: 1px solid var(--navy); background: var(--surface); color: var(--navy); border-radius: 7px; padding: 7px 12px; font-family: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--navy); color: #fff; }
+.btn.green { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, .tab:focus-visible, .ic:focus-visible, .v-main:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+form.vform { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.vform label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; font-weight: 600; }
+.vform label span.hint { font-weight: 400; color: var(--muted); }
+.vform input, .vform select, .vform textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-weight: 400; width: 100%; }
+.vform textarea { min-height: 64px; resize: vertical; }
+.vform .wide { grid-column: 1 / -1; }
+.vform .form-acts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.vform fieldset { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 0; min-width: 0; }
+.vform legend { font-size: .85rem; font-weight: 600; padding: 0 4px; }
+.vform legend .hint { font-weight: 400; color: var(--muted); }
+.checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 12px; max-height: 260px; overflow-y: auto; }
+.checks label, .county label { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; font-size: .88rem; padding: 2px 0; }
+.checks input, .county input { width: auto; margin: 0; }
+.county { margin-bottom: 8px; }
+.county > label { font-weight: 600; }
+.county .checks { max-height: none; margin-left: 20px; }
+.county.all .checks { opacity: .45; }
+.fs-acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.fs-acts .btn { font-size: .78rem; padding: 4px 9px; }
+.review-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.review-bar select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; background: var(--surface); max-width: 100%; }
+.dupe { font-size: .8rem; color: #8a6d1d; }
+.msg, .empty { text-align: center; color: var(--muted); padding: 28px 12px; }
+.note { font-size: .8rem; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: .9rem; z-index: 50; max-width: calc(100% - 32px); }
+.toast.err { background: var(--red); }
+#gate { max-width: 420px; margin: 10vh auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; text-align: center; }
+@media (max-width: 640px) {
+  .v-head { grid-template-columns: 1fr; }
+  .v-acts { justify-content: flex-start; }
+  .v-body { grid-template-columns: 1fr; }
+  .v-body dt { margin-top: 6px; }
+  form.vform { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Vendor Directory</h1>
+    <nav>
+      <a href="./feedback.html?tool=vendors">Feedback</a>
+      <a href="./index.html">← Tools</a>
+    </nav>
+  </div>
+</header>
+
+<div id="gate" hidden>
+  <p>Sign in with your Adams Cameron Google account.</p>
+  <div id="g-signin-btn" style="display:flex;justify-content:center"></div>
+</div>
+
+<main id="app" hidden>
+  <details class="notice">
+    <summary>Not an endorsement — please read</summary>
+    <p>This list shows vendors previously used by Adams, Cameron &amp; Co. agents and their customers. Inclusion on this list does not constitute a referral, recommendation, or endorsement by Adams, Cameron &amp; Co. These companies have not been vetted by Adams, Cameron &amp; Co. and are provided strictly for informational purposes.</p>
+    <p>Buyers, Sellers, and Homeowners often need access to a list of vendors to support everyday needs. This list is compiled by real estate agents and their customers to provide a short list. It is not intended as a recommendation or referral and links are provided to Google Business Pages for users to conduct their own research.</p>
+  </details>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="browse" aria-selected="true">Browse</button>
+    <button class="tab" role="tab" data-tab="add" aria-selected="false">Add a vendor</button>
+    <button class="tab" role="tab" data-tab="review" aria-selected="false" hidden>Review <span class="count" id="reviewCount" hidden></span></button>
+  </div>
+
+  <section id="tab-browse">
+    <div class="filters">
+      <input type="search" id="q" placeholder="Search name, specialty, contact…" aria-label="Search vendors">
+      <select id="fCat" aria-label="Category"><option value="">All categories</option></select>
+      <select id="fArea" aria-label="Area"><option value="">All areas</option></select>
+    </div>
+    <div id="list"><div class="msg">Loading…</div></div>
+  </section>
+
+  <section id="tab-add" hidden>
+    <p class="note" style="margin-top:0">Add a vendor you or your customers have used. An admin takes a quick look before it's shown to everyone; until then only you can see it.</p>
+    <div id="addFormWrap"></div>
+  </section>
+
+  <section id="tab-review" hidden>
+    <div class="review-bar">
+      <select id="rStatus" aria-label="Show">
+        <option value="pending">Waiting for review</option>
+        <option value="recheck">Needs recheck (not verified in 2 years)</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="archived">Archived</option>
+        <option value="all">Everything</option>
+      </select>
+      <input type="search" id="rq" placeholder="Search…" aria-label="Search review list" style="padding:8px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;flex:1 1 180px">
+      <button class="btn" id="importBtn" title="Brings in rows from the AppSheet's Vendor List sheet that haven't been imported yet, as waiting for review">Import from AppSheet sheet</button>
+    </div>
+    <div id="rlist"></div>
+  </section>
+</main>
+
+<script>
+const S = {
+  me: null,            // { email, isAdmin }
+  cats: [],            // [{ id, name }]
+  areas: [],           // [{ name, county, is_county }]
+  vendors: [],         // browse list (approved + my pending)
+  all: null,           // admin: every vendor, for Review
+  open: new Set(),     // expanded vendor ids
+  editing: null,       // vendor id being edited in Review
+};
+const RECHECK_DAYS = 730;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const digits = s => String(s || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+function toast(msg, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  t.setAttribute('role', 'status'); document.body.appendChild(t); setTimeout(() => t.remove(), 4000);
+}
+
+// ── Sign-in (shared auth.js; the gate shows only when needed) ──
+Auth.ready({
+  tool: 'Vendor Directory',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => { document.getElementById('gate').hidden = false; },
+}).then(() => {
+  document.getElementById('gate').hidden = true;
+  start();
+});
+
+async function start() {
+  document.getElementById('app').hidden = false;
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  ['q', 'fCat', 'fArea'].forEach(id => document.getElementById(id).addEventListener('input', renderBrowse));
+  ['rStatus', 'rq'].forEach(id => document.getElementById(id).addEventListener('input', renderReview));
+  document.getElementById('importBtn').onclick = importSheet;
+  try {
+    let lists;
+    [S.me, lists] = await Promise.all([Auth.api('/vendors/me'), Auth.api('/vendors/lists')]);
+    S.cats = lists.categories; S.areas = lists.areas;
+  } catch (e) {
+    document.getElementById('list').innerHTML = `<div class="msg">Couldn't load the directory: ${esc(e.message)}</div>`;
+    return;
+  }
+  renderFilters();
+  resetAddForm();
+  if (S.me.isAdmin) document.querySelector('.tab[data-tab="review"]').hidden = false;
+  await loadBrowse();
+  if (S.me.isAdmin) await loadAll();
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab === 'add' || (tab === 'review' && S.me.isAdmin)) showTab(tab);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+  ['browse', 'add', 'review'].forEach(t => document.getElementById('tab-' + t).hidden = t !== name);
+  const url = new URL(location.href);
+  name === 'browse' ? url.searchParams.delete('tab') : url.searchParams.set('tab', name);
+  history.replaceState(null, '', url);
+}
+
+function counties() { return [...new Set(S.areas.map(a => a.county))]; }
+
+function renderFilters() {
+  const cat = document.getElementById('fCat'), keepCat = cat.value;
+  cat.innerHTML = '<option value="">All categories</option>' + S.cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  cat.value = keepCat;
+  const area = document.getElementById('fArea'), keepArea = area.value;
+  area.innerHTML = '<option value="">All areas</option>' + counties().map(county =>
+    `<optgroup label="${esc(county)} County">${S.areas.filter(a => a.county === county).map(a =>
+      `<option value="${esc(a.name)}">${esc(a.is_county ? `Anywhere in ${county} County` : a.name)}</option>`).join('')}</optgroup>`).join('');
+  area.value = keepArea;
+}
+
+function resetAddForm() {
+  document.getElementById('addFormWrap').innerHTML = formHtml(null);
+  bindForm(document.querySelector('#addFormWrap form'), null);
+}
+
+// Does the vendor cover this area? A city also matches vendors covering its
+// whole county; a county matches vendors covering it or any city in it.
+function covers(v, areaName) {
+  const a = S.areas.find(x => x.name === areaName);
+  if (!a) return true;
+  const countyRow = S.areas.find(x => x.is_county && x.county === a.county);
+  if (a.is_county) return v.areas.some(n => S.areas.find(x => x.name === n)?.county === a.county);
+  return v.areas.includes(a.name) || (countyRow && v.areas.includes(countyRow.name));
+}
+
+async function loadBrowse() {
+  try {
+    S.vendors = await Auth.api('/vendors');
+    renderBrowse();
+  } catch (e) {
+    document.getElementById('list').innerHTML = `<div class="msg">Couldn't load vendors: ${esc(e.message)}</div>`;
+  }
+}
+
+async function loadAll() {
+  try {
+    S.all = await Auth.api('/vendors?all=1');
+    const n = S.all.filter(v => v.status === 'pending').length;
+    const c = document.getElementById('reviewCount');
+    c.textContent = n; c.hidden = !n;
+    renderReview();
+  } catch (e) {
+    document.getElementById('rlist').innerHTML = `<div class="msg">Couldn't load the review list: ${esc(e.message)}</div>`;
+  }
+}
+
+const matches = (v, q) => !q || [v.name, v.specialty, v.contact_name, v.categories.join(' '), v.areas.join(' '), v.city, v.service_area, v.comments]
+  .some(x => String(x || '').toLowerCase().includes(q));
+
+// ── Browse ─────────────────────────────────────────────────────────────────
+// A vendor is listed under every category it covers (a filtered category
+// shows only that heading).
+function renderBrowse() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const cat = document.getElementById('fCat').value, area = document.getElementById('fArea').value;
+  const list = S.vendors.filter(v => matches(v, q) && (!cat || v.category_ids.includes(Number(cat))) && (!area || covers(v, area)));
+  const el = document.getElementById('list');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">${S.vendors.length ? 'No vendors match.' : 'No vendors yet. The list is being reviewed and will fill in soon.'}</div>`;
+    return;
+  }
+  const catName = cat ? S.cats.find(c => String(c.id) === cat)?.name : null;
+  const groups = new Map();
+  for (const v of list) {
+    for (const k of (catName ? [catName] : (v.categories.length ? v.categories : ['Other']))) {
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(v);
+    }
+  }
+  el.innerHTML = `<p class="note">${list.length} vendor${list.length === 1 ? '' : 's'}${cat || area || q ? ' match' + (list.length === 1 ? 'es' : '') : ''}.</p>` +
+    [...groups.keys()].sort().map(k =>
+      `<h2 class="cat-h">${esc(k)} · ${groups.get(k).length}</h2>` + groups.get(k).map(v => vendorHtml(v, false, k)).join('')
+    ).join('');
+}
+
+function actionsHtml(v) {
+  const a = [];
+  const call = v.phone || v.cell;
+  if (call) a.push(`<a class="ic" href="tel:${digits(call)}" title="Call ${esc(call)}" aria-label="Call ${esc(v.name)}">📞</a>`);
+  if (v.cell) a.push(`<a class="ic" href="sms:${digits(v.cell)}" title="Text ${esc(v.cell)}" aria-label="Text ${esc(v.name)}">💬</a>`);
+  if (v.email) a.push(`<a class="ic" href="mailto:${esc(v.email)}" title="${esc(v.email)}" aria-label="Email ${esc(v.name)}">✉️</a>`);
+  if (v.website) a.push(`<a class="ic" href="${esc(v.website)}" target="_blank" rel="noopener" title="Website" aria-label="${esc(v.name)} website">🌐</a>`);
+  if (v.google_url) a.push(`<a class="ic" href="${esc(v.google_url)}" target="_blank" rel="noopener" title="Google reviews" aria-label="${esc(v.name)} on Google">⭐</a>`);
+  return a.join('');
+}
+
+function statusPill(v) {
+  if (v.status === 'pending') return ' <span class="pill gold">Waiting for review</span>';
+  if (v.status === 'rejected') return ' <span class="pill red">Rejected</span>';
+  if (v.status === 'archived') return ' <span class="pill">Archived</span>';
+  return '';
+}
+
+function needsRecheck(v) {
+  return v.status === 'approved' && (!v.last_verified_at || Date.now() - new Date(v.last_verified_at) > RECHECK_DAYS * 864e5);
+}
+
+function vendorHtml(v, review) {
+  const open = S.open.has(v.id);
+  const meta = [review ? v.categories.join(', ') : null, v.specialty, v.contact_name, v.city ? 'based in ' + v.city : null].filter(Boolean).map(esc).join(' · ');
+  const rows = [
+    ['Categories', v.categories.join(', ')], ['Specialty', v.specialty], ['Covers', v.areas.join(', ')],
+    ['Contact', v.contact_name],
+    ['Phone', [v.phone, v.phone_alt].filter(Boolean).join('  ·  ')], ['Cell', v.cell], ['Email', v.email],
+    ['Address', v.address], ['Based in', v.city],
+    ['Website', v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener">${esc(v.website.replace(/^https?:\/\//, ''))}</a>` : ''],
+    ['Comments', v.comments], ['Referred by', v.referred_by],
+  ];
+  if (review) rows.push(
+    ['Service area (AppSheet)', v.service_area],
+    ['Added by', [v.submitted_by_email, fmtDate(v.submitted_at), v.source === 'appsheet' ? 'from AppSheet' : ''].filter(Boolean).join(' · ')],
+    ['Last verified', fmtDate(v.last_verified_at) || 'Never'],
+    ['Review note', v.review_note],
+  );
+  const body = open ? `<dl class="v-body">${rows.filter(r => r[1]).map(([k, val]) =>
+      `<dt>${k}</dt><dd>${k === 'Website' ? val : esc(val)}</dd>`).join('')}
+      ${review ? `<div class="row-acts">${reviewActs(v)}</div>` : ''}</dl>` : '';
+  const dupe = review && v.status === 'pending' ? dupeNote(v) : '';
+  return `<div class="vendor" ${review ? `id="r-${v.id}"` : `data-v="${v.id}"`}>
+    <div class="v-head">
+      <div class="v-main" role="button" tabindex="0" aria-expanded="${open}" onclick="toggle(${v.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle(${v.id})}">
+        <div class="v-name">${esc(v.name)}${statusPill(v)}${review && needsRecheck(v) ? ' <span class="pill red">Needs recheck</span>' : ''}</div>
+        <div class="v-meta">${meta}</div>
+        ${dupe}
+      </div>
+      <div class="v-acts">${review && v.status === 'pending' && !open
+        ? `<button class="btn green" onclick="review(${v.id},'approve')">Approve</button><button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`
+        : actionsHtml(v)}</div>
+    </div>
+    ${review && S.editing === v.id ? `<div style="padding:0 14px 14px">${formHtml(v)}</div>` : body}
+  </div>`;
+}
+
+function toggle(id) {
+  S.open.has(id) ? S.open.delete(id) : S.open.add(id);
+  if (S.editing === id) S.editing = null;
+  renderBrowse(); if (S.all) renderReview();
+}
+
+// ── Review (admins) ────────────────────────────────────────────────────────
+// Possible duplicates: another vendor with the same name or phone number.
+function dupeNote(v) {
+  const name = v.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const phones = [v.phone, v.phone_alt, v.cell].map(digits).filter(p => p.length === 10);
+  const others = S.all.filter(o => o.id !== v.id && o.status !== 'rejected' && (
+    o.name.toLowerCase().replace(/[^a-z0-9]/g, '') === name ||
+    [o.phone, o.phone_alt, o.cell].map(digits).some(p => phones.includes(p))));
+  return others.length ? `<div class="dupe">Possible duplicate of ${others.map(o => esc(o.name) + (o.categories.length ? ` (${esc(o.categories.join(', '))})` : '')).join(', ')}</div>` : '';
+}
+
+function reviewActs(v) {
+  const b = [`<button class="btn" onclick="editVendor(${v.id})">Edit</button>`];
+  if (v.status === 'pending') b.unshift(`<button class="btn green" onclick="review(${v.id},'approve')">Approve</button>`, `<button class="btn danger" onclick="review(${v.id},'reject')">Reject</button>`);
+  if (v.status === 'approved') b.push(`<button class="btn" onclick="review(${v.id},'verify')" title="Still in business and the details are right">Mark verified</button>`, `<button class="btn danger" onclick="review(${v.id},'archive')">Archive</button>`);
+  if (v.status === 'rejected' || v.status === 'archived') b.push(`<button class="btn" onclick="review(${v.id},'reopen')">Back to review</button>`);
+  return b.join('');
+}
+
+function renderReview() {
+  if (!S.all) return;
+  const status = document.getElementById('rStatus').value;
+  const q = document.getElementById('rq').value.trim().toLowerCase();
+  const list = S.all.filter(v => matches(v, q) && (
+    status === 'all' || (status === 'recheck' ? needsRecheck(v) : v.status === status)));
+  // Oldest submissions first, so the queue is worked in order.
+  if (status === 'pending') list.sort((a, b) => String(a.submitted_at || '').localeCompare(String(b.submitted_at || '')) || a.name.localeCompare(b.name));
+  document.getElementById('rlist').innerHTML = list.length
+    ? `<p class="note">${list.length} vendor${list.length === 1 ? '' : 's'}. Open one to see everything and edit it.</p>` + list.map(v => vendorHtml(v, true)).join('')
+    : `<div class="empty">${status === 'pending' ? 'Nothing waiting for review.' : 'None.'}</div>`;
+  if (S.editing) bindForm(document.querySelector(`#r-${S.editing} form`), S.all.find(v => v.id === S.editing));
+}
+
+async function review(id, action) {
+  let note = null;
+  if (action === 'reject' || action === 'archive') {
+    note = prompt(`${action === 'reject' ? 'Reject' : 'Archive'} this vendor? Optional note (e.g. out of business, duplicate):`);
+    if (note === null) return;
+  }
+  try {
+    const v = await Auth.api(`/vendors/${id}/review`, { body: { action, note } });
+    replace(v);
+    toast({ approve: 'Approved — everyone can see it now.', reject: 'Rejected.', archive: 'Archived.', verify: 'Marked verified.', reopen: 'Back in the review queue.' }[action]);
+  } catch (e) { toast(e.message, true); }
+}
+
+function editVendor(id) { S.editing = id; S.open.add(id); renderReview(); }
+
+function replace(v) {
+  if (S.all) { const i = S.all.findIndex(x => x.id === v.id); i >= 0 ? S.all[i] = v : S.all.push(v); }
+  const j = S.vendors.findIndex(x => x.id === v.id);
+  const visible = v.status === 'approved' || (v.status === 'pending' && v.submitted_by_email === S.me.email);
+  if (j >= 0) visible ? S.vendors[j] = v : S.vendors.splice(j, 1);
+  else if (visible) S.vendors.push(v);
+  S.vendors.sort((a, b) => a.name.localeCompare(b.name));
+  if (S.all) {
+    const n = S.all.filter(x => x.status === 'pending').length;
+    const c = document.getElementById('reviewCount'); c.textContent = n; c.hidden = !n;
+  }
+  renderBrowse(); renderReview();
+}
+
+async function importSheet() {
+  if (!confirm('Bring in vendors from the AppSheet "Vendor List" sheet?\n\nRows already imported are skipped. New ones arrive as waiting for review.')) return;
+  const btn = document.getElementById('importBtn'); btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const r = await Auth.api('/vendors/admin/import-sheet', { body: {} });
+    const lists = await Auth.api('/vendors/lists');
+    S.cats = lists.categories; S.areas = lists.areas;
+    renderFilters(); resetAddForm();
+    await loadAll();
+    toast(`${r.added} vendor${r.added === 1 ? '' : 's'} imported${r.merged ? `, ${r.merged} sheet rows merged into a vendor listed under another category` : ''}${r.skipped ? `, ${r.skipped} already here` : ''}.`);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = 'Import from AppSheet sheet';
+}
+
+// ── Add / edit form ───────────────────────────────────────────────────────
+// Categories and areas are checklists: a vendor can cover several of each.
+// Ticking "All of <County> County" covers every city in it, so its cities
+// are greyed out (and not saved) while it's ticked.
+function categoryChecks(v) {
+  const sel = new Set(v?.category_ids || []);
+  return S.cats.map(c => `<label><input type="checkbox" name="category_ids" value="${c.id}" ${sel.has(c.id) ? 'checked' : ''}>${esc(c.name)}</label>`).join('');
+}
+
+function areaChecks(v) {
+  const sel = new Set(v?.areas || []);
+  return counties().map(county => {
+    const all = S.areas.find(a => a.is_county && a.county === county);
+    const cities = S.areas.filter(a => !a.is_county && a.county === county);
+    return `<div class="county ${all && sel.has(all.name) ? 'all' : ''}">
+      ${all ? `<label><input type="checkbox" name="areas" value="${esc(all.name)}" data-county-all ${sel.has(all.name) ? 'checked' : ''}>${esc(all.name)}</label>` : `<strong>${esc(county)} County</strong>`}
+      <div class="checks">${cities.map(a => `<label><input type="checkbox" name="areas" value="${esc(a.name)}" ${sel.has(a.name) ? 'checked' : ''} ${all && sel.has(all.name) ? 'disabled' : ''}>${esc(a.name)}</label>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function formHtml(v) {
+  const val = k => esc(v?.[k] ?? '');
+  const f = (k, label, attrs = '', hint = '') => `<label><span>${label}${hint ? ` <span class="hint">${hint}</span>` : ''}</span><input name="${k}" value="${val(k)}" ${attrs}></label>`;
+  return `<form class="vform" novalidate>
+    ${f('name', 'Vendor name *', 'required maxlength="200" autocomplete="off"')}
+    ${f('specialty', 'Specialty', 'maxlength="200"', 'e.g. A/C install & repair')}
+    <fieldset>
+      <legend>Categories * <span class="hint">tick every one that applies</span></legend>
+      <div class="checks" data-cats>${categoryChecks(v)}</div>
+      ${S.me.isAdmin ? '<div class="fs-acts"><button class="btn" type="button" data-new-cat>+ New category</button></div>' : ''}
+    </fieldset>
+    <fieldset>
+      <legend>Areas they cover * <span class="hint">a whole county, or the cities they serve</span></legend>
+      <div data-areas>${areaChecks(v)}</div>
+      ${S.me.isAdmin ? '<div class="fs-acts"><button class="btn" type="button" data-new-area>+ New city</button></div>' : ''}
+    </fieldset>
+    ${f('contact_name', 'Contact person', 'maxlength="200"')}
+    ${f('phone', 'Phone', 'type="tel" maxlength="40"')}
+    ${f('cell', 'Cell', 'type="tel" maxlength="40"', 'for texting')}
+    ${f('email', 'Email', 'type="email" maxlength="200"')}
+    ${f('website', 'Website', 'maxlength="500"')}
+    ${f('google_url', 'Google Business page', 'maxlength="1000"', 'for reviews')}
+    <label class="wide"><span>Address <span class="hint">optional</span></span><textarea name="address" maxlength="500">${val('address')}</textarea></label>
+    ${f('city', 'Based in', 'maxlength="100"', 'the city their office is in')}
+    ${f('referred_by', 'Referred by', 'maxlength="200"', v ? '' : 'who recommended them')}
+    <label class="wide">Comments<textarea name="comments" maxlength="2000" placeholder="${v ? '' : 'What did they do for you or your customer? Any discount for ACC?'}">${val('comments')}</textarea></label>
+    <div class="form-acts">
+      <button class="btn primary" type="submit">${v ? 'Save changes' : 'Add vendor'}</button>
+      ${v ? `<button class="btn" type="button" data-cancel>Cancel</button>` : '<span class="note">An admin reviews new vendors before everyone can see them.</span>'}
+    </div>
+  </form>`;
+}
+
+function bindForm(form, v) {
+  if (!form) return;
+  const checked = name => [...form.querySelectorAll(`[name="${name}"]:checked:not(:disabled)`)].map(x => x.value);
+
+  // "All of <County> County" greys out that county's cities.
+  form.querySelector('[data-areas]').addEventListener('change', ev => {
+    if (!ev.target.matches('[data-county-all]')) return;
+    const box = ev.target.closest('.county');
+    box.classList.toggle('all', ev.target.checked);
+    box.querySelectorAll('.checks input').forEach(i => i.disabled = ev.target.checked);
+  });
+
+  form.querySelector('[data-new-cat]')?.addEventListener('click', async () => {
+    const name = (prompt('New category name:') || '').trim();
+    if (!name) return;
+    try {
+      const c = await Auth.api('/vendors/admin/categories', { body: { name } });
+      if (!S.cats.some(x => x.id === c.id)) S.cats.push(c);
+      S.cats.sort((a, b) => a.name.localeCompare(b.name));
+      const keep = new Set([...checked('category_ids').map(Number), c.id]);
+      form.querySelector('[data-cats]').innerHTML = categoryChecks({ category_ids: [...keep] });
+      renderFilters();
+    } catch (e) { toast(e.message, true); }
+  });
+
+  form.querySelector('[data-new-area]')?.addEventListener('click', async () => {
+    const name = (prompt('New city name:') || '').trim();
+    if (!name) return;
+    const county = (prompt(`Which county is ${name} in? (e.g. ${counties().join(', ')})`) || '').trim().replace(/\s+county$/i, '');
+    if (!county) return;
+    try {
+      const a = await Auth.api('/vendors/admin/areas', { body: { name, county } });
+      if (!S.areas.some(x => x.name === a.name)) S.areas.push(a);
+      const keep = new Set([...form.querySelectorAll('[name="areas"]:checked')].map(x => x.value).concat(a.name));
+      form.querySelector('[data-areas]').innerHTML = areaChecks({ areas: [...keep] });
+      renderFilters();
+    } catch (e) { toast(e.message, true); }
+  });
+
+  form.querySelector('[data-cancel]')?.addEventListener('click', () => { S.editing = null; renderReview(); });
+
+  form.onsubmit = async ev => {
+    ev.preventDefault();
+    const body = Object.fromEntries([...new FormData(form)].filter(([k]) => k !== 'category_ids' && k !== 'areas'));
+    body.category_ids = checked('category_ids');
+    body.areas = checked('areas');
+    if (!body.name.trim()) { toast('Vendor name is required.', true); return; }
+    if (!body.category_ids.length) { toast('Tick at least one category.', true); return; }
+    if (!body.areas.length) { toast('Tick at least one area they cover.', true); return; }
+    if (!v && !body.phone.trim() && !body.cell.trim() && !body.email.trim() && !body.website.trim()) {
+      toast('Add at least one way to reach them: phone, cell, email or website.', true); return;
+    }
+    const btn = form.querySelector('[type="submit"]'); btn.disabled = true;
+    try {
+      const saved = v
+        ? await Auth.api(`/vendors/${v.id}`, { method: 'PUT', body })
+        : await Auth.api('/vendors', { body });
+      if (v) { S.editing = null; replace(saved); toast('Saved.'); }
+      else {
+        resetAddForm();
+        replace(saved);
+        if (S.me.isAdmin) await loadAll();
+        toast('Thanks! It shows as "waiting for review" until an admin approves it.');
+        showTab('browse');
+        document.querySelector(`[data-v="${saved.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) { toast(e.message, true); }
+    btn.disabled = false;
+  };
+}
+</script>
+</body>
+</html>
