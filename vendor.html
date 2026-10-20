@@ -39,6 +39,12 @@ label.f .hint { font-weight: 400; color: var(--muted); }
 input[type=text], input[type=tel], input[type=email], textarea { padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; width: 100%; background: #fff; }
 textarea { min-height: 60px; resize: vertical; }
 .wide { grid-column: 1 / -1; }
+.logo-field { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; font-weight: 600; }
+.logo-field .hint { font-weight: 400; color: var(--muted); }
+.lf-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lf-preview { width: 110px; height: 110px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.lf-btn { border: 1px solid var(--navy); background: #fff; color: var(--navy); border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+.lf-btn[hidden] { display: none; }
 fieldset { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 0; min-width: 0; }
 legend { font-size: .85rem; font-weight: 600; padding: 0 4px; }
 legend .hint { font-weight: 400; color: var(--muted); }
@@ -125,6 +131,34 @@ const SAMPLE = {
   }
 })();
 
+// Reads a logo file and redraws it as a PNG at most LOGO_SIDE px on its
+// longest side (SVGs are drawn at that size). The server only accepts PNG,
+// so an SVG's own content — scripts included — is never uploaded.
+// Same function as vendors.html's.
+const LOGO_SIDE = 600;
+async function logoToPng(file) {
+  if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) throw new Error('Please choose a PNG, JPG, WebP or SVG image.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('That file is over 10 MB. Please choose a smaller image.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("That image couldn't be read. Please try a different file."));
+      i.src = url;
+    });
+    const w0 = img.naturalWidth || LOGO_SIDE, h0 = img.naturalHeight || LOGO_SIDE;
+    const scale = file.type === 'image/svg+xml' ? LOGO_SIDE / Math.max(w0, h0) : Math.min(1, LOGO_SIDE / Math.max(w0, h0));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w0 * scale));
+    canvas.height = Math.max(1, Math.round(h0 * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 function counties() { return [...new Set(S.areas.map(a => a.county))]; }
 
 function areaChecks(sel) {
@@ -170,6 +204,14 @@ function render() {
           ${f('website', 'Website')}
           <label class="f wide">What you do <span class="hint">e.g. repairs, water heaters, repiping</span><input type="text" name="specialty" value="${val('specialty')}"></label>
           ${f('google_url', 'Google Business page', 'text', 'link to your Google reviews, if you have one')}
+          <div class="wide logo-field">
+            <span class="lf-label">Your logo <span class="hint">optional · PNG, JPG, WebP or SVG</span></span>
+            <div class="lf-row">
+              <img class="lf-preview" id="logoPreview" alt="" ${v.logo_url ? `src="${esc(v.logo_url)}"` : 'hidden'}>
+              <label class="lf-btn">${v.logo_url ? 'Replace logo' : 'Upload your logo'}<input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden></label>
+              <button class="lf-btn" type="button" id="logoRemove" ${v.logo_url ? '' : 'hidden'}>Remove logo</button>
+            </div>
+          </div>
           ${f('city', 'City your office is in')}
           <label class="f wide">Address <span class="hint">optional</span><textarea name="address">${val('address')}</textarea></label>
           <fieldset>
@@ -207,6 +249,24 @@ function render() {
     box.classList.toggle('all', ev.target.checked);
     box.querySelectorAll('.checks input').forEach(i => i.disabled = ev.target.checked);
   });
+  // Logo: S.logo undefined = unchanged, null = remove, a PNG data URL = new.
+  // Saved with "Keep me on the list".
+  S.logo = undefined;
+  const logoPreview = document.getElementById('logoPreview'), logoRemove = document.getElementById('logoRemove');
+  document.getElementById('logoFile').addEventListener('change', async ev => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    showErr('');
+    try {
+      S.logo = await logoToPng(file);
+      logoPreview.src = S.logo; logoPreview.hidden = false; logoRemove.hidden = false;
+    } catch (e) { showErr(e.message); }
+  });
+  logoRemove.addEventListener('click', () => {
+    S.logo = null;
+    logoPreview.removeAttribute('src'); logoPreview.hidden = true; logoRemove.hidden = true;
+  });
   form.onsubmit = ev => { ev.preventDefault(); keep(form); };
   document.getElementById('removeBtn').onclick = remove;
 }
@@ -230,7 +290,8 @@ async function keep(form) {
   if (PREVIEW) return done('Preview: in real use, the details and acceptance are saved here and John gets an email listing anything the vendor changed.');
   const btn = form.querySelector('[type="submit"]'); btn.disabled = true;
   try {
-    await api('/self', { t: TOKEN, action: 'keep', fields, accept: !!accept?.checked, signer_name: signer?.value || '' });
+    await api('/self', { t: TOKEN, action: 'keep', fields, accept: !!accept?.checked, signer_name: signer?.value || '',
+                         ...(S.logo !== undefined ? { logo: S.logo } : {}) });
     done(S.purpose === 'welcome'
       ? "Thank you! Your listing is set up. We'll ask you to confirm your details once a year."
       : "Thank you! Your details are confirmed and you'll stay on our vendor list. We'll check in again next year.");

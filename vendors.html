@@ -43,6 +43,11 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 1
 .v-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 10px 14px; align-items: center; }
 .v-main { min-width: 0; cursor: pointer; }
 .v-name { font-weight: 700; }
+.v-logo { float: left; width: 44px; height: 44px; object-fit: contain; margin-right: 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.logo-field { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; font-weight: 600; }
+.logo-field .lf-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.logo-field .lf-preview { width: 96px; height: 96px; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+.logo-field .lf-pick { display: inline-flex; align-items: center; cursor: pointer; font-weight: 600; }
 .v-meta { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
 .v-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .ic { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--navy); text-decoration: none; font-size: 1rem; }
@@ -366,6 +371,7 @@ function vendorHtml(v, review, group) {
   return `<div class="vendor" ${review ? `id="r-${v.id}"` : `data-v="${v.id}"`}>
     <div class="v-head">
       <div class="v-main" role="button" tabindex="0" aria-expanded="${open}" onclick="toggle(${v.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle(${v.id})}">
+        ${v.logo_url ? `<img class="v-logo" src="${esc(v.logo_url)}" alt="" loading="lazy">` : ''}
         <div class="v-name">${esc(v.name)}${statusPill(v)}${review && needsRecheck(v) ? ' <span class="pill red">Needs renewal</span>' : ''}${review && needsEmail(v) ? ' <span class="pill red">Needs email</span>' : ''}</div>
         <div class="v-meta">${meta}</div>
         ${dupe}
@@ -536,6 +542,14 @@ function formHtml(v) {
     ${f('email', 'Email *', 'type="email" required maxlength="200"')}
     ${f('website', 'Website', 'maxlength="500"')}
     ${f('google_url', 'Google Business page', 'maxlength="1000"', 'for reviews')}
+    <div class="wide logo-field">
+      <span class="lf-label">Logo <span class="hint">optional · PNG, JPG, WebP or SVG</span></span>
+      <div class="lf-row">
+        <img class="lf-preview" data-logo-preview alt="" ${v?.logo_url ? `src="${esc(v.logo_url)}"` : 'hidden'}>
+        <label class="btn lf-pick">${v?.logo_url ? 'Replace logo' : 'Choose logo'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo-file hidden></label>
+        <button class="btn" type="button" data-logo-remove ${v?.logo_url ? '' : 'hidden'}>Remove logo</button>
+      </div>
+    </div>
     <label class="wide"><span>Address <span class="hint">optional</span></span><textarea name="address" maxlength="500">${val('address')}</textarea></label>
     ${f('city', 'Based in', 'maxlength="100"', 'the city their office is in')}
     ${f('referred_by', 'Referred by', 'maxlength="200"', v ? '' : 'who recommended them')}
@@ -545,6 +559,34 @@ function formHtml(v) {
       ${v ? `<button class="btn" type="button" data-cancel>Cancel</button>` : '<span class="note">An admin reviews new vendors before everyone can see them.</span>'}
     </div>
   </form>`;
+}
+
+// Reads a logo file and redraws it as a PNG at most LOGO_SIDE px on its
+// longest side (SVGs are drawn at that size). The server only accepts PNG,
+// so an SVG's own content — scripts included — is never uploaded.
+// Same function as vendor.html's.
+const LOGO_SIDE = 600;
+async function logoToPng(file) {
+  if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) throw new Error('Please choose a PNG, JPG, WebP or SVG image.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('That file is over 10 MB. Please choose a smaller image.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("That image couldn't be read. Please try a different file."));
+      i.src = url;
+    });
+    const w0 = img.naturalWidth || LOGO_SIDE, h0 = img.naturalHeight || LOGO_SIDE;
+    const scale = file.type === 'image/svg+xml' ? LOGO_SIDE / Math.max(w0, h0) : Math.min(1, LOGO_SIDE / Math.max(w0, h0));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w0 * scale));
+    canvas.height = Math.max(1, Math.round(h0 * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function bindForm(form, v) {
@@ -588,6 +630,25 @@ function bindForm(form, v) {
 
   form.querySelector('[data-cancel]')?.addEventListener('click', () => { S.editing = S.editingIn = null; renderBrowse(); renderReview(); });
 
+  // Logo: undefined = unchanged, null = remove, a PNG data URL = new logo.
+  // Sent with the rest of the form on save.
+  let logo;
+  const logoPreview = form.querySelector('[data-logo-preview]');
+  const logoRemove = form.querySelector('[data-logo-remove]');
+  form.querySelector('[data-logo-file]').addEventListener('change', async ev => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    try {
+      logo = await logoToPng(file);
+      logoPreview.src = logo; logoPreview.hidden = false; logoRemove.hidden = false;
+    } catch (e) { toast(e.message, true); }
+  });
+  logoRemove.addEventListener('click', () => {
+    logo = null;
+    logoPreview.removeAttribute('src'); logoPreview.hidden = true; logoRemove.hidden = true;
+  });
+
   form.onsubmit = async ev => {
     ev.preventDefault();
     const body = Object.fromEntries([...new FormData(form)].filter(([k]) => k !== 'category_ids' && k !== 'areas'));
@@ -598,6 +659,7 @@ function bindForm(form, v) {
     if (!body.areas.length) { toast('Tick at least one area they cover.', true); return; }
     if (!body.email.trim()) { toast('Email is required.', true); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim())) { toast(`"${body.email.trim()}" doesn't look like an email address.`, true); return; }
+    if (logo !== undefined) body.logo = logo;
     const btn = form.querySelector('[type="submit"]'); btn.disabled = true;
     try {
       const saved = v
