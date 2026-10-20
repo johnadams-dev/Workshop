@@ -2620,6 +2620,32 @@ function nscValidationError(value, label) {
 const DATE_MIN_ATTR = '2000-01-01';
 const DATE_MAX_ATTR = `${new Date().getFullYear() + 5}-12-31`;
 
+// Runs dateSanityError() over every date field a status action can send.
+// Before 2026-10-20 only newCloseDate/expirationDate were checked here, so
+// typing "26" in a date picker's year box (stored as 0026) went straight
+// through on Back on Market / Went Under Contract / Closed.
+function actionFieldsDateError(fields) {
+  return dateSanityError(fields.effectiveDate, 'Effective date') ||
+         dateSanityError(fields.contractDate, 'Contract date') ||
+         dateSanityError(fields.expectedCloseDate, 'Expected closing date') ||
+         dateSanityError(fields.closeDate, 'Closing date');
+}
+
+// Every date picker that feeds a transaction date — bounded so the browser's
+// own widget won't scroll/spin past a sane year. Called from init() and again
+// each time the action modal renders its fields (those inputs are built then).
+const BOUNDED_DATE_INPUTS = [
+  'nl-list-date', 'nl-exp-date', 'nc-acc-date', 'nc-ext-contract-date', 'nc-ext-close-date',
+  'am-new-close-date', 'am-expiration-date', 'am-effective-date', 'am-close-date',
+  'am-contract-date', 'am-expected-close-date',
+];
+function boundDateInputs() {
+  for (const id of BOUNDED_DATE_INPUTS) {
+    const el = document.getElementById(id);
+    if (el) { el.min = DATE_MIN_ATTR; el.max = DATE_MAX_ATTR; }
+  }
+}
+
 const STATUS_CHIP = {
   coming_soon:             ['chip-neutral', 'Coming Soon'],
   active_listing:          ['chip-amber',   'Active'],
@@ -2667,12 +2693,9 @@ async function loadOffices() {
 async function init() {
   document.getElementById('admin-chip').textContent = userDisplay || userEmail;
 
-  // Bound the New Listing date pickers so the browser's own widget won't
-  // scroll/spin past a sane year (see DATE_MIN_ATTR/DATE_MAX_ATTR).
-  for (const id of ['nl-list-date', 'nl-exp-date']) {
-    const el = document.getElementById(id);
-    if (el) { el.min = DATE_MIN_ATTR; el.max = DATE_MAX_ATTR; }
-  }
+  // Bound the static date pickers (New Listing, New Contract) so the
+  // browser's own widget won't scroll/spin past a sane year.
+  boundDateInputs();
 
   const [, me, sm] = await Promise.all([
     loadOffices(),
@@ -4449,6 +4472,7 @@ async function amChooseAction(key) {
     fieldsHtml += amCustomerManagementHtml();
   }
   fieldsEl.innerHTML = fieldsHtml;
+  boundDateInputs();
 
   if (key === 'under_contract') {
     amUpdateRepFields();
@@ -5133,6 +5157,9 @@ async function amSubmit() {
     return;
   }
 
+  const amFieldsDateError = actionFieldsDateError(fields);
+  if (amFieldsDateError) { alert(amFieldsDateError); return; }
+
   try {
     await POST(`/daily-desk/transactions/${amState.id}/action`, { actionKey: key, kind: amState.kind, fields });
     if (key === 'closing') {
@@ -5416,6 +5443,9 @@ async function ncSaveAccContract() {
   }
   if (accBuyers.length) fields.buyers = accBuyers;
 
+  const accDateError = actionFieldsDateError(fields);
+  if (accDateError) { alert(accDateError); return; }
+
   try {
     await POST(`/daily-desk/transactions/${listingId}/action`, { actionKey: 'under_contract', fields });
     if (document.getElementById('nc-acc-has-referral')?.checked) {
@@ -5478,6 +5508,10 @@ async function ncSaveExternalContract() {
   const extNonSharedCommission = amParseMoney(document.getElementById('nc-ext-non-shared-commission').value);
   const extNscError = nscValidationError(extNonSharedCommission, 'Non-Shared Commission (Buyer)');
   if (extNscError) { alert(extNscError); return; }
+  const extDateError =
+    dateSanityError(document.getElementById('nc-ext-contract-date').value, 'Contract date') ||
+    dateSanityError(document.getElementById('nc-ext-close-date').value, 'Expected closing date');
+  if (extDateError) { alert(extDateError); return; }
   try {
     const txn = await POST('/daily-desk/contracts', {
       property_address:    addr,
