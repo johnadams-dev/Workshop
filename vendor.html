@@ -166,7 +166,7 @@ function render() {
           ${f('contact_name', 'Contact person')}
           ${f('phone', 'Phone', 'tel')}
           ${f('cell', 'Cell', 'tel', 'for texts')}
-          ${f('email', 'Email', 'email')}
+          ${f('email', 'Email *', 'email')}
           ${f('website', 'Website')}
           <label class="f wide">What you do <span class="hint">e.g. repairs, water heaters, repiping</span><input type="text" name="specialty" value="${val('specialty')}"></label>
           ${f('google_url', 'Google Business page', 'text', 'link to your Google reviews, if you have one')}
@@ -221,6 +221,8 @@ async function keep(form) {
   fields.category_ids = checked('category_ids').map(Number);
   fields.areas = checked('areas');
   if (!fields.name.trim()) return showErr('Please enter your business name.');
+  if (!fields.email.trim()) return showErr('Please enter your email address.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) return showErr(`"${fields.email.trim()}" doesn't look like an email address.`);
   if (!fields.category_ids.length) return showErr('Please tick at least one category.');
   if (!fields.areas.length) return showErr('Please tick at least one area you serve.');
   const accept = document.getElementById('accept'), signer = document.getElementById('signer');

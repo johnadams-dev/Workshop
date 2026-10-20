@@ -144,6 +144,7 @@ form.vform { background: var(--surface); border: 1px solid var(--border); border
     <div class="review-bar">
       <select id="rStatus" aria-label="Show">
         <option value="pending">Waiting for review</option>
+        <option value="needs_email">Needs email (no email address, so they can't confirm their listing)</option>
         <option value="recheck">Needs renewal (vendor hasn't confirmed in the last year)</option>
         <option value="approved">Approved</option>
         <option value="lapsed">Lapsed (didn't answer their renewal)</option>
@@ -323,6 +324,11 @@ function statusPill(v) {
   return '';
 }
 
+// Still in play (not rejected/archived) but with no email address — they can't
+// be sent the welcome/renewal link, so they get their own review queue,
+// separate from "Waiting for review" (which then only holds vendors with one).
+const needsEmail = v => !v.email && v.status !== 'rejected' && v.status !== 'archived';
+
 function needsRecheck(v) {
   // Everyone on the list (approved, plus the AppSheet vendors still in the
   // queue) whose vendor hasn't confirmed through a welcome or renewal link
@@ -360,7 +366,7 @@ function vendorHtml(v, review, group) {
   return `<div class="vendor" ${review ? `id="r-${v.id}"` : `data-v="${v.id}"`}>
     <div class="v-head">
       <div class="v-main" role="button" tabindex="0" aria-expanded="${open}" onclick="toggle(${v.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle(${v.id})}">
-        <div class="v-name">${esc(v.name)}${statusPill(v)}${review && needsRecheck(v) ? ' <span class="pill red">Needs renewal</span>' : ''}</div>
+        <div class="v-name">${esc(v.name)}${statusPill(v)}${review && needsRecheck(v) ? ' <span class="pill red">Needs renewal</span>' : ''}${review && needsEmail(v) ? ' <span class="pill red">Needs email</span>' : ''}</div>
         <div class="v-meta">${meta}</div>
         ${dupe}
       </div>
@@ -417,12 +423,16 @@ function renderReview() {
   const status = document.getElementById('rStatus').value;
   const q = document.getElementById('rq').value.trim().toLowerCase();
   const list = S.all.filter(v => matches(v, q) && (
-    status === 'all' || (status === 'recheck' ? needsRecheck(v) : v.status === status)));
+    status === 'all' ||
+    (status === 'recheck' ? needsRecheck(v)
+      : status === 'needs_email' ? needsEmail(v)
+      : status === 'pending' ? v.status === 'pending' && !!v.email
+      : v.status === status)));
   // Oldest submissions first, so the queue is worked in order.
-  if (status === 'pending') list.sort((a, b) => String(a.submitted_at || '').localeCompare(String(b.submitted_at || '')) || a.name.localeCompare(b.name));
+  if (status === 'pending' || status === 'needs_email') list.sort((a, b) => String(a.submitted_at || '').localeCompare(String(b.submitted_at || '')) || a.name.localeCompare(b.name));
   document.getElementById('rlist').innerHTML = list.length
     ? `<p class="note">${list.length} vendor${list.length === 1 ? '' : 's'}. Open one to see everything and edit it.</p>` + list.map(v => vendorHtml(v, true)).join('')
-    : `<div class="empty">${status === 'pending' ? 'Nothing waiting for review.' : 'None.'}</div>`;
+    : `<div class="empty">${status === 'pending' ? 'Nothing waiting for review.' : status === 'needs_email' ? 'Every vendor has an email address.' : 'None.'}</div>`;
   if (S.editingIn === 'review') bindForm(document.querySelector(`#r-${S.editing} form`), S.all.find(v => v.id === S.editing));
 }
 
@@ -523,7 +533,7 @@ function formHtml(v) {
     ${f('contact_name', 'Contact person', 'maxlength="200"')}
     ${f('phone', 'Phone', 'type="tel" maxlength="40"')}
     ${f('cell', 'Cell', 'type="tel" maxlength="40"', 'for texting')}
-    ${f('email', 'Email', 'type="email" maxlength="200"')}
+    ${f('email', 'Email *', 'type="email" required maxlength="200"')}
     ${f('website', 'Website', 'maxlength="500"')}
     ${f('google_url', 'Google Business page', 'maxlength="1000"', 'for reviews')}
     <label class="wide"><span>Address <span class="hint">optional</span></span><textarea name="address" maxlength="500">${val('address')}</textarea></label>
@@ -586,9 +596,8 @@ function bindForm(form, v) {
     if (!body.name.trim()) { toast('Vendor name is required.', true); return; }
     if (!body.category_ids.length) { toast('Tick at least one category.', true); return; }
     if (!body.areas.length) { toast('Tick at least one area they cover.', true); return; }
-    if (!v && !body.phone.trim() && !body.cell.trim() && !body.email.trim() && !body.website.trim()) {
-      toast('Add at least one way to reach them: phone, cell, email or website.', true); return;
-    }
+    if (!body.email.trim()) { toast('Email is required.', true); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim())) { toast(`"${body.email.trim()}" doesn't look like an email address.`, true); return; }
     const btn = form.querySelector('[type="submit"]'); btn.disabled = true;
     try {
       const saved = v
