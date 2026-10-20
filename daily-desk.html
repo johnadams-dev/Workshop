@@ -1447,6 +1447,7 @@ tbody tr.clickable { cursor: pointer; }
             <div class="report-card-desc">New listings and contracts for a selected month, organized by office.</div>
           </div>
           <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint()">🖨 Print</button>
+          <button class="btn btn-ghost" onclick="eomExportCsv()">⬇ CSV</button>
         </div>
         <div class="report-card-body">
           <div class="controls">
@@ -1475,6 +1476,7 @@ tbody tr.clickable { cursor: pointer; }
             <div class="report-card-desc">Active, coming soon, and under-contract listings with approaching expiration dates.</div>
           </div>
           <button class="btn btn-ghost" style="margin-left:auto" onclick="rptPrint()">🖨 Print</button>
+          <button class="btn btn-ghost" onclick="expExportCsv()">⬇ CSV</button>
         </div>
         <div class="report-card-body">
           <div class="controls">
@@ -7768,23 +7770,67 @@ function vtRenderTable() {
   document.getElementById('vt-output').innerHTML = summaryHtml + tableHtml;
 }
 
+// Shared by the reports' CSV buttons. The leading BOM makes Excel read the
+// file as UTF-8 (otherwise accented names come out garbled).
+function rptDownloadCsv(filename, header, rows) {
+  const csv = [header, ...rows]
+    .map(row => row.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','))
+    .join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('﻿' + csv);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+// Prices go out as plain numbers so they add up in Excel.
+const csvNum = v => (v == null || v === '' || isNaN(Number(v))) ? '' : Number(v);
+const csvDate = v => v ? fmtDate(v) : '';
+const csvStatus = s => (RPT_STATUS_CHIP[s] || [null, s || ''])[1];
+
 function vtExportCsv() {
   const rows = vtFilteredRows();
   if (!rows.length) return;
   const header = ['Address', 'City', 'Office', 'Agent', 'Status', 'Provider', 'Current Tour URL', "Cameron's Stage Link", 'MLS#', 'Tour Mismatch'];
-  const csvRows = rows.map(r => [
+  rptDownloadCsv(`virtual-tours-${new Date().toISOString().slice(0, 10)}.csv`, header, rows.map(r => [
     r.address || '', r.city || '', r.office_name || '', r.agent_name || '', r.status || '',
     r.provider_label || '', r.vtour_url || '', r.cs_tour_url || '', r.mls_id || '', r.tour_mismatch ? 'Yes' : '',
-  ]);
-  const csv = [header, ...csvRows]
-    .map(row => row.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))
-    .join('\r\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `virtual-tours-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  ]));
+}
+
+// One file for the whole month: listings and contracts together, with a Type
+// column, grouped by office (A–Z), listings before contracts within each.
+// The report's endpoint doesn't return an MLS# for contracts, so that column
+// is blank on contract rows.
+function eomExportCsv() {
+  if (!eomLast) { alert('Generate the report first.'); return; }
+  const { data: { listings, contracts }, month } = eomLast;
+  if (!listings.length && !contracts.length) { alert('Nothing to export for this month.'); return; }
+  const header = ['Type', 'Office', 'Entered', 'Listed', 'Expires', 'Contract Date', 'Expected Closing',
+    'Address', 'City', 'MLS#', 'Listing Agent', 'Selling Agent', 'List Price', 'Sale/Contract Price', 'Status'];
+  const office = r => r.office_name || '(No Office)';
+  const rows = [
+    ...listings.map(r => ['New Listing', office(r), csvDate(r.created_at), csvDate(r.list_date), csvDate(r.expiration_date), '', '',
+      r.property_address || '', r.city || '', r.mls_id || '', r.agent_name || '', '', csvNum(r.current_price), '', csvStatus(r.status)]),
+    ...contracts.map(r => ['Contract', office(r), csvDate(r.submitted_at), '', '', csvDate(r.contract_date), csvDate(r.expected_close_date),
+      r.property_address || '', r.city || '', r.mls_id || '', r.listing_agent || 'Co-broke', r.selling_agent || 'Co-broke',
+      csvNum(r.current_price), csvNum(r.sale_price || r.contract_price), csvStatus(r.status)]),
+  ].sort((a, b) => a[1].localeCompare(b[1]));   // stable: listings before contracts within an office
+  rptDownloadCsv(`end-of-month-${month}.csv`, header, rows);
+}
+
+function expExportCsv() {
+  if (!expLast) { alert('The report is still loading.'); return; }
+  const { rows, days } = expLast;
+  if (!rows.length) { alert(`No listings expiring within ${days} days.`); return; }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const header = ['Office', 'Expires', 'Days Left', 'Address', 'City', 'MLS#', 'Agent', 'List Price', 'Listed', 'Status'];
+  rptDownloadCsv(`expiring-listings-${days}-days-${new Date().toISOString().slice(0, 10)}.csv`, header, rows.map(r => [
+    r.office_name || '(No Office)', csvDate(r.expiration_date),
+    Math.round((new Date(r.expiration_date + 'T00:00:00') - today) / 86400000),
+    r.property_address || '', r.city || '', r.mls_id || '', r.agent_name || '',
+    csvNum(r.current_price), csvDate(r.list_date), csvStatus(r.status),
+  ]));
 }
 
 const RPT_STATUS_CHIP = {
@@ -7801,17 +7847,23 @@ function rptStatusChip(s) {
   return `<span class="chip ${cls}">${label}</span>`;
 }
 
+// The last data each report showed, for its CSV button.
+let eomLast = null; // { data: { listings, contracts }, month }
+let expLast = null; // { rows, days }
+
 async function rptLoadEOM() {
   const month    = document.getElementById('eom-month').value;
   const officeId = document.getElementById('eom-office').value;
   const out      = document.getElementById('eom-output');
   if (!month) { out.innerHTML = '<div class="report-error">Select a month first.</div>'; return; }
   out.innerHTML = '<div class="report-loading">Loading…</div>';
+  eomLast = null;
   document.getElementById('eom-btn').disabled = true;
   try {
     const params = new URLSearchParams({ month });
     if (officeId) params.set('office_id', officeId);
     const data = await GET('/daily-desk/report/eom?' + params);
+    eomLast = { data, month };
     out.innerHTML = rptRenderEOM(data, month);
   } catch (e) {
     out.innerHTML = `<div class="report-error">Error: ${escapeHtml(e.message)}</div>`;
@@ -7949,10 +8001,12 @@ async function rptLoadExpiring() {
   const officeId = document.getElementById('exp-office').value;
   const out      = document.getElementById('exp-output');
   out.innerHTML  = '<div class="report-loading">Loading…</div>';
+  expLast = null;
   try {
     const params = new URLSearchParams({ days });
     if (officeId) params.set('office_id', officeId);
     const rows = await GET('/daily-desk/report/expiring?' + params);
+    expLast = { rows, days: parseInt(days) };
     out.innerHTML = rptRenderExpiring(rows, parseInt(days));
   } catch (e) {
     out.innerHTML = `<div class="report-error">Error: ${escapeHtml(e.message)}</div>`;
