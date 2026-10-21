@@ -696,6 +696,7 @@
     .zg-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
     table.zg-compact th, table.zg-compact td { padding:5px 9px; font-size:0.85em; }
     .zg-grid img { width:100%; border:1px solid #ddd; border-radius:4px; }
+    .county-block { margin-top:22px; } .section-title + .county-block { margin-top:0; }
     .zg-note { font-size:0.82em; color:#666; margin:10px 0; line-height:1.5; }
     .zg-disclaimer { font-size:0.8em; color:#555; border-top:1px solid #eee; padding-top:8px; margin-top:12px; }
     .zg-footer { text-align:center; font-size:0.72em; color:#888; padding:0 0 10px; }
@@ -956,11 +957,13 @@ async function zestLookup(address, unit) {
   throw new Error(data.match ? 'Zillow has no Zestimate for that property.' : "Zillow couldn't find that address — check it and try again.");
 }
 
-// RPR's estimate: RPR's own widget (rpr-frame.html, our token, co-branded)
-// in a sandboxed frame without same-origin, so RPR's script can't see the
-// Workshop sign-in in localStorage. Display only — never read, stored or
-// calculated with; the report hides the block if RPR has no estimate.
-const RPR_FRAME_URL = new URL('rpr-frame.html', location.href).href;
+// RPR's estimate: RPR's own widget (our token, co-branded), served from
+// rpr.johnadams.org (the rpr-frame repo) — its own origin, so RPR's script
+// can't see the Workshop sign-in in johnadams.org's localStorage. It can't be
+// sandboxed without same-origin: RPR then gets no Referer and refuses.
+// Display only — never read, stored or calculated with; the report hides the
+// RPR page if RPR has no estimate.
+const RPR_FRAME_URL = 'https://rpr.johnadams.org/rpr-frame.html';
 
 // "31 Park Pl, Ormond Beach, FL 32174" + "478" -> "31 Park Pl #478, Ormond Beach, FL 32174"
 function rprQuery(address, unit) {
@@ -970,19 +973,25 @@ function rprQuery(address, unit) {
   return i < 0 ? `${address} ${u}` : `${address.slice(0, i)} ${u}${address.slice(i)}`;
 }
 
+// Two pages: the Zestimate and county values, then RPR's widget on its own
+// page (it's about 650px tall). Either is left out when it has nothing; the
+// report hides the RPR page if RPR has no estimate.
 function valuationPageHTML(d, header) {
+  const footer = '<div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>';
   const zest = d.zestimate ? zestBlockHTML(d.zestimate, d.subjectPrice) : '';
-  const title = zest ? '' : `<h2 class="section-title">Property Valuation — ${zgEsc(d.subjectFull)}</h2>`;
   const county = d.county ? countyBlockHTML(d.county) : '';
-  const rpr = `
-    <div id="rpr-block" style="margin-top:${zest || county ? '22px' : '0'}">
-      <h3 style="color:#1e3c72;margin:0 0 8px">RPR® estimate</h3>
-      <iframe id="rpr-frame" title="RPR's estimate for this home" src="${RPR_FRAME_URL}?q=${encodeURIComponent(d.subjectFull)}"
-              sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-              style="width:100%;height:80px;border:0;display:block"></iframe>
-    </div>`;
+  const title = `<h2 class="section-title">Property Valuation — ${zgEsc(d.subjectFull)}</h2>`;
   const zillowFooter = zest ? `<div class="zg-footer">© Zillow, Inc., 2006-2019. Use is subject to the <a href="${ZG_TERMS_URL}">Zillow Terms of Use</a>.</div>` : '';
-  return `<section class="print-page">${header}<div class="page-body zg-body">${title}${zest}${county}${rpr}</div><div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>${zillowFooter}</section>`;
+  const values = zest || county
+    ? `<section class="print-page">${header}<div class="page-body zg-body">${zest ? '' : title}${zest}${county}</div>${footer}${zillowFooter}</section>`
+    : '';
+  const rpr = `<section class="print-page" id="rpr-block">${header}<div class="page-body zg-body">
+      ${title.replace('Property Valuation', 'RPR® Estimate')}
+      <iframe id="rpr-frame" title="RPR's estimate for this home" src="${RPR_FRAME_URL}?q=${encodeURIComponent(d.subjectFull)}"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              style="width:100%;height:80px;border:0;display:block"></iframe>
+    </div>${footer}</section>`;
+  return values + rpr;
 }
 
 // ── County property appraiser ───────────────────────────────────────────────
@@ -1058,7 +1067,7 @@ async function countyLookup(address, unit) {
 function countyBlockHTML(c) {
   const row = (label, v) => v != null ? `<tr><td>${label}</td><td>${v}</td></tr>` : '';
   return `
-    <div style="margin-top:22px">
+    <div class="county-block">
       <h3 style="color:#1e3c72;margin:0 0 8px">${zgEsc(c.county)} County Property Appraiser</h3>
       <table class="zg-compact">
         ${row('Just (market) value', c.justValue != null ? zgMoney(c.justValue) : null)}
