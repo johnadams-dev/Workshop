@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estimated Seller Net | John Adams Real Estate Tools</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+  /* Design system shared with market-update.html/contract-calculator.html —
+     navy topbar + gold accent, white cards on a light-gray body. */
+  :root {
+    --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+    --red:#C0392B; --green:#1A7A4C;
+    --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--navy); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 50px; border-bottom: 3px solid var(--gold); }
+  .topbar-logo { color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.2); }
+  .topbar a { font-size: 12px; color: rgba(255,255,255,.55); text-decoration: none; letter-spacing: .03em; }
+  .content { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .wide { grid-column: span 2; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=date] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff;
+  }
+  input:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: var(--blue); }
+  .btn.secondary { background: #fff; color: var(--navy); border: 1px solid var(--border); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: #fff; border: 0; padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; }
+  .seg button.on { background: var(--navy); color: #fff; }
+  .msg { font-size: 13px; margin-top: 10px; }
+  .msg.ok { color: var(--green); }
+  .msg.err { color: var(--red); }
+  .cands { margin-top: 10px; display: grid; gap: 6px; max-height: 260px; overflow: auto; }
+  .cands button { text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .cands button:hover { border-color: var(--blue); }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-top: 8px; }
+  .check input:disabled + span { color: var(--muted); }
+  #signin { display: none; margin-top: 10px; }
+
+  /* ── The sheet: what prints ── */
+  .sheet-wrap { overflow-x: auto; }
+  .sheet { background: #fff; color: #000; border: 1px solid var(--border); border-radius: 10px; padding: 32px 36px; min-width: 620px; font-size: 13px; }
+  .sheet-head { display: flex; align-items: center; gap: 20px; margin-bottom: 18px; }
+  .sheet-head img { width: 120px; height: auto; }
+  .sheet-head h3 { flex: 1; text-align: center; font-size: 17px; margin-right: 140px; }
+  .facts { margin-bottom: 14px; }
+  .facts div { padding: 3px 0; }
+  .facts b { display: inline-block; min-width: 160px; font-weight: 400; color: #333; }
+  table.net { width: 100%; border-collapse: collapse; }
+  table.net th { text-align: right; font-size: 13px; padding: 6px 4px; }
+  table.net th:first-child { text-align: left; }
+  table.net td { padding: 5px 4px; border-bottom: 1px solid #e3e3e3; }
+  table.net td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.net tr.sub td { font-weight: 700; border-top: 1px solid #999; }
+  table.net tr.net-row td { font-weight: 700; font-size: 14px; border-top: 2px solid #000; border-bottom: 0; }
+  table.net .pct { color: #555; font-size: 12px; }
+  .notes { margin-top: 14px; font-size: 11.5px; color: #333; line-height: 1.45; }
+  .notes p + p { margin-top: 6px; }
+  .sigs { margin-top: 22px; display: grid; gap: 18px; font-size: 13px; }
+  .sigs div { border-bottom: 1px solid #000; padding-bottom: 2px; max-width: 460px; }
+  .prepared { margin-top: 16px; font-size: 11px; color: #444; }
+
+  @media (max-width: 600px) { .wide { grid-column: auto; } .sheet { padding: 20px; } }
+  @media print {
+    @page { size: letter; margin: 0.5in; }
+    body { background: #fff; }
+    .topbar, .no-print { display: none !important; }
+    .content { padding: 0; max-width: none; }
+    .sheet { border: 0; padding: 0; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Estimated Seller Net</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./feedback.html?tool=seller-net">Feedback</a>
+    <a href="./index.html">&#8592; Tools</a>
+  </div>
+</div>
+
+<div class="content">
+  <div class="no-print">
+    <h1>Estimated Seller Net</h1>
+    <p class="lede">Enter the address and price. Stamps, title insurance and the tax proration are calculated for you; the annual tax comes from the home's Stellar MLS record when there is one. Print the sheet or save it as a PDF — nothing is stored.</p>
+
+    <div class="card">
+      <h2>Property</h2>
+      <div class="grid">
+        <div class="wide"><label for="street">Street address</label><input type="text" id="street" placeholder="783 S Atmore Cir" autocomplete="off"></div>
+        <div><label for="unit">Unit (optional)</label><input type="text" id="unit" autocomplete="off"></div>
+        <div><label for="zip">ZIP</label><input type="text" id="zip" inputmode="numeric" maxlength="5" autocomplete="off"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="lookupBtn" type="button">Look up taxes</button>
+        <span class="hint">From the home's most recent Stellar listing. Sign-in needed.</span>
+      </div>
+      <div id="signin"><div class="hint" style="margin-bottom:6px">Sign in with your Adams Cameron account to look up taxes.</div><div id="g-signin-btn"></div></div>
+      <div id="lookupMsg" class="msg"></div>
+      <div id="cands" class="cands"></div>
+      <div class="grid" style="margin-top:14px">
+        <div class="wide"><label for="owners">Owners</label><input type="text" id="owners" autocomplete="off"></div>
+        <div><label for="sheetDate">Date</label><input type="date" id="sheetDate"></div>
+        <div><label for="closeDate">Based on closing date</label><input type="date" id="closeDate"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Sale price</h2>
+      <div class="row" style="margin-bottom:12px">
+        <div class="seg" role="group" aria-label="Columns">
+          <button type="button" data-cols="3" class="on">High, Mid, Low</button>
+          <button type="button" data-cols="1">One price</button>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="col-in" data-col="0"><label for="price0">High</label><input type="text" inputmode="decimal" id="price0" class="money"></div>
+        <div class="col-in" data-col="1"><label for="price1">Mid</label><input type="text" inputmode="decimal" id="price1" class="money"></div>
+        <div class="col-in" data-col="2"><label for="price2">Low</label><input type="text" inputmode="decimal" id="price2" class="money"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Costs</h2>
+      <div class="grid">
+        <div><label for="listPct">Listing side %</label><input type="number" id="listPct" step="0.25" min="0" max="20"></div>
+        <div><label for="buyPct">Buyer's side %</label><input type="number" id="buyPct" step="0.25" min="0" max="20"></div>
+        <div><label for="titleSearch">Title search, exam, closing</label><input type="text" inputmode="decimal" id="titleSearch" class="money" value="485.00"></div>
+        <div><label for="recording">Recording fees</label><input type="text" inputmode="decimal" id="recording" class="money" value="25.00"></div>
+        <div><label for="compliance">Compliance</label><input type="text" inputmode="decimal" id="compliance" class="money"></div>
+        <div><label for="repairs">Known repairs</label><input type="text" inputmode="decimal" id="repairs" class="money"></div>
+        <div><label for="estoppel">Estoppel</label><input type="text" inputmode="decimal" id="estoppel" class="money"></div>
+        <div><label for="warranty">Home warranty</label><input type="text" inputmode="decimal" id="warranty" class="money"></div>
+      </div>
+      <p class="hint" style="margin-top:10px">Lines left blank aren't printed. Stamps on the deed and title insurance are calculated from each price.</p>
+    </div>
+
+    <div class="card">
+      <h2>Mortgage and taxes</h2>
+      <div class="grid">
+        <div><label for="payoff">Mortgage payoff</label><input type="text" inputmode="decimal" id="payoff" class="money"></div>
+        <div><label for="intDays">Interest: number of days</label><input type="number" id="intDays" min="0" max="366"></div>
+        <div><label for="intPerDay">Interest: dollars per day</label><input type="text" inputmode="decimal" id="intPerDay" class="money"></div>
+        <div><label for="annualTax">Annual property tax</label><input type="text" inputmode="decimal" id="annualTax" class="money"><div class="hint" id="taxSource"></div></div>
+      </div>
+      <label class="check"><input type="checkbox" id="taxPaid"><span>This year's tax bill is paid (November and December closings)</span></label>
+      <p class="hint" style="margin-top:6px">Florida taxes are paid in arrears. Before November 1 the seller owes the buyer for the days they owned the home this year; from November 1 the bill is assumed paid and the buyer credits the seller for the rest of the year.</p>
+    </div>
+
+    <div class="row" style="margin-bottom:16px">
+      <button class="btn" type="button" onclick="window.print()">Print or save as PDF</button>
+      <button class="btn secondary" type="button" id="clearBtn">Start over</button>
+    </div>
+  </div>
+
+  <div class="sheet-wrap"><div class="sheet" id="sheet"></div></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// Estimated Seller Net — rules: "Estimated seller net sheet" in
+// server/docs/business-rules.md. The stamp and title-insurance rates match
+// Tally's pricing/net.js; the tax lookup is GET /seller-net/tax
+// (server/seller-net-routes.js). Nothing is saved.
+// ════════════════════════════════════════════════════════════════════════
+const DOC_STAMPS_PER_HUNDRED = 0.70;          // F.S. 201.02(1)(a), on whole $100s
+const TITLE_MINIMUM = 100;                     // F.A.C. 69O-186.003(1)(a)
+const TITLE_BANDS = [
+  { upTo: 100000, perThousand: 5.75 },
+  { upTo: 1000000, perThousand: 5.00 },
+  { upTo: 5000000, perThousand: 2.50 },
+  { upTo: 10000000, perThousand: 2.25 },
+  { upTo: null, perThousand: 2.00 },
+];
+const DEFAULT_CLOSING_DAYS = 45;
+const COL_NAMES = ['High', 'Mid', 'Low'];
+
+const $ = id => document.getElementById(id);
+const cents = n => Math.round(n * 100) / 100;
+const num = v => { const n = parseFloat(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) ? n : 0; };
+const has = id => String($(id).value).trim() !== '' && num($(id).value) !== 0;
+const money = n => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const showDate = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${+m}/${+d}/${y}`; };
+
+function docStamps(price) { return cents(Math.floor(price / 100) * DOC_STAMPS_PER_HUNDRED); }
+
+// Owner's promulgated rate on the price rounded to the nearest $1,000, band by band
+function titlePremium(price) {
+  if (!price) return 0;
+  const liability = Math.round(price / 1000) * 1000;
+  let premium = 0, floor = 0;
+  for (const { upTo, perThousand } of TITLE_BANDS) {
+    const top = upTo == null ? liability : Math.min(liability, upTo);
+    if (top > floor) premium += ((top - floor) / 1000) * perThousand;
+    if (upTo == null || liability <= upTo) break;
+    floor = upTo;
+  }
+  return cents(Math.max(premium, TITLE_MINIMUM));
+}
+
+// Whole days from January 1 up to, not including, closing day. Unpaid
+// (before November, or unticked): the seller owes the buyer for the days
+// elapsed (negative). Paid: the buyer credits the rest of the year (positive).
+function taxProration(annualTax, closingIso, paid) {
+  if (!annualTax || !closingIso) return null;
+  const d = new Date(`${closingIso}T00:00:00Z`);
+  const year = d.getUTCFullYear();
+  const jan1 = Date.UTC(year, 0, 1);
+  const daysInYear = (Date.UTC(year + 1, 0, 1) - jan1) / 86400000;
+  const elapsed = Math.round((d.getTime() - jan1) / 86400000);
+  const amount = paid ? annualTax * (daysInYear - elapsed) / daysInYear : -annualTax * elapsed / daysInYear;
+  return { amount: cents(amount), paid, elapsed, remaining: daysInYear - elapsed, daysInYear };
+}
+
+const closingInNovDec = () => { const v = $('closeDate').value; return !!v && +v.slice(5, 7) >= 11; };
+
+let cols = 3;
+let taxInfo = null;     // { annualTax, taxYear, address, mlsNumber } from the lookup
+let paidChoice = true;  // the agent's tick for a November/December closing
+
+function syncPaidBox() {
+  const box = $('taxPaid');
+  if (closingInNovDec()) { box.disabled = false; box.checked = paidChoice; }
+  else { box.disabled = true; box.checked = false; }
+}
+
+function compute(price) {
+  const listPct = num($('listPct').value), buyPct = num($('buyPct').value);
+  const lines = [
+    { label: 'Stamps on Deed', v: docStamps(price), always: true },
+    { label: 'Title Insurance', v: titlePremium(price), always: true },
+    { label: 'Title Search, Exam, and Closing', v: num($('titleSearch').value), always: true },
+    { label: 'Listing Side', pct: listPct, v: cents(price * listPct / 100), always: true },
+    { label: "Buyer's Side", pct: buyPct, v: cents(price * buyPct / 100), always: true },
+    { label: 'Recording Fees', v: num($('recording').value), always: true },
+    { label: 'Compliance', v: num($('compliance').value), show: has('compliance') },
+    { label: 'Known Repairs', v: num($('repairs').value), show: has('repairs') },
+    { label: 'Estoppel', v: num($('estoppel').value), show: has('estoppel') },
+    { label: 'Home Warranty', v: num($('warranty').value), show: has('warranty') },
+  ];
+  const expenses = cents(lines.reduce((s, l) => s + l.v, 0));
+  const gross = cents(price - expenses);
+  const payoff = num($('payoff').value);
+  const interest = cents(num($('intDays').value) * num($('intPerDay').value));
+  const pr = taxProration(num($('annualTax').value), $('closeDate').value, $('taxPaid').checked);
+  const net = cents(gross - payoff - interest + (pr ? pr.amount : 0));
+  return { price, lines, expenses, gross, payoff, interest, pr, net };
+}
+
+function render() {
+  syncPaidBox();
+  const prices = [0, 1, 2].slice(0, cols).map(i => num($('price' + i).value));
+  const results = prices.map(compute);
+  const heads = cols === 1 ? [''] : COL_NAMES;
+  const cell = (r, v) => `<td class="n">${r.price ? money(v) : ''}</td>`;
+  const row = (label, fn, cls = '') => `<tr class="${cls}"><td>${label}</td>${results.map(r => cell(r, fn(r))).join('')}</tr>`;
+
+  let body = row('Sale Price', r => r.price);
+  results[0].lines.forEach((l, i) => {
+    if (!l.always && !l.show) return;
+    const label = l.pct != null ? `${l.label} <span class="pct">${l.pct ? l.pct + '%' : ''}</span>` : l.label;
+    body += row(label, r => r.lines[i].v);
+  });
+  body += row('Total Estimated Expenses', r => r.expenses, 'sub');
+  body += row('Gross Proceeds', r => r.gross, 'sub');
+  body += row('Mortgage Payoff', r => r.payoff);
+  if (results[0].interest) body += row('Interest on Existing Mortgage', r => r.interest);
+  body += row('Pro-rated Taxes', r => r.pr ? r.pr.amount : 0);
+  body += row('Net to Seller', r => r.net, 'net-row');
+
+  const address = [$('street').value.trim(), $('unit').value.trim() && `Unit ${$('unit').value.trim()}`, taxInfo?.city, $('zip').value.trim()].filter(Boolean).join(', ');
+  const pr = results[0].pr;
+  let taxNote = '';
+  if (pr) {
+    const src = taxInfo && num($('annualTax').value) === taxInfo.annualTax
+      ? ` (${taxInfo.taxYear ? taxInfo.taxYear + ' bill' : 'most recent bill'}, from Stellar MLS listing ${esc(taxInfo.mlsNumber || '')})` : '';
+    taxNote = pr.paid
+      ? `<p>Taxes: annual tax of $${money(num($('annualTax').value))}${src}. This year's bill is assumed paid, so the buyer credits the seller for the ${pr.remaining} days from closing to the end of the year.</p>`
+      : `<p>Taxes: annual tax of $${money(num($('annualTax').value))}${src}. Florida taxes are paid in arrears, so the seller owes the buyer for the ${pr.elapsed} days owned this year before closing.</p>`;
+  }
+  const who = Auth.user ? `Prepared by: ${esc(Auth.user.name || '')} | Adams, Cameron &amp; Co., Realtors | ${esc(Auth.user.email || '')}` : 'Adams, Cameron &amp; Co., Realtors';
+
+  $('sheet').innerHTML = `
+    <div class="sheet-head"><img src="images/ac-logo.png" alt="Adams, Cameron &amp; Co., Realtors"><h3>Estimated Seller Net</h3></div>
+    <div class="facts">
+      <div><b>Date:</b> ${esc(showDate($('sheetDate').value))}</div>
+      <div><b>Property:</b> ${esc(address)}</div>
+      <div><b>Owners:</b> ${esc($('owners').value.trim())}</div>
+      <div><b>Based on Closing Date:</b> ${esc(showDate($('closeDate').value))}</div>
+    </div>
+    <table class="net">
+      <thead><tr><th></th>${heads.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <div class="notes">
+      ${taxNote}
+      <p>This net does not include any possible prepayment penalty on the existing mortgage, nor attorney fees. This net will vary due to pro-ration of rents, insurance, and interest on existing mortgages, based on the exact date of closing. This net is also based on the assumption that there are no other outstanding lien(s) or encumbrance(s) against the property that would be revealed by a title search.</p>
+    </div>
+    <div class="sigs"><div>Agent Signature:</div><div>Seller Signature:</div><div>Seller Signature:</div></div>
+    <div class="prepared">${who}</div>`;
+}
+
+// ── Tax lookup ──────────────────────────────────────────────────────────
+function useHome(h) {
+  taxInfo = h;
+  $('cands').innerHTML = '';
+  if (h.unit && !$('unit').value.trim()) $('unit').value = h.unit;
+  if (h.annualTax) {
+    $('annualTax').value = money(h.annualTax);
+    $('taxSource').textContent = `${h.taxYear || 'Latest'} bill from MLS ${h.mlsNumber || ''} (${(h.status || '').toLowerCase()}). Check it against the county if it looks old.`;
+    const old = h.taxYear && h.taxYear < new Date().getFullYear() - 1;
+    $('lookupMsg').className = 'msg ' + (old ? 'err' : 'ok');
+    $('lookupMsg').textContent = `Found ${h.address}${h.city ? ', ' + h.city : ''}: $${money(h.annualTax)} for ${h.taxYear || 'the latest year'}.` + (old ? ' That bill is a few years old — check the current one with the county.' : '');
+  } else {
+    $('lookupMsg').className = 'msg err';
+    $('lookupMsg').textContent = `Found ${h.address}, but its MLS record has no tax amount. Enter it by hand.`;
+  }
+  render();
+}
+
+async function lookup() {
+  const street = $('street').value.trim(), zip = $('zip').value.trim(), unit = $('unit').value.trim();
+  const msg = $('lookupMsg');
+  $('cands').innerHTML = '';
+  if (!street || !/^\d{5}$/.test(zip)) { msg.className = 'msg err'; msg.textContent = 'Enter the street address and the 5-digit ZIP.'; return; }
+  if (!Auth.user) {
+    $('signin').style.display = '';
+    await Auth.ready({ button: $('g-signin-btn') });
+    $('signin').style.display = 'none';
+  }
+  $('lookupBtn').disabled = true;
+  msg.className = 'msg'; msg.textContent = 'Looking up…';
+  try {
+    const q = new URLSearchParams({ street, zip, unit });
+    const r = await fetch(`${Auth.API}/seller-net/tax?${q}`, { headers: Auth.headers() });
+    if (r.status === 401) { await Auth.signOut(); $('lookupBtn').disabled = false; return lookup(); }
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    if (data.match) useHome(data.match);
+    else if (data.candidates.length) {
+      msg.className = 'msg'; msg.textContent = 'Several homes match. Pick one:';
+      $('cands').innerHTML = data.candidates.map((c, i) =>
+        `<button type="button" data-i="${i}">${esc(c.address)}${c.city ? ', ' + esc(c.city) : ''} — ${c.annualTax ? '$' + money(c.annualTax) + ' (' + (c.taxYear || '?') + ')' : 'no tax amount'}</button>`).join('');
+      $('cands').querySelectorAll('button').forEach(b => b.onclick = () => useHome(data.candidates[+b.dataset.i]));
+    } else {
+      msg.className = 'msg err'; msg.textContent = "No Stellar listing found for that address. Enter the annual tax by hand (from the county tax collector).";
+    }
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = e.message;
+  } finally {
+    $('lookupBtn').disabled = false;
+  }
+}
+
+// ── Wiring ──────────────────────────────────────────────────────────────
+function setCols(n) {
+  cols = n;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', +b.dataset.cols === n));
+  document.querySelectorAll('.col-in').forEach(el => { el.style.display = +el.dataset.col < n ? '' : 'none'; });
+  $('price0').previousElementSibling.textContent = n === 1 ? 'Price' : 'High';
+  render();
+}
+
+function resetDates() {
+  const today = new Date();
+  $('sheetDate').value = isoDate(today);
+  const close = new Date(today); close.setDate(close.getDate() + DEFAULT_CLOSING_DAYS);
+  $('closeDate').value = isoDate(close);
+}
+
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setCols(+b.dataset.cols));
+document.querySelectorAll('input').forEach(el => el.addEventListener('input', render));
+document.querySelectorAll('input.money').forEach(el => el.addEventListener('blur', () => { if (el.value.trim()) el.value = money(num(el.value)); }));
+$('taxPaid').addEventListener('change', () => { paidChoice = $('taxPaid').checked; render(); });
+$('annualTax').addEventListener('input', () => { if (!taxInfo || num($('annualTax').value) !== taxInfo.annualTax) $('taxSource').textContent = taxInfo ? 'Entered by hand.' : ''; });
+$('street').addEventListener('input', () => { taxInfo = null; });
+$('lookupBtn').onclick = lookup;
+$('zip').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+$('clearBtn').onclick = () => {
+  document.querySelectorAll('input[type=text], input[type=number]').forEach(el => { el.value = ''; });
+  $('titleSearch').value = '485.00'; $('recording').value = '25.00';
+  taxInfo = null; paidChoice = true;
+  $('lookupMsg').textContent = ''; $('cands').innerHTML = ''; $('taxSource').textContent = '';
+  resetDates(); render();
+};
+
+resetDates();
+setCols(3);
+// Usable without signing in; a saved session is picked up quietly (and fills "Prepared by").
+Auth.ready({ optional: true, tool: 'Estimated Seller Net' }).then(render);
+</script>
+</body>
+</html>
