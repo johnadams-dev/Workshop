@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Log — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280;
+  --red:#DC2626; --green:#16A34A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5}
+
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:36px 28px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.25);max-width:380px;width:90%}
+.signin-icon{font-size:36px;margin-bottom:14px}
+.signin-card h2{font-size:20px;color:var(--navy);font-weight:700;margin-bottom:8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.5}
+.signin-google{display:flex;justify-content:center}
+
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:10px;min-width:0}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500;white-space:nowrap}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.6);text-decoration:none;white-space:nowrap}
+.topbar-link:hover{color:#fff}
+
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:90}
+.tab{flex:1;padding:12px 0;text-align:center;font-weight:600;font-size:14px;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;font-family:inherit}
+.tab.active{color:var(--navy);border-bottom-color:var(--gold)}
+
+.main{max-width:640px;margin:0 auto;padding:16px 16px 64px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+.card h3{font-size:15px;color:var(--navy);margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h3 .total{font-size:13px;color:var(--muted);font-weight:600}
+
+.label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 7px}
+.label:first-child{margin-top:0}
+.label .opt{font-weight:500;text-transform:none;letter-spacing:0}
+input[type=date],input[type=number],input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:16px;font-family:inherit;color:var(--text);background:var(--bg)}
+input:focus,textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+textarea{min-height:64px;resize:vertical}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:9px 13px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:14px;font-family:inherit;color:var(--text);cursor:pointer;line-height:1.2}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip.sub{font-size:13px;padding:7px 11px}
+.chip.sub.on{background:var(--blue);border-color:var(--blue)}
+.dur-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px}
+.dur-row .chip{padding:10px 0;text-align:center;border-radius:8px}
+.custom-row{display:flex;gap:8px;align-items:center}
+.custom-row input{flex:1}
+.toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0}
+.toggle button{padding:10px 14px;border:none;background:#fff;font-family:inherit;font-size:14px;cursor:pointer;color:var(--muted)}
+.toggle button.on{background:var(--navy);color:#fff}
+
+.picker{position:relative}
+.picker-list{position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);border-radius:8px;margin-top:4px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:50;max-height:260px;overflow-y:auto;display:none}
+.picker-list div{padding:11px 12px;cursor:pointer;border-bottom:1px solid #F1F3F6}
+.picker-list div:hover{background:var(--bg)}
+.picker-list .office{color:var(--muted);font-size:12px}
+.picker-chosen{display:none;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--blue);border-radius:8px;background:#EEF5FC;font-weight:600}
+.picker-chosen button{border:none;background:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:0 4px}
+
+.actions{display:flex;gap:8px;margin-top:16px}
+.btn-primary{flex:1;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:13px;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-primary:disabled{opacity:.45}
+.btn-secondary{background:#fff;color:var(--navy);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-danger{color:var(--red)}
+.msg{font-size:13px;margin-top:10px;display:none}
+.msg.err{color:var(--red);display:block}
+.msg.ok{color:var(--green);display:block}
+
+.entry{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.entry:last-child{border-bottom:none}
+.entry .what{flex:1;min-width:0}
+.entry .cat{font-weight:600}
+.entry .detail{font-size:13px;color:var(--muted)}
+.entry .comment{font-size:13px;color:var(--text);margin-top:2px;white-space:pre-wrap}
+.entry .mins{font-weight:700;white-space:nowrap;color:var(--navy)}
+.entry .date{font-size:13px;color:var(--muted);white-space:nowrap;width:62px;flex-shrink:0}
+.entry.editing{background:#FFF8E6}
+.empty{color:var(--muted);text-align:center;padding:20px 0;font-size:14px}
+
+.range-row{display:flex;gap:8px;margin-top:10px}
+.range-row input{flex:1;font-size:15px}
+.big-total{font-size:28px;font-weight:700;color:var(--navy)}
+.big-total small{font-size:14px;color:var(--muted);font-weight:500}
+.bar-item{padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.bar-item:last-child{border-bottom:none}
+.bar-top{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.bar-top .name{font-weight:600}
+.bar-top .val{white-space:nowrap;color:var(--muted)}
+.bar-top .val b{color:var(--text)}
+.bar{height:8px;background:#EDF0F4;border-radius:4px;margin-top:5px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--blue);border-radius:4px}
+.subs{display:none;margin:6px 0 2px 12px}
+.bar-item.open .subs{display:block}
+.subs div{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:3px 0}
+.agent-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.agent-row:last-child{border-bottom:none}
+.agent-row .name{font-weight:600}
+.agent-row .val{color:var(--muted);font-size:14px}
+.agent-row .val b{color:var(--text)}
+.link-btn{background:none;border:none;color:var(--blue);font-family:inherit;font-size:13px;cursor:pointer;padding:0}
+#denied{display:none}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="signin-card">
+    <div class="signin-icon">⏱️</div>
+    <h2>Time Log</h2>
+    <p>Sign in with your Adams Cameron Google account to log where your time goes.</p>
+    <div class="signin-google"><div id="g-signin-btn"></div></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">ACC</span>
+      <span class="topbar-sep">/</span>
+      <span class="topbar-title">Time Log</span>
+    </div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./index.html">← Tools</a>
+      <a class="topbar-link" href="./feedback.html">Feedback</a>
+    </div>
+  </div>
+
+  <div class="main" id="denied">
+    <div class="card"><div class="empty">The Time Log is open to admins only for now.</div></div>
+  </div>
+
+  <div id="ready" style="display:none">
+    <div class="tabs">
+      <button class="tab active" data-tab="log" onclick="showTab('log')">Log</button>
+      <button class="tab" data-tab="reports" onclick="showTab('reports')">Reports</button>
+    </div>
+
+    <!-- ── Log ─────────────────────────────────────────────────────────── -->
+    <div class="main" id="tab-log">
+      <div class="card">
+        <h3 id="form-title">Log time</h3>
+        <span class="label">What</span>
+        <div class="chips" id="cat-chips"></div>
+        <div id="sub-wrap" style="display:none">
+          <span class="label">Sub-task <span class="opt">(optional)</span></span>
+          <div class="chips" id="sub-chips"></div>
+        </div>
+
+        <span class="label">How long</span>
+        <div class="dur-row" id="dur-short"></div>
+        <div class="dur-row" id="dur-long"></div>
+        <div class="custom-row">
+          <input type="number" id="f-custom" min="0" step="any" inputmode="decimal" placeholder="Other amount">
+          <div class="toggle">
+            <button id="unit-min" class="on" onclick="setUnit('min')">min</button>
+            <button id="unit-hrs" onclick="setUnit('hrs')">hrs</button>
+          </div>
+        </div>
+
+        <span class="label">Agent <span class="opt">(optional)</span></span>
+        <div class="picker" id="log-picker"></div>
+
+        <span class="label">Comments <span class="opt">(optional)</span></span>
+        <textarea id="f-comments" placeholder="Anything worth remembering"></textarea>
+
+        <span class="label">Date</span>
+        <input type="date" id="f-date">
+
+        <div class="actions">
+          <button class="btn-primary" id="save-btn" onclick="save()">Save</button>
+          <button class="btn-secondary" id="cancel-btn" style="display:none" onclick="resetForm()">Cancel</button>
+          <button class="btn-secondary btn-danger" id="delete-btn" style="display:none" onclick="removeEntry()">Delete</button>
+        </div>
+        <div class="msg" id="form-msg"></div>
+      </div>
+
+      <div class="card">
+        <h3><span id="day-title">Today</span><span class="total" id="day-total"></span></h3>
+        <div id="day-list"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ── Reports ─────────────────────────────────────────────────────── -->
+    <div class="main" id="tab-reports" style="display:none">
+      <div class="card">
+        <div class="chips" id="range-chips"></div>
+        <div class="range-row">
+          <input type="date" id="r-from" onchange="customRange()">
+          <input type="date" id="r-to" onchange="customRange()">
+        </div>
+        <span class="label">Agent history</span>
+        <div class="picker" id="report-picker"></div>
+      </div>
+
+      <div id="agent-history" style="display:none">
+        <div class="card">
+          <h3><span id="ah-name"></span><span class="total" id="ah-total"></span></h3>
+          <div id="ah-list"></div>
+        </div>
+      </div>
+
+      <div id="summary">
+        <div class="card">
+          <div class="big-total" id="r-total">—</div>
+        </div>
+        <div class="card">
+          <h3>Where the time goes</h3>
+          <div id="r-cats"><div class="empty">Loading…</div></div>
+        </div>
+        <div class="card">
+          <h3>Time with agents</h3>
+          <div id="r-agents"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHORT = [5, 10, 15, 30, 45];          // minutes
+const LONG  = [1, 1.5, 2, 3, 4];            // hours
+const MAX_MINUTES = 720;
+
+let categories = [];
+let agents = [];
+let form = {};          // { category, subtask, minutes, agentId }
+let unit = 'min';
+let editingId = null;
+let dayEntries = [];
+let reportAgentId = null;
+
+const logPicker = makePicker('log-picker', id => { form.agentId = id; });
+const reportPicker = makePicker('report-picker', id => { reportAgentId = id; loadReport(); });
+
+Auth.ready({ tool: 'Time Log', button: document.getElementById('g-signin-btn') })
+  .then(() => {
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    init();
+  });
+
+async function init() {
+  try {
+    categories = await Auth.api('/time-log/categories');
+  } catch (e) {
+    if (e.status === 403) { document.getElementById('denied').style.display = 'block'; return; }
+    document.getElementById('denied').style.display = 'block';
+    document.querySelector('#denied .empty').textContent = 'Could not load the Time Log: ' + e.message;
+    return;
+  }
+  document.getElementById('ready').style.display = 'block';
+  document.getElementById('dur-short').innerHTML = SHORT.map(m => `<button class="chip" data-min="${m}" onclick="pickMinutes(${m})">${m}m</button>`).join('');
+  document.getElementById('dur-long').innerHTML = LONG.map(h => `<button class="chip" data-min="${h * 60}" onclick="pickMinutes(${h * 60})">${h}h</button>`).join('');
+  document.getElementById('f-custom').addEventListener('input', () => { form.minutes = null; markDuration(); });
+  document.getElementById('f-date').addEventListener('change', loadDay);
+  document.getElementById('range-chips').innerHTML = RANGES.map(r => `<button class="chip sub" data-range="${r.key}" onclick="setRange('${r.key}')">${r.label}</button>`).join('');
+  resetForm();
+  setRange('week');
+  try {
+    agents = await Auth.api('/roster/agents');
+  } catch (e) { agents = []; }
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.getElementById('tab-log').style.display = name === 'log' ? 'block' : 'none';
+  document.getElementById('tab-reports').style.display = name === 'reports' ? 'block' : 'none';
+  if (name === 'reports') loadReport();
+}
+
+// ── Log form ──────────────────────────────────────────────────────────────
+function renderCats() {
+  document.getElementById('cat-chips').innerHTML = categories.map((c, i) =>
+    `<button class="chip${c.name === form.category ? ' on' : ''}" onclick="pickCat(${i})">${esc(c.name)}</button>`).join('');
+  const cat = categories.find(c => c.name === form.category);
+  // An entry saved under a sub-task that has since been renamed still shows it.
+  const subs = cat ? cat.subtasks.slice() : [];
+  if (form.subtask && !subs.includes(form.subtask)) subs.push(form.subtask);
+  document.getElementById('sub-wrap').style.display = subs.length ? 'block' : 'none';
+  document.getElementById('sub-chips').innerHTML = subs.map(s =>
+    `<button class="chip sub${s === form.subtask ? ' on' : ''}" data-sub="${esc(s)}" onclick="pickSub(this.dataset.sub)">${esc(s)}</button>`).join('');
+}
+function pickCat(i) {
+  const name = categories[i].name;
+  if (form.category !== name) form.subtask = null;
+  form.category = name;
+  renderCats();
+}
+function pickSub(s) { form.subtask = form.subtask === s ? null : s; renderCats(); }
+
+function pickMinutes(m) {
+  form.minutes = m;
+  document.getElementById('f-custom').value = '';
+  markDuration();
+}
+function setUnit(u) {
+  unit = u;
+  document.getElementById('unit-min').classList.toggle('on', u === 'min');
+  document.getElementById('unit-hrs').classList.toggle('on', u === 'hrs');
+}
+function markDuration() {
+  document.querySelectorAll('.dur-row .chip').forEach(b => b.classList.toggle('on', Number(b.dataset.min) === form.minutes));
+}
+function chosenMinutes() {
+  const raw = document.getElementById('f-custom').value.trim();
+  if (raw) return Math.round(Number(raw) * (unit === 'hrs' ? 60 : 1));
+  return form.minutes;
+}
+
+async function save() {
+  const minutes = chosenMinutes();
+  if (!form.category) return flash('Pick what you worked on.', true);
+  if (!minutes || !Number.isFinite(minutes) || minutes < 1) return flash('Pick how long.', true);
+  if (minutes > MAX_MINUTES) return flash('That is more than 12 hours. Split it into separate entries.', true);
+  const body = {
+    work_date: document.getElementById('f-date').value,
+    category: form.category,
+    subtask: form.subtask,
+    agent_id: form.agentId,
+    minutes,
+    comments: document.getElementById('f-comments').value,
+  };
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  try {
+    if (editingId) await Auth.api(`/time-log/entries/${editingId}`, { method: 'PATCH', body });
+    else await Auth.api('/time-log/entries', { method: 'POST', body });
+    const msg = `Saved ${fmtMin(minutes)} · ${form.category}`;
+    resetForm(body.work_date);
+    flash(msg);
+  } catch (e) {
+    flash(e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeEntry() {
+  if (!editingId || !confirm('Delete this entry?')) return;
+  try {
+    await Auth.api(`/time-log/entries/${editingId}`, { method: 'DELETE' });
+    resetForm(document.getElementById('f-date').value);
+    flash('Deleted.');
+  } catch (e) { flash(e.message, true); }
+}
+
+// Keeps the date so several entries can be logged for the same day.
+function resetForm(date) {
+  editingId = null;
+  form = { category: null, subtask: null, minutes: null, agentId: null };
+  document.getElementById('f-custom').value = '';
+  document.getElementById('f-comments').value = '';
+  document.getElementById('f-date').value = date || today();
+  document.getElementById('form-title').textContent = 'Log time';
+  document.getElementById('save-btn').textContent = 'Save';
+  document.getElementById('cancel-btn').style.display = 'none';
+  document.getElementById('delete-btn').style.display = 'none';
+  document.getElementById('form-msg').className = 'msg';
+  setUnit('min');
+  logPicker.set(null);
+  renderCats();
+  markDuration();
+  loadDay();
+}
+
+function editEntry(id) {
+  const e = dayEntries.find(x => x.id === id);
+  if (!e) return;
+  editingId = id;
+  form = { category: e.category, subtask: e.subtask, minutes: null, agentId: e.agent_id };
+  if ([...SHORT, ...LONG.map(h => h * 60)].includes(e.minutes)) {
+    form.minutes = e.minutes;
+    document.getElementById('f-custom').value = '';
+  } else {
+    setUnit('min');
+    document.getElementById('f-custom').value = e.minutes;
+  }
+  document.getElementById('f-comments').value = e.comments || '';
+  document.getElementById('f-date').value = e.work_date;
+  logPicker.set(e.agent_id, e.agent_id ? `${e.last_name}, ${e.first_name}` : null);
+  document.getElementById('form-title').textContent = 'Edit entry';
+  document.getElementById('save-btn').textContent = 'Update';
+  document.getElementById('cancel-btn').style.display = '';
+  document.getElementById('delete-btn').style.display = '';
+  document.getElementById('form-msg').className = 'msg';
+  renderCats();
+  markDuration();
+  renderDay();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function flash(text, isErr) {
+  const el = document.getElementById('form-msg');
+  el.textContent = text;
+  el.className = 'msg ' + (isErr ? 'err' : 'ok');
+}
+
+async function loadDay() {
+  const date = document.getElementById('f-date').value;
+  document.getElementById('day-title').textContent = date === today() ? 'Today' : fmtDate(date, true);
+  try {
+    dayEntries = await Auth.api(`/time-log/entries?from=${date}&to=${date}`);
+    renderDay();
+  } catch (e) {
+    document.getElementById('day-list').innerHTML = `<div class="empty">Could not load entries: ${esc(e.message)}</div>`;
+  }
+}
+function renderDay() {
+  const total = dayEntries.reduce((s, e) => s + e.minutes, 0);
+  document.getElementById('day-total').textContent = dayEntries.length ? fmtMin(total) : '';
+  document.getElementById('day-list').innerHTML = dayEntries.length
+    ? dayEntries.map(e => entryHtml(e, false)).join('')
+    : '<div class="empty">Nothing logged for this day yet.</div>';
+}
+
+function entryHtml(e, showDate) {
+  const detail = [e.subtask, !showDate && e.agent_id ? `${e.first_name} ${e.last_name}` : null].filter(Boolean).join(' · ');
+  return `<div class="entry${e.id === editingId ? ' editing' : ''}" ${showDate ? '' : `onclick="editEntry(${e.id})"`}>
+    ${showDate ? `<div class="date">${fmtDate(e.work_date)}</div>` : ''}
+    <div class="what">
+      <div class="cat">${esc(e.category)}</div>
+      ${detail ? `<div class="detail">${esc(detail)}</div>` : ''}
+      ${e.comments ? `<div class="comment">${esc(e.comments)}</div>` : ''}
+    </div>
+    <div class="mins">${fmtMin(e.minutes)}</div>
+  </div>`;
+}
+
+// ── Reports ───────────────────────────────────────────────────────────────
+const RANGES = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+  { key: 'lastmonth', label: 'Last month' },
+  { key: 'year', label: 'This year' },
+];
+function setRange(key) {
+  const now = new Date();
+  let from, to = now;
+  if (key === 'today') from = now;
+  if (key === 'week') { from = new Date(now); from.setDate(now.getDate() - ((now.getDay() + 6) % 7)); } // Monday
+  if (key === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (key === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  if (key === 'year') from = new Date(now.getFullYear(), 0, 1);
+  document.getElementById('r-from').value = isoDate(from);
+  document.getElementById('r-to').value = isoDate(to);
+  markRange(key);
+  if (document.getElementById('tab-reports').style.display !== 'none') loadReport();
+}
+function customRange() { markRange(null); loadReport(); }
+function markRange(key) {
+  document.querySelectorAll('#range-chips .chip').forEach(b => b.classList.toggle('on', b.dataset.range === key));
+}
+
+async function loadReport() {
+  const from = document.getElementById('r-from').value, to = document.getElementById('r-to').value;
+  if (!from || !to) return;
+  const q = `from=${from}&to=${to}`;
+  const history = document.getElementById('agent-history');
+  history.style.display = reportAgentId ? 'block' : 'none';
+  try {
+    const [rep, ah] = await Promise.all([
+      Auth.api(`/time-log/report?${q}`),
+      reportAgentId ? Auth.api(`/time-log/entries?${q}&agent_id=${reportAgentId}`) : null,
+    ]);
+    renderReport(rep);
+    if (ah) renderHistory(ah);
+  } catch (e) {
+    document.getElementById('r-cats').innerHTML = `<div class="empty">Could not load the report: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderReport(rep) {
+  document.getElementById('r-total').innerHTML = `${fmtMin(rep.total)} <small>logged · ${fmtDate(document.getElementById('r-from').value)} – ${fmtDate(document.getElementById('r-to').value)}</small>`;
+  const max = Math.max(1, ...rep.categories.map(c => c.minutes));
+  document.getElementById('r-cats').innerHTML = rep.categories.length ? rep.categories.map(c => `
+    <div class="bar-item" onclick="this.classList.toggle('open')">
+      <div class="bar-top"><span class="name">${esc(c.category)}</span><span class="val"><b>${fmtMin(c.minutes)}</b> · ${pct(c.minutes, rep.total)}</span></div>
+      <div class="bar"><span style="width:${(c.minutes / max * 100).toFixed(1)}%"></span></div>
+      <div class="subs">${c.subtasks.map(s => `<div><span>${esc(s.subtask || 'General')}</span><span>${fmtMin(s.minutes)}</span></div>`).join('')}</div>
+    </div>`).join('') : '<div class="empty">Nothing logged in this range.</div>';
+  document.getElementById('r-agents').innerHTML = rep.agents.length ? rep.agents.map(a => `
+    <div class="agent-row" data-name="${esc(a.last_name)}, ${esc(a.first_name)}" onclick="openAgent(${a.agent_id}, this.dataset.name)">
+      <span class="name">${esc(a.last_name)}, ${esc(a.first_name)}</span>
+      <span class="val"><b>${fmtMin(a.minutes)}</b> · ${a.entries} ${a.entries === 1 ? 'entry' : 'entries'}</span>
+    </div>`).join('') : '<div class="empty">No time tied to an agent in this range.</div>';
+}
+
+function openAgent(id, label) {
+  reportPicker.set(id, label);
+  reportAgentId = id;
+  loadReport();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderHistory(rows) {
+  const name = reportPicker.label() || '';
+  document.getElementById('ah-name').innerHTML = `${esc(name)} <button class="link-btn" onclick="reportPicker.set(null); reportAgentId = null; loadReport()">close</button>`;
+  document.getElementById('ah-total').textContent = rows.length ? fmtMin(rows.reduce((s, e) => s + e.minutes, 0)) : '';
+  document.getElementById('ah-list').innerHTML = rows.length
+    ? rows.map(e => entryHtml(e, true)).join('')
+    : '<div class="empty">No time logged with this agent in this range.</div>';
+}
+
+// ── Agent picker: type to search, tap to choose (Last, First) ─────────────
+function makePicker(rootId, onChange) {
+  const root = document.getElementById(rootId);
+  root.innerHTML = `<input type="text" placeholder="Search agents" autocomplete="off">
+    <div class="picker-list"></div>
+    <div class="picker-chosen"><span></span><button type="button" aria-label="Clear">×</button></div>`;
+  const input = root.querySelector('input'), list = root.querySelector('.picker-list'), chosen = root.querySelector('.picker-chosen');
+  let current = null, currentLabel = null;
+  function set(id, label) {
+    current = id || null;
+    currentLabel = id ? label : null;
+    chosen.querySelector('span').textContent = currentLabel || '';
+    chosen.style.display = current ? 'flex' : 'none';
+    input.style.display = current ? 'none' : 'block';
+    input.value = '';
+    list.style.display = 'none';
+  }
+  function show() {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { list.style.display = 'none'; return; }
+    const hits = agents.filter(a => `${a.first_name} ${a.last_name} ${a.last_name}, ${a.first_name}`.toLowerCase().includes(q)).slice(0, 12);
+    list.innerHTML = hits.length
+      ? hits.map(a => `<div data-id="${a.id}">${esc(a.last_name)}, ${esc(a.first_name)}${a.office_name ? ` <span class="office">${esc(a.office_name)}</span>` : ''}</div>`).join('')
+      : '<div class="office">No match</div>';
+    list.style.display = 'block';
+  }
+  input.addEventListener('input', show);
+  input.addEventListener('blur', () => setTimeout(() => { list.style.display = 'none'; }, 150));
+  list.addEventListener('mousedown', ev => {
+    const row = ev.target.closest('[data-id]');
+    if (!row) return;
+    const a = agents.find(x => x.id === Number(row.dataset.id));
+    set(a.id, `${a.last_name}, ${a.first_name}`);
+    onChange(a.id);
+  });
+  chosen.querySelector('button').addEventListener('click', () => { set(null); onChange(null); });
+  return { set, label: () => currentLabel };
+}
+
+// ── Formatting ────────────────────────────────────────────────────────────
+function fmtMin(m) {
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+function pct(m, total) { return total ? Math.round(m / total * 100) + '%' : '0%'; }
+function isoDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function today() { return isoDate(new Date()); }
+function fmtDate(v, long) {
+  if (!v) return '';
+  const d = new Date(String(v).slice(0, 10) + 'T00:00:00');
+  return long ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+              : d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+}
+function esc(s) {
+  return (s ?? '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
