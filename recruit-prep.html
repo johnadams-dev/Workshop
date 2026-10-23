@@ -250,6 +250,7 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
     <h2 id="progress-title">Preparing the briefing…</h2>
     <div class="progress-bar"><span></span></div>
     <div id="progress-step" class="hint"></div>
+    <div id="progress-note" class="hint" style="display:none;margin-top:8px"></div>
   </section>
 
   <section id="report"></section>
@@ -325,8 +326,12 @@ function start() {
   document.getElementById('who').textContent = s.kind === 'partner' ? (partnerProfile().name || s.email) : s.email;
   loadHistory();
   loadSettings();
+  // A run that was still going when the page was left (or reloaded) comes
+  // first — the address may still carry ?id= of the briefing opened before it.
+  const pending = loadPending();
   const id = new URLSearchParams(location.search).get('id');
-  if (id) openBriefing(id);
+  if (pending) resumeRun(pending);
+  else if (id) openBriefing(id);
 }
 
 // Partner mode: their brokerage's name and logo, no Stellar MLS (manual
@@ -503,12 +508,12 @@ async function addCourted(file) {
 
 // ── Running a briefing ──────────────────────────────────────────────────
 let progressTimer = null;
-function showProgress(on) {
+function showProgress(on, started = Date.now()) {
   document.getElementById('progress').style.display = on ? 'block' : 'none';
   document.getElementById('run-btn').disabled = on;
+  document.getElementById('progress-note').style.display = 'none';
   clearInterval(progressTimer);
   if (!on) return;
-  const started = Date.now();
   const step = document.getElementById('progress-step');
   const tick = () => {
     const s = Math.round((Date.now() - started) / 1000);
@@ -539,17 +544,82 @@ async function run() {
   body.screenshots = shots;
   if (courted) body.courted = courted;
   document.getElementById('report').style.display = 'none';
+  // Remembered until the answer arrives, so a dropped connection — or leaving
+  // the page and coming back — picks the run up instead of starting another.
+  const pending = { name: body.name.trim(), started: Date.now() };
+  savePending(pending);
   showProgress(true);
   try {
     const row = await api('/recruit-prep/run', { method: 'POST', body: JSON.stringify(body) });
+    clearPending();
     showProgress(false);
     renderReport(row);
     loadHistory();
   } catch (e) {
+    // No response at all (fetch rejected — "Load failed" on Apple devices):
+    // the run is very likely still going on the server, so wait for it.
+    if (!e.data) return resumeRun(pending);
+    clearPending();
     showProgress(false);
     err.textContent = e.message;
     err.style.display = 'block';
   }
+}
+
+// ── Picking up a run whose connection dropped ─────────────────────────────
+// Apple's WebKit (Safari, and Chrome or any browser on iPhone/iPad) can give
+// up on the 2–6 minute /run request ("Load failed"), or iOS pauses the tab
+// when you switch apps, while the server finishes and saves the briefing
+// anyway. So instead of an error, ask the server every few seconds for this
+// person's newest briefing for that agent, and show it when it's done.
+const PENDING_KEY = 'recruit_prep_pending';
+const RUN_LIMIT_MS = 11 * 60 * 1000;   // Cloud Run stops a request at 10 minutes
+function savePending(p) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch (_) {} }
+function clearPending() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} }
+function loadPending() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
+    if (p && p.name && Date.now() - p.started < RUN_LIMIT_MS) return p;
+  } catch (_) {}
+  clearPending();
+  return null;
+}
+
+let resumeTimer = null;
+function resumeRun(pending) {
+  clearTimeout(resumeTimer);
+  showProgress(true, pending.started);
+  const note = document.getElementById('progress-note');
+  note.textContent = `Still preparing the briefing for ${pending.name} (the connection dropped, but it carries on without it). It will appear here when it's ready — no need to run it again.`;
+  note.style.display = 'block';
+  document.getElementById('report').style.display = 'none';
+  const err = document.getElementById('run-error');
+  // Allow for the phone's clock being a little off from the server's.
+  const since = pending.started - 2 * 60 * 1000;
+  const resumedAt = Date.now();
+  const stop = msg => {
+    clearPending();
+    showProgress(false);
+    if (msg) { err.textContent = msg; err.style.display = 'block'; }
+  };
+  const check = async () => {
+    try {
+      const { run } = await api(`/recruit-prep/latest-run?name=${encodeURIComponent(pending.name)}&since=${since}`);
+      if (run && run.status === 'complete') { stop(); openBriefing(run.id); loadHistory(); return; }
+      if (run && run.status === 'failed') { stop(run.error_message || 'The briefing failed. Please try again.'); loadHistory(); return; }
+      // Nothing saved a while after we started waiting: the request never reached the server.
+      if (!run && Date.now() - resumedAt > 45000) { stop("The briefing didn't start. Please try again."); return; }
+    } catch (_) {
+      // Still offline or the tab is waking up — keep trying.
+    }
+    if (Date.now() - pending.started > RUN_LIMIT_MS) {
+      stop('This briefing is taking longer than expected. Check "Your briefings" in a few minutes.');
+      loadHistory();
+      return;
+    }
+    resumeTimer = setTimeout(check, 5000);
+  };
+  check();
 }
 
 // ── Report ──────────────────────────────────────────────────────────────
