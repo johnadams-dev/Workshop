@@ -1050,9 +1050,9 @@ tbody tr.clickable { cursor: pointer; }
             <tr>
               <th data-sort="property_address" onclick="sortContractsBy('property_address')">Address</th>
               <th data-sort="agent_name" onclick="sortContractsBy('agent_name')">Buyer's Agent</th>
-              <th>Listing Brokerage</th>
+              <th data-sort="listing_brokerage" onclick="sortContractsBy('listing_brokerage')">Listing Brokerage</th>
               <th data-sort="current_price" onclick="sortContractsBy('current_price')">Price</th>
-              <th data-sort="list_date" onclick="sortContractsBy('list_date')">Contract Date</th>
+              <th data-sort="contract_date" onclick="sortContractsBy('contract_date')">Contract Date</th>
               <th>Status</th>
               <th></th>
             </tr>
@@ -2974,9 +2974,9 @@ function renderContractsTable(rows) {
                 <div class="addr-sub">${escapeHtml(t.city) || '—'}</div>
               </td>
               <td>${escapeHtml(t.agent_name) || '—'}</td>
-              <td>—</td>
+              <td>${escapeHtml(t.listing_brokerage) || '—'}</td>
               <td>${fmtMoney(t.current_price)}</td>
-              <td>List ${fmtDate(t.list_date)}</td>
+              <td>${t.contract_date ? fmtDate(t.contract_date) : '—'}</td>
               <td><span class="chip ${chipClass}">${chipLabel}</span></td>
               <td><button class="row-action" onclick="openActionModal('${t.id}','${escapeJs(t.property_address)}','contract','${dStatus}')">Actions ▾</button></td>
             </tr>`;
@@ -5654,7 +5654,7 @@ async function ncSelectFsTransaction(index) {
 
 /* ═══ Listings / Contracts filtering ═══ */
 const lstSort = { col: 'list_date', dir: 'desc' };
-const ctrSort = { col: 'list_date', dir: 'desc' };
+const ctrSort = { col: 'contract_date', dir: 'desc' };
 const tdySort = { col: 'created_at', dir: 'asc' }; // default: oldest first
 const utkSort = { col: 'cached_at', dir: 'desc' };
 const mmSort  = { col: 'property_address', dir: 'asc' };
