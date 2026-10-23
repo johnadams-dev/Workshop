@@ -420,6 +420,11 @@ const CERT_DESIGNS = [
 ];
 let _certState = null; // { agentName, reason, amount, issuedAt, id, designIdx }
 
+// Who the certificate names: every agent on a shared closing side ("Jane
+// Smith & Bob Jones", from the server's certificate_names — still one $50
+// credit, held by the first), otherwise the credit holder.
+const certNames = r => r.certificate_names || (r.agent_first_name + ' ' + r.agent_last_name);
+
 function openPrintCert(id, agentName, reason, amount, issuedAt) {
   _certState = { id, agentName, reason: reason || '—', amount, issuedAt, designIdx: 0 };
   const picker = document.getElementById('design-picker');
@@ -448,7 +453,7 @@ function renderCertPreview() {
 
   const fAgent = document.getElementById('cert-field-agent');
   fAgent.style.cssText = styleFor(d.pos.agent);
-  fAgent.textContent = `Agent: ${agentName}`;
+  fAgent.textContent = `${agentName.includes(' & ') ? 'Agents' : 'Agent'}: ${agentName}`;
 
   const fReason = document.getElementById('cert-field-reason');
   fReason.style.cssText = styleFor(d.pos.reason);
@@ -625,8 +630,7 @@ async function issueFromEligible(id) {
     toast(`Credit issued — ID #${data.id}.`, 'ok');
     loadAll();
     if (row) {
-      openPrintCert(data.id, row.agent_first_name + ' ' + row.agent_last_name,
-        row.reason || row.property_address, row.amount, todayStr());
+      openPrintCert(data.id, certNames(row), row.reason || row.property_address, row.amount, todayStr());
     }
   } catch (e) {
     toast('Could not issue: ' + e.message, 'err');
@@ -714,7 +718,7 @@ async function loadOutstanding() {
 function printFromOutstanding(id) {
   const r = _outstandingCache.find(x => x.id === id);
   if (!r) return;
-  openPrintCert(id, r.agent_first_name + ' ' + r.agent_last_name, r.reason || r.property_address, r.amount, r.issued_at);
+  openPrintCert(id, certNames(r), r.reason || r.property_address, r.amount, r.issued_at);
 }
 
 function renderOutstandingRow(r) {
@@ -938,7 +942,7 @@ function printFromDrilldown(agentId, creditId) {
   if (!agentRow) return;
   const c = agentRow.credits.find(x => x.id === creditId);
   if (!c) return;
-  openPrintCert(c.id, agentRow.agent_first_name + ' ' + agentRow.agent_last_name, c.reason, c.amount, c.issued_at);
+  openPrintCert(c.id, c.certificate_names || (agentRow.agent_first_name + ' ' + agentRow.agent_last_name), c.reason, c.amount, c.issued_at);
 }
 
 // ── Google auth (shared auth.js) ───────────────────────────────────────────────
