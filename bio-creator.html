@@ -377,6 +377,10 @@
               </div>
               <div class="existing-bio-body" id="existing-bio-text"></div>
             </div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <button class="btn btn-gold" type="button" onclick="showNextSteps('deltanet')">Use this bio on Zillow, Realtor.com &amp; Homes.com →</button>
+              <span style="font-size:12px;color:#6b7280;">Already up to date in DeltaNet? Copy it to your other profiles without writing a new one.</span>
+            </div>
           </div>
         </div>
 
@@ -599,6 +603,9 @@
           <div class="spinner"></div>
           <span class="btn-label">📄 Save to Google Drive</span>
         </button>
+        <button class="btn btn-ghost" type="button" onclick="showNextSteps('unsaved')">
+          Update other sites without saving →
+        </button>
       </div>
 
       <!-- Status messages -->
@@ -606,12 +613,16 @@
         <div class="alert" id="save-dn-msg"></div>
         <div class="alert" id="save-drive-msg"></div>
       </div>
+    </div><!-- /panel-3 -->
 
-      <!-- Next Steps panel — revealed after successful DeltaNet save -->
-      <div id="next-steps-panel">
+    <!-- Next Steps panel — copying a bio to the other sites. Outside the step
+         panels so it can open from Step 1 (the bio already in DeltaNet) as
+         well as Step 3 (after saving, or without saving). showNextSteps()
+         sets the heading and which bio Copy Bio copies. -->
+    <div id="next-steps-panel">
         <div class="next-steps-header">
-          <h3>✅ Bio saved! Now update your other profiles</h3>
-          <p>Your DeltaNet bio is live and Pathfinder will reflect it shortly. Use the steps below to copy it across to Zillow, Realtor.com, and Homes.com.</p>
+          <h3 id="next-steps-title">✅ Bio saved! Now update your other profiles</h3>
+          <p id="next-steps-text">Your DeltaNet bio is live and Pathfinder will reflect it shortly. Use the steps below to copy it across to Zillow, Realtor.com, and Homes.com.</p>
         </div>
         <div class="next-steps-copy-row">
           <span style="font-size:13px;color:#065f46;font-weight:600;">Copy your bio to paste into each platform:</span>
@@ -670,8 +681,7 @@
             <a href="https://www.realtor.com/realestateagents/" target="_blank" class="btn btn-navy" style="font-size:13px;padding:9px 18px;">Open Realtor.com →</a>
           </div>
         </div>
-      </div>
-    </div>
+    </div><!-- /next-steps-panel -->
 
   </div><!-- /container -->
 </div><!-- /app -->
@@ -750,6 +760,9 @@ function goToStep(n) {
   document.getElementById(`tab-${n}`).classList.add("active");
   for (let i = 1; i < n; i++) document.getElementById(`tab-${i}`).classList.add("done");
   currentStep = n;
+  // The other-sites panel sits outside the steps; close it on any step change
+  // so it never shows under the wrong step or the wrong bio.
+  document.getElementById("next-steps-panel").style.display = "none";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -926,7 +939,7 @@ async function saveToDeltaNet() {
     const result = await api("POST", "/bio/save", { bio });
     showAlert("save-dn-msg", "success",
       result.message || "Biography saved to DeltaNet! Pathfinder will reflect it immediately.");
-    showNextSteps();
+    showNextSteps("saved");
   } catch (e) {
     showAlert("save-dn-msg", "error", "Save failed: " + e.message);
   } finally {
@@ -1048,9 +1061,32 @@ async function linkDmgId() {
 // ═══════════════════════════════════════════════════════════════
 // Next Steps panel
 // ═══════════════════════════════════════════════════════════════
-function showNextSteps() {
+// Which bio the panel's Copy Bio button copies: the one already in DeltaNet
+// (opened from Step 1 — the agent updated DeltaNet earlier and only needs the
+// other sites now) or the one in the Step 3 editor (after saving, or without).
+let nextStepsSource = "editor";
+
+const NEXT_STEPS_COPY = {
+  saved: ["✅ Bio saved! Now update your other profiles",
+    "Your DeltaNet bio is live and Pathfinder will reflect it shortly. Use the steps below to copy it across to Zillow, Realtor.com, and Homes.com."],
+  unsaved: ["Update your other profiles",
+    "This bio hasn't been saved to DeltaNet — you can still do that above. Use the steps below to copy it across to Zillow, Realtor.com, and Homes.com."],
+  deltanet: ["Update your other profiles with your DeltaNet bio",
+    "This copies the bio already in DeltaNet, shown above. Use the steps below to paste it into Zillow, Realtor.com, and Homes.com."],
+};
+
+// mode: 'saved' (after Save to DeltaNet), 'unsaved' (Step 3, not saved) or
+// 'deltanet' (Step 1, the bio already on file).
+function showNextSteps(mode = "saved") {
   const panel = document.getElementById("next-steps-panel");
   if (!panel) return;
+  if (mode === "unsaved" && !getCurrentHtml().trim()) {
+    return showAlert("save-dn-msg", "error", "Bio is empty — generate one first.");
+  }
+  nextStepsSource = mode === "deltanet" ? "deltanet" : "editor";
+  const [title, text] = NEXT_STEPS_COPY[mode] || NEXT_STEPS_COPY.saved;
+  document.getElementById("next-steps-title").textContent = title;
+  document.getElementById("next-steps-text").textContent = text;
   panel.style.display = "block";
   setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   switchPlatformTab("homes");
@@ -1068,7 +1104,7 @@ function switchPlatformTab(which) {
 }
 
 async function copyBioToClipboard() {
-  const html  = getCurrentHtml();
+  const html  = nextStepsSource === "deltanet" ? (profileData.deltanet?.Bio || "") : getCurrentHtml();
   const label = document.getElementById("copy-btn-label");
   try {
     // Try to copy as plain text (strips HTML tags) for easy pasting into web forms
