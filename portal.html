@@ -423,6 +423,14 @@ function dealHtml(d, agentsById) {
       ${C.titleCompany ? `<div class="fact"><div class="k">Title company</div><div class="v">${esc(C.titleCompany)}</div></div>` : ''}
       ${C.lender ? `<div class="fact"><div class="k">Lender</div><div class="v">${esc(C.lender)}</div></div>` : ''}
     </div></div>`);
+    // Buyer under contract: the home they're buying, on their agent's site
+    // (or adamscameron.com when the agent's site isn't on file).
+    if (C.homeLinks) {
+      const H = C.homeLinks;
+      parts.push(`<div class="links">${H.agentSiteUrl
+        ? `<a class="btn" href="${esc(H.agentSiteUrl)}" target="_blank" rel="noopener">See the home on ${esc(lead ? lead.name.split(' ')[0] + "'s" : "your agent's")} website</a>`
+        : `<a class="btn" href="${esc(H.companyUrl)}" target="_blank" rel="noopener">See the home on adamscameron.com</a>`}</div>`);
+    }
     if (C.deadlines.length || C.timelineUrl) parts.push(contractDatesHtml(C.deadlines.length ? 'Key dates' : 'Contract timeline', C.deadlines, C.timelineUrl));
   }
   // The agent is tracking contract dates (Contract Date Calculator) but Daily Desk doesn't show the
