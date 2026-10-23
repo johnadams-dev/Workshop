@@ -100,11 +100,29 @@ textarea{min-height:64px;resize:vertical}
 .bar-top .name{font-weight:600}
 .bar-top .val{white-space:nowrap;color:var(--muted)}
 .bar-top .val b{color:var(--text)}
-.bar{height:8px;background:#EDF0F4;border-radius:4px;margin-top:5px;overflow:hidden}
-.bar span{display:block;height:100%;background:var(--blue);border-radius:4px}
-.subs{display:none;margin:6px 0 2px 12px}
+/* Each bucket's bar is split into its sub-tasks (2px gaps between segments,
+   rounded only at the two ends). Colours: subColor() in the script. */
+.bar{height:10px;background:#EDF0F4;border-radius:4px;margin-top:5px;overflow:hidden;display:flex;gap:2px}
+.bar span{display:block;height:100%;flex:none}
+.bar span:first-child{border-top-left-radius:4px;border-bottom-left-radius:4px}
+.bar span:last-child{border-top-right-radius:4px;border-bottom-right-radius:4px}
+.subs{display:none;margin:8px 0 2px}
 .bar-item.open .subs{display:block}
-.subs div{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:3px 0}
+.sub-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px;padding:6px 4px;border-radius:6px}
+.sub-row:hover{background:#F4F6F9}
+.sub-row .sw{width:12px;height:12px;border-radius:3px}
+.sub-row .nm{color:var(--text);overflow-wrap:anywhere}
+.sub-row .vl{color:var(--muted);white-space:nowrap;text-align:right}
+.sub-row .vl b{color:var(--text)}
+.sub-row .chev{display:inline-block;width:12px;color:var(--muted)}
+.sub-entries{margin:2px 0 6px 20px;border-left:2px solid var(--border);padding-left:10px}
+.sub-entry{font-size:13px;padding:5px 0;border-bottom:1px solid #EEF1F5}
+.sub-entry:last-child{border-bottom:none}
+.sub-entry .se-top{display:flex;justify-content:space-between;gap:8px}
+.sub-entry .se-top span:first-child{color:var(--text)}
+.sub-entry .se-top span:last-child{color:var(--muted);white-space:nowrap}
+.sub-entry .se-note{color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.total-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .agent-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer}
 .agent-row:last-child{border-bottom:none}
 .agent-row .name{font-weight:600}
@@ -213,8 +231,9 @@ textarea{min-height:64px;resize:vertical}
       </div>
 
       <div id="summary">
-        <div class="card">
+        <div class="card total-row">
           <div class="big-total" id="r-total">—</div>
+          <button class="link-btn" style="font-size:14px" onclick="exportCsv()" title="Every entry in these dates, for Excel">⬇ Export CSV</button>
         </div>
         <div class="card">
           <h3>Where the time goes</h3>
@@ -483,20 +502,105 @@ async function loadReport() {
   }
 }
 
+// ── Sub-task colours ──────────────────────────────────────────────────────
+// A sub-task's colour comes from its fixed place in its bucket's list (the
+// server's CATEGORIES), never from how much time it has, so it keeps the same
+// colour from week to week. Seven colours (validated for colour-blind
+// separation on this white page); a bucket's 8th+ sub-task, or one since
+// renamed, is "Other" grey, and time with no sub-task is "General" grey.
+// Three of the colours are light, so names and times are always shown as text
+// in the list under each bucket — colour is never the only label.
+const SUB_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
+const GENERAL_COLOR = '#c4c3bd', OTHER_COLOR = '#8b8a85';
+function subColor(category, subtask) {
+  if (!subtask) return GENERAL_COLOR;
+  const cat = categories.find(c => c.name === category);
+  const i = cat ? cat.subtasks.indexOf(subtask) : -1;
+  return i >= 0 && i < SUB_COLORS.length ? SUB_COLORS[i] : OTHER_COLOR;
+}
+// Bar segments in the bucket's own sub-task order (so colours sit in the same
+// place every time), any renamed sub-task next, General last.
+function barOrder(c) {
+  const cat = categories.find(x => x.name === c.category);
+  const pos = s => !s.subtask ? 2e9 : (cat && cat.subtasks.includes(s.subtask) ? cat.subtasks.indexOf(s.subtask) : 1e9);
+  return c.subtasks.slice().sort((a, b) => pos(a) - pos(b));
+}
+
+let reportData = null;      // last /time-log/report response
+let subEntryCache = {};     // bucket → its entries in the current range (for the sub-task drill-down)
+
 function renderReport(rep) {
+  reportData = rep;
+  subEntryCache = {};
   document.getElementById('r-total').innerHTML = `${fmtMin(rep.total)} <small>logged · ${fmtDate(document.getElementById('r-from').value)} – ${fmtDate(document.getElementById('r-to').value)}</small>`;
   const max = Math.max(1, ...rep.categories.map(c => c.minutes));
-  document.getElementById('r-cats').innerHTML = rep.categories.length ? rep.categories.map(c => `
+  document.getElementById('r-cats').innerHTML = rep.categories.length ? rep.categories.map((c, ci) => `
     <div class="bar-item" onclick="this.classList.toggle('open')">
       <div class="bar-top"><span class="name">${esc(c.category)}</span><span class="val"><b>${fmtMin(c.minutes)}</b> · ${pct(c.minutes, rep.total)}</span></div>
-      <div class="bar"><span style="width:${(c.minutes / max * 100).toFixed(1)}%"></span></div>
-      <div class="subs">${c.subtasks.map(s => `<div><span>${esc(s.subtask || 'General')}</span><span>${fmtMin(s.minutes)}</span></div>`).join('')}</div>
+      <div class="bar">${barOrder(c).map(s =>
+        `<span style="width:${(s.minutes / max * 100).toFixed(2)}%;background:${subColor(c.category, s.subtask)}" title="${esc(s.subtask || 'General')} — ${fmtMin(s.minutes)} (${pct(s.minutes, c.minutes)} of ${esc(c.category)})"></span>`).join('')}</div>
+      <div class="subs">${c.subtasks.map((s, si) => `
+        <div class="sub-row" role="button" tabindex="0" onclick="event.stopPropagation(); toggleSubEntries(${ci}, ${si}, this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();toggleSubEntries(${ci}, ${si}, this)}">
+          <span class="sw" style="background:${subColor(c.category, s.subtask)}"></span>
+          <span class="nm"><span class="chev">▸</span>${esc(s.subtask || 'General')}</span>
+          <span class="vl"><b>${fmtMin(s.minutes)}</b> · ${pct(s.minutes, c.minutes)} · ${s.entries} ${s.entries === 1 ? 'entry' : 'entries'}</span>
+        </div>`).join('')}</div>
     </div>`).join('') : '<div class="empty">Nothing logged in this range.</div>';
   document.getElementById('r-agents').innerHTML = rep.agents.length ? rep.agents.map(a => `
     <div class="agent-row" data-name="${esc(a.last_name)}, ${esc(a.first_name)}" onclick="openAgent(${a.agent_id}, this.dataset.name)">
       <span class="name">${esc(a.last_name)}, ${esc(a.first_name)}</span>
       <span class="val"><b>${fmtMin(a.minutes)}</b> · ${a.entries} ${a.entries === 1 ? 'entry' : 'entries'}</span>
     </div>`).join('') : '<div class="empty">No time tied to an agent in this range.</div>';
+}
+
+// Tap a sub-task: the entries behind it, newest first. Fetched per bucket
+// (the entries list filters by bucket) and split by sub-task here.
+async function toggleSubEntries(ci, si, row) {
+  const open = row.nextElementSibling?.classList.contains('sub-entries') ? row.nextElementSibling : null;
+  if (open) { open.remove(); row.querySelector('.chev').textContent = '▸'; return; }
+  const c = reportData.categories[ci], s = c.subtasks[si];
+  row.querySelector('.chev').textContent = '▾';
+  const box = document.createElement('div');
+  box.className = 'sub-entries';
+  box.innerHTML = '<div class="sub-entry" style="color:var(--muted)">Loading…</div>';
+  box.onclick = ev => ev.stopPropagation();
+  row.after(box);
+  try {
+    if (!subEntryCache[c.category]) {
+      const from = document.getElementById('r-from').value, to = document.getElementById('r-to').value;
+      subEntryCache[c.category] = await Auth.api(`/time-log/entries?from=${from}&to=${to}&category=${encodeURIComponent(c.category)}`);
+    }
+    const rows = subEntryCache[c.category].filter(e => (e.subtask || null) === (s.subtask || null));
+    box.innerHTML = rows.length ? rows.map(e => `
+      <div class="sub-entry">
+        <div class="se-top"><span>${esc(fmtDate(e.work_date))}${e.agent_id ? ' · ' + esc(`${e.first_name} ${e.last_name}`) : ''}</span><span>${fmtMin(e.minutes)}</span></div>
+        ${e.comments ? `<div class="se-note">${esc(e.comments)}</div>` : ''}
+      </div>`).join('') : '<div class="sub-entry" style="color:var(--muted)">No entries.</div>';
+  } catch (e) {
+    box.innerHTML = `<div class="sub-entry" style="color:var(--red,#c0392b)">Could not load the entries: ${esc(e.message)}</div>`;
+  }
+}
+
+// Every entry in the chosen dates, for Excel. The leading BOM makes Excel
+// read it as UTF-8; Hours is there so totals can be summed directly.
+async function exportCsv() {
+  const from = document.getElementById('r-from').value, to = document.getElementById('r-to').value;
+  if (!from || !to) return;
+  let rows;
+  try { rows = await Auth.api(`/time-log/entries?from=${from}&to=${to}`); }
+  catch (e) { alert('Could not export: ' + e.message); return; }
+  if (!rows.length) { alert('Nothing logged in these dates.'); return; }
+  rows = rows.slice().sort((a, b) => a.work_date.localeCompare(b.work_date) || String(a.created_at).localeCompare(String(b.created_at)));
+  const header = ['Date', 'Bucket', 'Sub-task', 'Agent', 'Minutes', 'Hours', 'Comments'];
+  const data = rows.map(e => [e.work_date, e.category, e.subtask || 'General',
+    e.agent_id ? `${e.last_name}, ${e.first_name}` : '', e.minutes, (e.minutes / 60).toFixed(2), e.comments || '']);
+  const csv = [header, ...data].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('﻿' + csv);
+  a.download = `time-log-${from}-to-${to}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  // The entries list stops at 2,000 rows.
+  if (rows.length >= 2000) alert('This export stopped at 2,000 entries. Choose a shorter date range to get everything.');
 }
 
 function openAgent(id, label) {
