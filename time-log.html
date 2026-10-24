@@ -90,6 +90,18 @@ textarea{min-height:64px;resize:vertical}
 .entry.editing{background:#FFF8E6}
 .empty{color:var(--muted);text-align:center;padding:20px 0;font-size:14px}
 
+/* Buckets tab */
+.bk-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.bk-head .name{font-weight:600;color:var(--navy);overflow-wrap:anywhere}
+.bk-head button,.bk-sub button{border:none;background:none;cursor:pointer;font-family:inherit;color:var(--muted)}
+.bk-head button{font-size:13px;font-weight:600;color:var(--red);flex-shrink:0}
+.bk-sub{display:inline-flex;align-items:center;gap:2px;padding:6px 6px 6px 11px;border:1px solid var(--border);border-radius:20px;font-size:13px;background:#fff}
+.bk-sub button{font-size:17px;line-height:1;padding:0 4px}
+.bk-sub button:hover{color:var(--red)}
+.bk-add{display:flex;gap:8px;margin-top:10px}
+.bk-add input{flex:1;font-size:15px;padding:8px 11px}
+.bk-add .btn-secondary{padding:8px 14px}
+
 .range-row{display:flex;gap:8px;margin-top:10px}
 .range-row input{flex:1;font-size:15px}
 .big-total{font-size:28px;font-weight:700;color:var(--navy)}
@@ -164,6 +176,7 @@ textarea{min-height:64px;resize:vertical}
     <div class="tabs">
       <button class="tab active" data-tab="log" onclick="showTab('log')">Log</button>
       <button class="tab" data-tab="reports" onclick="showTab('reports')">Reports</button>
+      <button class="tab" data-tab="buckets" onclick="showTab('buckets')">Buckets</button>
     </div>
 
     <!-- ── Log ─────────────────────────────────────────────────────────── -->
@@ -245,6 +258,22 @@ textarea{min-height:64px;resize:vertical}
         </div>
       </div>
     </div>
+
+    <!-- ── Buckets ─────────────────────────────────────────────────────── -->
+    <div class="main" id="tab-buckets" style="display:none">
+      <div class="card">
+        <div class="empty" style="padding:0;text-align:left">The choices under <b>What</b> and <b>Sub-task</b> on the Log tab. Removing one only hides it from new entries — time already logged under it keeps its name in reports.</div>
+        <div class="msg" id="bk-msg"></div>
+      </div>
+      <div id="bk-list"></div>
+      <div class="card">
+        <span class="label">Add a bucket</span>
+        <div class="bk-add">
+          <input type="text" id="bk-new" maxlength="80" placeholder="e.g. Office Operations" onkeydown="if(event.key==='Enter')addBucket()">
+          <button class="btn-secondary" onclick="addBucket()">Add</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -297,7 +326,82 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.getElementById('tab-log').style.display = name === 'log' ? 'block' : 'none';
   document.getElementById('tab-reports').style.display = name === 'reports' ? 'block' : 'none';
+  document.getElementById('tab-buckets').style.display = name === 'buckets' ? 'block' : 'none';
   if (name === 'reports') loadReport();
+  if (name === 'buckets') renderBuckets();
+}
+
+// ── Buckets ───────────────────────────────────────────────────────────────
+// Every change saves the whole list (PUT /time-log/categories) straight away.
+function renderBuckets() {
+  document.getElementById('bk-list').innerHTML = categories.map((c, i) => `
+    <div class="card">
+      <div class="bk-head">
+        <span class="name">${esc(c.name)}</span>
+        <button onclick="removeBucket(${i})">Remove</button>
+      </div>
+      <div class="chips">${c.subtasks.map((s, si) => `
+        <span class="bk-sub">${esc(s)}<button title="Remove sub-task" aria-label="Remove ${esc(s)}" onclick="removeSub(${i}, ${si})">×</button></span>`).join('')
+        || '<span class="opt" style="font-size:13px;color:var(--muted)">No sub-tasks</span>'}</div>
+      <div class="bk-add">
+        <input type="text" id="bk-sub-${i}" maxlength="80" placeholder="Add a sub-task" onkeydown="if(event.key==='Enter')addSub(${i})">
+        <button class="btn-secondary" onclick="addSub(${i})">Add</button>
+      </div>
+    </div>`).join('');
+}
+
+async function saveBuckets(next, okText, focusId) {
+  const el = document.getElementById('bk-msg');
+  try {
+    categories = await Auth.api('/time-log/categories', { method: 'PUT', body: next });
+  } catch (e) {
+    el.textContent = e.message;
+    el.className = 'msg err';
+    return false;
+  }
+  el.textContent = okText;
+  el.className = 'msg ok';
+  // A bucket or sub-task picked on the Log form that was just removed.
+  const cat = categories.find(c => c.name === form.category);
+  if (!cat) { form.category = null; form.subtask = null; }
+  else if (form.subtask && !cat.subtasks.includes(form.subtask) && !editingId) form.subtask = null;
+  renderCats();
+  renderBuckets();
+  if (focusId) document.getElementById(focusId)?.focus();
+  return true;
+}
+
+const copyBuckets = () => categories.map(c => ({ name: c.name, subtasks: c.subtasks.slice() }));
+
+async function addBucket() {
+  const input = document.getElementById('bk-new');
+  const name = input.value.trim();
+  if (!name) return;
+  if (await saveBuckets([...copyBuckets(), { name, subtasks: [] }], `Added “${name}”.`)) input.value = '';
+}
+
+async function removeBucket(i) {
+  const name = categories[i].name;
+  if (!confirm(`Remove the “${name}” bucket and its sub-tasks?
+
+Time already logged under it stays in your reports.`)) return;
+  const next = copyBuckets();
+  next.splice(i, 1);
+  await saveBuckets(next, `Removed “${name}”.`);
+}
+
+async function addSub(i) {
+  const sub = document.getElementById(`bk-sub-${i}`).value.trim();
+  if (!sub) return;
+  const next = copyBuckets();
+  next[i].subtasks.push(sub);
+  await saveBuckets(next, `Added “${sub}” to ${next[i].name}.`, `bk-sub-${i}`);
+}
+
+async function removeSub(i, si) {
+  const next = copyBuckets();
+  const [sub] = next[i].subtasks.splice(si, 1);
+  await saveBuckets(next, `Removed “${sub}” from ${next[i].name}.`);
 }
 
 // ── Log form ──────────────────────────────────────────────────────────────

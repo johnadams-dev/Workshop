@@ -6697,6 +6697,7 @@ function adminRenderTemplateDetail(t) {
           <div class="btn-row" style="margin-top:10px;">
             <button class="btn btn-primary btn-sm" onclick="adminSaveItem(${item.id}, this)">Save Item</button>
             <button class="btn btn-ghost btn-sm" onclick="adminToggleItem(${item.id})">Cancel</button>
+            <button class="btn btn-ghost btn-sm" style="margin-left:auto; color:var(--red);" onclick="adminRemoveItem(${item.id})">Remove Item</button>
           </div>
         </div>
       </td></tr>` : ''}`;
@@ -6803,6 +6804,20 @@ async function adminCreateItem(templateId, btn) {
     await adminLoadTemplates();
   } catch (e) {
     alert('Failed to add item: ' + e.message);
+  }
+}
+
+async function adminRemoveItem(itemId) {
+  const t = adminTemplates.find(x => x.id === adminOpenTemplateId);
+  const item = t && (t.items || []).find(i => i.id === itemId);
+  if (!confirm(`Remove "${item ? item.title : 'this item'}"?\n\nIt will no longer be added to new checklists, and any open (not yet done) copies come off existing checklists. Completed records are kept.`)) return;
+  try {
+    const r = await DELETE(`/daily-desk/checklist-items/${itemId}`);
+    if (r.deactivated) alert(`Removed from open checklists. ${r.kept} completed/skipped record${r.kept === 1 ? '' : 's'} still reference it, so it is kept as Inactive for history.`);
+    adminOpenItemId = null;
+    await adminLoadTemplates();
+  } catch (e) {
+    alert('Failed to remove item: ' + e.message);
   }
 }
 
