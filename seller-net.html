@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Estimated Seller Net | John Adams Real Estate Tools</title>
+<title>Seller Net &amp; Buyer Costs | John Adams Real Estate Tools</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -25,8 +25,13 @@
   .content { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
   h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
   .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; margin-bottom: -1px; }
+  .tabs button.on { color: var(--navy); border-bottom-color: var(--gold); }
+  body[data-tab=seller] .only-buyer, body[data-tab=buyer] .only-seller { display: none !important; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
   .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; }
+  .card h4 { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 8px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
   .wide { grid-column: span 2; }
   label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
@@ -69,6 +74,7 @@
   table.net td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   table.net tr.sub td { font-weight: 700; border-top: 1px solid #999; }
   table.net tr.net-row td { font-weight: 700; font-size: 14px; border-top: 2px solid #000; border-bottom: 0; }
+  table.net tr.section td { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #333; padding-top: 14px; border-bottom: 1px solid #999; }
   table.net .pct { color: #555; font-size: 12px; }
   .notes { margin-top: 14px; font-size: 11.5px; color: #333; line-height: 1.45; }
   .notes p + p { margin-top: 6px; }
@@ -86,11 +92,11 @@
   }
 </style>
 </head>
-<body>
+<body data-tab="seller">
 <div class="topbar">
   <div style="display:flex;align-items:center">
     <span class="topbar-logo">Adams Cameron</span>
-    <span class="topbar-title">Estimated Seller Net</span>
+    <span class="topbar-title" id="topTitle">Estimated Seller Net</span>
   </div>
   <div style="display:flex;align-items:center;gap:16px">
     <a href="./feedback.html?tool=seller-net">Feedback</a>
@@ -100,8 +106,14 @@
 
 <div class="content">
   <div class="no-print">
-    <h1>Estimated Seller Net</h1>
-    <p class="lede">Enter the address and price. Stamps, title insurance and the tax proration are calculated for you; the annual tax comes from the home's Stellar MLS record when there is one. Print the sheet or save it as a PDF — nothing is stored.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="seller" class="on">Seller Net</button>
+      <button type="button" data-tab="buyer">Buyer Costs</button>
+    </div>
+    <h1 class="only-seller">Estimated Seller Net</h1>
+    <p class="lede only-seller">Enter the address and price. Stamps, title insurance and the tax proration are calculated for you; the annual tax comes from the home's Stellar MLS record when there is one. Print the sheet or save it as a PDF — nothing is stored.</p>
+    <h1 class="only-buyer">Estimated Buyer Costs</h1>
+    <p class="lede only-buyer">What a buyer should expect to bring to closing, and the monthly payment. Mortgage stamps, intangible tax, the lender's title policy, prepaid interest and the tax proration are calculated for you. Print the sheet or save it as a PDF — nothing is stored.</p>
 
     <div class="card">
       <h2>Property</h2>
@@ -118,16 +130,17 @@
       <div id="lookupMsg" class="msg"></div>
       <div id="cands" class="cands"></div>
       <div class="grid" style="margin-top:14px">
-        <div class="wide"><label for="owners">Owners</label><input type="text" id="owners" autocomplete="off"></div>
+        <div class="wide only-seller"><label for="owners">Owners</label><input type="text" id="owners" autocomplete="off"></div>
+        <div class="wide only-buyer"><label for="buyers">Buyers</label><input type="text" id="buyers" autocomplete="off"></div>
         <div><label for="sheetDate">Date</label><input type="date" id="sheetDate"></div>
         <div><label for="closeDate">Based on closing date</label><input type="date" id="closeDate"></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Sale price</h2>
+      <h2><span class="only-seller">Sale price</span><span class="only-buyer">Purchase price</span></h2>
       <div class="row" style="margin-bottom:12px">
-        <div class="seg" role="group" aria-label="Columns">
+        <div class="seg" id="colsSeg" role="group" aria-label="Columns">
           <button type="button" data-cols="3" class="on">High, Mid, Low</button>
           <button type="button" data-cols="1">One price</button>
         </div>
@@ -140,6 +153,16 @@
     </div>
 
     <div class="card">
+      <h2>Property taxes</h2>
+      <div class="grid">
+        <div><label for="annualTax">Annual property tax</label><input type="text" inputmode="decimal" id="annualTax" class="money"><div class="hint" id="taxSource"></div></div>
+      </div>
+      <label class="check"><input type="checkbox" id="taxPaid"><span>This year's tax bill is paid (November and December closings)</span></label>
+      <p class="hint" style="margin-top:6px">Florida taxes are paid in arrears. Before November 1 the seller owes the buyer for the days they owned the home this year; from November 1 the bill is assumed paid and the buyer credits the seller for the rest of the year.</p>
+    </div>
+
+    <!-- ── Seller only ── -->
+    <div class="card only-seller">
       <h2>Costs</h2>
       <div class="grid">
         <div><label for="listPct">Listing side %</label><input type="number" id="listPct" step="0.25" min="0" max="20"></div>
@@ -154,16 +177,59 @@
       <p class="hint" style="margin-top:10px">Lines left blank aren't printed. Stamps on the deed and title insurance are calculated from each price.</p>
     </div>
 
-    <div class="card">
-      <h2>Mortgage and taxes</h2>
+    <div class="card only-seller">
+      <h2>Mortgage</h2>
       <div class="grid">
         <div><label for="payoff">Mortgage payoff</label><input type="text" inputmode="decimal" id="payoff" class="money"></div>
         <div><label for="intDays">Interest: number of days</label><input type="number" id="intDays" min="0" max="366"></div>
         <div><label for="intPerDay">Interest: dollars per day</label><input type="text" inputmode="decimal" id="intPerDay" class="money"></div>
-        <div><label for="annualTax">Annual property tax</label><input type="text" inputmode="decimal" id="annualTax" class="money"><div class="hint" id="taxSource"></div></div>
       </div>
-      <label class="check"><input type="checkbox" id="taxPaid"><span>This year's tax bill is paid (November and December closings)</span></label>
-      <p class="hint" style="margin-top:6px">Florida taxes are paid in arrears. Before November 1 the seller owes the buyer for the days they owned the home this year; from November 1 the bill is assumed paid and the buyer credits the seller for the rest of the year.</p>
+    </div>
+
+    <!-- ── Buyer only ── -->
+    <div class="card only-buyer">
+      <h2>Financing</h2>
+      <div class="row" style="margin-bottom:12px">
+        <div class="seg" id="finSeg" role="group" aria-label="Financing">
+          <button type="button" data-fin="loan" class="on">Mortgage</button>
+          <button type="button" data-fin="cash">Cash</button>
+        </div>
+      </div>
+      <div class="grid fin-loan">
+        <div><label for="downPct">Down payment %</label><input type="number" id="downPct" step="0.5" min="0" max="100" value="20"></div>
+        <div><label for="rate">Interest rate %</label><input type="number" id="rate" step="0.125" min="0" max="20"></div>
+        <div><label for="term">Term (years)</label><input type="number" id="term" min="1" max="40" value="30"></div>
+        <div><label for="points">Origination / points %</label><input type="number" id="points" step="0.125" min="0" max="10"></div>
+      </div>
+      <p class="hint fin-loan" style="margin-top:10px">The loan is each column's price less the down payment. The lender's Loan Estimate replaces these figures once the buyer applies.</p>
+    </div>
+
+    <div class="card only-buyer">
+      <h2>Closing costs</h2>
+      <div class="grid">
+        <div class="fin-loan"><label for="lenderFees">Lender fees (appraisal, credit, underwriting)</label><input type="text" inputmode="decimal" id="lenderFees" class="money"></div>
+        <div><label for="bTitleFee">Title: settlement and closing</label><input type="text" inputmode="decimal" id="bTitleFee" class="money"></div>
+        <div><label for="bRecording">Recording fees (deed, mortgage)</label><input type="text" inputmode="decimal" id="bRecording" class="money"></div>
+        <div><label for="bBrokerPct">Buyer's broker paid by buyer %</label><input type="number" id="bBrokerPct" step="0.25" min="0" max="20"></div>
+        <div><label for="survey">Survey</label><input type="text" inputmode="decimal" id="survey" class="money"></div>
+        <div><label for="inspection">Inspections</label><input type="text" inputmode="decimal" id="inspection" class="money"></div>
+        <div><label for="hoaFees">HOA / condo application, transfer</label><input type="text" inputmode="decimal" id="hoaFees" class="money"></div>
+        <div><label for="bOther">Other</label><input type="text" inputmode="decimal" id="bOther" class="money"></div>
+      </div>
+      <p class="hint" style="margin-top:10px">Lines left blank aren't printed. Mortgage stamps, intangible tax and the lender's title policy are calculated from each loan. The owner's title policy is left to the seller, as on the seller net.</p>
+    </div>
+
+    <div class="card only-buyer">
+      <h2>Prepaids, credits and the monthly payment</h2>
+      <div class="grid">
+        <div><label for="insurance">Homeowner's insurance (yearly)</label><input type="text" inputmode="decimal" id="insurance" class="money"></div>
+        <div class="fin-loan"><label for="escrowMonths">Escrow reserve (months)</label><input type="number" id="escrowMonths" min="0" max="14" value="3"></div>
+        <div><label for="hoaMonthly">HOA dues (monthly)</label><input type="text" inputmode="decimal" id="hoaMonthly" class="money"></div>
+        <div class="fin-loan"><label for="miMonthly">Mortgage insurance (monthly)</label><input type="text" inputmode="decimal" id="miMonthly" class="money"></div>
+        <div><label for="deposit">Escrow deposit already paid</label><input type="text" inputmode="decimal" id="deposit" class="money"></div>
+        <div><label for="sellerCredit">Seller credit to buyer</label><input type="text" inputmode="decimal" id="sellerCredit" class="money"></div>
+      </div>
+      <p class="hint" style="margin-top:10px">Prepaid interest runs from closing day through the end of that month. The escrow reserve is that many months of tax and insurance held by the lender.</p>
     </div>
 
     <div class="row" style="margin-bottom:16px">
@@ -177,12 +243,15 @@
 
 <script>
 // ════════════════════════════════════════════════════════════════════════
-// Estimated Seller Net — rules: "Estimated seller net sheet" in
-// server/docs/business-rules.md. The stamp and title-insurance rates match
-// Tally's pricing/net.js; the tax lookup is GET /seller-net/tax
-// (server/seller-net-routes.js). Nothing is saved.
+// Estimated Seller Net and Estimated Buyer Costs — rules: "Estimated seller
+// net sheet" and "Estimated buyer costs" in server/docs/business-rules.md.
+// The stamp and title-insurance rates match Tally's pricing/net.js; the tax
+// lookup is GET /seller-net/tax (server/seller-net-routes.js). Nothing is saved.
 // ════════════════════════════════════════════════════════════════════════
 const DOC_STAMPS_PER_HUNDRED = 0.70;          // F.S. 201.02(1)(a), on whole $100s
+const NOTE_STAMPS_PER_HUNDRED = 0.35;         // F.S. 201.08(1)(a), per $100 or part
+const INTANGIBLE_RATE = 0.002;                 // F.S. 199.133, 2 mills on the loan
+const LENDER_SIMULTANEOUS = 25;                // F.A.C. 69O-186.003, lender's policy issued with the owner's
 const TITLE_MINIMUM = 100;                     // F.A.C. 69O-186.003(1)(a)
 const TITLE_BANDS = [
   { upTo: 100000, perThousand: 5.75 },
@@ -193,6 +262,7 @@ const TITLE_BANDS = [
 ];
 const DEFAULT_CLOSING_DAYS = 45;
 const COL_NAMES = ['High', 'Mid', 'Low'];
+const TITLES = { seller: 'Estimated Seller Net', buyer: 'Estimated Buyer Costs' };
 
 const $ = id => document.getElementById(id);
 const cents = n => Math.round(n * 100) / 100;
@@ -204,6 +274,7 @@ const isoDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, 
 const showDate = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${+m}/${+d}/${y}`; };
 
 function docStamps(price) { return cents(Math.floor(price / 100) * DOC_STAMPS_PER_HUNDRED); }
+function noteStamps(loan) { return cents(Math.ceil(loan / 100) * NOTE_STAMPS_PER_HUNDRED); }
 
 // Owner's promulgated rate on the price rounded to the nearest $1,000, band by band
 function titlePremium(price) {
@@ -222,6 +293,7 @@ function titlePremium(price) {
 // Whole days from January 1 up to, not including, closing day. Unpaid
 // (before November, or unticked): the seller owes the buyer for the days
 // elapsed (negative). Paid: the buyer credits the rest of the year (positive).
+// Amounts are from the seller's side; the buyer sheet flips the sign.
 function taxProration(annualTax, closingIso, paid) {
   if (!annualTax || !closingIso) return null;
   const d = new Date(`${closingIso}T00:00:00Z`);
@@ -233,9 +305,24 @@ function taxProration(annualTax, closingIso, paid) {
   return { amount: cents(amount), paid, elapsed, remaining: daysInYear - elapsed, daysInYear };
 }
 
+// Closing day through the last day of its month, inclusive.
+function prepaidDays(closingIso) {
+  if (!closingIso) return 0;
+  const [y, m, d] = closingIso.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
+}
+
+function monthlyPI(loan, ratePct, years) {
+  if (!loan || !years) return 0;
+  const n = years * 12, r = ratePct / 1200;
+  return cents(r ? loan * r / (1 - Math.pow(1 + r, -n)) : loan / n);
+}
+
 const closingInNovDec = () => { const v = $('closeDate').value; return !!v && +v.slice(5, 7) >= 11; };
 
+let tab = 'seller';
 let cols = 3;
+let financed = true;
 let taxInfo = null;     // { annualTax, taxYear, address, mlsNumber } from the lookup
 let paidChoice = true;  // the agent's tick for a November/December closing
 
@@ -268,26 +355,95 @@ function compute(price) {
   return { price, lines, expenses, gross, payoff, interest, pr, net };
 }
 
+function computeBuyer(price) {
+  const downPct = financed ? Math.min(100, num($('downPct').value)) : 100;
+  const loan = cents(price * (1 - downPct / 100));
+  const down = cents(price - loan);
+  const rate = num($('rate').value);
+  const annualTax = num($('annualTax').value), insurance = num($('insurance').value);
+  const points = num($('points').value), brokerPct = num($('bBrokerPct').value);
+  const costs = [
+    { label: 'Origination / Points', pct: points, v: cents(loan * points / 100), show: !!loan && has('points') },
+    { label: 'Lender Fees', v: loan ? num($('lenderFees').value) : 0, show: !!loan && has('lenderFees') },
+    { label: 'Stamps on Mortgage Note', v: loan ? noteStamps(loan) : 0, show: financed },
+    { label: 'Intangible Tax on Mortgage', v: cents(loan * INTANGIBLE_RATE), show: financed },
+    { label: "Lender's Title Policy", v: loan ? LENDER_SIMULTANEOUS : 0, show: financed },
+    { label: 'Title Settlement and Closing', v: num($('bTitleFee').value), show: has('bTitleFee') },
+    { label: 'Recording Fees', v: num($('bRecording').value), show: has('bRecording') },
+    { label: "Buyer's Broker", pct: brokerPct, v: cents(price * brokerPct / 100), show: has('bBrokerPct') },
+    { label: 'Survey', v: num($('survey').value), show: has('survey') },
+    { label: 'Inspections', v: num($('inspection').value), show: has('inspection') },
+    { label: 'HOA / Condo Application and Transfer', v: num($('hoaFees').value), show: has('hoaFees') },
+    { label: 'Other', v: num($('bOther').value), show: has('bOther') },
+  ];
+  const days = loan ? prepaidDays($('closeDate').value) : 0;
+  const months = loan ? num($('escrowMonths').value) : 0;
+  const prepaids = [
+    { label: "Homeowner's Insurance, First Year", v: insurance, show: has('insurance') },
+    { label: `Prepaid Interest${days ? ` <span class="pct">${days} days</span>` : ''}`, v: cents(loan * rate / 100 / 365 * days), show: financed && !!rate },
+    { label: `Escrow Reserve${months ? ` <span class="pct">${months} months</span>` : ''}`, v: cents((annualTax + insurance) / 12 * months), show: financed && !!months },
+  ];
+  const closingCosts = cents(costs.reduce((s, l) => s + l.v, 0));
+  const prepaidTotal = cents(prepaids.reduce((s, l) => s + l.v, 0));
+  const pr = taxProration(annualTax, $('closeDate').value, $('taxPaid').checked);
+  const prBuyer = pr ? -pr.amount : 0;    // a seller debit is a buyer credit
+  const deposit = num($('deposit').value), sellerCredit = num($('sellerCredit').value);
+  const cash = cents(down + closingCosts + prepaidTotal + prBuyer - deposit - sellerCredit);
+  const pi = monthlyPI(loan, rate, num($('term').value));
+  const monthly = [
+    { label: 'Principal and Interest', v: pi, show: financed },
+    { label: 'Property Taxes', v: cents(annualTax / 12), show: !!annualTax },
+    { label: "Homeowner's Insurance", v: cents(insurance / 12), show: !!insurance },
+    { label: 'HOA Dues', v: num($('hoaMonthly').value), show: has('hoaMonthly') },
+    { label: 'Mortgage Insurance', v: loan ? num($('miMonthly').value) : 0, show: financed && has('miMonthly') },
+  ];
+  const monthlyTotal = cents(monthly.reduce((s, l) => s + l.v, 0));
+  return { price, downPct, down, loan, costs, closingCosts, prepaids, prepaidTotal, pr, prBuyer, deposit, sellerCredit, cash, monthly, monthlyTotal };
+}
+
 function render() {
   syncPaidBox();
   const prices = [0, 1, 2].slice(0, cols).map(i => num($('price' + i).value));
-  const results = prices.map(compute);
   const heads = cols === 1 ? [''] : COL_NAMES;
+  const results = prices.map(tab === 'buyer' ? computeBuyer : compute);
   const cell = (r, v) => `<td class="n">${r.price ? money(v) : ''}</td>`;
   const row = (label, fn, cls = '') => `<tr class="${cls}"><td>${label}</td>${results.map(r => cell(r, fn(r))).join('')}</tr>`;
-
-  let body = row('Sale Price', r => r.price);
-  results[0].lines.forEach((l, i) => {
-    if (!l.always && !l.show) return;
+  const section = label => `<tr class="section"><td colspan="${results.length + 1}">${label}</td></tr>`;
+  const lineRows = key => results[0][key].map((l, i) => {
+    if (!l.always && !l.show) return '';
     const label = l.pct != null ? `${l.label} <span class="pct">${l.pct ? l.pct + '%' : ''}</span>` : l.label;
-    body += row(label, r => r.lines[i].v);
-  });
-  body += row('Total Estimated Expenses', r => r.expenses, 'sub');
-  body += row('Gross Proceeds', r => r.gross, 'sub');
-  body += row('Mortgage Payoff', r => r.payoff);
-  if (results[0].interest) body += row('Interest on Existing Mortgage', r => r.interest);
-  body += row('Pro-rated Taxes', r => r.pr ? r.pr.amount : 0);
-  body += row('Net to Seller', r => r.net, 'net-row');
+    return row(label, r => r[key][i].v);
+  }).join('');
+
+  let body;
+  if (tab === 'buyer') {
+    body = row('Purchase Price', r => r.price);
+    if (financed) {
+      body += row(`Down Payment <span class="pct">${results[0].downPct}%</span>`, r => r.down);
+      body += row('Loan Amount', r => r.loan);
+    }
+    body += section('Closing Costs') + lineRows('costs') + row('Total Closing Costs', r => r.closingCosts, 'sub');
+    if (results[0].prepaids.some(l => l.show)) body += section('Prepaids') + lineRows('prepaids') + row('Total Prepaids', r => r.prepaidTotal, 'sub');
+    body += section('Cash to Close');
+    body += row(financed ? 'Down Payment' : 'Purchase Price', r => r.down);
+    body += row('Closing Costs and Prepaids', r => cents(r.closingCosts + r.prepaidTotal));
+    if (results[0].pr) body += row(results[0].prBuyer < 0 ? 'Pro-rated Taxes (seller credit)' : 'Pro-rated Taxes', r => r.prBuyer);
+    if (has('deposit')) body += row('Less Escrow Deposit Paid', r => -r.deposit);
+    if (has('sellerCredit')) body += row('Less Seller Credit', r => -r.sellerCredit);
+    body += row('Estimated Cash to Close', r => r.cash, 'net-row');
+    if (results[0].monthly.some(l => l.show)) {
+      body += section('Estimated Monthly Payment') + lineRows('monthly') + row('Total Monthly Payment', r => r.monthlyTotal, 'sub');
+    }
+  } else {
+    body = row('Sale Price', r => r.price);
+    body += lineRows('lines');
+    body += row('Total Estimated Expenses', r => r.expenses, 'sub');
+    body += row('Gross Proceeds', r => r.gross, 'sub');
+    body += row('Mortgage Payoff', r => r.payoff);
+    if (results[0].interest) body += row('Interest on Existing Mortgage', r => r.interest);
+    body += row('Pro-rated Taxes', r => r.pr ? r.pr.amount : 0);
+    body += row('Net to Seller', r => r.net, 'net-row');
+  }
 
   const address = [$('street').value.trim(), $('unit').value.trim() && `Unit ${$('unit').value.trim()}`, taxInfo?.city, $('zip').value.trim()].filter(Boolean).join(', ');
   const pr = results[0].pr;
@@ -300,13 +456,23 @@ function render() {
       : `<p>Taxes: annual tax of $${money(num($('annualTax').value))}${src}. Florida taxes are paid in arrears, so the seller owes the buyer for the ${pr.elapsed} days owned this year before closing.</p>`;
   }
   const who = Auth.user ? `Prepared by: ${esc(Auth.user.name || '')} | Adams, Cameron &amp; Co., Realtors | ${esc(Auth.user.email || '')}` : 'Adams, Cameron &amp; Co., Realtors';
+  const people = tab === 'buyer'
+    ? `<div><b>Buyers:</b> ${esc($('buyers').value.trim())}</div>`
+    : `<div><b>Owners:</b> ${esc($('owners').value.trim())}</div>`;
+  const loanFact = tab === 'buyer'
+    ? `<div><b>Financing:</b> ${financed ? `${esc(String(num($('term').value) || ''))}-year mortgage${num($('rate').value) ? ` at ${num($('rate').value)}%` : ''}` : 'Cash'}</div>` : '';
+  const disclaimer = tab === 'buyer'
+    ? `<p>These are estimates to help with planning, not a Loan Estimate or Closing Disclosure. The buyer's lender and closing agent set the actual figures, which vary with the loan program, the lender's fees, the insurance premium, the escrow the lender requires, and the exact date of closing. The owner's title policy is assumed to be paid by the seller.</p>`
+    : `<p>This net does not include any possible prepayment penalty on the existing mortgage, nor attorney fees. This net will vary due to pro-ration of rents, insurance, and interest on existing mortgages, based on the exact date of closing. This net is also based on the assumption that there are no other outstanding lien(s) or encumbrance(s) against the property that would be revealed by a title search.</p>`;
+  const sigs = tab === 'buyer' ? ['Agent', 'Buyer', 'Buyer'] : ['Agent', 'Seller', 'Seller'];
 
   $('sheet').innerHTML = `
-    <div class="sheet-head"><img src="images/ac-logo.png" alt="Adams, Cameron &amp; Co., Realtors"><h3>Estimated Seller Net</h3></div>
+    <div class="sheet-head"><img src="images/ac-logo.png" alt="Adams, Cameron &amp; Co., Realtors"><h3>${TITLES[tab]}</h3></div>
     <div class="facts">
       <div><b>Date:</b> ${esc(showDate($('sheetDate').value))}</div>
       <div><b>Property:</b> ${esc(address)}</div>
-      <div><b>Owners:</b> ${esc($('owners').value.trim())}</div>
+      ${people}
+      ${loanFact}
       <div><b>Based on Closing Date:</b> ${esc(showDate($('closeDate').value))}</div>
     </div>
     <table class="net">
@@ -315,9 +481,9 @@ function render() {
     </table>
     <div class="notes">
       ${taxNote}
-      <p>This net does not include any possible prepayment penalty on the existing mortgage, nor attorney fees. This net will vary due to pro-ration of rents, insurance, and interest on existing mortgages, based on the exact date of closing. This net is also based on the assumption that there are no other outstanding lien(s) or encumbrance(s) against the property that would be revealed by a title search.</p>
+      ${disclaimer}
     </div>
-    <div class="sigs"><div>Agent Signature:</div><div>Seller Signature:</div><div>Seller Signature:</div></div>
+    <div class="sigs">${sigs.map(s => `<div>${s} Signature:</div>`).join('')}</div>
     <div class="prepared">${who}</div>`;
 }
 
@@ -374,11 +540,28 @@ async function lookup() {
 }
 
 // ── Wiring ──────────────────────────────────────────────────────────────
+function setTab(t) {
+  tab = t;
+  document.body.dataset.tab = t;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('topTitle').textContent = TITLES[t];
+  document.title = `${TITLES[t]} | John Adams Real Estate Tools`;
+  history.replaceState(null, '', t === 'buyer' ? '#buyer' : location.pathname + location.search);
+  render();
+}
+
 function setCols(n) {
   cols = n;
-  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', +b.dataset.cols === n));
+  document.querySelectorAll('#colsSeg button').forEach(b => b.classList.toggle('on', +b.dataset.cols === n));
   document.querySelectorAll('.col-in').forEach(el => { el.style.display = +el.dataset.col < n ? '' : 'none'; });
   $('price0').previousElementSibling.textContent = n === 1 ? 'Price' : 'High';
+  render();
+}
+
+function setFinancing(loan) {
+  financed = loan;
+  document.querySelectorAll('#finSeg button').forEach(b => b.classList.toggle('on', (b.dataset.fin === 'loan') === loan));
+  document.querySelectorAll('.fin-loan').forEach(el => { el.style.display = loan ? '' : 'none'; });
   render();
 }
 
@@ -389,7 +572,9 @@ function resetDates() {
   $('closeDate').value = isoDate(close);
 }
 
-document.querySelectorAll('.seg button').forEach(b => b.onclick = () => setCols(+b.dataset.cols));
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+document.querySelectorAll('#colsSeg button').forEach(b => b.onclick = () => setCols(+b.dataset.cols));
+document.querySelectorAll('#finSeg button').forEach(b => b.onclick = () => setFinancing(b.dataset.fin === 'loan'));
 document.querySelectorAll('input').forEach(el => el.addEventListener('input', render));
 document.querySelectorAll('input.money').forEach(el => el.addEventListener('blur', () => { if (el.value.trim()) el.value = money(num(el.value)); }));
 $('taxPaid').addEventListener('change', () => { paidChoice = $('taxPaid').checked; render(); });
@@ -400,13 +585,16 @@ $('zip').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
 $('clearBtn').onclick = () => {
   document.querySelectorAll('input[type=text], input[type=number]').forEach(el => { el.value = ''; });
   $('titleSearch').value = '485.00'; $('recording').value = '25.00';
+  $('downPct').value = '20'; $('term').value = '30'; $('escrowMonths').value = '3';
   taxInfo = null; paidChoice = true;
   $('lookupMsg').textContent = ''; $('cands').innerHTML = ''; $('taxSource').textContent = '';
-  resetDates(); render();
+  resetDates(); setFinancing(true);
 };
 
 resetDates();
+tab = location.hash === '#buyer' ? 'buyer' : 'seller';
 setCols(3);
+setTab(tab);
 // Usable without signing in; a saved session is picked up quietly (and fills "Prepared by").
 Auth.ready({ optional: true, tool: 'Estimated Seller Net' }).then(render);
 </script>
