@@ -57,6 +57,8 @@
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-top: 8px; }
   .check input:disabled + span { color: var(--muted); }
   #signin { display: none; margin-top: 10px; }
+  .tax-warn { margin-top: 12px; background: var(--gold-lt); border: 1px solid var(--gold); border-left: 5px solid var(--red); border-radius: 6px; padding: 12px 14px; font-size: 13px; line-height: 1.5; }
+  .tax-warn strong { display: block; color: var(--red); font-size: 14px; margin-bottom: 4px; }
 
   /* ── The sheet: what prints ── */
   .sheet-wrap { overflow-x: auto; }
@@ -67,6 +69,8 @@
   .facts { margin-bottom: 14px; }
   .facts div { padding: 3px 0; }
   .facts b { display: inline-block; min-width: 160px; font-weight: 400; color: #333; }
+  .sheet-warn { border: 2px solid #000; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; line-height: 1.45; }
+  .sheet-warn b { display: block; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
   table.net { width: 100%; border-collapse: collapse; }
   table.net th { text-align: right; font-size: 13px; padding: 6px 4px; }
   table.net th:first-child { text-align: left; }
@@ -159,6 +163,10 @@
       </div>
       <label class="check"><input type="checkbox" id="taxPaid"><span>This year's tax bill is paid (November and December closings)</span></label>
       <p class="hint" style="margin-top:6px">Florida taxes are paid in arrears. Before November 1 the seller owes the buyer for the days they owned the home this year; from November 1 the bill is assumed paid and the buyer credits the seller for the rest of the year.</p>
+      <div class="tax-warn only-buyer" role="note">
+        <strong>⚠ The buyer's future taxes could be very different</strong>
+        <span id="taxWarnText"></span>
+      </div>
     </div>
 
     <!-- ── Seller only ── -->
@@ -263,6 +271,8 @@ const TITLE_BANDS = [
 const DEFAULT_CLOSING_DAYS = 45;
 const COL_NAMES = ['High', 'Mid', 'Low'];
 const TITLES = { seller: 'Estimated Seller Net', buyer: 'Estimated Buyer Costs' };
+// Shown on the Buyer Costs tab and printed on its sheet.
+const BUYER_TAX_WARNING = "In Florida, property taxes depend as much on the owner as on the property. The tax figure used here is the current owner's bill, which reflects their exemptions and years of capped assessments. After the sale the assessment resets to market value, and the buyer's bill depends on the buyer's own exemptions — including homestead, and portability if they are selling or have recently sold a home in Florida. Future taxes could be much higher (or lower). For an estimate, the buyer should contact the county property appraiser.";
 
 const $ = id => document.getElementById(id);
 const cents = n => Math.round(n * 100) / 100;
@@ -392,7 +402,7 @@ function computeBuyer(price) {
   const pi = monthlyPI(loan, rate, num($('term').value));
   const monthly = [
     { label: 'Principal and Interest', v: pi, show: financed },
-    { label: 'Property Taxes', v: cents(annualTax / 12), show: !!annualTax },
+    { label: "Property Taxes <span class=\"pct\">current owner's bill</span>", v: cents(annualTax / 12), show: !!annualTax },
     { label: "Homeowner's Insurance", v: cents(insurance / 12), show: !!insurance },
     { label: 'HOA Dues', v: num($('hoaMonthly').value), show: has('hoaMonthly') },
     { label: 'Mortgage Insurance', v: loan ? num($('miMonthly').value) : 0, show: financed && has('miMonthly') },
@@ -475,6 +485,7 @@ function render() {
       ${loanFact}
       <div><b>Based on Closing Date:</b> ${esc(showDate($('closeDate').value))}</div>
     </div>
+    ${tab === 'buyer' ? `<div class="sheet-warn"><b>Property taxes will change after the sale</b>${esc(BUYER_TAX_WARNING)}</div>` : ''}
     <table class="net">
       <thead><tr><th></th>${heads.map(h => `<th>${h}</th>`).join('')}</tr></thead>
       <tbody>${body}</tbody>
@@ -591,6 +602,7 @@ $('clearBtn').onclick = () => {
   resetDates(); setFinancing(true);
 };
 
+$('taxWarnText').textContent = BUYER_TAX_WARNING;
 resetDates();
 tab = location.hash === '#buyer' ? 'buyer' : 'seller';
 setCols(3);
