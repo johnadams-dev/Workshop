@@ -184,9 +184,10 @@
     <div class="card" id="gapsCard" style="display:none;">
       <div class="card-title">⚠️ Your Active Listing Gaps</div>
       <p style="font-size:13px;color:#64748b;margin:0 0 16px;line-height:1.6;">
-        These listings appear in one MLS system but not the other. If a gap is intentional
-        (e.g. the property is only listed in one market by agreement), you can mark it as such
-        and your office coordinator will be notified.
+        These listings appear in one MLS system but not the other. If you're not going to
+        enter one in the other MLS (for example, a Tampa listing doesn't belong in Daytona),
+        stop alerts for it: you won't be emailed about it again, and your office coordinator
+        will be notified.
       </p>
       <div id="gapsList"></div>
     </div>
@@ -263,8 +264,12 @@
     // Parse token from URL
     const params = new URLSearchParams(window.location.search);
     const token  = params.get('token');
+    // ?stop=<listing id>: opened from an alert email's "Stop alerts for this
+    // listing" link, so that listing is shown first with the button to stop.
+    const stopListing = params.get('stop');
 
     let agentData = null;
+    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     function showMain() {
       document.getElementById('stateLoading').style.display = 'none';
@@ -304,30 +309,39 @@
         if (!r.ok) return;
         const data = await r.json();
         const gaps = data.gaps || [];
+        if (stopListing) {
+          const i = gaps.findIndex(g => g.listing_id === stopListing);
+          if (i > 0) gaps.unshift(...gaps.splice(i, 1));
+          if (i < 0) {
+            document.getElementById('gapsCard').style.display = 'block';
+            document.getElementById('gapsList').innerHTML = `<div style="padding:12px;border:1px solid #86efac;border-radius:8px;margin-bottom:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:600;">✓ Alerts for listing ${esc(stopListing)} are already off, or it's no longer missing from the other MLS.</div>`;
+          }
+        }
         if (gaps.length === 0) return;
 
         const MLS = { 1: 'Stellar MLS', 2: 'Daytona DBAR' };
         document.getElementById('gapsCard').style.display = 'block';
-        document.getElementById('gapsList').innerHTML = gaps.map(g => `
-          <div id="gap-${g.id}" style="padding:12px;border:1px solid #fca5a5;border-radius:8px;margin-bottom:10px;background:#fef2f2;">
+        document.getElementById('gapsList').innerHTML += gaps.map(g => `
+          <div id="gap-${g.id}" style="padding:12px;border:${g.listing_id === stopListing ? '2px solid #dc2626' : '1px solid #fca5a5'};border-radius:8px;margin-bottom:10px;background:#fef2f2;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
               <div>
-                <div style="font-weight:600;font-size:14px;color:#1e293b;">${g.address || g.listing_id}</div>
+                <div style="font-weight:600;font-size:14px;color:#1e293b;">${esc(g.address || g.listing_id)}</div>
                 <div style="font-size:12px;color:#dc2626;margin-top:2px;">Missing from ${MLS[g.missing_mls_id] || 'Unknown'}</div>
               </div>
-              <button onclick="suppressGap('${g.listing_id}', ${g.id})"
-                style="background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
-                Mark intentional
+              <button onclick="suppressGap(${esc(JSON.stringify(g.listing_id))}, ${g.id})"
+                style="background:${g.listing_id === stopListing ? '#dc2626' : 'none'};border:1px solid #fca5a5;color:${g.listing_id === stopListing ? '#fff' : '#dc2626'};border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                Stop alerts for this listing
               </button>
             </div>
           </div>`).join('');
+        if (stopListing) setTimeout(() => document.getElementById('gapsCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       } catch(e) {
         console.warn('Could not load gaps:', e.message);
       }
     }
 
     async function suppressGap(listingId, gapId) {
-      const reason = prompt('Optional: briefly explain why this listing is only in one system (press Cancel to skip).');
+      const reason = prompt("Stop alerts for this listing? You won't be emailed about it again.\n\nOptional: why is it only in one MLS (e.g. it's outside that MLS's area)?");
       if (reason === null) return; // user cancelled
 
       try {
@@ -344,7 +358,7 @@
         if (el) {
           el.style.background = '#f0fdf4';
           el.style.borderColor = '#86efac';
-          el.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;">✓ Marked as intentional — your coordinator has been notified.</div>`;
+          el.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;">✓ Alerts stopped for this listing — your coordinator has been notified.</div>`;
         }
       } catch(e) {
         alert('Error: ' + e.message);
