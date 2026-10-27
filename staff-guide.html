@@ -72,6 +72,18 @@ strong{color:var(--text)}
 
 .divider{border:none;border-top:1px solid var(--border);margin:32px 0}
 
+/* search */
+.search-wrap{padding:0 16px 16px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+.search-wrap input{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
+.search-wrap input:focus{outline:none;border-color:var(--blue);background:var(--surface)}
+.search-results{padding:0 16px}
+.search-results a{padding:8px;margin-bottom:2px}
+.search-results .sr-title{font-weight:600;color:var(--navy)}
+.search-results .sr-parent{font-size:11px;color:var(--muted)}
+.search-results .sr-snip{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.search-empty{padding:6px 8px;font-size:13px;color:var(--muted)}
+mark{background:#FDE68A;color:inherit;border-radius:2px;padding:0 1px}
+
 @media print{
   .sidebar{display:none}
   .content{padding:20px;max-width:100%}
@@ -94,6 +106,10 @@ strong{color:var(--text)}
 <div class="layout">
 
   <nav class="sidebar">
+    <div class="search-wrap">
+      <input type="search" id="guide-search" placeholder="Search the guide…  ( / )" autocomplete="off" aria-label="Search the guide">
+    </div>
+    <div class="search-results" id="search-results" hidden></div>
     <div class="sidebar-section">
       <div class="sidebar-label">Getting Started</div>
       <a href="#overview">Overview</a>
@@ -107,6 +123,7 @@ strong{color:var(--text)}
       <a href="#new-listing">Adding a Listing</a>
       <a href="#new-contract">Adding a Contract</a>
       <a href="#transaction-stages">Transaction Stages</a>
+      <a href="#printing-forms">Printing Forms</a>
       <a href="#untracked">Untracked Listings</a>
       <a href="#mismatches">Mismatches</a>
       <a href="#caravan">Caravan</a>
@@ -190,6 +207,7 @@ strong{color:var(--text)}
     <h1 id="overview">Adams Cameron Staff Guide</h1>
     <p class="lead">This guide covers the internal tools used by Adams Cameron &amp; Co. staff — coordinators, managers, and administrators — to manage transactions, floor time, lockboxes, and agent notices.</p>
     <div class="note">Looking for the full catalog of Workshop tools available to all agents (not just staff operations)? See the <a href="./workshop-guide.html">Workshop Guide</a>.</div>
+    <p>To find something quickly, type in the <strong>Search the guide</strong> box at the top of the menu (or press <strong>/</strong>).</p>
 
     <h2 id="roles">Roles &amp; Access</h2>
     <p>Every staff member signs in with their <strong>@adamscameron.com</strong> Google account. What you can see and do depends on your assigned role.</p>
@@ -313,6 +331,21 @@ strong{color:var(--text)}
       <li><strong>Under Contract</strong> → <strong>Closed</strong> — click <em>Mark Closed</em> in the drawer; enter the closing date and final sale price</li>
     </ol>
     <p>Transactions can also be marked as <strong>Expired</strong>, <strong>Withdrawn</strong>, or <strong>Cancelled</strong> from the drawer if the listing or contract falls through.</p>
+
+    <h3 id="printing-forms">Printing Forms</h3>
+    <p><span class="label-pill pill-all">All Staff</span></p>
+    <p>After you record certain actions, the confirmation screen offers a <strong>Print</strong> button for the matching office form:</p>
+    <ul>
+      <li><strong>Closing</strong> → Commission Disbursement Form</li>
+      <li><strong>Expired</strong>, <strong>Withdrawn</strong>, <strong>Fall Through</strong>, <strong>Return to Market</strong>, or a <strong>Change</strong> to an Under Contract transaction → Delayed Contract Closing Form</li>
+    </ul>
+    <p>If you clicked <strong>Done</strong> before printing, open the transaction's action menu again and choose the print item:</p>
+    <ul>
+      <li><strong>Delayed Closing Form</strong> — Active, Under Contract, Withdrawn, and Temporarily Off Market transactions</li>
+      <li><strong>Commission Disclosure</strong> — Closed transactions</li>
+      <li><strong>Print Listing / Contract Form</strong> — Active, Under Contract, and Closed transactions</li>
+    </ul>
+    <div class="note"><strong>Note:</strong> A reprinted form shows the transaction as it is <em>now</em>. The date is the day you print, and the status is the current one. For example, after a fall-through the listing is Active again, so the form shows "Active". Write the original date and status on the printout if you need them.</div>
 
     <h3 id="untracked">Untracked DeltaNet Listings</h3>
     <p><span class="label-pill pill-all">All Staff</span></p>
@@ -723,6 +756,140 @@ const obs = new IntersectionObserver(entries => {
   });
 }, { rootMargin: '-20% 0px -70% 0px' });
 headings.forEach(h => obs.observe(h));
+</script>
+<script>
+// Guide search: index the text under each heading, list matches in the sidebar
+(function () {
+  const main = document.querySelector('main.content');
+  const box = document.getElementById('guide-search');
+  const results = document.getElementById('search-results');
+  const navSections = document.querySelectorAll('.sidebar .sidebar-section');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const reEsc = s => s.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&');
+
+  // Split the page into sections at each h1/h2/h3
+  const sections = [];
+  let current = null, parent = '';
+  const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeType === 1) {
+      if (/^H[123]$/.test(n.tagName)) {
+        const title = n.textContent.trim();
+        if (!n.id) {
+          const slug = 'sec-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          let id = slug, k = 2;
+          while (document.getElementById(id)) id = slug + '-' + k++;
+          n.id = id;
+        }
+        if (n.tagName !== 'H3') parent = title;
+        current = { el: n, title, parent: n.tagName === 'H3' ? parent : '', text: '' };
+        sections.push(current);
+      }
+    } else if (current && !current.el.contains(n)) {
+      current.text += n.nodeValue;
+    }
+  }
+  sections.forEach(s => {
+    s.text = s.text.replace(/\s+/g, ' ').trim();
+    s.lower = s.text.toLowerCase();
+    s.lowerTitle = s.title.toLowerCase();
+  });
+
+  let marks = [];
+  function clearMarks() {
+    marks.forEach(m => {
+      const p = m.parentNode;
+      if (!p) return;
+      p.replaceChild(document.createTextNode(m.textContent), m);
+      p.normalize();
+    });
+    marks = [];
+  }
+
+  // Wrap matches in <mark> from a section's heading up to the next heading
+  function highlight(sec, words) {
+    clearMarks();
+    const next = sections[sections.indexOf(sec) + 1];
+    const re = new RegExp('(' + words.map(reEsc).join('|') + ')', 'gi');
+    const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+    w.currentNode = sec.el;
+    const nodes = [];
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (next && (next.el.contains(n) || (next.el.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING))) break;
+      if (n.nodeValue.match(re)) nodes.push(n);
+    }
+    nodes.forEach(n => {
+      const frag = document.createDocumentFragment();
+      n.nodeValue.split(re).forEach((part, i) => {
+        if (!part) return;
+        if (i % 2) {
+          const m = document.createElement('mark');
+          m.textContent = part;
+          marks.push(m);
+          frag.appendChild(m);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+      n.parentNode.replaceChild(frag, n);
+    });
+  }
+
+  function snippet(sec, words) {
+    let at = -1;
+    words.forEach(w => { const i = sec.lower.indexOf(w); if (i >= 0 && (at < 0 || i < at)) at = i; });
+    const start = Math.max(0, at - 40);
+    let s = esc(sec.text.slice(start, start + 140));
+    words.forEach(w => { s = s.replace(new RegExp('(' + reEsc(esc(w)) + ')', 'gi'), '<mark>$1</mark>'); });
+    return (start > 0 ? '…' : '') + s + (start + 140 < sec.text.length ? '…' : '');
+  }
+
+  let lastWords = [];
+  function run() {
+    const q = box.value.trim().toLowerCase();
+    if (!q) {
+      results.hidden = true;
+      navSections.forEach(s => s.hidden = false);
+      clearMarks();
+      return;
+    }
+    const words = q.split(/\s+/);
+    lastWords = words;
+    // Every word must appear; sections whose heading matches come first
+    const hits = sections
+      .filter(s => words.every(w => s.lowerTitle.includes(w) || s.lower.includes(w)))
+      .map(s => ({ s, score: words.filter(w => s.lowerTitle.includes(w)).length }))
+      .sort((a, b) => b.score - a.score);
+    navSections.forEach(s => s.hidden = true);
+    results.hidden = false;
+    results.innerHTML = hits.length
+      ? hits.slice(0, 40).map(h =>
+          '<a href="#' + h.s.el.id + '" data-i="' + sections.indexOf(h.s) + '">' +
+          '<span class="sr-title">' + esc(h.s.title) + '</span>' +
+          (h.s.parent ? ' <span class="sr-parent">· ' + esc(h.s.parent) + '</span>' : '') +
+          '<span class="sr-snip">' + snippet(h.s, words) + '</span></a>').join('')
+      : '<div class="search-empty">No matches</div>';
+  }
+
+  let timer;
+  box.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 150); });
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { box.value = ''; run(); box.blur(); }
+  });
+  results.addEventListener('click', e => {
+    const a = e.target.closest('a[data-i]');
+    if (!a) return;
+    e.preventDefault();
+    const sec = sections[+a.dataset.i];
+    highlight(sec, lastWords);
+    window.scrollTo({ top: sec.el.getBoundingClientRect().top + window.scrollY - 70, behavior: 'smooth' });
+    history.replaceState(null, '', '#' + sec.el.id);
+  });
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) { e.preventDefault(); box.focus(); }
+  });
+})();
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Staff Guide',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>

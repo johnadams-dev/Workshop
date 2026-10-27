@@ -80,6 +80,18 @@ strong{color:var(--text)}
 
 .divider{border:none;border-top:1px solid var(--border);margin:32px 0}
 
+/* search */
+.search-wrap{padding:0 16px 16px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+.search-wrap input{width:100%;padding:8px 10px;font:inherit;font-size:13px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
+.search-wrap input:focus{outline:none;border-color:var(--blue);background:var(--surface)}
+.search-results{padding:0 16px}
+.search-results a{padding:8px;margin-bottom:2px}
+.search-results .sr-title{font-weight:600;color:var(--navy)}
+.search-results .sr-parent{font-size:11px;color:var(--muted)}
+.search-results .sr-snip{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.search-empty{padding:6px 8px;font-size:13px;color:var(--muted)}
+mark{background:#FDE68A;color:inherit;border-radius:2px;padding:0 1px}
+
 @media print{
   .sidebar{display:none}
   .content{padding:20px;max-width:100%}
@@ -102,6 +114,10 @@ strong{color:var(--text)}
 <div class="layout">
 
   <nav class="sidebar">
+    <div class="search-wrap">
+      <input type="search" id="guide-search" placeholder="Search the guide…  ( / )" autocomplete="off" aria-label="Search the guide">
+    </div>
+    <div class="search-results" id="search-results" hidden></div>
     <div class="sidebar-section">
       <div class="sidebar-label">Getting Started</div>
       <a href="#overview">Overview</a>
@@ -184,6 +200,8 @@ strong{color:var(--text)}
     <p>Whether you're preparing a listing presentation, calculating contract deadlines, generating a market report, or building a business plan, John's Workshop has a tool for it. Many tools are powered by AI (specifically Claude, Anthropic's AI assistant) and connect directly to DeltaNet, Form Simplicity, the MLS systems, and other platforms you already use.</p>
 
     <div class="note"><strong>Access:</strong> Log in at johnadams.org using your Adams Cameron credentials. Individual agents log in with their own credentials and see tools relevant to their role; some tools shown here (marked <span class="label-pill pill-mgr">Manager / Staff</span>) are only visible to staff and managers.</div>
+
+    <p>To find something quickly, type in the <strong>Search the guide</strong> box at the top of the menu (or press <strong>/</strong>).</p>
 
     <h2 id="organization">How the Workshop Is Organized</h2>
     <p>The Workshop is divided into six sections based on what you're trying to accomplish:</p>
@@ -283,7 +301,7 @@ strong{color:var(--text)}
     </ul>
     <a href="./deltanet-profile-audit.html" class="tool-open">Open DeltaNet Profile Audit →</a>
 
-    <h3 id="hold-open-house"><a href="./hold-open-house.html">Hold an Open House</a> <span class="label-pill pill-soon">Beta</span></h3>
+    <h3 id="hold-open-house"><a href="./hold-open-house.html">Hold an Open House</a></h3>
     <p><strong>What it does:</strong> Hosting an open house is an opportunity to market to your sphere, put your name in front of buyers, and bring in new prospects. This tool shows every listing other agents have made available to hold open, lets you reserve a date, and then guides you with a dated plan: telling your sphere, advance signage, letting the neighbors know, printing and packing, running the open house, and following up. The visitors you meet are yours.</p>
     <p><strong>Who uses it:</strong> Any agent who wants to host — no production minimum, and no limit on how many you hold. Listing agents hosting their own listing use <a href="#open-house-listings">Open House Listing Manager</a> instead (same plan).</p>
     <p><strong>When to use it:</strong> Ideally at least 5 days before the open house, so there's time for social posts and signs. Shorter notice is fine — steps whose dates have passed show as catch-up tasks due today.</p>
@@ -374,7 +392,7 @@ strong{color:var(--text)}
     </ul>
     <a href="./camerons-stage.html" class="tool-open">Open Cameron's Stage →</a>
 
-    <h3 id="open-house-listings"><a href="./open-house-listings.html">Open House Listing Manager</a> <span class="label-pill pill-soon">Beta</span></h3>
+    <h3 id="open-house-listings"><a href="./open-house-listings.html">Open House Listing Manager</a></h3>
     <p><strong>What it does:</strong> Lets you offer your listings to be held open by other agents. You can't hold every listing open yourself; your seller gets the exposure and so do you. You mark the dates each listing is available on a calendar, other agents reserve them from <a href="#hold-open-house">Hold an Open House</a>, and you get a short report after each one. <strong>The host keeps the visitors they meet; you get the report.</strong></p>
     <p><strong>Who uses it:</strong> Listing agents, for their Active and Coming Soon listings in Daily Desk. Team leaders see their teammates' listings too.</p>
     <p><strong>When to use it:</strong> As soon as a listing is ready to be shown. Coming Soon listings can have dates set in advance; open houses can be reserved once the listing is Active.</p>
@@ -494,7 +512,7 @@ strong{color:var(--text)}
     </ul>
     <a href="./foundation.html" class="tool-open">Open Adams Cameron Foundation →</a>
 
-    <h3 id="customer-portal"><a href="./portal-share.html">Customer Portal</a> <span class="label-pill pill-soon">Beta</span></h3>
+    <h3 id="customer-portal"><a href="./portal-share.html">Customer Portal</a></h3>
     <p><strong>What it does:</strong> Gives your buyers and sellers their own page about their home with Adams Cameron. They see you front and centre (photo, call, text, email), where their deal stands and what's next, and the details that matter at each stage:</p>
     <ul>
       <li><strong>On the market:</strong> links to the listing on adamscameron.com and on your website, the MLS boards it's on, price and days on market, price changes, upcoming open houses, the virtual tour and how many times it's been viewed, and the marketing plan.</li>
@@ -516,7 +534,7 @@ strong{color:var(--text)}
     </ul>
     <a href="./portal-share.html" class="tool-open">Open Customer Portal →</a>
 
-    <h3 id="vendor-directory"><a href="./vendors.html">Vendor Directory</a> <span class="label-pill pill-soon">Beta</span></h3>
+    <h3 id="vendor-directory"><a href="./vendors.html">Vendor Directory</a></h3>
     <p><strong>What it does:</strong> A list of vendors our agents and their customers have used: roofers, plumbers, inspectors, lenders, title companies and more. It replaces the old AppSheet "Vendors" app. Use it when a buyer who's just moved in needs a plumber, or a seller needs a handyman before listing.</p>
     <p><strong>Where to find it:</strong> open <strong>Vendor Directory</strong> from the Tools page (Maintain Relationships). It has two tabs for agents:</p>
     <ul>
@@ -625,6 +643,7 @@ strong{color:var(--text)}
     <ul>
       <li><strong>Does each office see its own data?</strong><br>Yes. Daily Desk is scoped by office, so each location sees its own listings and contracts.</li>
       <li><strong>What are "today's action items"?</strong><br>Items that require attention that day — contract deadlines, expiring listings, or other time-sensitive matters.</li>
+      <li><strong>I closed the window before printing the form. Can I get it back?</strong><br>Yes. Open the transaction's action menu and choose the print item (Delayed Closing Form, Commission Disclosure, or Print Listing / Contract Form). See <a href="./staff-guide.html#printing-forms">Printing Forms</a> in the Staff Reference Guide.</li>
     </ul>
     <a href="./daily-desk.html" class="tool-open">Open Daily Desk →</a>
 
@@ -766,10 +785,6 @@ strong{color:var(--text)}
       <p>The Workshop's AI features are built for professional use. Avoid entering personally identifiable client information (full names, SSNs, financial account numbers) into AI tools unless the tool specifically requests it for a defined purpose.</p>
     </div>
     <div class="faq-item">
-      <div class="faq-q">What does "Beta" mean next to a tool?</div>
-      <p>Tools marked Beta are functional but still being actively refined. You may encounter occasional issues. Use the <a href="./feedback.html">Feedback &amp; Support</a> tool to report any problems you find — your input helps improve the tool.</p>
-    </div>
-    <div class="faq-item">
       <div class="faq-q">I'm on a team. Why can't I see my partner's listings?</div>
       <p>Only <strong>team leaders</strong> see their teammates' listings; team members see the ones they're named on. In a partnership both partners should be leaders. Your team and roles come from DeltaNet — if they're wrong, contact your office, and the change shows up the next morning. See <a href="#teams">Working as a Team</a>.</p>
     </div>
@@ -856,6 +871,140 @@ const obs = new IntersectionObserver(entries => {
   });
 }, { rootMargin: '-20% 0px -70% 0px' });
 headings.forEach(h => obs.observe(h));
+</script>
+<script>
+// Guide search: index the text under each heading, list matches in the sidebar
+(function () {
+  const main = document.querySelector('main.content');
+  const box = document.getElementById('guide-search');
+  const results = document.getElementById('search-results');
+  const navSections = document.querySelectorAll('.sidebar .sidebar-section');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const reEsc = s => s.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&');
+
+  // Split the page into sections at each h1/h2/h3
+  const sections = [];
+  let current = null, parent = '';
+  const walker = document.createTreeWalker(main, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeType === 1) {
+      if (/^H[123]$/.test(n.tagName)) {
+        const title = n.textContent.trim();
+        if (!n.id) {
+          const slug = 'sec-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          let id = slug, k = 2;
+          while (document.getElementById(id)) id = slug + '-' + k++;
+          n.id = id;
+        }
+        if (n.tagName !== 'H3') parent = title;
+        current = { el: n, title, parent: n.tagName === 'H3' ? parent : '', text: '' };
+        sections.push(current);
+      }
+    } else if (current && !current.el.contains(n)) {
+      current.text += n.nodeValue;
+    }
+  }
+  sections.forEach(s => {
+    s.text = s.text.replace(/\s+/g, ' ').trim();
+    s.lower = s.text.toLowerCase();
+    s.lowerTitle = s.title.toLowerCase();
+  });
+
+  let marks = [];
+  function clearMarks() {
+    marks.forEach(m => {
+      const p = m.parentNode;
+      if (!p) return;
+      p.replaceChild(document.createTextNode(m.textContent), m);
+      p.normalize();
+    });
+    marks = [];
+  }
+
+  // Wrap matches in <mark> from a section's heading up to the next heading
+  function highlight(sec, words) {
+    clearMarks();
+    const next = sections[sections.indexOf(sec) + 1];
+    const re = new RegExp('(' + words.map(reEsc).join('|') + ')', 'gi');
+    const w = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+    w.currentNode = sec.el;
+    const nodes = [];
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (next && (next.el.contains(n) || (next.el.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING))) break;
+      if (n.nodeValue.match(re)) nodes.push(n);
+    }
+    nodes.forEach(n => {
+      const frag = document.createDocumentFragment();
+      n.nodeValue.split(re).forEach((part, i) => {
+        if (!part) return;
+        if (i % 2) {
+          const m = document.createElement('mark');
+          m.textContent = part;
+          marks.push(m);
+          frag.appendChild(m);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+      n.parentNode.replaceChild(frag, n);
+    });
+  }
+
+  function snippet(sec, words) {
+    let at = -1;
+    words.forEach(w => { const i = sec.lower.indexOf(w); if (i >= 0 && (at < 0 || i < at)) at = i; });
+    const start = Math.max(0, at - 40);
+    let s = esc(sec.text.slice(start, start + 140));
+    words.forEach(w => { s = s.replace(new RegExp('(' + reEsc(esc(w)) + ')', 'gi'), '<mark>$1</mark>'); });
+    return (start > 0 ? '…' : '') + s + (start + 140 < sec.text.length ? '…' : '');
+  }
+
+  let lastWords = [];
+  function run() {
+    const q = box.value.trim().toLowerCase();
+    if (!q) {
+      results.hidden = true;
+      navSections.forEach(s => s.hidden = false);
+      clearMarks();
+      return;
+    }
+    const words = q.split(/\s+/);
+    lastWords = words;
+    // Every word must appear; sections whose heading matches come first
+    const hits = sections
+      .filter(s => words.every(w => s.lowerTitle.includes(w) || s.lower.includes(w)))
+      .map(s => ({ s, score: words.filter(w => s.lowerTitle.includes(w)).length }))
+      .sort((a, b) => b.score - a.score);
+    navSections.forEach(s => s.hidden = true);
+    results.hidden = false;
+    results.innerHTML = hits.length
+      ? hits.slice(0, 40).map(h =>
+          '<a href="#' + h.s.el.id + '" data-i="' + sections.indexOf(h.s) + '">' +
+          '<span class="sr-title">' + esc(h.s.title) + '</span>' +
+          (h.s.parent ? ' <span class="sr-parent">· ' + esc(h.s.parent) + '</span>' : '') +
+          '<span class="sr-snip">' + snippet(h.s, words) + '</span></a>').join('')
+      : '<div class="search-empty">No matches</div>';
+  }
+
+  let timer;
+  box.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 150); });
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { box.value = ''; run(); box.blur(); }
+  });
+  results.addEventListener('click', e => {
+    const a = e.target.closest('a[data-i]');
+    if (!a) return;
+    e.preventDefault();
+    const sec = sections[+a.dataset.i];
+    highlight(sec, lastWords);
+    window.scrollTo({ top: sec.el.getBoundingClientRect().top + window.scrollY - 70, behavior: 'smooth' });
+    history.replaceState(null, '', '#' + sec.el.id);
+  });
+  document.addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) { e.preventDefault(); box.focus(); }
+  });
+})();
 </script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Workshop Guide',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
