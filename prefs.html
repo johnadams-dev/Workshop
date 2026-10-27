@@ -192,6 +192,17 @@
       <div id="gapsList"></div>
     </div>
 
+    <div class="card" id="mismatchCard" style="display:none;">
+      <div class="card-title">⚡ Your Price Mismatches</div>
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px;line-height:1.6;">
+        These listings have different prices in Stellar and Daytona. If they're meant to differ
+        (for example, a commercial listing priced per SF per month in one MLS and per year in
+        the other), stop alerts for it: you won't be emailed about it again, and your office
+        coordinator will be notified.
+      </p>
+      <div id="mismatchList"></div>
+    </div>
+
     <!-- Notification settings card -->
     <div class="card">
       <div class="card-title">🔔 Notification Settings</div>
@@ -267,6 +278,8 @@
     // ?stop=<listing id>: opened from an alert email's "Stop alerts for this
     // listing" link, so that listing is shown first with the button to stop.
     const stopListing = params.get('stop');
+    // ?stopPrice=<mismatch id>: the same, from a price-mismatch row.
+    const stopPrice = parseInt(params.get('stopPrice'), 10) || null;
 
     let agentData = null;
     const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -297,6 +310,7 @@
         agentData = data;
         renderPrefs(data);
         await loadGaps();
+        await loadMismatches();
         showMain();
       } catch(e) {
         showError(e.message);
@@ -337,6 +351,67 @@
         if (stopListing) setTimeout(() => document.getElementById('gapsCard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       } catch(e) {
         console.warn('Could not load gaps:', e.message);
+      }
+    }
+
+    async function loadMismatches() {
+      try {
+        const r = await fetch(`${PROXY}/agent/mismatches?token=${encodeURIComponent(token)}`);
+        if (!r.ok) return;
+        const list = (await r.json()).mismatches || [];
+        const card = document.getElementById('mismatchCard'), el = document.getElementById('mismatchList');
+        if (stopPrice) {
+          const i = list.findIndex(m => m.id === stopPrice);
+          if (i > 0) list.unshift(...list.splice(i, 1));
+          if (i < 0) {
+            card.style.display = 'block';
+            el.innerHTML = `<div style="padding:12px;border:1px solid #86efac;border-radius:8px;margin-bottom:10px;background:#f0fdf4;color:#15803d;font-size:13px;font-weight:600;">✓ Alerts for that listing's price are already off, or the prices match now.</div>`;
+          }
+        }
+        if (!list.length) return;
+        const money = v => v == null ? '—' : '$' + Number(v).toLocaleString();
+        card.style.display = 'block';
+        el.innerHTML += list.map(m => {
+          const mine = m.id === stopPrice;
+          return `
+          <div id="mm-${m.id}" style="padding:12px;border:${mine ? '2px solid #d97706' : '1px solid #fde68a'};border-radius:8px;margin-bottom:10px;background:#fefce8;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div>
+                <div style="font-weight:600;font-size:14px;color:#1e293b;">${esc(m.address || m.stellar_listing_id)}</div>
+                <div style="font-size:12px;color:#92400e;margin-top:2px;">Stellar ${money(m.stellar_price)} · Daytona DBAR ${money(m.dbar_price)}</div>
+              </div>
+              <button onclick="suppressMismatch(${m.id})"
+                style="background:${mine ? '#d97706' : 'none'};border:1px solid #fbbf24;color:${mine ? '#fff' : '#92400e'};border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                Stop alerts for this listing
+              </button>
+            </div>
+          </div>`;
+        }).join('');
+        if (stopPrice) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      } catch (e) {
+        console.warn('Could not load price mismatches:', e.message);
+      }
+    }
+
+    async function suppressMismatch(id) {
+      const reason = prompt("Stop price alerts for this listing? You won't be emailed about it again.\n\nOptional: why do the prices differ (e.g. price per SF per month vs. per year)?");
+      if (reason === null) return;
+      try {
+        const r = await fetch(`${PROXY}/agent/suppress-mismatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, mismatch_id: id, reason: reason || '' }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Failed to stop alerts');
+        const el = document.getElementById(`mm-${id}`);
+        if (el) {
+          el.style.background = '#f0fdf4';
+          el.style.borderColor = '#86efac';
+          el.innerHTML = `<div style="color:#15803d;font-size:13px;font-weight:600;">✓ Alerts stopped for this listing — your coordinator has been notified.</div>`;
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
       }
     }
 
