@@ -2722,11 +2722,12 @@ function renderOfficesList() {
       ${isAdmin ? `
         <div class="fg" style="margin-bottom:8px">
           <div class="field"><label>Phone</label><input type="tel" id="of-phone-${o.id}" value="${esc(o.phone || '')}" placeholder="(386) 555-0100"></div>
+          <div class="field"><label>Fax</label><input type="tel" id="of-fax-${o.id}" value="${esc(o.fax || '')}" placeholder="(386) 555-0101"></div>
           <div class="field"><label>Address</label><input type="text" id="of-address-${o.id}" value="${esc(o.address || '')}" placeholder="Street, City, FL Zip"></div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="saveOffice(${o.id})">Save</button>
       ` : `
-        <div style="font-size:12px;color:var(--muted)">${[o.phone ? fmtPhone(o.phone) : '', o.address].filter(Boolean).join(' · ') || 'No phone/address on file'}</div>
+        <div style="font-size:12px;color:var(--muted)">${[o.phone ? fmtPhone(o.phone) : '', o.fax ? 'Fax ' + fmtPhone(o.fax) : '', o.address].filter(Boolean).join(' · ') || 'No phone/address on file'}</div>
       `}
     </div>
   `).join('') || `<div style="padding:24px;text-align:center;color:var(--muted)">No offices found.</div>`;
@@ -2734,10 +2735,11 @@ function renderOfficesList() {
 
 async function saveOffice(id) {
   const phone   = document.getElementById(`of-phone-${id}`).value.trim();
+  const fax     = document.getElementById(`of-fax-${id}`).value.trim();
   const address = document.getElementById(`of-address-${id}`).value.trim();
   try {
     const r = await fetch(`${PROXY_URL}/roster/offices/${id}`, {
-      method: 'PUT', headers: H(), body: JSON.stringify({ phone: phone || null, address: address || null }),
+      method: 'PUT', headers: H(), body: JSON.stringify({ phone: phone || null, fax: fax || null, address: address || null }),
     });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + r.status); }
     const updated = await r.json();

@@ -559,7 +559,7 @@ async function submitCompose() {
 /* ── Offices tab — pick an office, see its address/phone + management team ── */
 function renderOfficesTab(q) {
   const offices = [...STATE.offices].sort((a, b) => a.name.localeCompare(b.name))
-    .filter(o => matchesSearch([o.name, o.address, o.phone], q));
+    .filter(o => matchesSearch([o.name, o.address, o.phone, o.fax], q));
 
   document.getElementById('offices-pick-chips').innerHTML = offices.length
     ? offices.map(o => `<div class="chip ${STATE.selectedOfficeName === o.name ? 'active' : ''}" onclick="selectOffice('${esc(o.name).replace(/'/g,"\\'")}')">${esc(o.name)}</div>`).join('')
@@ -593,7 +593,8 @@ function renderOfficeDetail() {
       <div class="name">${esc(office.name)}</div>
       ${office.address ? `<div class="line">${esc(office.address)}</div>` : ''}
       ${office.phone ? `<div class="line"><a href="tel:${esc(office.phone)}">${esc(fmtPhone(office.phone))}</a></div>` : ''}
-      ${(!office.address && !office.phone) ? `<div class="line">No phone/address on file yet.</div>` : ''}
+      ${office.fax ? `<div class="line">Fax ${esc(fmtPhone(office.fax))}</div>` : ''}
+      ${(!office.address && !office.phone && !office.fax) ? `<div class="line">No phone/address on file yet.</div>` : ''}
     </div>
     <div class="section-title">Management Team <span class="count">${staff.length ? `(${staff.length})` : ''}</span></div>
     ${staff.length ? staff.map(staffRow).join('') : `<div class="empty">No staff assigned to this office.</div>`}
