@@ -5273,6 +5273,7 @@ function openNewContractModal() {
 
   populateCustomers('nc-acc');
   populateCustomers('nc-ext');
+  populateCustomers('nc-ext-seller');
 
   document.getElementById('newContractModal').classList.add('open');
 }
@@ -5653,6 +5654,9 @@ async function ncSelectFsTransaction(index) {
     ncFsDetail = await POST('/fs/get-trans-by-id', { transId: tx.id });
     if (ncFsDetail?.buyerLandlordName || ncFsDetail?.buyerParty1Email) {
       populateCustomers('nc-ext', [{ name: ncFsDetail.buyerLandlordName || '', email: ncFsDetail.buyerParty1Email || '' }]);
+    }
+    if (ncFsDetail?.sellerLandlordName || ncFsDetail?.sellerParty1Email) {
+      populateCustomers('nc-ext-seller', [{ name: ncFsDetail.sellerLandlordName || '', email: ncFsDetail.sellerParty1Email || '' }]);
     }
   } catch (_) {}
 }
