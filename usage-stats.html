@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script src="auth.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -50,6 +51,11 @@
       font-weight: 500; font-size: .95rem; display: flex; align-items: center; justify-content: space-between;
     }
     .card-head .total { font-size: .78rem; color: var(--muted); font-weight: 400; }
+
+    /* usage-over-time chart */
+    .chart-card { margin-bottom: 1.5rem; }
+    .chart-wrap { position: relative; height: 300px; padding: 1rem 1.25rem; }
+    @media (max-width: 680px) { .chart-wrap { height: 240px; padding: .75rem; } }
 
     table { width: 100%; border-collapse: collapse; font-size: .87rem; }
     th { text-align: left; padding: .6rem 1.25rem; color: var(--muted); font-weight: 500; font-size: .78rem;
@@ -149,10 +155,16 @@
     <p class="subtitle" id="subtitle">Loading…</p>
 
     <div class="period-tabs">
+      <button class="tab" data-days="today">Today</button>
       <button class="tab" data-days="7">Last 7 days</button>
       <button class="tab active" data-days="30">Last 30 days</button>
       <button class="tab" data-days="90">Last 90 days</button>
       <button class="tab" data-days="">All time</button>
+    </div>
+
+    <div class="card chart-card">
+      <div class="card-head">Usage Over Time <span class="total" id="chart-total"></span></div>
+      <div class="chart-wrap"><canvas id="usage-chart"></canvas></div>
     </div>
 
     <div class="grid">
@@ -216,7 +228,8 @@ document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    _days = btn.dataset.days ? parseInt(btn.dataset.days, 10) : '';
+    const d = btn.dataset.days;
+    _days = d === 'today' ? 'today' : d ? parseInt(d, 10) : '';
     loadStats(_days);
   });
 });
@@ -273,7 +286,9 @@ let _crossRows = [];
 function renderStats(data) {
   _crossRows = data.cross || [];
 
-  const period = data.period.days === 'all' ? 'all time' : `last ${data.period.days} days`;
+  const period = data.period.days === 'all'   ? 'all time'
+               : data.period.days === 'today' ? 'today'
+               : `last ${data.period.days} days`;
   const total = data.by_tool.reduce((s, r) => s + r.count, 0);
   document.getElementById('subtitle').textContent =
     `${total.toLocaleString()} total visits — ${period}`;
@@ -315,6 +330,94 @@ function renderStats(data) {
       <span class="email-cell" title="${esc(r.agent_email || '')}">${esc(shortEmail(r.agent_email))}</span>
       <span class="time-str">${fmtTime(r.created_at)}</span>
     </div>`).join('') || '<div class="feed-row"><span colspan="3" class="muted-val">No activity yet</span></div>';
+
+  renderChart(data.series);
+}
+
+// ── Usage-over-time chart ─────────────────────────────────────────────────────
+// Stacked lines, one band per tool, so the top edge is total usage. The
+// busiest tools get their own band; the rest share "Other".
+const CHART_TOP_N = 7;
+const CHART_COLORS = ['#c9a84c', '#2d2d4a', '#1d9e75', '#c0602b', '#5a7bb5', '#9b5a8c', '#7a9a3a'];
+const CHART_OTHER = '#c8c4b8';
+let _chart = null;
+
+// Buckets arrive as Eastern local "YYYY-MM-DDTHH:MI"; read them as local
+// wall-clock time rather than UTC.
+function bucketDate(b) {
+  const [y, m, d, h] = b.split(/[-T:]/).map(Number);
+  return new Date(y, m - 1, d, h);
+}
+
+function bucketLabel(b, unit) {
+  const d = bucketDate(b);
+  if (unit === 'hour') return d.toLocaleTimeString('en-US', { hour: 'numeric' });
+  const opts = { month: 'short', day: 'numeric' };
+  if (unit === 'week') opts.year = '2-digit';
+  return d.toLocaleDateString('en-US', opts);
+}
+
+function renderChart(series) {
+  if (typeof Chart === 'undefined' || !series) return;
+  const { unit, buckets, rows } = series;
+  const idx = new Map(buckets.map((b, i) => [b, i]));
+
+  const totals = new Map();
+  rows.forEach(r => totals.set(r.tool, (totals.get(r.tool) || 0) + r.count));
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  const top = ranked.slice(0, CHART_TOP_N);
+  const hasOther = ranked.length > top.length;
+
+  const bands = top.map((tool, i) => ({ tool, label: tool, color: CHART_COLORS[i], data: buckets.map(() => 0) }));
+  if (hasOther) bands.push({ tool: null, label: 'Other', color: CHART_OTHER, data: buckets.map(() => 0) });
+  rows.forEach(r => {
+    const i = idx.get(r.bucket);
+    if (i === undefined) return;
+    const band = bands.find(b => b.tool === r.tool) || (hasOther ? bands[bands.length - 1] : null);
+    if (band) band.data[i] += r.count;
+  });
+
+  const per = { hour: 'hourly', day: 'daily', week: 'weekly' }[unit];
+  document.getElementById('chart-total').textContent = ranked.length ? `${per} visits by tool` : 'no visits';
+
+  if (_chart) _chart.destroy();
+  _chart = new Chart(document.getElementById('usage-chart'), {
+    type: 'line',
+    data: {
+      labels: buckets.map(b => bucketLabel(b, unit)),
+      datasets: bands.map((b, i) => ({
+        label: b.label,
+        data: b.data,
+        borderColor: b.color,
+        backgroundColor: b.color + '99',
+        borderWidth: 1.5,
+        fill: i === 0 ? 'origin' : '-1',
+        tension: 0.25,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#8a8aa8', maxRotation: 0, autoSkipPadding: 12 } },
+        y: { stacked: true, beginAtZero: true, grid: { color: '#f0ece0' },
+             ticks: { color: '#8a8aa8', precision: 0 } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, color: '#5a5a78', font: { family: 'DM Sans' } } },
+        tooltip: {
+          itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
+          filter: item => item.raw > 0,
+          callbacks: {
+            footer: items => 'Total: ' + items.reduce((s, it) => s + it.raw, 0).toLocaleString(),
+          },
+        },
+      },
+    },
+  });
 }
 
 function esc(s) {
