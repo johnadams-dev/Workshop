@@ -2052,7 +2052,7 @@ tbody tr.clickable { cursor: pointer; }
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Listing Agent Email</span>
-              <input type="email" id="nc-ext-list-agent-email" placeholder="agent@brokerage.com">
+              <input type="email" id="nc-ext-list-agent-email" placeholder="agent@brokerage.com" onchange="checkOutsideAgentEmail(this)">
             </div>
             <div></div>
           </div>
@@ -3679,7 +3679,7 @@ function _buildCustomerRow(ns, idx, data = {}) {
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
         <span style="${lS}">Email</span>
-        <input type="email" class="cust-email" value="${escapeHtml(data.email||'')}" placeholder="Optional" style="${iS}">
+        <input type="email" class="cust-email" value="${escapeHtml(isPlaceholderEmail(data.email) ? '' : (data.email||''))}" placeholder="Optional — leave blank if none" onchange="checkCustomerEmail(this)" style="${iS}">
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;min-width:0;">
@@ -3705,6 +3705,42 @@ function _buildCustomerRow(ns, idx, data = {}) {
       <input type="tel" class="cust-phone" value="${escapeHtml(data.phone||'')}" placeholder="Optional" style="${iS}">
     </div>
   </div>`;
+}
+
+// Placeholder customer emails (none@none.com, our own addresses, …) are
+// treated as no email — same list as the server's customer-email.js, which
+// also drops them on save. A customer with no email is left blank.
+const PLACEHOLDER_EMAIL_LOCAL   = /^(none|noemail|no-email|no\.email|na|n\/a|nomail|test|unknown|email|noreply|no-reply)$/i;
+const PLACEHOLDER_EMAIL_DOMAINS = new Set(['none.com', 'noemail.com', 'example.com', 'test.com', 'email.com', 'na.com', 'adamscameron.com', 'adamscamerontitle.com']);
+const PLACEHOLDER_EMAILS        = new Set(['nana@gmail.com']);
+function isPlaceholderEmail(email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e) return false;
+  const [local, domain] = e.split('@');
+  return PLACEHOLDER_EMAILS.has(e) || PLACEHOLDER_EMAIL_LOCAL.test(local || '') || PLACEHOLDER_EMAIL_DOMAINS.has(domain);
+}
+function checkCustomerEmail(input) {
+  if (!isPlaceholderEmail(input.value)) return;
+  alert("Use the customer's own email address, or leave it blank if they don't have one.\n\nPlaceholder addresses (like none@none.com) and Adams Cameron addresses can't be used for a customer.");
+  input.value = '';
+  input.focus();
+}
+// The other brokerage's agent: one of our addresses means the agent is ours
+// (record the deal as in-house), and a placeholder gets them no email at all.
+function isCompanyEmail(email) {
+  const domain = String(email || '').trim().toLowerCase().split('@')[1];
+  return domain === 'adamscameron.com' || domain === 'adamscamerontitle.com';
+}
+function checkOutsideAgentEmail(input) {
+  if (isCompanyEmail(input.value)) {
+    alert("That's an Adams Cameron address. An outside agent needs their own brokerage email.\n\nIf the other agent is one of ours, record this as an in-house deal and choose them from our agents.");
+  } else if (isPlaceholderEmail(input.value)) {
+    alert("Use the agent's real email address, or leave it blank if you don't have it.\n\nPlaceholder addresses (like none@none.com) can't be used.");
+  } else {
+    return;
+  }
+  input.value = '';
+  input.focus();
 }
 
 function addCustomerRow(ns, data = {}) {
@@ -4747,7 +4783,7 @@ function amUpdateRepFields() {
       </div>
       <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
         <span class="field-label" style="${labelStyle}">Cooperating Agent Email</span>
-        <input type="email" id="am-coop-email" placeholder="agent@brokerage.com">
+        <input type="email" id="am-coop-email" placeholder="agent@brokerage.com" onchange="checkOutsideAgentEmail(this)">
       </div>`;
   } else {
     el.innerHTML = '';  // fsbo — no cooperating agent fields
@@ -5392,7 +5428,7 @@ function ncUpdateAccRepFields() {
       </div>
       <div class="field" style="display:flex; flex-direction:column; gap:5px; margin-bottom:14px;">
         <span class="field-label" style="${lblStyle}">Cooperating Agent Email</span>
-        <input type="email" id="nc-acc-coop-email" placeholder="agent@brokerage.com">
+        <input type="email" id="nc-acc-coop-email" placeholder="agent@brokerage.com" onchange="checkOutsideAgentEmail(this)">
       </div>`;
   } else {
     el.innerHTML = '';  // fsbo — no cooperating agent fields
