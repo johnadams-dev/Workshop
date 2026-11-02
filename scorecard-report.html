@@ -151,6 +151,11 @@ a.kpi-card:hover, a.kpi-card:focus-visible { border-color: var(--blue); outline:
   color: var(--text); font: inherit; font-size: 0.74rem; padding: 0.2rem 0.4rem;
 }
 .goal-edit-row input[type=number] { width: 90px; }
+.desk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0.9rem; margin-bottom: 1rem; }
+.desk-grid .panel { margin-bottom: 0; }
+.desk-value { font-size: 1.75rem; font-weight: 600; line-height: 1.1; margin: 0.25rem 0 0.1rem; }
+.desk-parts { font-size: 0.75rem; color: var(--text-muted); min-height: 1.1em; }
+tr.total-row td { font-weight: 600; border-top: 1px solid var(--ink-border); }
 
 /* ── Charts ── */
 .chart-wrap { position: relative; }
@@ -209,6 +214,11 @@ a.kpi-card:hover, a.kpi-card:focus-visible { border-color: var(--blue); outline:
       <select id="filter-office" onchange="loadData()" title="Office">
         <option value="">All Offices</option>
       </select>
+      <select id="filter-days" onchange="render()" title="Days shown" style="display:none">
+        <option value="30">Last 30 days</option>
+        <option value="90" selected>Last 90 days</option>
+        <option value="365">Last 365 days</option>
+      </select>
       <select id="filter-range" onchange="render()" title="Chart range" style="display:none">
         <option value="12">Last 12 months</option>
         <option value="24" selected>Last 24 months</option>
@@ -218,6 +228,7 @@ a.kpi-card:hover, a.kpi-card:focus-visible { border-color: var(--blue); outline:
       <nav class="view-links">
         <a href="#" id="link-scorecard">Scorecard</a>
         <a href="#all" id="link-all">All metrics</a>
+        <a href="#desk" id="link-desk">Daily Desk</a>
       </nav>
     </div>
 
@@ -340,8 +351,9 @@ async function loadOffices() {
 async function loadData() {
   const seq = ++_loadSeq;
   const out = document.getElementById("report-output");
-  if (_data) out.classList.add("refreshing"); // keep the previous render while refetching
-  else out.innerHTML = '<div class="loading">Loading…</div>';
+  const desk = currentRoute().view === "desk"; // that view loads its own data (loadDesk)
+  if (_data && !desk) out.classList.add("refreshing"); // keep the previous render while refetching
+  else if (!desk) out.innerHTML = '<div class="loading">Loading…</div>';
   const qs = new URLSearchParams({ end_month: document.getElementById("filter-month").value, months: MONTHS_FETCHED });
   const officeId = document.getElementById("filter-office").value;
   if (officeId) qs.set("office_id", officeId);
@@ -355,27 +367,36 @@ async function loadData() {
     render();
   } catch (e) {
     if (seq !== _loadSeq) return;
-    out.innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+    if (currentRoute().view !== "desk") out.innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
   } finally {
     out.classList.remove("refreshing");
   }
 }
 
-// ── Routing: "" = scorecard, "#m=<key>" = detail, "#all" = every metric ────
+// ── Routing: "" = scorecard, "#m=<key>" = detail, "#all" = every metric,
+// "#desk" = Daily Desk's nightly counts ────────────────────────────────────
 function currentRoute() {
   const h = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (h === "all") return { view: "all" };
+  if (h === "desk") return { view: "desk" };
   if (h.startsWith("m=")) return { view: "detail", key: h.slice(2) };
   return { view: "main" };
 }
 
+const MONTHLY_NOTE = "Office changes Listing Tours and the capture rates; the rest are company-wide.";
 function render() {
-  if (!_data) return;
   const route = currentRoute();
+  const desk = route.view === "desk";
   document.getElementById("filter-range").style.display = route.view === "detail" ? "" : "none";
+  document.getElementById("filter-days").style.display = desk ? "" : "none";
+  document.getElementById("filter-month").style.display = desk ? "none" : "";
+  document.getElementById("filters-note").textContent = desk ? "Counted every night after the listing sync, by Daily Desk's own rules. Office narrows the charts." : MONTHLY_NOTE;
   document.getElementById("link-scorecard").classList.toggle("current", route.view === "main");
   document.getElementById("link-all").classList.toggle("current", route.view === "all");
+  document.getElementById("link-desk").classList.toggle("current", desk);
   CHARTS.clear();
+  if (desk) { loadDesk(); return; }
+  if (!_data) return;
   const out = document.getElementById("report-output");
   if (route.view === "all") out.innerHTML = renderAllMetrics();
   else if (route.view === "detail") { out.innerHTML = renderDetail(route.key); loadOfficePanel(route.key); }
@@ -859,6 +880,100 @@ function renderAllMetrics() {
         </table>
       </div>
     </div>`).join("");
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Daily Desk — nightly counts of Daily Desk's work queues (GET /scorecard/
+// daily-counts, written by snapshotDailyCounts() in daily-desk-routes.js with
+// the same queries as the Daily Desk tabs). Lower is better for every one.
+// The office filter narrows the charts; the table always shows every office.
+// ════════════════════════════════════════════════════════════════════════════
+const DESK_PENDING = [
+  { label: "Waiting for manager review", note: "From Form Simplicity, once it makes this available to us." },
+];
+let _desk = {};      // days -> /scorecard/daily-counts response
+let _deskSeq = 0;
+
+async function loadDesk() {
+  const out = document.getElementById("report-output");
+  const days = document.getElementById("filter-days").value;
+  const seq = ++_deskSeq;
+  if (!_desk[days]) {
+    out.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+      _desk[days] = await GET(`/scorecard/daily-counts?days=${days}`);
+    } catch (e) {
+      if (seq === _deskSeq) out.innerHTML = `<div class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+      return;
+    }
+  }
+  if (seq !== _deskSeq || currentRoute().view !== "desk") return;
+  out.innerHTML = renderDesk(_desk[days]);
+}
+
+function deskDay(d, long) {
+  const dt = new Date(`${d}T00:00:00`);
+  return long ? dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+              : dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function renderDesk(data) {
+  const pending = DESK_PENDING.map(p => `<div class="kpi-card untracked">
+      <div class="kpi-head"><span class="kpi-label">${esc(p.label)}</span></div>
+      <div class="kpi-value">Not tracked yet</div><p>${esc(p.note)}</p></div>`).join("");
+  if (!data.dates.length) {
+    return `<div class="empty-state">No nightly counts yet. The first is taken after tonight's listing sync.</div>
+      <div class="kpi-grid" style="margin-top:1rem">${pending}</div>`;
+  }
+  const officeId = document.getElementById("filter-office").value;
+  const scope = officeId ? officeName() : "All offices";
+  const pick = key => ((data.series[key] || {})[officeId || "all"]) || data.dates.map(() => null);
+  const latestIdx = vals => { for (let i = vals.length - 1; i >= 0; i--) if (vals[i] != null) return i; return -1; };
+  const xEvery = Math.max(1, Math.ceil(data.dates.length / 8));
+
+  const panels = data.metrics.map(m => {
+    const vals = pick(m.key);
+    const li = latestIdx(vals);
+    const v = li >= 0 ? vals[li] : null;
+    // Change against 7 and 30 nights earlier; up is worse for all of these.
+    const chg = [[7, "a week ago"], [30, "30 days ago"]].map(([k, lbl]) => {
+      if (li - k < 0 || vals[li - k] == null) return null;
+      const d = vals[li] - vals[li - k];
+      return `<span class="${d > 0 ? "delta-bad" : d < 0 ? "delta-good" : ""}">${d > 0 ? "+" : ""}${d}</span> vs ${lbl}`;
+    }).filter(Boolean).join(" · ");
+    const parts = (m.parts || []).map(p => { const pv = pick(p.key); return li >= 0 && pv[li] != null ? `${pv[li]} ${esc(p.label)}` : null; }).filter(Boolean).join(" · ");
+    return `<div class="panel">
+      <div class="kpi-head"><span class="panel-title">${esc(m.label)}</span><span class="kpi-month">${li >= 0 ? deskDay(data.dates[li]) : ""}</span></div>
+      <div class="panel-sub">${esc(m.source)} · ${esc(scope)}</div>
+      <div class="desk-value">${v == null ? "—" : v.toLocaleString()}</div>
+      <div class="desk-parts">${parts}</div>
+      <div class="kpi-delta">${chg || "Not enough history to compare yet"}</div>
+      ${lineChart({ series: [{ name: m.label, color: "var(--series-1)", values: vals }], labels: data.dates.map(d => deskDay(d)),
+                    tipLabels: data.dates.map(d => deskDay(d, true)), unit: "count", width: 420, height: 150, compact: true, xEvery })}
+    </div>`;
+  }).join("");
+
+  // Latest night, every office. "No office" is what the company-wide count
+  // holds beyond the offices (e.g. an untracked listing by an agent who isn't
+  // on our roster).
+  const latestOf = s => { const i = latestIdx(s || []); return i >= 0 ? s[i] : null; };
+  const latestAll = data.metrics.map(m => latestOf((data.series[m.key] || {}).all));
+  const officeRows = data.offices
+    .map(o => ({ name: o.name, vals: data.metrics.map(m => latestOf((data.series[m.key] || {})[String(o.id)])) }))
+    .filter(r => r.vals.some(v => v != null));
+  const noOffice = latestAll.map((t, k) => t == null ? null : t - officeRows.reduce((sum, r) => sum + (r.vals[k] || 0), 0));
+  const cell = v => `<td class="num">${v == null ? "—" : v.toLocaleString()}</td>`;
+  const table = `<div class="panel"><div class="panel-title">By office, latest night</div>
+    <div class="panel-sub">Virtual tours and Not yet tracked go by the listing agent's office; Mismatches by the transaction's office.</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Office</th>${data.metrics.map(m => `<th class="num">${esc(m.label)}</th>`).join("")}</tr></thead>
+      <tbody>${officeRows.map(r => `<tr><td>${esc(r.name)}</td>${r.vals.map(cell).join("")}</tr>`).join("")}
+        ${noOffice.some(v => v > 0) ? `<tr><td>No office</td>${noOffice.map(cell).join("")}</tr>` : ""}
+        <tr class="total-row"><td>All offices</td>${latestAll.map(cell).join("")}</tr></tbody>
+    </table></div></div>`;
+
+  return `<div class="desk-grid">${panels}</div>${table}
+    <section class="kpi-section"><div class="section-title">Coming later</div><div class="kpi-grid">${pending}</div></section>`;
 }
 </script>
 
