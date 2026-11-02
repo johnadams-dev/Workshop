@@ -298,14 +298,19 @@ const PROXY         = Auth.API;
 const WORKSHOP_TOOLS = WORKSHOP_RESOURCES.filter(t => t.kind === 'workshop');
 const TOOL_NAMES = Object.fromEntries(WORKSHOP_TOOLS.map(t => [t.slug, t.name]));
 
-// Preserves each group's existing option order (cosmetic only — a tool not
-// listed here just sorts after the ones that are, e.g. the newly-added
-// deltanet-profile-audit).
+// The groups and their order are index.html's sections, and each group lists
+// its tools in that section's card order (a tool on two sections goes under
+// the first). A tool not listed here just sorts after the ones that are; a
+// group with no tools (Buyer Assistance, whose tools are all cross-listed
+// from Listing Marketing) is skipped.
 const FEEDBACK_GROUP_ORDER = {
-  'Day to Day':        ['contract-calculator', 'seller-net', 'market-update', 'mls-magic', 'camerons-lens', 'camerons-stage', 'hotsheet-v2', 'marketing-plan', 'acc-binder'],
-  'Agent Presence':     ['bio-creator', 'photo-updater', 'social-audit', 'agent-quiz', 'foundation'],
-  'Building Business':  ['floor-time', 'pathfinder', 'text-messaging', 'agent-notices', 'leaderboard'],
-  'Administrative':     ['lockbox', 'agent-master-form', 'daily-desk', 'agent-checklists', 'scorecard-entry', 'broadcast-messaging', 'staff-guide', 'usage-stats', 'review-engine', 'agent-hub'],
+  'Find New Prospects':     ['floor-time', 'hold-open-house', 'agent-notices', 'bio-creator', 'photo-updater', 'social-audit', 'deltanet-profile-audit'],
+  'Listing Marketing':      ['market-update', 'mls-magic', 'camerons-lens', 'camerons-stage', 'marketing-plan', 'open-house-listings', 'lockbox', 'acc-binder', 'contract-calculator', 'seller-net', 'hotsheet-v2'],
+  'Buyer Assistance':       [],
+  'Maintain Relationships': ['review-engine', 'foundation', 'portal-share', 'vendors'],
+  'Learn and Find Help':    ['pathfinder', 'agent-hub', 'agent-quiz', 'staff-guide'],
+  'Office & Operations':    ['roster', 'agent-master-form', 'daily-desk', 'agent-checklists', 'marketing-bucks', 'broadcast-messaging', 'leaderboard', 'text-messaging'],
+  'Business Growth':        ['recruit-prep', 'scorecard-report', 'scorecard-entry', 'usage-stats', 'bi-chat'],
 };
 
 // Builds the <optgroup>s + trailing standalone option shared by both
