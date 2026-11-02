@@ -2873,6 +2873,17 @@ function renderStaffDetail(s) {
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-head">Pathfinder</div>
+      <div class="card-body">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="sf-coach"${s.is_coach?' checked':''} onchange="staffDirty()">
+          Pathfinder coach
+        </label>
+        <div class="field-hint" style="margin-top:5px">Agents can pick them as their coach when enrolling. The coach whose offices include the agent's office is suggested.</div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:24px">
       <button class="btn btn-secondary" id="sf-discard-btn" style="display:none" onclick="selectStaff(${s.id})">Discard</button>
       <button class="btn btn-primary" id="sf-save-btn" onclick="saveStaff(${s.id})">Save Changes</button>
@@ -2908,6 +2919,7 @@ async function saveStaff(id) {
     cell_e164,
     agent_id:   agentVal ? Number(agentVal) : null,
     office_ids,
+    is_coach:   !!document.getElementById('sf-coach')?.checked,
   };
 
   try {

@@ -859,21 +859,39 @@ function prefillFromExistingPlan(p) {
 }
 
 /* ── COACHES ──────────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Coaches are the active staff marked "Pathfinder coach" in Agent Records →
+// Staff (GET /coaches). The suggested one covers the agent's office — their
+// roster office when we have it, else whatever they typed.
 async function loadCoaches() {
-  S.coaches = [
-    { id: 3, name: 'Ashlee Selman',    title: 'Sales Manager', offices: 'Port Orange & Ormond Mainland' },
-    { id: 4, name: 'Kristin Petersen', title: 'Sales Manager', offices: 'Beachside, Daytona & Flagler' },
-    { id: 1, name: 'John Adams',       title: 'President',     offices: 'Ponce Inlet, West Volusia & Commercial' },
-  ];
-  const officeRaw = (v('f_office') || S.agentProfile?.office || '').toLowerCase();
-  let suggestedId = 3;
-  if (['ormond beachside','daytona beach','flagler'].some(o => officeRaw.includes(o))) suggestedId = 4;
-  if (['ponce inlet','west volusia','deland','commercial'].some(o => officeRaw.includes(o))) suggestedId = 1;
-  document.getElementById('coachOptions').innerHTML = S.coaches.map(c => `
+  const box = document.getElementById('coachOptions');
+  try {
+    const res = await fetch(`${PROXY_BASE}/coaches`, { headers: Auth.headers() });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+    S.coaches = (await res.json()).map(c => ({ ...c, officeNames: c.offices.map(o => o.name).join(', ') }));
+  } catch (e) {
+    S.coaches = [];
+    box.innerHTML = `<div style="font-size:0.85rem;color:var(--text2)">Couldn't load the coach list (${esc(e.message)}). Please try again.</div>`;
+    return;
+  }
+  if (!S.coaches.length) {
+    box.innerHTML = '<div style="font-size:0.85rem;color:var(--text2)">No coaches are set up yet. Please contact your sales manager.</div>';
+    return;
+  }
+  const officeId  = S.agentProfile?.office_id;
+  const officeRaw = (v('f_office') || S.agentProfile?.office || '').toLowerCase().trim();
+  const covers = c => officeId
+    ? c.offices.some(o => o.id === officeId)
+    : !!officeRaw && c.offices.some(o => { const n = o.name.toLowerCase(); return n.includes(officeRaw) || officeRaw.includes(n); });
+  const suggestedId = (S.coaches.find(covers) || S.coaches[0]).id;
+  box.innerHTML = S.coaches.map(c => `
     <label style="display:flex;align-items:flex-start;gap:0.75rem;background:var(--surface2);border:1px solid ${c.id===suggestedId?'var(--gold)':'var(--border2)'};border-radius:8px;padding:0.85rem 1rem;cursor:pointer">
       <input type="radio" name="coachSelect" value="${c.id}" ${c.id===suggestedId?'checked':''} style="margin-top:3px;accent-color:var(--gold)">
-      <div><div style="font-size:0.88rem;font-weight:600;color:var(--text)">${c.name}${c.id===suggestedId?' <span style="font-size:0.68rem;color:var(--gold)">← suggested</span>':''}</div>
-      <div style="font-size:0.78rem;color:var(--text2)">${c.title} · ${c.offices}</div></div>
+      <div><div style="font-size:0.88rem;font-weight:600;color:var(--text)">${esc(c.name)}${c.id===suggestedId?' <span style="font-size:0.68rem;color:var(--gold)">← suggested</span>':''}</div>
+      <div style="font-size:0.78rem;color:var(--text2)">${[c.title, c.officeNames].filter(Boolean).map(esc).join(' · ')}</div></div>
     </label>`).join('');
 }
 
