@@ -787,6 +787,10 @@ tbody tr.clickable { cursor: pointer; }
 .pp-photo-placeholder { font-size: 8pt; color: #777; text-align: center; padding: 12pt; }
 .pp-entry { background: #fffbf0; border: 1pt solid #d29922; border-radius: 3pt; padding: 6pt 9pt; font-size: 8.5pt; color: #222; line-height: 1.4; max-height: 44pt; overflow: hidden; }
 .pp-entry-label { font-family: 'IBM Plex Mono', monospace; font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #a5720d; margin-bottom: 3pt; }
+.pp-agent { border: 1.5pt solid #1f3a5f; border-radius: 3pt; padding: 5pt 9pt; background: #f2f6fb; }
+.pp-agent-label { font-family: 'IBM Plex Mono', monospace; font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: #1f3a5f; margin-bottom: 2pt; }
+.pp-agent-name { font-size: 11pt; font-weight: 700; color: #111; }
+.pp-agent-cell { font-size: 11pt; font-weight: 600; color: #111; margin-top: 1pt; }
 .pp-info-cell { display: flex; flex-direction: column; gap: 6pt; }
 .pp-address { font-size: 15pt; font-weight: 600; color: #0d1117; line-height: 1.2; margin-bottom: 2pt; }
 .pp-city { font-size: 10pt; color: #444; margin-bottom: 6pt; }
@@ -3205,6 +3209,7 @@ async function nlReset() {
   document.getElementById('nl-coop-commission').value = '';
   document.getElementById('nl-commission-type').value = 'percent';
   nlSyncCommissionType('percent');
+  nlSyncCommissionType('percent');
   document.getElementById('nl-fs-trans-id').value = '';
   document.getElementById('nl-mls-wrap').innerHTML =
     '<input type="text" class="nl-mls-id" placeholder="MLS # (optional)">';
@@ -3351,6 +3356,7 @@ async function nlSaveListing() {
     document.getElementById('nl-commission-type').value,
     ['Total Commission', 'Buyer Broker Commission']
   );
+  if (!nlCommissionType) return;
   if (!confirmCommissionAmount([nlCommissionVal, nlCoopCommissionVal], nlCommissionType, ['Total Commission', 'Buyer Broker Commission'])) return;
   const nlAlsoBuyer = document.getElementById('nl-also-buyer').checked;
   const body = {
@@ -4608,9 +4614,21 @@ function ncExtSyncCommissionType(type) {
 // return — there's no invalid state here, just an ambiguous one to disambiguate,
 // so it always falls through and returns a type to submit with.
 function confirmCommissionType(values, type, fieldLabels) {
+  // One value that looks like the other unit while another doesn't is a
+  // mixed entry (e.g. $2,500 total with "3" for the buyer broker), not a
+  // mistyped unit: flipping the whole row would turn the $2,500 into 2,500%.
+  // Ask for both in the same unit instead. Returns null to stop the save.
+  // $0 / 0% (no co-broke commission) fits either unit, so it's left out.
+  const entered = values.map((v, i) => ({ v, label: fieldLabels[i] })).filter(x => x.v != null && !isNaN(x.v) && x.v !== 0);
+  const looksOther = x => type === 'percent' ? x.v > 20 : x.v < 10;
+  if (entered.some(looksOther) && !entered.every(looksOther)) {
+    const unit = type === 'fixed' ? 'dollars' : 'percent';
+    alert(`${entered.map(x => `${x.label}: ${x.v}`).join('\n')}\n\nThese use the same unit, and $ / % is set to ${unit}. Enter every commission on this listing in ${unit}${type === 'fixed' ? ' (for example 2500, not 3)' : ''}, or switch $ / % if they're all the other way.`);
+    return null;
+  }
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
-    if (v == null || isNaN(v)) continue;
+    if (v == null || isNaN(v) || v === 0) continue;
     if (type === 'percent' && v > 20) {
       const flip = confirm(`${fieldLabels[i]}: ${v}% is over 20% — did you mean to enter this transaction's commission as a flat fee instead of a percent?`);
       if (flip) return 'fixed';
@@ -4626,7 +4644,9 @@ function confirmCommissionType(values, type, fieldLabels) {
 // mix-ups (typed a percent into a flat-fee field or vice versa); this one
 // catches a plausible-unit-but-unusual-value typo (e.g. a percent commission
 // over 10%, or a flat fee under $2,500) and just asks the agent to confirm
-// they meant it, without offering to flip the type. Run this AFTER
+// they meant it, without offering to flip the type. The $2,500 floor is for
+// the total commission only: a co-broke / buyer broker fee can be anything,
+// $0 included (John Adams, 2026-11-03). Run this AFTER
 // confirmCommissionType has resolved the final type. Returns false if the
 // agent backs out — callers should abort the save in that case, same as any
 // other validation failure in this form.
@@ -4637,7 +4657,7 @@ function confirmCommissionAmount(values, type, fieldLabels) {
     if (v == null || isNaN(v)) continue;
     if (!isFixed && v > 10) {
       if (!confirm(`${fieldLabels[i]}: ${v}% is a high commission — are you sure that's correct?`)) return false;
-    } else if (isFixed && v < 2500) {
+    } else if (isFixed && v < 2500 && !/co-broke|buyer broker/i.test(fieldLabels[i])) {
       if (!confirm(`${fieldLabels[i]}: $${v} is a low flat-fee commission — are you sure that's correct?`)) return false;
     }
   }
@@ -5548,6 +5568,7 @@ async function ncSaveExternalContract() {
     document.getElementById('nc-ext-commission-type').value,
     ['Buyer Broker Commission']
   );
+  if (!extCommissionType) return;
   if (!confirmCommissionAmount([extCoopCommissionVal], extCommissionType, ['Buyer Broker Commission'])) return;
   const extNonSharedCommission = amParseMoney(document.getElementById('nc-ext-non-shared-commission').value);
   const extNscError = nscValidationError(extNonSharedCommission, 'Non-Shared Commission (Buyer)');
@@ -7203,11 +7224,27 @@ async function cvPrintAll() {
   window.print();
 }
 
+// DeltaNet gives the listing agent as a name ("Jane Smith"); find their cell
+// in our agent records by that name. Null when there's no single match.
+function cvAgentCell(name, agents) {
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim();
+  const n = norm(name);
+  if (!n) return null;
+  const hits = (agents || []).filter(a => a.cell_e164 && norm(`${a.first_name} ${a.last_name}`) === n);
+  return hits.length === 1 ? hits[0].cell_e164 : null;
+}
+function cvFmtPhone(p) {
+  const d = String(p || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : String(p || '');
+}
+
 async function cvBuildPrintPages(indices) {
   const container = document.getElementById('cv-print-pages');
   container.innerHTML = '';
   const date  = cvCaravanDate();
   const total = indices.length;
+  let agentCells = [];
+  try { agentCells = await GET('/daily-desk/agents?all=true'); } catch (_) { /* DeltaNet's number still prints */ }
   for (const idx of indices) {
     const item    = cvQueue[idx];
     await cvEnrichItem(item); // fetch MLS detail if this item was loaded from DB
@@ -7242,6 +7279,12 @@ async function cvBuildPrintPages(indices) {
         ).join('')
       + `<div class="pp-rt-row"><div class="pp-rt-cat">Price</div>${priceLabels.map(l => `<div class="pp-rt-box">${escapeHtml(l)}</div>`).join('')}</div>`;
     const mlsChip = item.mlsId ? `<div class="pp-mls-chip">MLS# ${escapeHtml(item.mlsId)}</div>` : '';
+    // Listing agent, beside the showing instructions where agents look for
+    // who to call: their cell from our agent records, else DeltaNet's number.
+    const agentCell = cvAgentCell(item.agent, agentCells) || item.agentPhone;
+    const agentHtml = item.agent
+      ? `<div class="pp-agent"><div class="pp-agent-label">Listing Agent</div><div class="pp-agent-name">${escapeHtml(item.agent)}</div>${agentCell ? `<div class="pp-agent-cell">Cell ${escapeHtml(cvFmtPhone(agentCell))}</div>` : ''}</div>`
+      : '';
     const page = document.createElement('div');
     page.className = 'cv-print-page';
     page.innerHTML = `
@@ -7260,6 +7303,7 @@ async function cvBuildPrintPages(indices) {
         <div class="pp-photo-cell">
           <div class="pp-photo">${photoHtml}</div>
           ${item.entryInstructions ? `<div class="pp-entry"><div class="pp-entry-label">Entry / Showing Instructions</div>${escapeHtml(item.entryInstructions)}</div>` : ''}
+          ${agentHtml}
           ${item.agentComments ? `<div class="pp-entry" style="border-color:#aaa;background:#f9f9f9;"><div class="pp-entry-label" style="color:#666;">Listing Agent Comments</div>${escapeHtml(item.agentComments)}</div>` : ''}
         </div>
         <div class="pp-info-cell">
@@ -7281,7 +7325,6 @@ async function cvBuildPrintPages(indices) {
         </div>
       </div>
       ${remarksHtml}
-      ${item.agent ? `<div style="font-size:8pt;color:#555;margin-bottom:5pt;padding:3pt 7pt;background:#f7f7f7;border-radius:3pt;border:1px solid #e0e0e0;display:inline-block;"><strong>Listing Agent:</strong> ${escapeHtml(item.agent)}${item.agentPhone ? '&nbsp;&nbsp;📞 ' + escapeHtml(item.agentPhone) : ''}</div>` : ''}
       <div class="pp-rating-section">
         <div class="pp-rating-title">Agent Feedback</div>
         <div>${ratingGridHtml}</div>
