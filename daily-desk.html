@@ -2563,6 +2563,31 @@ const PATCH  = (path, body) => api(path, { method: "PATCH",  body: JSON.stringif
 const PUT    = (path, body) => api(path, { method: "PUT",    body: JSON.stringify(body) });
 const DELETE = (path)       => api(path, { method: "DELETE" });
 
+// Saves can take seconds, and people click again while waiting: that doubled
+// contracts, closings, price changes and whole listings. While one of these
+// is running, further clicks do nothing and its button is greyed out.
+function singleSubmit(fn) {
+  let saving = false;
+  return async function (...args) {
+    if (saving) return;
+    saving = true;
+    const btn = window.event?.target?.closest?.('button');
+    if (btn) btn.disabled = true;
+    try {
+      return await fn.apply(this, args);
+    } finally {
+      saving = false;
+      if (btn) btn.disabled = false;
+    }
+  };
+}
+nlSaveListing          = singleSubmit(nlSaveListing);
+ncSaveAccContract      = singleSubmit(ncSaveAccContract);
+ncSaveExternalContract = singleSubmit(ncSaveExternalContract);
+amSubmit               = singleSubmit(amSubmit);
+submitFieldCorrection  = singleSubmit(submitFieldCorrection);
+confirmStartTracking   = singleSubmit(confirmStartTracking);
+
 /* ═══════════════════════════════════════════════════════════════════
    FORMATTING HELPERS
 ═══════════════════════════════════════════════════════════════════ */
@@ -7910,14 +7935,14 @@ function eomExportCsv() {
   const { data: { listings, contracts }, month } = eomLast;
   if (!listings.length && !contracts.length) { alert('Nothing to export for this month.'); return; }
   const header = ['Type', 'Office', 'Entered', 'Listed', 'Expires', 'Contract Date', 'Expected Closing',
-    'Address', 'City', 'MLS#', 'Listing Agent', 'Selling Agent', 'List Price', 'Sale/Contract Price', 'Status'];
+    'Address', 'City', 'MLS#', 'Listing Agent', 'Selling Agent', 'List Price', 'Sale/Contract Price', 'Sides', 'Status'];
   const office = r => r.office_name || '(No Office)';
   const rows = [
     ...listings.map(r => ['New Listing', office(r), csvDate(r.created_at), csvDate(r.list_date), csvDate(r.expiration_date), '', '',
-      r.property_address || '', r.city || '', r.mls_id || '', r.agent_name || '', '', csvNum(r.current_price), '', csvStatus(r.status)]),
+      r.property_address || '', r.city || '', r.mls_id || '', r.agent_name || '', '', csvNum(r.current_price), '', 1, csvStatus(r.status)]),
     ...contracts.map(r => ['Contract', office(r), csvDate(r.submitted_at), '', '', csvDate(r.contract_date), csvDate(r.expected_close_date),
       r.property_address || '', r.city || '', r.mls_id || '', r.listing_agent || 'Co-broke', r.selling_agent || 'Co-broke',
-      csvNum(r.current_price), csvNum(r.sale_price || r.contract_price), csvStatus(r.status)]),
+      csvNum(r.current_price), csvNum(r.sale_price || r.contract_price), r.sides, csvStatus(r.status)]),
   ].sort((a, b) => a[1].localeCompare(b[1]));   // stable: listings before contracts within an office
   rptDownloadCsv(`end-of-month-${month}.csv`, header, rows);
 }
@@ -7988,7 +8013,8 @@ function rptRenderEOM({ listings, contracts }, month) {
     offices.get(k)[row._type === 'listing' ? 'listings' : 'contracts'].push(row);
   });
 
-  let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;font-family:var(--mono);">${monthLabel} · ${listings.length} listing${listings.length!==1?'s':''} · ${contracts.length} contract${contracts.length!==1?'s':''}</div>`;
+  const contractSides = contracts.reduce((s,r) => s + r.sides, 0);
+  let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;font-family:var(--mono);">${monthLabel} · ${listings.length} listing${listings.length!==1?'s':''} · ${contracts.length} contract${contracts.length!==1?'s':''} (${contractSides} side${contractSides!==1?'s':''})</div>`;
   offices.forEach((data, officeName) => {
     html += rptRenderEOMOffice(officeName, data.listings, data.contracts);
   });
@@ -7999,6 +8025,7 @@ function rptRenderEOMOffice(name, listings, contracts) {
   const totalListPrice    = listings.reduce((s,r) => s + (Number(r.current_price)||0), 0);
   const totalContractList = contracts.reduce((s,r) => s + (Number(r.current_price)||0), 0);
   const totalSalePrice    = contracts.reduce((s,r) => s + (Number(r.sale_price||r.contract_price)||0), 0);
+  const totalSides        = contracts.reduce((s,r) => s + r.sides, 0);
 
   // Grouped/sorted by when the record was entered into Daily Desk
   // (created_at/submitted_at), not by the business date (list_date/
@@ -8028,6 +8055,7 @@ function rptRenderEOMOffice(name, listings, contracts) {
       <td class="td-addr">${escapeHtml(r.property_address)}<div class="td-muted">${escapeHtml(r.city||'')}</div></td>
       <td class="td-price">${fmtMoney(r.current_price)}</td>
       <td class="td-price">${r.sale_price ? fmtMoney(r.sale_price) : r.contract_price ? fmtMoney(r.contract_price) : '—'}</td>
+      <td class="td-mono">${r.sides}</td>
     </tr>`).join('');
 
   return `
@@ -8036,6 +8064,7 @@ function rptRenderEOMOffice(name, listings, contracts) {
     <div class="office-summary">
       <div class="summary-stat"><div class="summary-stat-val">${listings.length}</div><div class="summary-stat-key">New Listings</div></div>
       <div class="summary-stat"><div class="summary-stat-val">${contracts.length}</div><div class="summary-stat-key">Contracts</div></div>
+      <div class="summary-stat"><div class="summary-stat-val">${totalSides}</div><div class="summary-stat-key">Contract Sides</div></div>
       ${totalListPrice ? `<div class="summary-stat"><div class="summary-stat-val">${fmtMoney(totalListPrice)}</div><div class="summary-stat-key">Listing Volume</div></div>` : ''}
       ${totalSalePrice ? `<div class="summary-stat"><div class="summary-stat-val">${fmtMoney(totalSalePrice)}</div><div class="summary-stat-key">Contract Volume</div></div>` : ''}
     </div>
@@ -8052,11 +8081,12 @@ function rptRenderEOMOffice(name, listings, contracts) {
     ${contracts.length ? `
     <div class="report-section-title">Contracts — ${contracts.length}</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Entered</th><th>Contract</th><th>Closing</th><th>Listing Agent</th><th>Selling Agent</th><th>Address</th><th>List Price</th><th>Sale Price</th></tr></thead>
+      <thead><tr><th>Entered</th><th>Contract</th><th>Closing</th><th>Listing Agent</th><th>Selling Agent</th><th>Address</th><th>List Price</th><th>Sale Price</th><th>Sides</th></tr></thead>
       <tbody>${contractRows}</tbody>
       <tfoot><tr><td colspan="6" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);padding:6px 10px;">Total</td>
         <td class="td-price" style="font-weight:600;">${fmtMoney(totalContractList)}</td>
-        <td class="td-price" style="font-weight:600;">${fmtMoney(totalSalePrice)}</td></tr></tfoot>
+        <td class="td-price" style="font-weight:600;">${fmtMoney(totalSalePrice)}</td>
+        <td class="td-mono" style="font-weight:600;">${totalSides}</td></tr></tfoot>
     </table></div>` : ''}
   </div>`;
 }
