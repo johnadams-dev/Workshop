@@ -169,7 +169,7 @@ textarea{min-height:64px;resize:vertical}
   </div>
 
   <div class="main" id="denied">
-    <div class="card"><div class="empty">The Time Log is open to admins only for now.</div></div>
+    <div class="card"><div class="empty">The Time Log is open to managers and admins only.</div></div>
   </div>
 
   <div id="ready" style="display:none">
@@ -227,13 +227,31 @@ textarea{min-height:64px;resize:vertical}
     <!-- ── Reports ─────────────────────────────────────────────────────── -->
     <div class="main" id="tab-reports" style="display:none">
       <div class="card">
+        <div class="chips" id="report-scope" style="display:none;margin-bottom:10px">
+          <button class="chip sub on" data-scope="mine" onclick="setScope('mine')">My time</button>
+          <button class="chip sub" data-scope="everyone" onclick="setScope('everyone')">Everyone</button>
+        </div>
         <div class="chips" id="range-chips"></div>
         <div class="range-row">
           <input type="date" id="r-from" onchange="customRange()">
           <input type="date" id="r-to" onchange="customRange()">
         </div>
-        <span class="label">Agent history</span>
-        <div class="picker" id="report-picker"></div>
+        <div id="agent-filter">
+          <span class="label">Agent history</span>
+          <div class="picker" id="report-picker"></div>
+        </div>
+      </div>
+
+      <div id="everyone" style="display:none">
+        <div class="card total-row"><div class="big-total" id="ev-total">—</div></div>
+        <div class="card">
+          <h3>By person</h3>
+          <div id="ev-people"><div class="empty">Loading…</div></div>
+        </div>
+        <div class="card">
+          <h3>By bucket</h3>
+          <div id="ev-cats"></div>
+        </div>
       </div>
 
       <div id="agent-history" style="display:none">
@@ -320,6 +338,9 @@ async function init() {
   try {
     agents = await Auth.api('/roster/agents');
   } catch (e) { agents = []; }
+  try {
+    if ((await Auth.api('/time-log/access')).everyone) document.getElementById('report-scope').style.display = '';
+  } catch (e) { /* no Everyone report, just their own */ }
 }
 
 function showTab(name) {
@@ -588,9 +609,55 @@ function markRange(key) {
   document.querySelectorAll('#range-chips .chip').forEach(b => b.classList.toggle('on', b.dataset.range === key));
 }
 
+// Reports → Everyone: only shown to those /time-log/access allows.
+let reportScope = 'mine';
+function setScope(scope) {
+  reportScope = scope;
+  document.querySelectorAll('#report-scope .chip').forEach(b => b.classList.toggle('on', b.dataset.scope === scope));
+  const everyone = scope === 'everyone';
+  document.getElementById('everyone').style.display = everyone ? 'block' : 'none';
+  document.getElementById('summary').style.display = everyone ? 'none' : 'block';
+  document.getElementById('agent-filter').style.display = everyone ? 'none' : 'block';
+  if (everyone) document.getElementById('agent-history').style.display = 'none';
+  loadReport();
+}
+
+async function loadEveryone(from, to) {
+  try {
+    renderEveryone(await Auth.api(`/time-log/report/everyone?from=${from}&to=${to}`), from, to);
+  } catch (e) {
+    document.getElementById('ev-people').innerHTML = `<div class="empty">Could not load the report: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderEveryone(rep, from, to) {
+  const entriesLabel = n => `${n} ${n === 1 ? 'entry' : 'entries'}`;
+  const bar = (minutes, max) => `<div class="bar"><span style="width:${(minutes / max * 100).toFixed(2)}%;background:${SUB_COLORS[0]}"></span></div>`;
+  document.getElementById('ev-total').innerHTML = `${fmtMin(rep.total)} <small>logged · ${fmtDate(from)} – ${fmtDate(to)}</small>`;
+  const maxPerson = Math.max(1, ...rep.people.map(p => p.minutes));
+  document.getElementById('ev-people').innerHTML = rep.people.length ? rep.people.map(p => `
+    <div class="bar-item" onclick="this.classList.toggle('open')">
+      <div class="bar-top"><span class="name">${esc(p.name)}</span><span class="val"><b>${fmtMin(p.minutes)}</b> · ${pct(p.minutes, rep.total)}</span></div>
+      ${bar(p.minutes, maxPerson)}
+      <div class="subs">${p.categories.map(c => `
+        <div class="sub-row" style="cursor:default">
+          <span class="sw" style="background:${SUB_COLORS[0]}"></span>
+          <span class="nm">${esc(c.category)}</span>
+          <span class="vl"><b>${fmtMin(c.minutes)}</b> · ${pct(c.minutes, p.minutes)} · ${entriesLabel(c.entries)}</span>
+        </div>`).join('')}</div>
+    </div>`).join('') : '<div class="empty">Nothing logged in this range.</div>';
+  const maxCat = Math.max(1, ...rep.categories.map(c => c.minutes));
+  document.getElementById('ev-cats').innerHTML = rep.categories.map(c => `
+    <div class="bar-item" style="cursor:default">
+      <div class="bar-top"><span class="name">${esc(c.category)}</span><span class="val"><b>${fmtMin(c.minutes)}</b> · ${pct(c.minutes, rep.total)} · ${entriesLabel(c.entries)}</span></div>
+      ${bar(c.minutes, maxCat)}
+    </div>`).join('');
+}
+
 async function loadReport() {
   const from = document.getElementById('r-from').value, to = document.getElementById('r-to').value;
   if (!from || !to) return;
+  if (reportScope === 'everyone') return loadEveryone(from, to);
   const q = `from=${from}&to=${to}`;
   const history = document.getElementById('agent-history');
   history.style.display = reportAgentId ? 'block' : 'none';
