@@ -291,9 +291,9 @@ header {
     <div class="panel">
       <div class="panel-head">
         <div class="panel-title" id="existingAddress">—</div>
-        <div class="panel-sub">This listing already has a saved tour. <a id="viewExistingTourLink" href="#" target="_blank" style="color:var(--gold)">View tour →</a></div>
-        <div class="share-row" id="shareRow-existing" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
+        <div class="panel-sub">This listing already has a saved tour. MLS does not allow agent name or contact info on virtual tours — use the unbranded link there. The branded link (with your contact info) is for social media, Zillow, Realtor.com, and Homes.com.</div>
       </div>
+      <div class="panel-body" id="tourLinks-existing" style="border-bottom:1px solid var(--cream-dark)"></div>
       <div class="report-stats">
         <div>
           <div class="report-stat-num" id="totalViews">—</div>
@@ -492,27 +492,7 @@ header {
         <div class="panel-sub">MLS does not allow agent name or contact info on virtual tours — use the unbranded link there. The branded link (with your contact info) is for social media, Zillow, Realtor.com, and Homes.com.</div>
       </div>
       <div class="panel-body">
-        <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">MLS link (unbranded — no agent info)</label>
-        <div class="share-box">
-          <input type="text" id="mlsTourUrl" readonly>
-          <button class="btn btn-gold" onclick="copyUrl('mlsTourUrl')">Copy</button>
-          <a id="previewMlsLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
-        </div>
-
-        <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin:1rem 0 6px;">Social / Zillow / Realtor.com link (branded)</label>
-        <div class="share-box">
-          <input type="text" id="brandedTourUrl" readonly>
-          <button class="btn btn-gold" onclick="copyUrl('brandedTourUrl')">Copy</button>
-          <a id="previewBrandedLink" href="#" target="_blank" class="btn btn-ghost">Preview</a>
-        </div>
-        <div class="share-row" id="shareRow-done" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
-        <div id="listingPageRow" style="margin-top:1rem;display:none">
-          <label style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Full listing page (for reference)</label>
-          <div class="share-box">
-            <input type="text" id="listingPageUrl" readonly>
-            <button class="btn btn-gold" onclick="copyUrl('listingPageUrl')">Copy</button>
-          </div>
-        </div>
+        <div id="tourLinks-done"></div>
 
         <div style="display:flex;gap:0.75rem;margin-top:1.25rem">
           <button class="btn btn-ghost" onclick="setStep(4)">← Back to Music</button>
@@ -955,16 +935,7 @@ const REPORT_COLORS = ['#c9a84c', '#5a5a78', '#2a4a70', '#1a7a42', '#7a5a10', '#
 async function showTourReport(tour) {
   const address = STATE.address || tour.address || 'Existing tour';
   document.getElementById('existingAddress').textContent = address;
-  document.getElementById('viewExistingTourLink').href = `./camerons-stage-view.html?id=${tour.id}&brand=1`;
-  // Absolute URL, unlike the in-page link above — a relative one is
-  // meaningless once shared off the page.
-  const brandedUrl = `https://johnadams.org/camerons-stage-view.html?id=${tour.id}&brand=1`;
-  // Share button posts a different URL than Copy/Preview/View-tour above —
-  // one that renders real og:image/twitter:image tags server-side for
-  // whichever platform's crawler fetches it (see GET /tours/:id/share's
-  // header comment for why camerons-stage-view.html itself can't do this).
-  const shareUrl = `${PROXY}/camerons-stage/tours/${tour.id}/share`;
-  renderShareRow('shareRow-existing', shareUrl, address, `Check out this virtual tour of ${address}!`);
+  renderTourLinks('tourLinks-existing', tour.id, address);
   setStep(2);
   document.getElementById('reportEmptyState').style.display = 'none';
   document.getElementById('reportCharts').style.display = 'block';
@@ -1304,26 +1275,7 @@ async function doSave() {
       id = result.id;
     }
 
-    const brandedUrl = `https://johnadams.org/camerons-stage-view.html?id=${id}&brand=1`;
-    document.getElementById('mlsTourUrl').value = `https://johnadams.org/camerons-stage-view.html?id=${id}`;
-    document.getElementById('brandedTourUrl').value = brandedUrl;
-    document.getElementById('previewMlsLink').href = `./camerons-stage-view.html?id=${id}`;
-    document.getElementById('previewBrandedLink').href = `./camerons-stage-view.html?id=${id}&brand=1`;
-    // Share button posts a different URL than Copy/Preview above — see the
-    // matching comment in showTourReport().
-    const shareUrl = `${PROXY}/camerons-stage/tours/${id}/share`;
-    renderShareRow('shareRow-done', shareUrl, STATE.address || 'Property tour', `Check out this virtual tour of ${STATE.address || 'this property'}!`);
-
-    // Fetch the saved tour back to get the agent's website for the listing-page link
-    try {
-      const tour = await GET(`/camerons-stage/tours/${id}`);
-      if (tour.agent?.website && tour.mls_id) {
-        const base = tour.agent.website.replace(/\/+$/, '');
-        document.getElementById('listingPageUrl').value = `${base}/${tour.mls_id}`;
-        document.getElementById('listingPageRow').style.display = 'block';
-      }
-    } catch (e) { /* listing-page link is a nice-to-have, not blocking */ }
-
+    renderTourLinks('tourLinks-done', id, STATE.address);
     setStep(5);
   } catch (e) {
     toast('Save failed: ' + e.message);
@@ -1336,6 +1288,53 @@ function copyUrl(id) {
   const input = document.getElementById(id);
   input.select();
   navigator.clipboard.writeText(input.value).then(() => toast('Link copied'));
+}
+
+/* The MLS/branded link box, shown both when a tour is finished (step 5) and
+   when an agent comes back to a saved one (step 2's report). Element ids are
+   suffixed with the container id because both copies live in the page at once. */
+function renderTourLinks(containerId, id, address) {
+  const el = document.getElementById(containerId);
+  const labelStyle = 'font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;';
+  // Absolute URLs for copying — a relative one is meaningless once it's off
+  // the page. Preview stays relative so it opens on whatever host we're on.
+  const linkRow = (key, query) => `
+    <div class="share-box">
+      <input type="text" id="${key}-${containerId}" value="https://johnadams.org/camerons-stage-view.html?${query}" readonly>
+      <button class="btn btn-gold" onclick="copyUrl('${key}-${containerId}')">Copy</button>
+      <a href="./camerons-stage-view.html?${query}" target="_blank" class="btn btn-ghost">Preview</a>
+    </div>`;
+  el.dataset.tourId = id;
+  el.innerHTML = `
+    <label style="${labelStyle}margin-bottom:6px;">MLS link (unbranded — no agent info)</label>
+    ${linkRow('mlsTourUrl', `id=${id}`)}
+    <label style="${labelStyle}margin:1rem 0 6px;">Social / Zillow / Realtor.com link (branded)</label>
+    ${linkRow('brandedTourUrl', `id=${id}&brand=1`)}
+    <div class="share-row" id="shareRow-${containerId}" style="display:flex;gap:0.5rem;margin-top:0.75rem;"></div>
+    <div id="listingPageRow-${containerId}" style="margin-top:1rem;display:none">
+      <label style="${labelStyle}margin-bottom:6px;">Full listing page (for reference)</label>
+      <div class="share-box">
+        <input type="text" id="listingPageUrl-${containerId}" readonly>
+        <button class="btn btn-gold" onclick="copyUrl('listingPageUrl-${containerId}')">Copy</button>
+      </div>
+    </div>`;
+
+  // Share button posts a different URL than Copy/Preview — one that renders
+  // real og:image/twitter:image tags server-side for whichever platform's
+  // crawler fetches it (see GET /tours/:id/share's header comment for why
+  // camerons-stage-view.html itself can't do this).
+  renderShareRow(`shareRow-${containerId}`, `${PROXY}/camerons-stage/tours/${id}/share`,
+    address || 'Property tour', `Check out this virtual tour of ${address || 'this property'}!`);
+
+  // The agent's website, needed for the listing-page link, only comes with the
+  // full tour record. Nice-to-have, so it fills in late rather than holding the
+  // page up, and it's dropped if the box has since moved on to another tour.
+  GET(`/camerons-stage/tours/${id}`).then(tour => {
+    if (el.dataset.tourId !== String(id) || !tour.agent?.website || !tour.mls_id) return;
+    const base = tour.agent.website.replace(/\/+$/, '');
+    document.getElementById(`listingPageUrl-${containerId}`).value = `${base}/${tour.mls_id}`;
+    document.getElementById(`listingPageRow-${containerId}`).style.display = 'block';
+  }).catch(() => {});
 }
 
 /* ═══════════════════════════════════════════════════════════════════
