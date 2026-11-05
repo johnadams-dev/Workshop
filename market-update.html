@@ -134,6 +134,10 @@
         .cma-basis { color:var(--muted); font-size:.95em; max-width:340px; }
         .cma-price { display:flex; gap:20px; align-items:flex-end; flex-wrap:wrap; }
         .cma-big { font-size:1.8em; font-weight:700; color:var(--navy); }
+        .cma-picks { display:flex; gap:4px; margin-top:4px; }
+        .cma-pick { flex:1; border:1px solid var(--border); background:#fff; border-radius:5px; padding:3px 4px; font:inherit; font-size:.75em; cursor:pointer; color:var(--text); }
+        .cma-pick.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+        .cma-conflict input { border-color:var(--gold); background:var(--gold-lt); }
         #cmaFlexmls { font-size:.85em; background:var(--bg); border-radius:6px; padding:8px 10px; margin-bottom:12px; }
         @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
         @media (max-width: 768px) {
@@ -197,15 +201,16 @@
                 <div class="cma-step">4 · Price</div><div id="cmaPrice"></div>
                 <div class="cma-step">5 · Report</div>
             </div>
-            <div class="form-group">
+            <!-- Searching the MLS, the square feet come from step 1 (this field is hidden and kept in step) -->
+            <div class="form-group" id="sqftGroup">
                 <label for="subjectSqft">📐 Subject Property Square Feet <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
                 <input type="number" id="subjectSqft" placeholder="e.g., 2100">
                 <p class="input-hint">Left blank, it's filled in from the Volusia County Property Appraiser when you enter a Volusia address.</p>
             </div>
-            <div class="form-group">
-                <label for="subjectPrice">💰 Subject Property List Price <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
-                <input type="number" id="subjectPrice" placeholder="e.g., 425000">
-                <p class="input-hint">Enter numbers only (no dollar signs or commas)</p>
+            <div class="form-group" id="priceGroup">
+                <label for="subjectPrice" id="subjectPriceLabel">💰 Subject Property List Price <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
+                <input type="number" id="subjectPrice" placeholder="e.g., 425000" oninput="CMA.priceEdited = true">
+                <p class="input-hint" id="subjectPriceHint">Enter numbers only (no dollar signs or commas)</p>
             </div>
             <div class="form-group" id="zillowGroup">
                 <label class="check-label"><input type="checkbox" id="includeZillow" checked onchange="zgToggle()"> Include Zillow market pages</label>
