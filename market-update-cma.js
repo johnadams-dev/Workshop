@@ -82,10 +82,13 @@ function cmaRenderFlexmls() {
     return;
   }
   if (f.connected) {
-    const acct = f.account || {};
-    const who = acct.error ? ` (couldn't check the account: ${cmaEsc(acct.error)})`
-      : [acct.name, acct.email, acct.preferred_username].filter(Boolean).length ? ` as <b>${cmaEsc([acct.name, acct.email || acct.preferred_username].filter(Boolean).join(' — '))}</b>` : '';
-    el.innerHTML = `<b>Daytona (Flex):</b> connected with your Flexmls account${who}. <a href="#" onclick="cmaFlexmlsDisconnect();return false">Disconnect</a>`;
+    // The server tests the connection with Flexmls's MCP server on every status check
+    const m = (f.account || {}).mcp || {};
+    const check = (f.account || {}).error ? ` — couldn't test it: ${cmaEsc(f.account.error)}`
+      : m.call && m.call.ok ? ' — Flexmls accepts searches ✓'
+      : m.call ? ` — but Flexmls refuses searches: "${cmaEsc(m.call.error)}"`
+      : m.error ? ` — but Flexmls refuses the connection: "${cmaEsc(m.error.replace(/^MCP error -?\d+:\s*/, ''))}"` : '';
+    el.innerHTML = `<b>Daytona (Flex):</b> connected with your Flexmls account${check}. <a href="#" onclick="cmaFlexmlsDisconnect();return false">Disconnect</a>`;
   } else {
     el.innerHTML = `<b>Daytona (Flex):</b> ${f.expired ? 'your Flexmls sign-in has run out — connect again.' : f.fallbackAvailable ? 'using the company\'s Flexmls connection.' : 'not connected — comps come from Stellar only.'}
       <button class="cma-btn-sm" onclick="cmaFlexmlsConnect()">Connect my Flexmls account</button>
