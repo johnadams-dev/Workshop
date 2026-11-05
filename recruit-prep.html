@@ -371,7 +371,8 @@ function sourceHtml(src) {
   }
   return esc(s);
 }
-const list = arr => (arr || []).filter(Boolean);
+// The model sometimes returns one sentence where the format asks for a list
+const list = arr => (Array.isArray(arr) ? arr.filter(Boolean) : arr ? [arr] : []);
 
 // ── Choosing the agent ──────────────────────────────────────────────────
 let mode = 'mls';
@@ -747,7 +748,7 @@ function renderReport(row) {
   }
   const r = row.report, snap = r.agent_snapshot || {};
   const mls = row.mls_stats;
-  const chips = [snap.years_in_real_estate && `${snap.years_in_real_estate} in real estate`, snap.team_or_individual, ...(snap.specialties || []), snap.reviews]
+  const chips = [snap.years_in_real_estate && `${snap.years_in_real_estate} in real estate`, snap.team_or_individual, ...list(snap.specialties), snap.reviews]
     .filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
   const email = r.follow_up_email || {};
   el.innerHTML = `

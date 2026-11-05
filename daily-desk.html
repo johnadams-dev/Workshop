@@ -1746,11 +1746,11 @@ tbody tr.clickable { cursor: pointer; }
           <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Address</span>
-              <input type="text" id="nl-addr" placeholder="123 Main St">
+              <input type="text" id="nl-addr" placeholder="123 Main St" onchange="nlFillFromMls()">
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
-              <input type="text" id="nl-city" placeholder="Ormond Beach">
+              <input type="text" id="nl-city" placeholder="Ormond Beach" onchange="nlFillFromMls()">
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 2fr; gap:14px;">
@@ -1760,7 +1760,7 @@ tbody tr.clickable { cursor: pointer; }
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
-              <input type="text" id="nl-zip" placeholder="32174" maxlength="10">
+              <input type="text" id="nl-zip" placeholder="32174" maxlength="10" onchange="nlFillFromMls()">
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
@@ -2027,11 +2027,11 @@ tbody tr.clickable { cursor: pointer; }
           <div class="form-row" style="display:grid; grid-template-columns:2fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label req" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Property Address</span>
-              <input type="text" id="nc-ext-addr" placeholder="123 Main St">
+              <input type="text" id="nc-ext-addr" placeholder="123 Main St" onchange="ncExtMlsChanged()">
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">City</span>
-              <input type="text" id="nc-ext-city" placeholder="Ormond Beach">
+              <input type="text" id="nc-ext-city" placeholder="Ormond Beach" onchange="ncExtMlsChanged()">
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 2fr; gap:14px;">
@@ -2041,7 +2041,7 @@ tbody tr.clickable { cursor: pointer; }
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Zip</span>
-              <input type="text" id="nc-ext-zip" placeholder="32174" maxlength="10">
+              <input type="text" id="nc-ext-zip" placeholder="32174" maxlength="10" onchange="ncExtMlsChanged()">
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
@@ -3353,20 +3353,30 @@ async function selectFsTransaction(index) {
       populateCustomers('nl', [{ name: nlFsDetail.sellerLandlordName || '', email: nlFsDetail.sellerParty1Email || '' }]);
     }
   } catch (_) {}
+  // Form Simplicity's seller comes first; the MLS fills what's still blank
+  nlFillFromMls();
 }
 
 /* ═══ Fill blanks from the MLS ═══
-   An MLS number brings in the expiration date and the seller's name and phone
-   (Daytona only: GET /daily-desk/mls-lookup, server/mls-listing-facts.js). Only
-   blank fields are filled, and they stay editable, so nothing typed is lost. */
+   An MLS number, or an address with exactly one current listing, brings in the
+   expiration date and the seller's name and phone (Daytona only: GET
+   /daily-desk/mls-lookup, server/mls-listing-facts.js). Only blank fields are
+   filled, and they stay editable, so nothing typed is lost. */
 let _mlsFillRun = 0;
-async function fillBlanksFromMls(mlsIds, { expInput, customerNs, noteId, stillWanted }) {
+function mlsLookupPaths(mlsIds, addressId, cityId, zipId) {
+  if (mlsIds.length) return mlsIds.map(id => '/daily-desk/mls-lookup/' + encodeURIComponent(id));
+  const address = document.getElementById(addressId).value.trim();
+  if (!address) return [];
+  const q = new URLSearchParams({ address, city: document.getElementById(cityId).value.trim(), zip: document.getElementById(zipId).value.trim() });
+  return ['/daily-desk/mls-lookup?' + q];
+}
+async function fillBlanksFromMls(paths, { expInput, customerNs, noteId, stillWanted }) {
   const run = ++_mlsFillRun;
   const note = document.getElementById(noteId);
   const filled = new Set();
-  for (const id of mlsIds) {
+  for (const path of paths) {
     let facts;
-    try { facts = await GET('/daily-desk/mls-lookup/' + encodeURIComponent(id)); } catch (_) { continue; }
+    try { facts = await GET(path); } catch (_) { continue; }
     // The form was closed or the number changed while this was out
     if (run !== _mlsFillRun || (stillWanted && !stillWanted())) return;
     if (!facts?.found) continue;
@@ -3385,18 +3395,25 @@ async function fillBlanksFromMls(mlsIds, { expInput, customerNs, noteId, stillWa
   note.style.display = filled.size ? 'block' : 'none';
 }
 
+// A match fills the deal's blanks on the server: say what it filled
+function mlsFilledNotice(linked) {
+  if (linked?.filled?.length) alert(`Linked. Filled in from the Daytona MLS: ${linked.filled.join(' and ')}. Please check them on the deal.`);
+}
+
 function nlFillFromMls(stillWanted) {
   const ids = [...document.querySelectorAll('#nl-mls-wrap .nl-mls-id')].map(el => el.value.trim()).filter(Boolean);
-  if (!ids.length) return;
-  return fillBlanksFromMls(ids, { expInput: document.getElementById('nl-exp-date'), customerNs: 'nl', noteId: 'nl-mls-note', stillWanted });
+  const paths = mlsLookupPaths(ids, 'nl-addr', 'nl-city', 'nl-zip');
+  if (!paths.length) return;
+  return fillBlanksFromMls(paths, { expInput: document.getElementById('nl-exp-date'), customerNs: 'nl', noteId: 'nl-mls-note', stillWanted });
 }
 function nlMlsChanged(e) {
   if (e.target.classList.contains('nl-mls-id')) nlFillFromMls();
 }
 function ncExtMlsChanged() {
   const id = document.getElementById('nc-ext-mlsid').value.trim();
-  if (!id) return;
-  fillBlanksFromMls([id], { customerNs: 'nc-ext-seller', noteId: 'nc-ext-mls-note' });
+  const paths = mlsLookupPaths(id ? [id] : [], 'nc-ext-addr', 'nc-ext-city', 'nc-ext-zip');
+  if (!paths.length) return;
+  fillBlanksFromMls(paths, { customerNs: 'nc-ext-seller', noteId: 'nc-ext-mls-note' });
 }
 
 async function nlSaveListing() {
@@ -5789,6 +5806,7 @@ async function ncSelectFsTransaction(index) {
       populateCustomers('nc-ext-seller', [{ name: ncFsDetail.sellerLandlordName || '', email: ncFsDetail.sellerParty1Email || '' }]);
     }
   } catch (_) {}
+  ncExtMlsChanged();
 }
 
 /* ═══ Listings / Contracts filtering ═══ */
@@ -5999,8 +6017,9 @@ async function linkToPossibleMatch(deltaListingId, skipConfirm) {
   if (!pm) return;
   if (!skipConfirm && !confirm(`Link ${row.address}${row.mls_ids?.length ? ' (MLS# ' + row.mls_ids.join(', ') + ')' : ''} to the deal already in Daily Desk?\n\n${possibleMatchLabel(pm)}`)) return;
   try {
-    await POST('/daily-desk/deltanet-matches', { delta_listing_id: deltaListingId, transaction_id: pm.id });
+    const linked = await POST('/daily-desk/deltanet-matches', { delta_listing_id: deltaListingId, transaction_id: pm.id });
     await renderAll();
+    mlsFilledNotice(linked);
   } catch (e) {
     alert('Failed to link: ' + e.message);
   }
@@ -6170,12 +6189,13 @@ async function confirmMatch(transactionId) {
   const label = t ? (t.property_address || transactionId) : transactionId;
   if (!confirm(`Link DeltaNet listing to "${label}"?`)) return;
   try {
-    await POST('/daily-desk/deltanet-matches', {
+    const linked = await POST('/daily-desk/deltanet-matches', {
       delta_listing_id: matchDeltaListingId,
       transaction_id: transactionId,
     });
     closeMatchModal();
     await renderAll();
+    mlsFilledNotice(linked);
   } catch (e) {
     alert('Failed to save match: ' + e.message);
   }
