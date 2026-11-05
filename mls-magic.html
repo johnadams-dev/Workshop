@@ -394,15 +394,28 @@ function proxyHeaders(proxySecret, extra = {}) {
   return Auth.headers({ "Accept": "application/json", ...extra });
 }
 
+// "1875 Alameda Dr, De Leon Springs" → { number: "1875", name: "Alameda" }. Both MLSs keep the
+// street type (Dr, Ave…) and direction in their own fields, so searching StreetName for
+// "ALAMEDA DR" found nothing (2026-11-05: V4952039, 1875 Alameda Drive). City/ZIP after a comma
+// are dropped; quotes are escaped for OData.
+const STREET_TYPE = /^(st|street|ave?|avenue|rd|road|dr|drive|ln|lane|ct|court|pl|place|blvd|boulevard|way|trl|trail|tr|cir|circle|ter|terrace|pkwy|parkway|hwy|highway|loop|pt|point|run|path|sq|square|xing|trce|trace|cv|cove)\.?$/i;
+const STREET_DIR = /^(n|s|e|w|ne|nw|se|sw|north|south|east|west)\.?$/i;
+function parseStreet(address) {
+  const words = String(address || "").split(",")[0].trim().split(/\s+/);
+  const number = words.shift() || "";
+  if (words.length > 1 && STREET_DIR.test(words[0])) words.shift();
+  while (words.length > 1 && (STREET_TYPE.test(words[words.length - 1]) || STREET_DIR.test(words[words.length - 1]))) words.pop();
+  return { number: number.replace(/'/g, "''"), name: words.join(" ").replace(/'/g, "''") };
+}
+
 // ─── Bridge API (Stellar MLS) ─────────────────────────────────────────────
 const bridgeAPI = {
   base(proxyUrl) { return `${Auth.API}/bridge`; },
 
   async searchByAddress(token, dataSystem, address, proxyUrl, proxySecret) {
-    const parts = address.trim().split(" ");
-    const streetName = parts.slice(1).join(" ").toUpperCase();
+    const { number, name } = parseStreet(address);
     const officeFilter = STELLAR_OFFICE_KEYS.map(k => `ListOfficeMlsId eq '${k}'`).join(" or ");
-    const filter = `StreetNumber eq '${parts[0]}' and contains(StreetName,'${streetName}') and (${officeFilter})`;
+    const filter = `StreetNumber eq '${number}' and contains(tolower(StreetName),'${name.toLowerCase()}') and (${officeFilter})`;
     const url = `${this.base(proxyUrl)}/${dataSystem}/Properties?$filter=${encodeURIComponent(filter)}&$top=25&$expand=Rooms&access_token=${token}`;
     const r = await fetch(url, { headers: proxyHeaders(proxySecret) });
     if (!r.ok) throw new Error(`Bridge ${r.status}`);
@@ -417,9 +430,8 @@ const bridgeAPI = {
   },
 
   async searchPublicRecordsByAddress(token, address, proxyUrl, proxySecret) {
-    const parts = address.trim().split(" ");
-    const streetName = parts.slice(1).join(" ").toUpperCase();
-    const filter = `StreetNumber eq '${parts[0]}' and contains(StreetName,'${streetName}')`;
+    const { number, name } = parseStreet(address);
+    const filter = `StreetNumber eq '${number}' and contains(tolower(StreetName),'${name.toLowerCase()}')`;
     const url = `${this.base(proxyUrl)}/pub/Properties?$filter=${encodeURIComponent(filter)}&$top=5&access_token=${token}`;
     const r = await fetch(url, { headers: proxyHeaders(proxySecret) });
     if (!r.ok) throw new Error(`Bridge Public Records ${r.status}`);
@@ -472,9 +484,10 @@ const sparkAPI = {
   },
 
   async searchByAddress(token, address, proxyUrl, proxySecret, feedId) {
-    const parts = address.trim().split(" ");
-    const streetName = parts.slice(1).join(" ").replace(/\b\w/g, c => c.toUpperCase());
-    const filter = `StreetNumber eq '${parts[0]}' and contains(StreetName,'${streetName}')`;
+    // Spark keeps street names in title case ("Oxbow")
+    const { number, name } = parseStreet(address);
+    const streetName = name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    const filter = `StreetNumber eq '${number}' and contains(StreetName,'${streetName}')`;
     const url = `${this.base(proxyUrl)}/Property?$filter=${encodeURIComponent(filter)}&$top=5`;
     const r = await fetch(url, { headers: this.headers(proxySecret, token) });
     if (!r.ok) throw new Error(`Spark ${r.status}`);
