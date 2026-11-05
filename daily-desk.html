@@ -1855,10 +1855,11 @@ tbody tr.clickable { cursor: pointer; }
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">MLS ID(s)</span>
-              <div id="nl-mls-wrap" style="display:flex; flex-direction:column; gap:6px;">
+              <div id="nl-mls-wrap" onchange="nlMlsChanged(event)" style="display:flex; flex-direction:column; gap:6px;">
                 <input type="text" class="nl-mls-id" placeholder="MLS # (optional)">
               </div>
               <span class="tbl-link" style="font-size:11px; margin-top:4px;" onclick="nlAddMlsId()">+ Add another MLS #</span>
+              <div id="nl-mls-note" style="display:none; font-size:11px; color:var(--text-muted);"></div>
             </div>
           </div>
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
@@ -2070,7 +2071,8 @@ tbody tr.clickable { cursor: pointer; }
           <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">MLS ID</span>
-              <input type="text" id="nc-ext-mlsid" placeholder="Optional">
+              <input type="text" id="nc-ext-mlsid" placeholder="Optional" onchange="ncExtMlsChanged()">
+              <div id="nc-ext-mls-note" style="display:none; font-size:11px; color:var(--text-muted);"></div>
             </div>
             <div class="field" style="display:flex; flex-direction:column; gap:5px;">
               <span class="field-label" style="font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em;">Source of Buyer</span>
@@ -3238,6 +3240,7 @@ async function nlReset() {
   document.getElementById('nl-fs-trans-id').value = '';
   document.getElementById('nl-mls-wrap').innerHTML =
     '<input type="text" class="nl-mls-id" placeholder="MLS # (optional)">';
+  document.getElementById('nl-mls-note').style.display = 'none';
   document.getElementById('nl-fs-list').innerHTML = '<div class="empty">Select an agent to load their Form Simplicity files.</div>';
   // Reset co-agent area
   document.getElementById('nl-coagent-area').style.display = 'none';
@@ -3350,6 +3353,50 @@ async function selectFsTransaction(index) {
       populateCustomers('nl', [{ name: nlFsDetail.sellerLandlordName || '', email: nlFsDetail.sellerParty1Email || '' }]);
     }
   } catch (_) {}
+}
+
+/* ═══ Fill blanks from the MLS ═══
+   An MLS number brings in the expiration date and the seller's name and phone
+   (Daytona only: GET /daily-desk/mls-lookup, server/mls-listing-facts.js). Only
+   blank fields are filled, and they stay editable, so nothing typed is lost. */
+let _mlsFillRun = 0;
+async function fillBlanksFromMls(mlsIds, { expInput, customerNs, noteId, stillWanted }) {
+  const run = ++_mlsFillRun;
+  const note = document.getElementById(noteId);
+  const filled = new Set();
+  for (const id of mlsIds) {
+    let facts;
+    try { facts = await GET('/daily-desk/mls-lookup/' + encodeURIComponent(id)); } catch (_) { continue; }
+    // The form was closed or the number changed while this was out
+    if (run !== _mlsFillRun || (stillWanted && !stillWanted())) return;
+    if (!facts?.found) continue;
+    if (expInput && facts.expiration_date && !expInput.value) {
+      expInput.value = facts.expiration_date;
+      filled.add('expiration date');
+    }
+    const hasSeller = [...document.querySelectorAll(`#${customerNs}-customer-rows .cust-name`)].some(el => el.value.trim());
+    if (facts.owner_name && !hasSeller) {
+      populateCustomers(customerNs, [{ name: facts.owner_name, phone: facts.owner_phone || '' }]);
+      filled.add(facts.owner_phone ? 'seller name and phone' : 'seller name');
+    }
+  }
+  if (!note) return;
+  note.textContent = filled.size ? `Filled in from the Daytona MLS: ${[...filled].join(', ')}. Please check.` : '';
+  note.style.display = filled.size ? 'block' : 'none';
+}
+
+function nlFillFromMls(stillWanted) {
+  const ids = [...document.querySelectorAll('#nl-mls-wrap .nl-mls-id')].map(el => el.value.trim()).filter(Boolean);
+  if (!ids.length) return;
+  return fillBlanksFromMls(ids, { expInput: document.getElementById('nl-exp-date'), customerNs: 'nl', noteId: 'nl-mls-note', stillWanted });
+}
+function nlMlsChanged(e) {
+  if (e.target.classList.contains('nl-mls-id')) nlFillFromMls();
+}
+function ncExtMlsChanged() {
+  const id = document.getElementById('nc-ext-mlsid').value.trim();
+  if (!id) return;
+  fillBlanksFromMls([id], { customerNs: 'nc-ext-seller', noteId: 'nc-ext-mls-note' });
 }
 
 async function nlSaveListing() {
@@ -5320,6 +5367,7 @@ function openNewContractModal() {
   document.getElementById('nc-ext-list-agent-email').value = '';
   document.getElementById('nc-ext-seller-customer-rows').innerHTML = '';
   document.getElementById('nc-ext-mlsid').value = '';
+  document.getElementById('nc-ext-mls-note').style.display = 'none';
   document.getElementById('nc-ext-source').value = '';
   document.getElementById('nc-ext-bedrooms').value = '';
   document.getElementById('nc-ext-bathrooms').value = '';
@@ -6021,6 +6069,9 @@ async function startTracking(deltaListingId) {
     if (row.co_agent_id)
       document.getElementById('nl-coagent-sel').value = String(row.co_agent_id);
   }
+
+  // Expiration date and seller from the MLS, if DeltaNet didn't give them
+  nlFillFromMls(() => _stDeltaListingId === deltaListingId);
 }
 
 function closeStartTrackingModal() {

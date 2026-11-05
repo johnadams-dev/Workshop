@@ -5,9 +5,9 @@
    adjusted $/sq ft. All numbers come from the server (server/cma-routes.js,
    server/cma/*.js); rules: "CMA" in server/docs/business-rules.md.
 
-   Daytona sales come through the agent's own Flexmls sign-in, or John's when
-   they haven't connected (server/flexmls-auth.js). Stellar comes through
-   Bridge and needs nothing from the agent.
+   Daytona sales come from the Back Office Feed and Stellar through Bridge;
+   neither needs anything from the agent. The Flexmls sign-in code below only
+   runs if the server has no feed token (server/flexmls-auth.js).
 
    The search results also feed the page's existing market pages (price vs
    size, $/sq ft, absorption, days on market) through cmaMarketRows(), and
@@ -71,6 +71,9 @@ async function cmaNeedSignIn() {
 // ── Daytona connection ─────────────────────────────────────────────────────
 async function cmaFlexmlsStatus() {
   if (!Auth.user) return cmaRenderFlexmls();
+  try {
+    if ((await Auth.api('/cma/sources')).daytona === 'feed') { CMA.daytonaFeed = true; return cmaRenderFlexmls(); }
+  } catch (_) { /* an older server: ask about the sign-in */ }
   try { CMA.flexmls = await Auth.api('/flexmls/status'); } catch (e) { CMA.flexmls = null; }
   cmaRenderFlexmls();
 }
@@ -85,6 +88,10 @@ function cmaRenderFlexmls() {
   const f = CMA.flexmls, el = cmaEl('cmaFlexmls');
   if (!Auth.user) {
     el.innerHTML = `<b>Sign in to search the MLS</b> — use the Google sign-in below (in the Zillow section), or look a home up and you'll be asked.`;
+    return;
+  }
+  if (CMA.daytonaFeed) {
+    el.innerHTML = `<b>Searches Stellar and Daytona.</b> There's nothing to connect.`;
     return;
   }
   if (!f || !f.configured || (!cmaFlexmlsSetup() && !(f.connected && ((f.account || {}).mcp || {}).call?.ok))) {

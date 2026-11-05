@@ -109,10 +109,31 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 2
       <label>From <input type="date" id="fFrom"></label>
       <label>To <input type="date" id="fTo"></label>
       <label>City <input type="text" id="fCity" placeholder="Any"></label>
-      <label>Min price <input type="number" id="fMin" min="0" step="10000" placeholder="Any"></label>
-      <label>Max price <input type="number" id="fMax" min="0" step="10000" placeholder="Any"></label>
+      <label>Min price <input type="text" inputmode="numeric" id="fMin" placeholder="Any"></label>
+      <label>Max price <input type="text" inputmode="numeric" id="fMax" placeholder="Any"></label>
       <label>Beds <select id="fBeds"><option value="">Any</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-      <label>Type <input type="text" id="fType" placeholder="Any"></label>
+      <label>Type <select id="fType">
+        <option value="">Any</option>
+        <optgroup label="Residential">
+          <option>Single Family</option>
+          <option>Condominium</option>
+          <option>Single Family Attached</option>
+          <option>Condotel</option>
+        </optgroup>
+        <optgroup label="Manufactured">
+          <option>Manufactured Home w/ Land</option>
+          <option>Manufactured Home no Land</option>
+        </optgroup>
+        <optgroup label="Multi-Unit">
+          <option>Duplex</option>
+          <option>Triplex</option>
+          <option>Fourplex</option>
+          <option>5+ Units</option>
+        </optgroup>
+        <optgroup label="Commercial">
+          <option>Commercial Land &amp; Building</option>
+        </optgroup>
+      </select></label>
     </div>
     <p class="count" id="count"></p>
     <div id="results"><div class="msg">Loading…</div></div>
@@ -196,21 +217,29 @@ function showTab(which) {
 }
 
 // ── Browse ─────────────────────────────────────────────────────────────────
+// Only the newest request may draw the list. An unfiltered request takes several
+// times longer than a narrow one, so while typing "500000" the earlier request
+// for "5" could finish last and put every listing back on screen.
+let slotsRequest = 0;
 async function loadSlots() {
+  const thisRequest = ++slotsRequest;
   const q = new URLSearchParams();
   const v = id => document.getElementById(id).value.trim();
+  const amount = id => v(id).replace(/[^\d.]/g, ''); // accepts $500,000
   if (v('fFrom')) q.set('from', v('fFrom'));
   if (v('fTo')) q.set('to', v('fTo'));
   if (v('fCity')) q.set('city', v('fCity'));
-  if (v('fMin')) q.set('minPrice', v('fMin'));
-  if (v('fMax')) q.set('maxPrice', v('fMax'));
+  if (amount('fMin')) q.set('minPrice', amount('fMin'));
+  if (amount('fMax')) q.set('maxPrice', amount('fMax'));
   if (v('fBeds')) q.set('beds', v('fBeds'));
   if (v('fType')) q.set('type', v('fType'));
   try {
     const data = await api('/open-house/available?' + q);
+    if (thisRequest !== slotsRequest) return;
     S.slots = data.slots; S.today = data.today;
     render();
   } catch (e) {
+    if (thisRequest !== slotsRequest) return;
     document.getElementById('results').innerHTML = `<div class="msg">Couldn't load listings: ${esc(e.message)}</div>`;
   }
 }

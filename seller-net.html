@@ -113,7 +113,7 @@
       <button type="button" data-tab="buyer">Buyer Costs</button>
     </div>
     <h1 class="only-seller">Estimated Seller Net</h1>
-    <p class="lede only-seller">Enter the address and price. Stamps, title insurance and the tax proration are calculated for you; the annual tax comes from the home's Stellar MLS record when there is one. Print the sheet or save it as a PDF — nothing is stored.</p>
+    <p class="lede only-seller">Enter the address and price. Stamps, title insurance and the tax proration are calculated for you; the annual tax comes from the home's Stellar or Daytona MLS record when there is one. Print the sheet or save it as a PDF — nothing is stored.</p>
     <h1 class="only-buyer">Estimated Buyer Costs</h1>
     <p class="lede only-buyer">What a buyer should expect to bring to closing, and the monthly payment. Mortgage stamps, intangible tax, the lender's title policy, prepaid interest and the tax proration are calculated for you. Print the sheet or save it as a PDF — nothing is stored.</p>
 
@@ -126,7 +126,7 @@
       </div>
       <div class="row" style="margin-top:12px">
         <button class="btn" id="lookupBtn" type="button">Look up taxes</button>
-        <span class="hint">From the home's most recent Stellar listing. Sign-in needed.</span>
+        <span class="hint">From the home's most recent MLS listing. Sign-in needed.</span>
       </div>
       <div id="signin"><div class="hint" style="margin-bottom:6px">Sign in with your Adams Cameron account to look up taxes.</div><div id="g-signin-btn"></div></div>
       <div id="lookupMsg" class="msg"></div>
@@ -458,7 +458,7 @@ function render() {
   let taxNote = '';
   if (pr) {
     const src = taxInfo && num($('annualTax').value) === taxInfo.annualTax
-      ? ` (${taxInfo.taxYear ? taxInfo.taxYear + ' bill' : 'most recent bill'}, from Stellar MLS listing ${esc(taxInfo.mlsNumber || '')})` : '';
+      ? ` (${taxInfo.taxYear ? taxInfo.taxYear + ' bill' : 'most recent bill'}, from ${esc(taxInfo.source || 'Stellar')} MLS listing ${esc(taxInfo.mlsNumber || '')})` : '';
     taxNote = pr.paid
       ? `<p>Taxes: annual tax of $${money(num($('annualTax').value))}${src}. This year's bill is assumed paid, so the buyer credits the seller for the ${pr.remaining} days from closing to the end of the year.</p>`
       : `<p>Taxes: annual tax of $${money(num($('annualTax').value))}${src}. Florida taxes are paid in arrears, so the seller owes the buyer for the ${pr.elapsed} days owned this year before closing.</p>`;
@@ -538,7 +538,7 @@ async function lookup() {
         `<button type="button" data-i="${i}">${esc(c.address)}${c.city ? ', ' + esc(c.city) : ''} — ${c.annualTax ? '$' + money(c.annualTax) + ' (' + (c.taxYear || '?') + ')' : 'no tax amount'}</button>`).join('');
       $('cands').querySelectorAll('button').forEach(b => b.onclick = () => useHome(data.candidates[+b.dataset.i]));
     } else {
-      msg.className = 'msg err'; msg.textContent = "No Stellar listing found for that address. Enter the annual tax by hand (from the county tax collector).";
+      msg.className = 'msg err'; msg.textContent = "No MLS listing found for that address. Enter the annual tax by hand (from the county tax collector).";
     }
   } catch (e) {
     msg.className = 'msg err'; msg.textContent = e.message;

@@ -197,10 +197,10 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
     <p class="section-label">Step 1</p>
     <h2>Who are you meeting?</h2>
     <div class="seg" role="tablist">
-      <button id="mode-mls" class="active" onclick="setMode('mls')">Find in Stellar MLS</button>
+      <button id="mode-mls" class="active" onclick="setMode('mls')">Find in the MLS</button>
       <button id="mode-manual" onclick="setMode('manual')">Enter their details</button>
     </div>
-    <div class="hint" id="mode-hint">Agents in Stellar MLS get verified production numbers. Anyone else — including agents in other markets — use "Enter their details".</div>
+    <div class="hint" id="mode-hint">Agents in the MLS get verified production numbers. Anyone else — including agents in other markets — use "Enter their details".</div>
 
     <div id="mls-box">
       <label class="field" for="mls-search">Agent name</label>
@@ -233,7 +233,7 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
 
     <div class="input-block">
       <h3>Courted export</h3>
-      <div class="hint">Upload the agent's export from Courted — Excel, CSV, PDF or a screenshot. Its production figures are added to the briefing, labeled "Courted export". Especially useful for agents outside Stellar MLS.</div>
+      <div class="hint">Upload the agent's export from Courted — Excel, CSV, PDF or a screenshot. Its production figures are added to the briefing, labeled "Courted export". Especially useful for agents outside the MLS.</div>
       <label class="field" for="courted">Courted file</label>
       <input type="file" id="courted" accept=".csv,.xlsx,.xls,.pdf,.txt,image/*" onchange="addCourted(this.files[0])">
       <div class="file-chip" id="courted-chip" hidden></div>
@@ -270,7 +270,7 @@ footer { text-align: center; font-size: 12px; color: var(--muted); padding: 10px
   </section>
 </main>
 
-<footer>Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked "Stellar MLS" comes from MLS records and "Courted export" from the file you uploaded; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.</footer>
+<footer>Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked as MLS data comes from MLS records and "Courted export" from the file you uploaded; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.</footer>
 
 <div id="toast"></div>
 
@@ -349,7 +349,7 @@ function applyPartner(p) {
   document.querySelector('#intake .seg').style.display = 'none';
   document.getElementById('mode-hint').style.display = 'none';
   document.getElementById('m-market').placeholder = 'e.g. Ridgewood, NJ';
-  document.querySelectorAll('#intake .input-block .hint').forEach(h => { h.textContent = h.textContent.replace(' Especially useful for agents outside Stellar MLS.', ''); });
+  document.querySelectorAll('#intake .input-block .hint').forEach(h => { h.textContent = h.textContent.replace(' Especially useful for agents outside the MLS.', ''); });
   document.querySelector('#settings summary').textContent = `"Why ${short}" — what the briefing may say ${short} offers`;
   document.querySelector('footer').textContent = 'Built from publicly available information plus anything you add. Facts are linked to their sources; anything unconfirmed is listed separately. Production marked "Courted export" comes from the file you uploaded; other production figures are estimates from public profiles. Use it to listen better, not to pressure — and never share anything from your personal notes with the agent.';
 }
@@ -392,24 +392,25 @@ function onSearch() {
   if (q.length < 3) { box.style.display = 'none'; return; }
   searchTimer = setTimeout(async () => {
     box.style.display = 'block';
-    box.innerHTML = '<div class="hint">Searching Stellar MLS…</div>';
+    box.innerHTML = '<div class="hint">Searching the MLS…</div>';
     try {
       const d = await api('/recruit-prep/agents/search?q=' + encodeURIComponent(q));
       window._agents = d.agents || [];
       box.innerHTML = window._agents.length
-        ? window._agents.map((a, i) => `<div onclick="pickAgent(${i})"><b>${esc(a.name)}</b> <small>· ${esc(a.office || 'office unknown')}${a.officeCity ? ', ' + esc(a.officeCity) : ''}${a.status && a.status !== 'Active' ? ' · ' + esc(a.status) : ''}</small></div>`).join('')
-        : '<div class="hint">No one in Stellar MLS by that name — try "Enter their details".</div>';
+        ? window._agents.map((a, i) => `<div onclick="pickAgent(${i})"><b>${esc(a.name)}</b> <small>· ${esc(a.office || 'office unknown')}${a.officeCity ? ', ' + esc(a.officeCity) : ''}${a.status && a.status !== 'Active' ? ' · ' + esc(a.status) : ''} · ${boardName(a)}</small></div>`).join('')
+        : '<div class="hint">No one in the MLS by that name — try "Enter their details".</div>';
     } catch (e) {
       box.innerHTML = `<div class="hint">${esc(e.message)}</div>`;
     }
   }, 400);
 }
+const boardName = a => (a.alsoOn ? 'Stellar and Daytona MLS' : a.board === 'dbar' ? 'Daytona MLS' : 'Stellar MLS');
 function pickAgent(i) {
   picked = window._agents[i];
   document.getElementById('mls-results').style.display = 'none';
   const el = document.getElementById('mls-picked');
   el.style.display = 'flex';
-  el.innerHTML = `<div><b>${esc(picked.name)}</b><div class="hint">${esc(picked.office || '')}${picked.officeCity ? ' · ' + esc(picked.officeCity) : ''} · Stellar MLS #${esc(picked.mlsId)}</div></div>
+  el.innerHTML = `<div><b>${esc(picked.name)}</b><div class="hint">${esc(picked.office || '')}${picked.officeCity ? ' · ' + esc(picked.officeCity) : ''} · ${boardName(picked)} #${esc(picked.mlsId)}</div></div>
     <button class="btn btn-ghost" style="margin-left:auto" onclick="clearPick()">Change</button>`;
 }
 function clearPick() {
@@ -518,7 +519,7 @@ function showProgress(on, started = Date.now()) {
   const tick = () => {
     const s = Math.round((Date.now() - started) / 1000);
     const mm = Math.floor(s / 60), ss = String(s % 60).padStart(2, '0');
-    const msg = s < 20 ? 'Reading Stellar MLS records…'
+    const msg = s < 20 ? 'Reading MLS records…'
       : s < 150 ? 'Searching public sources — websites, profiles, reviews, news…'
       : s < 300 ? 'Still researching — thorough runs take up to 6 minutes.'
       : 'Writing the briefing…';
@@ -533,8 +534,8 @@ async function run() {
   err.style.display = 'none';
   let body;
   if (mode === 'mls') {
-    if (!picked) { err.textContent = 'Pick the agent from the Stellar MLS results, or switch to "Enter their details".'; err.style.display = 'block'; return; }
-    body = { name: picked.name.replace(/,\s*(PA|P\.A\.|LLC)$/i, ''), brokerage: picked.office, market: picked.officeCity, mlsBoard: 'stellar', mlsMemberId: picked.mlsId };
+    if (!picked) { err.textContent = 'Pick the agent from the MLS results, or switch to "Enter their details".'; err.style.display = 'block'; return; }
+    body = { name: picked.name.replace(/,\s*(PA|P\.A\.|LLC)$/i, ''), brokerage: picked.office, market: picked.officeCity, mlsBoard: picked.board || 'stellar', mlsMemberId: picked.mlsId };
   } else {
     const name = document.getElementById('m-name').value.trim();
     if (!name) { err.textContent = "Enter the agent's name."; err.style.display = 'block'; return; }
@@ -665,14 +666,13 @@ function courtedHtml(r) {
       ${rows.map(c => `<tr><td class="wrap">${esc(c.figure)}</td><td>${esc(c.period || '')}</td><td class="wrap">${esc(c.note || '')}</td></tr>`).join('')}</table></div>`;
 }
 
-function productionHtml(mls, r) {
-  if (mls && mls.source === 'stellar_mls') {
+// One MLS's production: the agent's record there, year by year
+function boardProductionHtml(mls) {
     const ys = mls.by_year || [];
     const mix = mls.side_mix_last_3_years || {};
     const tl = (mls.brokerage_timeline || []).map(t => `<span>${esc(t.office)} · ${t.from === t.to ? t.from : t.from + '–' + t.to}</span>`).join('');
     const act = (mls.active_listings || []);
-    return `<span class="source-tag mls">Stellar MLS — verified MLS data, as of ${esc(mls.as_of)}</span>
-      ${r.production_reading ? `<p style="margin:10px 0">${esc(r.production_reading)}</p>` : ''}
+    return `<span class="source-tag mls">${esc(mls.source_label || 'Stellar MLS — verified MLS data')}, as of ${esc(mls.as_of)}</span>
       <div class="chart-wrap">${productionChart(ys)}</div>
       <div class="hint">Bars: closed volume (both sides). Line: closed sides. * this year so far.</div>
       <div class="tbl-wrap" style="margin-top:10px"><table>
@@ -684,7 +684,29 @@ function productionHtml(mls, r) {
       ${act.length ? `<p class="section-label" style="margin-top:6px">Active and pending listings</p><div class="tbl-wrap"><table>
         <tr><th>Address</th><th>City</th><th>Status</th><th>List price</th><th>DOM</th></tr>
         ${act.map(l => `<tr><td class="wrap">${esc(l.address)}</td><td>${esc(l.city)}</td><td>${esc(l.status)}</td><td>${money(l.price)}</td><td>${l.days_on_market ?? '—'}</td></tr>`).join('')}
-      </table></div>` : ''}
+      </table></div>` : ''}`;
+}
+
+// Year by year on each MLS. Not added together: a home listed on both shows on both.
+function boardComparisonHtml(a, b) {
+  const yearOf = (m, y) => (m.by_year || []).find(r => r.year === y) || {};
+  const years = (a.by_year || []).map(y => y.year);
+  return `<p class="section-label">On both MLSs</p>
+    <div class="tbl-wrap"><table>
+      <tr><th>Year</th><th>${esc(a.board_name)} sides</th><th>${esc(a.board_name)} volume</th><th>${esc(b.board_name)} sides</th><th>${esc(b.board_name)} volume</th></tr>
+      ${years.map(y => { const p = yearOf(a, y), q = yearOf(b, y); return `<tr><td>${y}${p.partial_year ? ' (so far)' : ''}</td><td>${p.total_sides ?? 0}</td><td>${money(p.total_volume)}</td><td>${q.total_sides ?? 0}</td><td>${money(q.total_volume)}</td></tr>`; }).join('')}
+    </table></div>
+    <div class="hint" style="margin-bottom:14px">Shown side by side, not added together: a home listed on both MLSs counts on both.</div>`;
+}
+
+function productionHtml(mls, r) {
+  if (mls && /_mls$/.test(mls.source || '')) {
+    const other = mls.other_board;
+    return `${r.production_reading ? `<p style="margin:10px 0">${esc(r.production_reading)}</p>` : ''}
+      ${other ? boardComparisonHtml(mls, other) : ''}
+      ${boardProductionHtml(mls)}
+      ${other ? `<div style="height:18px"></div>${boardProductionHtml(other)}` : ''}
+      ${mls.other_board_error ? `<div class="warn">${esc(mls.other_board_error)}</div>` : ''}
       ${courtedHtml(r)}`;
   }
   const pub = list(r.public_production);
@@ -822,8 +844,10 @@ function reportText() {
   sec('Pain', list(r.pain).map(p => `${p.what} (${p.when || ''}; ${p.source || ''}) → ${p.approach || ''}`));
   sec('Pleasure', list(r.pleasure).map(p => `${p.what} (${p.when || ''}; ${p.source || ''}) → ${p.approach || ''}`));
   const mls = row.mls_stats;
-  if (mls && mls.source === 'stellar_mls') {
-    sec('Production (Stellar MLS)', (mls.by_year || []).map(y => `${y.year}${y.partial_year ? ' (so far)' : ''}: ${y.total_sides} sides (${y.listing_sides_closed} listing / ${y.buyer_sides_closed} buyer), ${money(y.total_volume)}`));
+  if (mls && /_mls$/.test(mls.source || '')) {
+    for (const m of [mls, mls.other_board].filter(Boolean)) {
+      sec('Production (' + (m.board_name || 'Stellar MLS') + ')', (m.by_year || []).map(y => `${y.year}${y.partial_year ? ' (so far)' : ''}: ${y.total_sides} sides (${y.listing_sides_closed} listing / ${y.buyer_sides_closed} buyer), ${money(y.total_volume)}`));
+    }
   } else {
     sec('Production (estimate from public profiles)', list(r.public_production).map(p => `${p.figure} (${p.as_of || ''}; ${p.source || ''})`));
   }

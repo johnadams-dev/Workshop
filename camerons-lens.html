@@ -1422,12 +1422,36 @@ async function mlsDoSearch(query) {
 
   // API returns { listings: [...] } — normalise top result
   const hits = body?.listings || body?.data || body?.results || [];
-  if (!hits.length) {
-    throw new Error('MLS# ' + query + ' not found in DeltaNet. Double-check the number and try again.');
-  }
+  if (!hits.length) return mlsAnyBoardSearch(query);
 
   const listing = normalizeDeltanetListing(hits[0]);
   return { listing, source: listing._mlsSource };
+}
+
+// DeltaNet only has our own agents' listings. Anything else: Stellar, then Daytona.
+async function mlsAnyBoardSearch(query) {
+  const res = await fetchWithRetry(`${mlsProxyUrl}/camerons-stage/any-listing/${encodeURIComponent(query)}`, { headers: mlsHeaders() });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || 'The MLS lookup failed (' + res.status + ').');
+  const l = body?.listing;
+  if (!l) throw new Error('MLS# ' + query + ' not found in DeltaNet, Stellar or Daytona. Double-check the number and try again.');
+  const source = body.source === 'dbar' ? 'Daytona MLS' : 'Stellar MLS';
+  return {
+    source,
+    listing: {
+      UnparsedAddress: l.address,
+      ListPrice:       l.price,
+      BedroomsTotal:   l.bedrooms,
+      BathroomsFull:   l.bathrooms,
+      LivingArea:      l.sqft,
+      ListingId:       l.mlsId,
+      StandardStatus:  l.status,
+      PublicRemarks:   l.remarks,
+      PropertyType:    l.propertyType,
+      _deltanetPhotos: l.photos || [],   // { url, title }: extractPhotos reads these the same way
+      _mlsSource:      source,
+    },
+  };
 }
 
 // Search Bridge (Stellar) then fall back to Spark (DBAR)
