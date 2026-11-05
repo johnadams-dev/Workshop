@@ -87,7 +87,7 @@ function cmaRenderFlexmls() {
       : [acct.name, acct.email, acct.preferred_username].filter(Boolean).length ? ` as <b>${cmaEsc([acct.name, acct.email || acct.preferred_username].filter(Boolean).join(' — '))}</b>` : '';
     el.innerHTML = `<b>Daytona (Flex):</b> connected with your Flexmls account${who}. <a href="#" onclick="cmaFlexmlsDisconnect();return false">Disconnect</a>`;
   } else {
-    el.innerHTML = `<b>Daytona (Flex):</b> ${f.fallbackAvailable ? 'using the company\'s Flexmls connection.' : 'not connected — comps come from Stellar only.'}
+    el.innerHTML = `<b>Daytona (Flex):</b> ${f.expired ? 'your Flexmls sign-in has run out — connect again.' : f.fallbackAvailable ? 'using the company\'s Flexmls connection.' : 'not connected — comps come from Stellar only.'}
       <button class="cma-btn-sm" onclick="cmaFlexmlsConnect()">Connect my Flexmls account</button>
       <div class="input-hint">First turn on the MCP server in Flexmls: Preferences → <a href="https://help.flexmls.com/en/ai-settings--enable-the-mcp-server.html" target="_blank">AI Settings</a>, and accept its terms. You sign in on Flexmls's own page — we never see your password.</div>`;
   }
