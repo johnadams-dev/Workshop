@@ -105,6 +105,36 @@
         .feature-list li:last-child { border-bottom: none; }
         .feature-list li:before { content: "✓ "; color: var(--green); font-weight: bold; margin-right: 8px; }
         .footer { text-align: center; padding: 20px; color: var(--muted); font-size: 0.78em; }
+        /* ── CMA (market-update-cma.js) ── */
+        .cma-mode { display:flex; gap:0; margin-bottom:18px; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+        .cma-mode button { flex:1; padding:10px; border:none; background:var(--bg); font:inherit; font-size:.9em; font-weight:600; color:var(--muted); cursor:pointer; }
+        .cma-mode button.on { background:var(--navy); color:#fff; }
+        .cma-step { font-size:.8em; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.5px; margin:18px 0 8px; padding-top:14px; border-top:1px solid var(--border); }
+        .cma-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+        .cma-btn-sm { background:#fff; border:1px solid var(--blue); color:var(--blue); border-radius:6px; padding:5px 10px; font:inherit; font-size:.82em; font-weight:600; cursor:pointer; margin-left:6px; }
+        .cma-toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+        .cma-table-wrap { overflow-x:auto; }
+        .cma-table { width:100%; border-collapse:collapse; font-size:.8em; }
+        .cma-table th { text-align:left; background:var(--bg); color:var(--muted); font-weight:600; padding:6px; white-space:nowrap; }
+        .cma-table td { padding:6px; border-top:1px solid var(--border); vertical-align:top; }
+        .cma-table tr.on td { background:#F3F8FD; }
+        .cma-table tr.cma-across td { background:#FFF8EC; }
+        .cma-table input[type=number] { width:96px; padding:4px 6px; font-size:.95em; }
+        .cma-table select { width:auto; padding:3px; font-size:.95em; }
+        .cma-table .edited, .cma-table tr.edited td { background:var(--gold-lt); }
+        .cma-score { display:inline-block; min-width:30px; text-align:center; color:#fff; font-weight:700; border-radius:10px; padding:2px 6px; }
+        .cma-sub { color:var(--muted); font-size:.92em; margin-top:2px; }
+        .cma-reasons span { display:inline-block; background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1px 7px; margin:3px 3px 0 0; font-size:.9em; }
+        .cma-reasons span.warn { background:#FFF1D6; border-color:#EDC66B; color:#8A5A00; font-weight:600; }
+        .cma-method { font-size:.85em; border-radius:8px; padding:1px 7px; white-space:nowrap; }
+        .cma-method.regression { background:#E3F5EC; color:var(--green); }
+        .cma-method.paired { background:#E8F1FA; color:var(--blue); }
+        .cma-method.estimate { background:#FBEAE8; color:var(--red); }
+        .cma-method.edited { background:var(--gold-lt); color:#8A6A10; }
+        .cma-basis { color:var(--muted); font-size:.95em; max-width:340px; }
+        .cma-price { display:flex; gap:20px; align-items:flex-end; flex-wrap:wrap; }
+        .cma-big { font-size:1.8em; font-weight:700; color:var(--navy); }
+        #cmaFlexmls { font-size:.85em; background:var(--bg); border-radius:6px; padding:8px 10px; margin-bottom:12px; }
         @keyframes spin { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
         @media (max-width: 768px) {
             h1 { font-size: 1.25em; }
@@ -140,7 +170,11 @@
         </div>
 
         <div class="form-section">
-            <div class="form-group">
+            <div class="cma-mode">
+                <button type="button" data-mode="search" class="on" onclick="cmaSetMode('search')">🔎 Search the MLS (CMA)</button>
+                <button type="button" data-mode="upload" onclick="cmaSetMode('upload')">📁 Upload an MLS export</button>
+            </div>
+            <div class="form-group" id="uploadGroup" style="display:none">
                 <label for="mlsFile">📁 Upload MLS Data (CSV or Excel)</label>
                 <input type="file" id="mlsFile" accept=".csv,.xlsx,.xls" required>
                 <p class="input-hint">Works with any MLS format — automatically detects columns like Living Area, Heated Area, Current Price, List Price, etc.</p>
@@ -152,6 +186,16 @@
                     <input type="text" id="subjectUnit" placeholder="Unit" autocomplete="off" style="width:90px">
                 </div>
                 <p class="input-hint">Adds a Property Valuation page with the home's Zestimate® home valuation from Zillow, the county's values and RPR's estimate. Leave blank to skip it. For a condo, add the unit.</p>
+            </div>
+            <div id="cmaSection">
+                <div id="cmaFlexmls"></div>
+                <button class="button-primary" style="background:var(--navy)" onclick="cmaLookup()">Look up this home in the MLS</button>
+                <div class="status" id="cmaStatus"></div>
+                <div class="cma-step">1 · The home</div><div id="cmaSubject"><p class="input-hint">Enter the address above and look it up.</p></div>
+                <div class="cma-step">2 · Comparable sales</div><div id="cmaComps"></div>
+                <div class="cma-step">3 · Adjustments</div><div id="cmaAdjust"></div>
+                <div class="cma-step">4 · Price</div><div id="cmaPrice"></div>
+                <div class="cma-step">5 · Report</div>
             </div>
             <div class="form-group">
                 <label for="subjectSqft">📐 Subject Property Square Feet <span style="font-weight:normal;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
@@ -235,16 +279,17 @@
         const fileInput = document.getElementById('mlsFile');
         const sqftInput = document.getElementById('subjectSqft');
         const priceInput = document.getElementById('subjectPrice');
-        if (!fileInput.files.length) { showStatus('⚠️ Please upload an MLS data file', 'error'); return; }
+        const searching = CMA.mode === 'search';
+        if (searching && !CMA.analysis) { showStatus('⚠️ Look the home up and find comparable sales first (steps 1–2), or switch to uploading an MLS export.', 'error'); return; }
+        if (!searching && !fileInput.files.length) { showStatus('⚠️ Please upload an MLS data file', 'error'); return; }
         let subjectSqft    = (sqftInput.value  && parseFloat(sqftInput.value)  > 0) ? parseFloat(sqftInput.value)  : null;
         const subjectPrice = (priceInput.value && parseFloat(priceInput.value) > 0) ? parseFloat(priceInput.value) : null;
         const btn = document.getElementById('generateBtn');
         btn.disabled = true; btn.textContent = 'Processing...';
         showStatus('⏳ Processing your data...', 'processing');
         try {
-            const file = fileInput.files[0];
-            const data = await readFile(file);
-            mlsData = parseMLSData(data);
+            // Search: the market pages are built from the sales and listings the CMA found
+            mlsData = searching ? cmaMarketRows() : parseMLSData(await readFile(fileInput.files[0]));
             if (!mlsData || mlsData.length === 0) throw new Error('No valid data found in file. Please check that your file has Status, Square Feet, and Price columns with valid data.');
             separateListings(mlsData);
             const totalListings = activeListings.length + soldListings.length;
@@ -280,10 +325,12 @@
                 catch (e) { zillowNote = '\n⚠️ Zillow pages left out: ' + e.message; }
             }
             const subjectFull = subjectAddress ? rprQuery(subjectAddress, subjectUnit) : '';
-            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate, county, subjectFull };
+            const cma = searching ? cmaReportData() : null;
+            lastReportData = { subjectSqft, subjectPrice, chartImageData, domChartImageData, zillow, zestimate, county, subjectFull, cma };
             document.getElementById('downloadSection').style.display = 'block';
             const notes = countyNote + zestNote + zillowNote;
             showStatus('✅ Report generated successfully!' + sqftNote
+                + (cma ? `\n🏠 CMA pages included: ${cma.comps.length} comparables, recommended ${cmaMoney(cma.recommendation.value)}.` : searching ? '\n⚠️ CMA pages left out: choose at least 3 comparables.' : '')
                 + (subjectFull ? `\n🏡 Property Valuation page included for ${subjectFull}.` : '')
                 + (zillow ? `\n🏘️ Zillow pages included for ${zillow.data.area.name}.` : '') + notes, notes ? 'error' : 'success');
         } catch (error) {
@@ -644,7 +691,7 @@
                 </table>`;
         }
 
-        const pages = [
+        const pages = (lastReportData && lastReportData.cma ? cmaPagesHTML(lastReportData.cma, header) : '') + [
             subjectSection + overviewSection,
             priceChartSection,
             pricePerSqftSection + absorptionSection,
@@ -769,6 +816,7 @@ function zgSignIn() {
     zgSigningIn = false;
     document.getElementById('zillowSignin').style.display = 'none';
     zgLoadAreas();
+    cmaFlexmlsStatus();
   });
 }
 
@@ -801,6 +849,7 @@ window.addEventListener('load', async () => {
   // Usable without signing in; a saved session is picked up quietly.
   await Auth.ready({ optional: true });
   zgLoadAreas();
+  cmaSetMode(CMA.mode);   // searching the MLS is the default; upload stays one click away
 });
 
 // Parse the chosen file as soon as it's picked, so the area is pre-selected
@@ -1193,6 +1242,7 @@ function zgPagesHTML(z, header) {
   return page1 + page2 + page3;
 }
 </script>
+<script src="market-update-cma.js"></script>
 <script>fetch('https://mls-proxy-975684028597.us-east1.run.app/log/visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:'Market Update',email:localStorage.getItem('ac_user_email')||sessionStorage.getItem('ac_user_email')||''})}).catch(()=>{});</script>
 </body>
 </html>

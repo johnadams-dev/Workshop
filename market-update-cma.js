@@ -1,0 +1,398 @@
+/* ── CMA in Market Update ────────────────────────────────────────────────────
+   Search the MLS instead of uploading an export: the subject's facts, the
+   comparable sales with a confidence score, adjustments worked out from local
+   sales (the agent can change any of them), and a recommended price from the
+   adjusted $/sq ft. All numbers come from the server (server/cma-routes.js,
+   server/cma/*.js); rules: "CMA" in server/docs/business-rules.md.
+
+   Daytona sales come through the agent's own Flexmls sign-in, or John's when
+   they haven't connected (server/flexmls-auth.js). Stellar comes through
+   Bridge and needs nothing from the agent.
+
+   The search results also feed the page's existing market pages (price vs
+   size, $/sq ft, absorption, days on market) through cmaMarketRows(), and
+   the CMA pages are added to the printed report by cmaPagesHTML(). */
+
+const CMA = {
+  mode: 'search',          // 'search' | 'upload'
+  subject: null,           // facts the agent can edit
+  analysis: null,          // /cma/analyze response
+  chosen: new Set(),       // mlsNumbers of the comps the agent picked
+  amounts: {},             // adjustment key → dollars per unit (derived, then the agent's changes)
+  edited: new Set(),       // adjustment keys the agent changed
+  ratePerMonth: 0,
+  cellOverrides: {},       // mlsNumber → { key: dollars }
+  reads: {},               // mlsNumber|'subject' → { condition, conditionLabel, notes }
+  priced: null,            // /cma/price response
+  flexmls: null,           // /flexmls/status response
+};
+const CMA_CONDITIONS = ['Original', 'Updated', 'Remodeled', 'New construction'];
+const CMA_WATER = { none: 'No water', access: 'Water access / view', lake: 'Lake / pond front', canal: 'Canal front', river: 'River / ICW front', ocean: 'Oceanfront', other: 'Waterfront (other)' };
+const cmaEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cmaMoney = n => (n == null || isNaN(n)) ? '—' : (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const cmaDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+const cmaEl = id => document.getElementById(id);
+
+// ── Mode: search the MLS, or upload an export (today's flow) ───────────────
+function cmaSetMode(mode) {
+  CMA.mode = mode;
+  cmaEl('cmaSection').style.display = mode === 'search' ? '' : 'none';
+  cmaEl('uploadGroup').style.display = mode === 'upload' ? '' : 'none';
+  document.querySelectorAll('.cma-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  cmaEl('generateBtn').textContent = mode === 'search' ? '🚀 Generate Report' : '🚀 Generate Reports';
+  if (mode === 'search') cmaFlexmlsStatus();
+}
+
+function cmaStatus(msg, type) {
+  const el = cmaEl('cmaStatus');
+  el.textContent = msg || '';
+  el.className = 'status ' + (type || 'processing');
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function cmaNeedSignIn() {
+  if (Auth.user) return true;
+  cmaStatus('Sign in with your Adams Cameron Google account (below) to search the MLS.', 'error');
+  document.getElementById('zillowOptions').style.display = '';   // the sign-in button lives there
+  zgSignIn();
+  return false;
+}
+
+// ── Daytona connection ─────────────────────────────────────────────────────
+async function cmaFlexmlsStatus() {
+  if (!Auth.user) return cmaRenderFlexmls();
+  try { CMA.flexmls = await Auth.api('/flexmls/status'); } catch (e) { CMA.flexmls = null; }
+  cmaRenderFlexmls();
+}
+
+function cmaRenderFlexmls() {
+  const f = CMA.flexmls, el = cmaEl('cmaFlexmls');
+  if (!f || !f.configured) {
+    el.innerHTML = `<b>Daytona (Flex):</b> not available yet — comps come from Stellar only for now.`;
+    return;
+  }
+  if (f.connected) {
+    el.innerHTML = `<b>Daytona (Flex):</b> connected with your Flexmls account. <a href="#" onclick="cmaFlexmlsDisconnect();return false">Disconnect</a>`;
+  } else {
+    el.innerHTML = `<b>Daytona (Flex):</b> ${f.fallbackAvailable ? 'using the company\'s Flexmls connection.' : 'not connected — comps come from Stellar only.'}
+      <button class="cma-btn-sm" onclick="cmaFlexmlsConnect()">Connect my Flexmls account</button>
+      <div class="input-hint">First turn on the MCP server in Flexmls: Preferences → <a href="https://help.flexmls.com/en/ai-settings--enable-the-mcp-server.html" target="_blank">AI Settings</a>, and accept its terms. You sign in on Flexmls's own page — we never see your password.</div>`;
+  }
+}
+
+async function cmaFlexmlsConnect() {
+  try {
+    const r = await Auth.api('/flexmls/connect', { body: { returnTo: location.origin + location.pathname } });
+    location.href = r.url;
+  } catch (e) { cmaStatus('Couldn\'t start the Flexmls sign-in: ' + e.message, 'error'); }
+}
+async function cmaFlexmlsDisconnect() {
+  try { await Auth.api('/flexmls/disconnect', { body: {} }); } catch (_) {}
+  cmaFlexmlsStatus();
+}
+
+// ── Step 1: the subject ────────────────────────────────────────────────────
+async function cmaLookup() {
+  if (!(await cmaNeedSignIn())) return;
+  const address = cmaEl('subjectAddress').value.trim();
+  if (!address) return cmaStatus('Enter the subject property\'s address first.', 'error');
+  cmaStatus('🔎 Looking the address up in the MLS…');
+  try {
+    const r = await Auth.api('/cma/subject', { body: { address } });
+    let s = r.subject;
+    if (!s) {
+      s = { address, sqft: null, beds: null, baths: null, yearBuilt: null, garage: null, pool: null, water: null, golf: null, subdivision: null, subType: 'Single Family Residence', lat: null, lon: null };
+      cmaStatus('This home isn\'t in the MLS search results — enter its facts below. (Its location is needed to find comparables: try the address as the MLS lists it.)', 'error');
+    } else {
+      cmaStatus(`Found ${s.address} in ${s.source === 'daytona' ? 'Daytona' : 'Stellar'} (MLS# ${s.mlsNumber}, ${s.status}${s.closeDate ? ' ' + cmaDate(s.closeDate) : ''}). Check the facts below — the MLS record may be out of date.`, 'success');
+    }
+    // County living area is the tie-breaker when the MLS has none
+    if (!s.sqft) {
+      try { const c = await countyLookup(address, cmaEl('subjectUnit').value.trim()); if (c && c.livingArea) s.sqft = c.livingArea; } catch (_) {}
+    }
+    CMA.subject = s;
+    CMA.analysis = null; CMA.priced = null; CMA.chosen.clear(); CMA.reads = {}; CMA.cellOverrides = {};
+    cmaRenderSubject();
+    cmaRenderComps(); cmaRenderAdjust(); cmaRenderPrice();
+  } catch (e) { cmaStatus('Couldn\'t look the address up: ' + e.message, 'error'); }
+}
+
+function cmaRenderSubject() {
+  const s = CMA.subject, el = cmaEl('cmaSubject');
+  if (!s) { el.innerHTML = ''; return; }
+  const num = (k, label, step) => `<div><label>${label}</label><input type="number" step="${step || 1}" value="${s[k] ?? ''}" oninput="cmaSubjectSet('${k}', this.value === '' ? null : Number(this.value))"></div>`;
+  const yn = (k, label) => `<div><label>${label}</label><select onchange="cmaSubjectSet('${k}', this.value === '' ? null : this.value === 'yes')">
+      <option value="" ${s[k] == null ? 'selected' : ''}>Unknown</option><option value="yes" ${s[k] === true ? 'selected' : ''}>Yes</option><option value="no" ${s[k] === false ? 'selected' : ''}>No</option></select></div>`;
+  const read = CMA.reads.subject;
+  el.innerHTML = `
+    <div class="cma-grid">
+      ${num('sqft', 'Living area (sq ft)')}${num('beds', 'Bedrooms')}${num('baths', 'Bathrooms', 0.5)}${num('yearBuilt', 'Year built')}${num('garage', 'Garage spaces')}
+      ${yn('pool', 'Private pool')}${yn('golf', 'On a golf course')}
+      <div><label>Water</label><select onchange="cmaSubjectSet('water', this.value || null)"><option value="">Unknown</option>
+        ${Object.entries(CMA_WATER).map(([k, v]) => `<option value="${k}" ${s.water === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div><label>Condition</label><select onchange="cmaSubjectSet('condition', this.value === '' ? null : Number(this.value))"><option value="">Unknown</option>
+        ${CMA_CONDITIONS.map((c, i) => `<option value="${i}" ${s.condition === i ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      <div style="grid-column:span 2"><label>Subdivision</label><input type="text" value="${cmaEsc(s.subdivision || '')}" oninput="cmaSubjectSet('subdivision', this.value)"></div>
+    </div>
+    ${read && read.notes.length ? `<p class="input-hint">AI read of the remarks: ${cmaEsc(read.notes.join(' · '))}</p>` : ''}
+    <button class="button-primary" style="margin-top:12px" onclick="cmaAnalyze()">Find comparable sales</button>`;
+}
+
+function cmaSubjectSet(k, v) {
+  CMA.subject[k] = v;
+  if (k === 'sqft' && v) cmaEl('subjectSqft').value = v;
+  if (CMA.priced) cmaReprice();
+}
+
+// ── Step 2: comparables ────────────────────────────────────────────────────
+async function cmaAnalyze() {
+  if (!(await cmaNeedSignIn())) return;
+  const s = CMA.subject;
+  if (!s || s.lat == null) return cmaStatus('The subject\'s location is needed — look the address up first.', 'error');
+  if (!s.sqft) return cmaStatus('Enter the subject\'s living area.', 'error');
+  cmaStatus('🔎 Searching closed sales nearby and working out the adjustments… (about 10–30 seconds)');
+  try {
+    const a = await Auth.api('/cma/analyze', { body: { subject: s } });
+    CMA.analysis = a;
+    CMA.chosen = new Set(a.candidates.filter(c => c.suggested).map(c => c.mlsNumber));
+    CMA.amounts = Object.fromEntries(a.adjustments.adjustments.map(x => [x.key, x.amount]));
+    CMA.edited.clear();
+    CMA.ratePerMonth = a.adjustments.time.ratePerMonth;
+    CMA.cellOverrides = {};
+    const src = a.sources.daytona === 'ok' ? 'Stellar and Daytona' : 'Stellar' + (a.sources.daytona === 'not_connected' ? ' (Daytona not connected)' : ' (Daytona didn\'t answer)');
+    cmaStatus(`Found ${a.candidates.filter(c => c.inTier).length} sales within ${a.tier.miles} mi over ${a.tier.months} months from ${src}. ${CMA.chosen.size} are ticked as the best matches — change the selection as you like.`, 'success');
+    cmaRenderComps(); cmaRenderAdjust();
+    await cmaReprice();
+  } catch (e) { cmaStatus('Couldn\'t search the MLS: ' + e.message, 'error'); }
+}
+
+function cmaRenderComps() {
+  const el = cmaEl('cmaComps'), a = CMA.analysis;
+  if (!a) { el.innerHTML = ''; return; }
+  const show = c => c.inTier && !c.outlier || CMA.chosen.has(c.mlsNumber) || cmaEl('cmaShowAll')?.checked;
+  const rows = a.candidates.filter(show).map(c => {
+    const flag = c.acrossWater && c.acrossWater.length ? ' cma-across' : '';
+    const read = CMA.reads[c.mlsNumber];
+    return `<tr class="${CMA.chosen.has(c.mlsNumber) ? 'on' : ''}${flag}">
+      <td><input type="checkbox" ${CMA.chosen.has(c.mlsNumber) ? 'checked' : ''} onchange="cmaToggle('${cmaEsc(c.mlsNumber)}', this.checked)"></td>
+      <td><span class="cma-score" style="background:${c.score >= 75 ? '#1A7A4C' : c.score >= 55 ? '#C9A84C' : '#C0392B'}">${c.score}</span></td>
+      <td><b>${cmaEsc(c.address)}</b><div class="cma-sub">${cmaEsc(c.subdivision || '')} · ${c.source === 'daytona' ? 'Daytona' : 'Stellar'} ${cmaEsc(c.mlsNumber)}${c.outlier ? ' · <b>priced far from the others</b>' : ''}${!c.inTier ? ' · outside the search area/time' : ''}</div>
+        <div class="cma-reasons">${(c.reasons || []).map(r => `<span${/less comparable/.test(r) ? ' class="warn"' : ''}>${cmaEsc(r)}</span>`).join('')}</div>
+        ${read && read.notes.length ? `<div class="cma-sub">AI read: ${cmaEsc(read.notes.join(' · '))}</div>` : ''}</td>
+      <td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
+      <td>${c.sqft ? cmaMoney(c.closePrice / c.sqft) : '—'}</td><td>${c.beds ?? '—'}/${c.baths ?? '—'}</td><td>${c.yearBuilt || '—'}</td>
+      <td>${cmaEsc(CMA_WATER[c.water] || '—')}${c.pool ? '<br>Pool' : ''}${c.golf ? '<br>Golf' : ''}</td>
+      <td><select onchange="cmaSetCondition('${cmaEsc(c.mlsNumber)}', this.value)"><option value="">—</option>
+        ${CMA_CONDITIONS.map((x, i) => `<option value="${i}" ${c.condition === i ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
+    </tr>`;
+  }).join('');
+  const listings = (a.listings || []).filter(l => l.sqft && l.listPrice);
+  el.innerHTML = `
+    <div class="cma-toolbar">
+      <label class="check-label" style="font-weight:400"><input type="checkbox" id="cmaShowAll" onchange="cmaRenderComps()"> Show sales left out (outliers, outside the area)</label>
+      <button class="cma-btn-sm" onclick="cmaReadRemarks()">✨ Read the remarks (condition)</button>
+    </div>
+    <div class="cma-table-wrap"><table class="cma-table">
+      <tr><th></th><th>Score</th><th>Sale</th><th>Sold</th><th>Price</th><th>Sq ft</th><th>$/sq ft</th><th>Bd/Ba</th><th>Built</th><th>Features</th><th>Condition</th></tr>
+      ${rows}</table></div>
+    <p class="input-hint">Score out of 100: distance, subdivision, size, how recent, beds/baths, water, age, golf, pool and kind of home. Sales across a major waterway are marked and scored lower — use them only when the subject's side has too few.</p>
+    ${listings.length ? `<details style="margin-top:10px"><summary><b>${listings.length} active and pending listings within a mile</b> (the competition — not used in the price)</summary>
+      <div class="cma-table-wrap"><table class="cma-table"><tr><th>Address</th><th>Status</th><th>List price</th><th>Sq ft</th><th>$/sq ft</th><th>Days</th></tr>
+      ${listings.slice(0, 40).map(l => `<tr><td>${cmaEsc(l.address)}</td><td>${cmaEsc(l.status)}</td><td>${cmaMoney(l.listPrice)}</td><td>${l.sqft.toLocaleString()}</td><td>${cmaMoney(l.listPrice / l.sqft)}</td><td>${l.dom ?? '—'}</td></tr>`).join('')}
+      </table></div></details>` : ''}`;
+}
+
+function cmaToggle(mls, on) {
+  on ? CMA.chosen.add(mls) : CMA.chosen.delete(mls);
+  cmaRenderComps();
+  cmaReprice();
+}
+
+function cmaSetCondition(mls, v) {
+  const c = CMA.analysis.candidates.find(x => x.mlsNumber === mls);
+  if (c) c.condition = v === '' ? null : Number(v);
+  cmaReprice();
+}
+
+async function cmaReadRemarks() {
+  const chosen = cmaChosenComps();
+  if (!chosen.length) return cmaStatus('Tick some comparables first.', 'error');
+  cmaStatus('✨ Reading the listing remarks for condition and features the MLS fields miss…');
+  try {
+    const r = await Auth.api('/cma/read-remarks', { body: { subject: CMA.subject, comps: chosen } });
+    CMA.reads = r.reads || {};
+    for (const c of CMA.analysis.candidates) if (CMA.reads[c.mlsNumber] && CMA.reads[c.mlsNumber].condition != null) c.condition = CMA.reads[c.mlsNumber].condition;
+    if (CMA.reads.subject && CMA.reads.subject.condition != null && CMA.subject.condition == null) CMA.subject.condition = CMA.reads.subject.condition;
+    cmaStatus('Condition filled in from the remarks — check each one; you know these homes better than the remarks do.', 'success');
+    cmaRenderSubject(); cmaRenderComps();
+    cmaReprice();
+  } catch (e) { cmaStatus(e.message, 'error'); }
+}
+
+const cmaChosenComps = () => CMA.analysis ? CMA.analysis.candidates.filter(c => CMA.chosen.has(c.mlsNumber)) : [];
+
+// ── Step 3: adjustments ────────────────────────────────────────────────────
+function cmaRenderAdjust() {
+  const el = cmaEl('cmaAdjust'), a = CMA.analysis;
+  if (!a) { el.innerHTML = ''; return; }
+  const badge = m => `<span class="cma-method ${m}">${m === 'regression' ? 'measured' : m === 'paired' ? 'paired sales' : 'estimate'}</span>`;
+  const rows = a.adjustments.adjustments.map(x => `
+    <tr class="${CMA.edited.has(x.key) ? 'edited' : ''}"><td>${cmaEsc(x.label)}</td>
+      <td><input type="number" step="500" value="${CMA.amounts[x.key]}" onchange="cmaSetAmount('${x.key}', this.value)"></td>
+      <td>${CMA.edited.has(x.key) ? '<span class="cma-method edited">changed by you</span>' : badge(x.method)}</td>
+      <td class="cma-basis">${cmaEsc(x.basis)}</td></tr>`).join('');
+  const t = a.adjustments.time;
+  el.innerHTML = `
+    <p class="input-hint">Worked out from ${a.pool.sales} sales of this kind of home within ${a.pool.radiusMiles} miles over ${a.pool.months} months${a.pool.sameSideOnly ? ', on the subject\'s side of the water' : ''}. Each comparable is moved toward the subject by these amounts; size is handled by the price per square foot, so it isn't adjusted here.</p>
+    <div class="cma-table-wrap"><table class="cma-table cma-adj">
+      <tr><th>Difference</th><th>Amount</th><th>How</th><th>Basis</th></tr>${rows}
+      <tr class="${CMA.edited.has('time') ? 'edited' : ''}"><td>Market change (per month)</td>
+        <td><input type="number" step="0.1" value="${(CMA.ratePerMonth * 100).toFixed(2)}" onchange="cmaSetRate(this.value)"> %</td>
+        <td>${CMA.edited.has('time') ? '<span class="cma-method edited">changed by you</span>' : badge(t.method)}</td><td class="cma-basis">${cmaEsc(t.basis)}</td></tr>
+    </table></div>
+    <div id="cmaGrid"></div>`;
+  cmaRenderGrid();
+}
+
+function cmaSetAmount(key, v) { CMA.amounts[key] = Number(v) || 0; CMA.edited.add(key); cmaRenderAdjust(); cmaReprice(); }
+function cmaSetRate(v) { CMA.ratePerMonth = (Number(v) || 0) / 100; CMA.edited.add('time'); cmaRenderAdjust(); cmaReprice(); }
+
+function cmaRenderGrid() {
+  const el = cmaEl('cmaGrid');
+  if (!el) return;
+  const p = CMA.priced;
+  if (!p || !p.comps.length) { el.innerHTML = ''; return; }
+  const keys = [...new Set(p.comps.flatMap(c => c.lines.map(l => l.key)))];
+  const label = k => (p.comps.flatMap(c => c.lines).find(l => l.key === k) || {}).label || k;
+  el.innerHTML = `<h4 style="margin:16px 0 6px;color:var(--navy)">Adjustment grid</h4>
+    <p class="input-hint">Change any cell to override it for that sale only.</p>
+    <div class="cma-table-wrap"><table class="cma-table cma-grid-t">
+    <tr><th>Sale</th><th>Sold for</th>${keys.map(k => `<th>${cmaEsc(label(k))}</th>`).join('')}<th>Adjusted</th><th>Adj. $/sq ft</th></tr>
+    ${p.comps.map(c => {
+      const over = CMA.cellOverrides[c.mlsNumber] || {};
+      return `<tr><td>${cmaEsc(c.address)}</td><td>${cmaMoney(c.closePrice)}</td>
+      ${keys.map(k => { const l = c.lines.find(x => x.key === k); const v = over[k] ?? (l ? l.amount : 0);
+        return `<td class="${over[k] != null ? 'edited' : ''}"><input type="number" step="500" value="${v}" onchange="cmaSetCell('${cmaEsc(c.mlsNumber)}','${k}',this.value)"></td>`; }).join('')}
+      <td><b>${cmaMoney(c.adjustedPrice)}</b></td><td>${cmaMoney(c.adjustedPrice / c.sqft)}</td></tr>`; }).join('')}
+    </table></div>`;
+}
+
+function cmaSetCell(mls, key, v) {
+  (CMA.cellOverrides[mls] = CMA.cellOverrides[mls] || {})[key] = Number(v) || 0;
+  cmaReprice();
+}
+
+// ── Step 4: the price ──────────────────────────────────────────────────────
+let cmaRepriceTimer = null;
+function cmaReprice() {
+  clearTimeout(cmaRepriceTimer);
+  return new Promise(resolve => {
+    cmaRepriceTimer = setTimeout(async () => {
+      const comps = cmaChosenComps().map(c => ({ ...c, remarks: undefined, cellOverrides: CMA.cellOverrides[c.mlsNumber] || {} }));
+      try {
+        CMA.priced = await Auth.api('/cma/price', { body: { subject: CMA.subject, comps, amounts: CMA.amounts, ratePerMonth: CMA.ratePerMonth } });
+      } catch (e) { cmaStatus('Couldn\'t work out the price: ' + e.message, 'error'); }
+      cmaRenderGrid(); cmaRenderPrice();
+      resolve();
+    }, 250);
+  });
+}
+
+function cmaRenderPrice() {
+  const el = cmaEl('cmaPrice'), p = CMA.priced;
+  if (!p) { el.innerHTML = ''; return; }
+  const r = p.recommendation;
+  if (r.status !== 'ok') { el.innerHTML = `<p class="input-hint">${cmaEsc(r.reason)}</p>`; return; }
+  el.innerHTML = `
+    <div class="cma-price">
+      <div><div class="cma-big">${cmaMoney(r.value)}</div><div class="cma-sub">Recommended price · range ${cmaMoney(r.low)} – ${cmaMoney(r.high)}</div></div>
+      <div><label>Your list price</label><input type="number" id="cmaListPrice" value="${cmaEl('subjectPrice').value || ''}" placeholder="${r.value}" oninput="cmaEl('subjectPrice').value = this.value"></div>
+    </div>
+    <table class="cma-table" style="margin-top:10px"><tr><th>Adjusted $/sq ft</th><th>Per sq ft</th><th>Value at ${Number(CMA.subject.sqft).toLocaleString()} sq ft</th></tr>
+      ${r.table.map(t => `<tr><td>${t.label}</td><td>${cmaMoney(t.pricePerSqft)}</td><td>${cmaMoney(t.value)}</td></tr>`).join('')}</table>
+    <p class="input-hint">${cmaEsc(r.how)}</p>`;
+}
+
+// ── Into the report ────────────────────────────────────────────────────────
+// Rows in parseMLSData()'s shape, so the existing market pages work from the search
+function cmaMarketRows() {
+  const a = CMA.analysis;
+  if (!a) return [];
+  const sold = a.candidates.filter(c => c.inTier && c.closePrice && c.sqft).map(c => ({
+    status: 'Closed', sqft: c.sqft, price: c.closePrice, pricePerSqft: c.closePrice / c.sqft,
+    closeDate: c.closeDate ? new Date(c.closeDate + 'T12:00:00') : null, dom: c.dom, city: c.city || '', zip: c.zip || '' }));
+  const active = (a.listings || []).filter(l => /^active$/i.test(l.status || '') && l.listPrice && l.sqft).map(l => ({
+    status: 'Active', sqft: l.sqft, price: l.listPrice, pricePerSqft: l.listPrice / l.sqft, closeDate: null, dom: l.dom, city: l.city || '', zip: l.zip || '' }));
+  return [...sold, ...active];
+}
+
+// Snapshot for the printed report
+function cmaReportData() {
+  if (!CMA.priced || CMA.priced.recommendation.status !== 'ok') return null;
+  const byMls = Object.fromEntries(cmaChosenComps().map(c => [c.mlsNumber, c]));
+  return {
+    subject: { ...CMA.subject },
+    comps: CMA.priced.comps.map(p => ({ ...byMls[p.mlsNumber], ...p })),
+    recommendation: CMA.priced.recommendation,
+    adjustments: CMA.analysis.adjustments.adjustments.map(x => ({ ...x, amount: CMA.amounts[x.key], edited: CMA.edited.has(x.key) })),
+    ratePerMonth: CMA.ratePerMonth, rateEdited: CMA.edited.has('time'),
+    overrides: Object.entries(CMA.cellOverrides).flatMap(([mls, o]) => Object.entries(o).map(([k, v]) => ({ address: (byMls[mls] || {}).address, key: k, amount: v }))),
+    pool: CMA.analysis.pool, tier: CMA.analysis.tier, listPrice: Number(cmaEl('subjectPrice').value) || null,
+  };
+}
+
+function cmaPagesHTML(d, header) {
+  const footer = '<div class="page-footer">© Adams, Cameron &amp; Co. 2026</div>';
+  const page = content => `<section class="print-page">${header}<div class="page-body zg-body">${content}</div>${footer}</section>`;
+  const s = d.subject, r = d.recommendation;
+  const facts = [['Living area', s.sqft ? Number(s.sqft).toLocaleString() + ' sq ft' : '—'], ['Bedrooms / baths', `${s.beds ?? '—'} / ${s.baths ?? '—'}`],
+    ['Year built', s.yearBuilt || '—'], ['Garage', s.garage != null ? s.garage + ' spaces' : '—'], ['Pool', s.pool == null ? '—' : s.pool ? 'Yes' : 'No'],
+    ['Water', CMA_WATER[s.water] || '—'], ['Golf course', s.golf == null ? '—' : s.golf ? 'Yes' : 'No'], ['Condition', s.condition != null ? CMA_CONDITIONS[s.condition] : '—'],
+    ['Subdivision', s.subdivision || '—']];
+  const keys = [...new Set(d.comps.flatMap(c => c.lines.map(l => l.key)))];
+  const label = k => (d.comps.flatMap(c => c.lines).find(l => l.key === k) || {}).label || k;
+  const changed = d.adjustments.filter(a => a.edited);
+  return page(`
+      <h2 style="color:#1e3c72;margin-bottom:6px">Comparative Market Analysis</h2>
+      <p style="margin-bottom:12px"><b>${zgEsc(s.address)}</b>${s.city ? ', ' + zgEsc(s.city) : ''}</p>
+      <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <table class="zg-compact">${facts.map(([k, v]) => `<tr><td>${k}</td><td>${zgEsc(v)}</td></tr>`).join('')}</table>
+        <div style="flex:1;min-width:240px;background:#f4f6f9;border-radius:8px;padding:16px">
+          <div style="font-size:.8em;color:#666;text-transform:uppercase;letter-spacing:.5px">Recommended price</div>
+          <div style="font-size:2em;font-weight:700;color:#1e3c72">${cmaMoney(r.value)}</div>
+          <div style="color:#555">Range ${cmaMoney(r.low)} – ${cmaMoney(r.high)}</div>
+          ${d.listPrice ? `<div style="margin-top:10px">Suggested list price: <b>${cmaMoney(d.listPrice)}</b></div>` : ''}
+        </div>
+      </div>
+      <h3 style="color:#1e3c72;margin:18px 0 6px">Comparable sales</h3>
+      <table class="zg-compact"><tr><th>Address</th><th>Sold</th><th>Price</th><th>Sq ft</th><th>Bd/Ba</th><th>Built</th><th>Distance</th><th>Adjusted</th><th>Adj. $/sq ft</th></tr>
+        ${d.comps.map(c => `<tr><td>${zgEsc(c.address)}${c.acrossWater && c.acrossWater.length ? ' *' : ''}</td><td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
+          <td>${c.beds ?? '—'}/${c.baths ?? '—'}</td><td>${c.yearBuilt || '—'}</td><td>${c.distanceMiles != null ? c.distanceMiles + ' mi' : '—'}</td><td><b>${cmaMoney(c.adjustedPrice)}</b></td><td>${cmaMoney(c.adjustedPrice / c.sqft)}</td></tr>`).join('')}</table>
+      ${d.comps.some(c => c.acrossWater && c.acrossWater.length) ? '<p style="font-size:.8em;color:#666;margin-top:4px">* Across a major waterway from the subject — less comparable, used because the subject\'s side had too few recent sales.</p>' : ''}
+      <h3 style="color:#1e3c72;margin:18px 0 6px">Price per square foot after adjustments</h3>
+      <table class="zg-compact"><tr><th></th><th>Per sq ft</th><th>Value at ${Number(s.sqft).toLocaleString()} sq ft</th></tr>
+        ${r.table.map(t => `<tr><td>${t.label}</td><td>${cmaMoney(t.pricePerSqft)}</td><td>${cmaMoney(t.value)}</td></tr>`).join('')}</table>
+      <p style="font-size:.85em;color:#555;margin-top:6px">${zgEsc(r.how)}</p>`)
+    + page(`
+      <h2 style="color:#1e3c72;margin-bottom:6px">Adjustments</h2>
+      <p style="font-size:.85em;color:#555;margin-bottom:10px">Each sale is adjusted toward the subject for its differences. Amounts are measured from ${d.pool.sales} local sales over ${d.pool.months} months where the data allows${changed.length || d.rateEdited ? '; amounts marked † were set by the agent' : ''}.</p>
+      <table class="zg-compact"><tr><th>Sale</th><th>Sold for</th>${keys.map(k => `<th>${zgEsc(label(k))}</th>`).join('')}<th>Adjusted</th></tr>
+        ${d.comps.map(c => `<tr><td>${zgEsc(c.address)}</td><td>${cmaMoney(c.closePrice)}</td>${keys.map(k => { const l = c.lines.find(x => x.key === k); return `<td>${l ? cmaMoney(l.amount) : ''}</td>`; }).join('')}<td><b>${cmaMoney(c.adjustedPrice)}</b></td></tr>`).join('')}</table>
+      <h3 style="color:#1e3c72;margin:16px 0 6px">Amounts used</h3>
+      <table class="zg-compact"><tr><th>Difference</th><th>Amount</th><th>Basis</th></tr>
+        ${d.adjustments.filter(a => d.comps.some(c => c.lines.some(l => l.key === a.key))).map(a => `<tr><td>${zgEsc(a.label)}${a.edited ? ' †' : ''}</td><td>${cmaMoney(a.amount)}</td><td style="font-size:.85em">${a.edited ? 'Set by the agent' : zgEsc(a.basis)}</td></tr>`).join('')}
+        ${d.ratePerMonth ? `<tr><td>Market change${d.rateEdited ? ' †' : ''}</td><td>${(d.ratePerMonth * 100).toFixed(2)}% a month</td><td style="font-size:.85em">${d.rateEdited ? 'Set by the agent' : 'Measured from local sales'}</td></tr>` : ''}</table>
+      ${d.overrides.length ? `<p style="font-size:.85em;color:#555;margin-top:8px">Changed by the agent for single sales: ${d.overrides.map(o => `${zgEsc(o.address)} (${zgEsc(label(o.key))} ${cmaMoney(o.amount)})`).join('; ')}.</p>` : ''}
+      <p style="font-size:.8em;color:#777;margin-top:14px">This analysis is an estimate of market value prepared by a real estate licensee from MLS sales data. It is not an appraisal. Waterway boundaries: © OpenStreetMap contributors.</p>`);
+}
+
+// Back from the Flexmls sign-in page
+window.addEventListener('load', () => {
+  const p = new URLSearchParams(location.search);
+  const f = p.get('flexmls');
+  if (!f) return;
+  history.replaceState(null, '', location.pathname);
+  cmaSetMode('search');
+  cmaStatus(f === 'connected' ? 'Your Flexmls account is connected — Daytona sales are included in your searches.'
+    : f === 'expired' ? 'The Flexmls sign-in took too long — try connecting again.' : 'The Flexmls sign-in didn\'t finish — try again.', f === 'connected' ? 'success' : 'error');
+});
