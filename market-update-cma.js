@@ -75,10 +75,20 @@ async function cmaFlexmlsStatus() {
   cmaRenderFlexmls();
 }
 
+// Connecting Flexmls is hidden from agents while Flexmls refuses our app ("MCP has not been
+// enabled for your MLS", 2026-11-05, even on a fresh login with MCP on). Reachable for testing
+// with market-update.html?flexmls-setup; set to true once Flexmls/DBAR enable the app.
+const CMA_FLEXMLS_OPEN = false;
+const cmaFlexmlsSetup = () => CMA_FLEXMLS_OPEN || new URLSearchParams(location.search).has('flexmls-setup');
+
 function cmaRenderFlexmls() {
   const f = CMA.flexmls, el = cmaEl('cmaFlexmls');
-  if (!f || !f.configured) {
-    el.innerHTML = `<b>Daytona (Flex):</b> not available yet — comps come from Stellar only for now.`;
+  if (!Auth.user) {
+    el.innerHTML = `<b>Sign in to search the MLS</b> — use the Google sign-in below (in the Zillow section), or look a home up and you'll be asked.`;
+    return;
+  }
+  if (!f || !f.configured || (!cmaFlexmlsSetup() && !(f.connected && ((f.account || {}).mcp || {}).call?.ok))) {
+    el.innerHTML = `<b>Daytona (Flex):</b> Daytona sales aren't available yet — comps come from Stellar.`;
     return;
   }
   if (f.connected) {
@@ -98,7 +108,7 @@ function cmaRenderFlexmls() {
 
 async function cmaFlexmlsConnect() {
   try {
-    const r = await Auth.api('/flexmls/connect', { body: { returnTo: location.origin + location.pathname } });
+    const r = await Auth.api('/flexmls/connect', { body: { returnTo: location.origin + location.pathname + (cmaFlexmlsSetup() ? '?flexmls-setup' : '') } });
     location.href = r.url;
   } catch (e) { cmaStatus('Couldn\'t start the Flexmls sign-in: ' + e.message, 'error'); }
 }
@@ -223,7 +233,8 @@ async function cmaAnalyze() {
     CMA.ratePerMonth = a.adjustments.time.ratePerMonth;
     CMA.cellOverrides = {};
     const src = a.sources.daytona === 'ok' ? 'Stellar and Daytona'
-      : a.sources.daytona === 'not_connected' ? 'Stellar (Daytona not connected)'
+      : a.sources.daytona === 'not_connected' ? (cmaFlexmlsSetup() ? 'Stellar (Daytona not connected)' : "Stellar (Daytona sales aren't available yet)")
+      : a.sources.daytona === 'not_enabled' && !cmaFlexmlsSetup() ? "Stellar (Daytona sales aren't available yet)"
       : a.sources.daytona === 'not_enabled' ? `Stellar only — Flexmls refused the Daytona search: "${a.sources.daytonaMessage}"`
       : 'Stellar (Daytona didn\'t answer' + (a.sources.daytonaMessage ? `: ${a.sources.daytonaMessage}` : '') + ')';
     cmaStatus(`Found ${a.candidates.filter(c => c.inTier).length} sales within ${a.tier.miles} mi over ${a.tier.months} months from ${src}. ${CMA.chosen.size} are ticked as the best matches — change the selection as you like.`, 'success');
