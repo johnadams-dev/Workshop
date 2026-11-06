@@ -245,7 +245,7 @@ async function cmaAnalyze() {
       : a.sources.daytona === 'not_enabled' && !cmaFlexmlsSetup() ? "Stellar (Daytona sales aren't available yet)"
       : a.sources.daytona === 'not_enabled' ? `Stellar only — Flexmls refused the Daytona search: "${a.sources.daytonaMessage}"`
       : 'Stellar (Daytona didn\'t answer' + (a.sources.daytonaMessage ? `: ${a.sources.daytonaMessage}` : '') + ')';
-    cmaStatus(`Found ${a.candidates.filter(c => c.inTier).length} sales within ${a.tier.miles} mi over ${a.tier.months} months from ${src}. ${CMA.chosen.size} are ticked as the best matches — change the selection as you like.`, 'success');
+    cmaStatus(`Found ${a.candidates.filter(c => c.inTier).length} sales within ${a.tier.miles} mi over ${a.tier.months} months from ${src}. ${cmaFrontageNote(a)}${CMA.chosen.size} are ticked as the best matches — change the selection as you like.`, 'success');
     cmaRenderComps(); cmaRenderAdjust();
     await cmaReprice();
   } catch (e) { cmaStatus('Couldn\'t search the MLS: ' + e.message, 'error'); }
@@ -253,7 +253,16 @@ async function cmaAnalyze() {
 
 const cmaScoreColor = score => score >= 75 ? '#1A7A4C' : score >= 55 ? '#C9A84C' : '#C0392B';
 // The sales shown in the table and on the map
-const cmaShownComps = () => CMA.analysis.candidates.filter(c => c.inTier && !c.outlier || CMA.chosen.has(c.mlsNumber) || CMA.showAll);
+const cmaShownComps = () => CMA.analysis.candidates.filter(c => (c.inTier || c.frontageMatch) && !c.outlier || CMA.chosen.has(c.mlsNumber) || CMA.showAll);
+
+// When the subject is on the water, say how far the search looked for the same frontage
+function cmaFrontageNote(a) {
+  const n = a.candidates.filter(c => c.frontageMatch && !c.outlier).length;
+  if (!a.frontageTier) return '';
+  const label = (CMA_WATER[CMA.subject.water] || 'same frontage').toLowerCase();
+  return n ? `${n} with the same frontage (${label}) on this side within ${a.frontageTier.miles} mi over ${a.frontageTier.months} months. `
+    : `No other ${label} sales on this side within ${a.frontageTier.miles} mi over ${a.frontageTier.months} months. `;
+}
 
 function cmaRenderComps() {
   const el = cmaEl('cmaComps'), a = CMA.analysis;
@@ -264,7 +273,7 @@ function cmaRenderComps() {
     return `<tr class="${CMA.chosen.has(c.mlsNumber) ? 'on' : ''}${flag}">
       <td><input type="checkbox" ${CMA.chosen.has(c.mlsNumber) ? 'checked' : ''} onchange="cmaToggle('${cmaEsc(c.mlsNumber)}', this.checked)"></td>
       <td><span class="cma-score" style="background:${cmaScoreColor(c.score)}">${c.score}</span></td>
-      <td><b><a href="#" class="cma-comp-link" title="Show on the map" onclick="cmaFocusPin('${cmaEsc(c.mlsNumber)}');return false">${cmaEsc(c.address)}</a></b><div class="cma-sub">${cmaEsc(c.subdivision || '')} · ${c.source === 'daytona' ? 'Daytona' : 'Stellar'} ${cmaEsc(c.mlsNumber)}${c.outlier ? ' · <b>priced far from the others</b>' : ''}${!c.inTier ? ' · outside the search area/time' : ''}</div>
+      <td><b><a href="#" class="cma-comp-link" title="Show on the map" onclick="cmaFocusPin('${cmaEsc(c.mlsNumber)}');return false">${cmaEsc(c.address)}</a></b><div class="cma-sub">${cmaEsc(c.subdivision || '')} · ${c.source === 'daytona' ? 'Daytona' : 'Stellar'} ${cmaEsc(c.mlsNumber)}${c.outlier ? ' · <b>priced far from the others</b>' : ''}${!c.inTier && !c.frontageMatch ? ' · outside the search area/time' : ''}</div>
         <div class="cma-reasons">${(c.reasons || []).map(r => `<span${/less comparable/.test(r) ? ' class="warn"' : ''}>${cmaEsc(r)}</span>`).join('')}</div>
         ${read && read.notes.length ? `<div class="cma-sub">AI read: ${cmaEsc(read.notes.join(' · '))}</div>` : ''}</td>
       <td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
@@ -431,27 +440,20 @@ async function cmaRenderMap() {
   }
 }
 
-// The report's map: a Static Maps image, the subject plus chosen comps lettered A, B, C…
-// in the order of the report's table. Stays under Google's 8,192-character URL limit.
-const CMA_STATIC_MAX = 8000;
+// The report's map: the subject plus chosen comps lettered A, B, C… in the order of the
+// report's table. The server fetches the image with its private key (POST /maps/static)
+// and the report embeds it. No image, no map: the report still prints.
 const cmaCompLetter = i => i < 26 ? String.fromCharCode(65 + i) : '';
-function cmaStaticMapUrl(subject, comps, key = WorkshopMap.KEY) {
-  const params = new URLSearchParams({ size: '640x270', scale: '2', maptype: 'roadmap', key });
-  const hasSubject = cmaHasPoint(subject);
-  if (hasSubject) params.append('markers', `color:0x1B3A5C|label:H|${subject.lat},${subject.lon}`);
-  let added = 0;
-  (comps || []).forEach((c, i) => {
-    const letter = cmaCompLetter(i);
-    if (!letter || !cmaHasPoint(c)) return;
-    const across = c.acrossWater && c.acrossWater.length;
-    const next = new URLSearchParams(params);
-    next.append('markers', `color:${across ? '0xE67E22' : '0x2E75B6'}|label:${letter}|${c.lat},${c.lon}`);
-    if (`https://maps.googleapis.com/maps/api/staticmap?${next}`.length > CMA_STATIC_MAX) return;
-    params.append('markers', `color:${across ? '0xE67E22' : '0x2E75B6'}|label:${letter}|${c.lat},${c.lon}`);
-    added++;
-  });
-  if (!hasSubject && !added) return null;
-  return `https://maps.googleapis.com/maps/api/staticmap?${params}`;
+function cmaStaticMapRequest(subject, comps) {
+  return {
+    home: cmaHasPoint(subject) ? { lat: subject.lat, lon: subject.lon } : null,
+    comps: (comps || []).map((c, i) => ({ lat: c.lat, lon: c.lon, letter: cmaCompLetter(i), across: !!(c.acrossWater && c.acrossWater.length) }))
+      .filter(c => c.letter && cmaHasPoint(c)),
+  };
+}
+async function cmaFetchMapImage(d) {
+  try { return (await Auth.api('/maps/static', { body: cmaStaticMapRequest(d.subject, d.comps) })).dataUrl || null; }
+  catch (e) { console.warn('Report map left out:', e.message); return null; }
 }
 
 function cmaToggle(mls, on) {
@@ -610,7 +612,7 @@ function cmaPagesHTML(d, header) {
   const keys = [...new Set(d.comps.flatMap(c => c.lines.map(l => l.key)))];
   const label = k => (d.comps.flatMap(c => c.lines).find(l => l.key === k) || {}).label || k;
   const changed = d.adjustments.filter(a => a.edited);
-  const mapUrl = cmaStaticMapUrl(s, d.comps);
+  const mapUrl = d.mapImage;
   return page(`
       <h2 style="color:#1e3c72;margin-bottom:6px">Comparative Market Analysis</h2>
       <p style="margin-bottom:12px"><b>${zgEsc(s.address)}</b>${s.city ? ', ' + zgEsc(s.city) : ''}</p>

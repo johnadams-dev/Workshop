@@ -1,18 +1,15 @@
 /* workshop-map.js — Google Maps for Workshop pages (Market Update's CMA, Hold an Open House).
    Loads Google's script once, only when a page first needs a map, so opening a page
-   without using its map costs nothing.
-
-   The key belongs in the page: a browser key always does. It's restricted to
-   johnadams.org and to the Maps JavaScript and Maps Static services (Cloud project
-   mls-data-sync, key "Workshop Maps (browser)"), so it won't work from anywhere else —
-   including localhost.
+   without using its map costs nothing. Needs auth.js and a signed-in user: the key comes
+   from the server (GET /maps/config, server/maps-routes.js), so it isn't in this repo or
+   on a public page. It's restricted to johnadams.org and the Maps JavaScript service,
+   so maps don't work on localhost.
 
      await WorkshopMap.load();                   // rejects if the map can't be used
      const map = WorkshopMap.create(element, { center: { lat, lng } });
      WorkshopMap.onFailure(() => { ...hide the map... });
 */
 (function () {
-  const KEY = 'AIzaSyBcAM4h9sSW8B1xJnPHnisEfdwHar75otQ';
   let loading = null;
   let failed = false;
   const listeners = [];
@@ -27,19 +24,24 @@
   function load() {
     if (failed) return Promise.reject(new Error('map unavailable'));
     if (loading) return loading;
-    loading = new Promise((resolve, reject) => {
-      window.__workshopMapReady = async () => {
-        try {
-          await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]);
-          resolve(google.maps);
-        } catch (e) { fail(); reject(e); }
-      };
-      const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${KEY}&v=weekly&loading=async&callback=__workshopMapReady`;
-      s.async = true;
-      s.onerror = () => { fail(); reject(new Error("couldn't load Google Maps")); };
-      document.head.appendChild(s);
-    });
+    loading = (async () => {
+      const { browserKey } = await Auth.api('/maps/config');
+      if (!browserKey) throw new Error('the map is not set up');
+      await new Promise((resolve, reject) => {
+        window.__workshopMapReady = async () => {
+          try {
+            await Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]);
+            resolve();
+          } catch (e) { reject(e); }
+        };
+        const s = document.createElement('script');
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(browserKey)}&v=weekly&loading=async&callback=__workshopMapReady`;
+        s.async = true;
+        s.onerror = () => reject(new Error("couldn't load Google Maps"));
+        document.head.appendChild(s);
+      });
+      return google.maps;
+    })().catch(e => { fail(); throw e; });
     return loading;
   }
 
@@ -60,7 +62,7 @@
   }
 
   window.WorkshopMap = {
-    KEY, load, create, fit,
+    load, create, fit,
     onFailure(fn) { if (failed) fn(); else listeners.push(fn); },
     get failed() { return failed; },
   };
