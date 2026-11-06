@@ -234,6 +234,7 @@ async function cmaAnalyze() {
   try {
     const a = await Auth.api('/cma/analyze', { body: { subject: s } });
     CMA.analysis = a;
+    CMA_MAP.fit = true;
     CMA.chosen = new Set(a.candidates.filter(c => c.suggested).map(c => c.mlsNumber));
     CMA.amounts = Object.fromEntries(a.adjustments.adjustments.map(x => [x.key, x.amount]));
     CMA.edited.clear();
@@ -250,17 +251,20 @@ async function cmaAnalyze() {
   } catch (e) { cmaStatus('Couldn\'t search the MLS: ' + e.message, 'error'); }
 }
 
+const cmaScoreColor = score => score >= 75 ? '#1A7A4C' : score >= 55 ? '#C9A84C' : '#C0392B';
+// The sales shown in the table and on the map
+const cmaShownComps = () => CMA.analysis.candidates.filter(c => c.inTier && !c.outlier || CMA.chosen.has(c.mlsNumber) || CMA.showAll);
+
 function cmaRenderComps() {
   const el = cmaEl('cmaComps'), a = CMA.analysis;
-  if (!a) { el.innerHTML = ''; return; }
-  const show = c => c.inTier && !c.outlier || CMA.chosen.has(c.mlsNumber) || cmaEl('cmaShowAll')?.checked;
-  const rows = a.candidates.filter(show).map(c => {
+  if (!a) { el.innerHTML = ''; cmaRenderMap(); return; }
+  const rows = cmaShownComps().map(c => {
     const flag = c.acrossWater && c.acrossWater.length ? ' cma-across' : '';
     const read = CMA.reads[c.mlsNumber];
     return `<tr class="${CMA.chosen.has(c.mlsNumber) ? 'on' : ''}${flag}">
       <td><input type="checkbox" ${CMA.chosen.has(c.mlsNumber) ? 'checked' : ''} onchange="cmaToggle('${cmaEsc(c.mlsNumber)}', this.checked)"></td>
-      <td><span class="cma-score" style="background:${c.score >= 75 ? '#1A7A4C' : c.score >= 55 ? '#C9A84C' : '#C0392B'}">${c.score}</span></td>
-      <td><b>${cmaEsc(c.address)}</b><div class="cma-sub">${cmaEsc(c.subdivision || '')} · ${c.source === 'daytona' ? 'Daytona' : 'Stellar'} ${cmaEsc(c.mlsNumber)}${c.outlier ? ' · <b>priced far from the others</b>' : ''}${!c.inTier ? ' · outside the search area/time' : ''}</div>
+      <td><span class="cma-score" style="background:${cmaScoreColor(c.score)}">${c.score}</span></td>
+      <td><b><a href="#" class="cma-comp-link" title="Show on the map" onclick="cmaFocusPin('${cmaEsc(c.mlsNumber)}');return false">${cmaEsc(c.address)}</a></b><div class="cma-sub">${cmaEsc(c.subdivision || '')} · ${c.source === 'daytona' ? 'Daytona' : 'Stellar'} ${cmaEsc(c.mlsNumber)}${c.outlier ? ' · <b>priced far from the others</b>' : ''}${!c.inTier ? ' · outside the search area/time' : ''}</div>
         <div class="cma-reasons">${(c.reasons || []).map(r => `<span${/less comparable/.test(r) ? ' class="warn"' : ''}>${cmaEsc(r)}</span>`).join('')}</div>
         ${read && read.notes.length ? `<div class="cma-sub">AI read: ${cmaEsc(read.notes.join(' · '))}</div>` : ''}</td>
       <td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
@@ -273,7 +277,7 @@ function cmaRenderComps() {
   const listings = (a.listings || []).filter(l => l.sqft && l.listPrice);
   el.innerHTML = `
     <div class="cma-toolbar">
-      <label class="check-label" style="font-weight:400"><input type="checkbox" id="cmaShowAll" onchange="cmaRenderComps()"> Show sales left out (outliers, outside the area)</label>
+      <label class="check-label" style="font-weight:400"><input type="checkbox" id="cmaShowAll" ${CMA.showAll ? 'checked' : ''} onchange="CMA.showAll = this.checked; cmaRenderComps()"> Show sales left out (outliers, outside the area)</label>
       <button class="cma-btn-sm" onclick="cmaReadRemarks()">✨ Read the remarks (condition)</button>
     </div>
     <div class="cma-table-wrap"><table class="cma-table">
@@ -284,6 +288,170 @@ function cmaRenderComps() {
       <div class="cma-table-wrap"><table class="cma-table"><tr><th>Address</th><th>Status</th><th>List price</th><th>Sq ft</th><th>$/sq ft</th><th>Days</th></tr>
       ${listings.slice(0, 40).map(l => `<tr><td>${cmaEsc(l.address)}</td><td>${cmaEsc(l.status)}</td><td>${cmaMoney(l.listPrice)}</td><td>${l.sqft.toLocaleString()}</td><td>${cmaMoney(l.listPrice / l.sqft)}</td><td>${l.dom ?? '—'}</td></tr>`).join('')}
       </table></div></details>` : ''}`;
+  cmaRenderMap();
+}
+
+// ── The map (workshop-map.js) ──────────────────────────────────────────────
+// Pins are updated in place so ticking a sale doesn't move the map. It's fitted
+// only on a new search. If Google won't draw it, the table still does everything.
+const CMA_MAP = { map: null, pins: new Map(), info: null, openKey: null, fit: false };
+const CMA_STAR = 'M0,-12 L3.5,-4 L12,-4 L5,1.5 L7.5,10 L0,5 L-7.5,10 L-5,1.5 L-12,-4 L-3.5,-4 Z';
+
+// How a sold comp looks: solid and larger when used, hollow when not; orange edge across the water
+function cmaPinStyle(c, used) {
+  const color = cmaScoreColor(c.score);
+  const across = !!(c.acrossWater && c.acrossWater.length);
+  return {
+    scale: used ? 9 : 6,
+    fillColor: used ? color : '#FFFFFF',
+    fillOpacity: 1,
+    strokeColor: across ? '#E67E22' : used ? '#FFFFFF' : color,
+    strokeWeight: across ? 3 : used ? 1.5 : 2,
+  };
+}
+
+const cmaHasPoint = r => r && r.lat != null && r.lon != null;
+
+// What belongs on the map now: { key: { kind, record } }
+function cmaMapItems() {
+  const items = new Map(), a = CMA.analysis;
+  if (!a) return items;
+  if (cmaHasPoint(CMA.subject)) items.set('subject', { kind: 'subject', record: CMA.subject });
+  for (const c of cmaShownComps()) if (cmaHasPoint(c)) items.set('c:' + c.mlsNumber, { kind: 'comp', record: c });
+  if (cmaEl('cmaMapListings')?.checked) {
+    for (const l of a.listings || []) if (cmaHasPoint(l)) items.set('l:' + l.mlsNumber, { kind: 'listing', record: l });
+  }
+  return items;
+}
+
+function cmaPinOptions({ kind, record }) {
+  const circle = google.maps.SymbolPath.CIRCLE;
+  if (kind === 'subject') return { zIndex: 1000, title: record.address, icon: { path: CMA_STAR, scale: 1.3, fillColor: '#1B3A5C', fillOpacity: 1, strokeColor: '#C9A84C', strokeWeight: 1.5 } };
+  if (kind === 'listing') return { zIndex: 1, title: record.address, icon: { path: circle, scale: 5, fillColor: /^active$/i.test(record.status || '') ? '#2E75B6' : '#6B7280', fillOpacity: 0.9, strokeColor: '#FFFFFF', strokeWeight: 1 } };
+  const used = CMA.chosen.has(record.mlsNumber);
+  return { zIndex: used ? 100 + record.score : record.score, title: record.address, icon: { path: circle, ...cmaPinStyle(record, used) } };
+}
+
+// Built as elements, with listing text escaped, so the button needs no inline handler
+function cmaPinContent({ kind, record: r }) {
+  const box = document.createElement('div');
+  box.className = 'cma-pin-info';
+  const facts = [r.beds != null || r.baths != null ? `${r.beds ?? '—'} bd / ${r.baths ?? '—'} ba` : '', r.sqft ? Number(r.sqft).toLocaleString() + ' sq ft' : ''].filter(Boolean).join(' · ');
+  if (kind === 'subject') {
+    box.innerHTML = `<b>${cmaEsc(r.address)}</b><div>The home you're pricing</div><div>${cmaEsc(facts)}</div>`;
+  } else if (kind === 'listing') {
+    box.innerHTML = `<b>${cmaEsc(r.address)}</b><div>${cmaEsc(r.status)} · ${cmaMoney(r.listPrice)}${r.sqft && r.listPrice ? ' · ' + cmaMoney(r.listPrice / r.sqft) + '/sq ft' : ''}</div>
+      <div>${cmaEsc(facts)}${r.dom != null ? ' · ' + cmaEsc(r.dom) + ' days' : ''}</div>`;
+  } else {
+    const reasons = r.reasons || [];
+    const warn = reasons.filter(x => /less comparable/.test(x)), others = reasons.filter(x => !/less comparable/.test(x));
+    box.innerHTML = `<b>${cmaEsc(r.address)}</b><div>Sold ${cmaDate(r.closeDate)} · ${cmaMoney(r.closePrice)}${r.sqft ? ' · ' + cmaMoney(r.closePrice / r.sqft) + '/sq ft' : ''}</div>
+      <div>${cmaEsc(facts)} · Score ${cmaEsc(r.score)}</div>
+      ${warn.map(x => `<div class="warn">${cmaEsc(x)}</div>`).join('')}
+      ${others.length ? `<div>${cmaEsc(others.join(' · '))}</div>` : ''}`;
+    const used = CMA.chosen.has(r.mlsNumber);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cma-btn-sm';
+    btn.style.marginLeft = '0';
+    btn.textContent = used ? "Don't use this sale" : 'Use this sale';
+    btn.addEventListener('click', () => cmaToggle(r.mlsNumber, !used));
+    box.appendChild(btn);
+  }
+  return box;
+}
+
+function cmaOpenPin(key) {
+  const pin = CMA_MAP.pins.get(key);
+  if (!pin) return;
+  CMA_MAP.openKey = key;
+  CMA_MAP.info.setContent(cmaPinContent(pin.item));
+  CMA_MAP.info.open({ map: CMA_MAP.map, anchor: pin.marker });
+}
+
+// From a table row's address
+function cmaFocusPin(mls) {
+  const pin = CMA_MAP.pins.get('c:' + mls);
+  if (!pin) return;
+  cmaEl('cmaMapWrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  CMA_MAP.map.panTo(pin.marker.getPosition());
+  cmaOpenPin('c:' + mls);
+}
+
+function cmaMapFailed() {
+  cmaEl('cmaMapWrap').innerHTML = '<p class="input-hint">The map couldn\'t load just now — everything below still works from the table.</p>';
+}
+
+async function cmaRenderMap() {
+  const wrap = cmaEl('cmaMapWrap');
+  if (!CMA.analysis) {
+    wrap.style.display = 'none';
+    CMA_MAP.pins.forEach(p => p.marker.setMap(null));
+    CMA_MAP.pins.clear();
+    if (CMA_MAP.info) CMA_MAP.info.close();
+    CMA_MAP.openKey = null;
+    return;
+  }
+  wrap.style.display = '';
+  if (WorkshopMap.failed) return cmaMapFailed();
+  try { await WorkshopMap.load(); } catch (_) { return cmaMapFailed(); }
+  if (WorkshopMap.failed) return cmaMapFailed();
+  if (!CMA.analysis) return;   // changed while Google's script loaded
+  if (!CMA_MAP.map) {
+    WorkshopMap.onFailure(cmaMapFailed);
+    CMA_MAP.map = WorkshopMap.create(cmaEl('cmaMap'), { center: { lat: CMA.subject.lat, lng: CMA.subject.lon } });
+    CMA_MAP.info = new google.maps.InfoWindow();
+    CMA_MAP.info.addListener('closeclick', () => { CMA_MAP.openKey = null; });
+  }
+  const items = cmaMapItems();
+  for (const [key, pin] of CMA_MAP.pins) {
+    if (!items.has(key)) { pin.marker.setMap(null); CMA_MAP.pins.delete(key); }
+  }
+  for (const [key, item] of items) {
+    const position = { lat: Number(item.record.lat), lng: Number(item.record.lon) };
+    let pin = CMA_MAP.pins.get(key);
+    if (!pin) {
+      pin = { marker: new google.maps.Marker({ map: CMA_MAP.map, position }), item };
+      pin.marker.addListener('click', () => cmaOpenPin(key));
+      CMA_MAP.pins.set(key, pin);
+    }
+    pin.item = item;
+    pin.marker.setPosition(position);
+    pin.marker.setOptions(cmaPinOptions(item));
+  }
+  if (CMA_MAP.fit) {
+    CMA_MAP.fit = false;
+    const fitTo = [...items.values()].filter(i => i.kind === 'subject' || (i.kind === 'comp' && CMA.chosen.has(i.record.mlsNumber)));
+    WorkshopMap.fit(CMA_MAP.map, fitTo.map(i => ({ lat: Number(i.record.lat), lng: Number(i.record.lon) })));
+  }
+  // An open info window follows its pin's changes, such as Use / Don't use
+  if (CMA_MAP.openKey) {
+    if (CMA_MAP.pins.has(CMA_MAP.openKey)) CMA_MAP.info.setContent(cmaPinContent(CMA_MAP.pins.get(CMA_MAP.openKey).item));
+    else { CMA_MAP.info.close(); CMA_MAP.openKey = null; }
+  }
+}
+
+// The report's map: a Static Maps image, the subject plus chosen comps lettered A, B, C…
+// in the order of the report's table. Stays under Google's 8,192-character URL limit.
+const CMA_STATIC_MAX = 8000;
+const cmaCompLetter = i => i < 26 ? String.fromCharCode(65 + i) : '';
+function cmaStaticMapUrl(subject, comps, key = WorkshopMap.KEY) {
+  const params = new URLSearchParams({ size: '640x270', scale: '2', maptype: 'roadmap', key });
+  const hasSubject = cmaHasPoint(subject);
+  if (hasSubject) params.append('markers', `color:0x1B3A5C|label:H|${subject.lat},${subject.lon}`);
+  let added = 0;
+  (comps || []).forEach((c, i) => {
+    const letter = cmaCompLetter(i);
+    if (!letter || !cmaHasPoint(c)) return;
+    const across = c.acrossWater && c.acrossWater.length;
+    const next = new URLSearchParams(params);
+    next.append('markers', `color:${across ? '0xE67E22' : '0x2E75B6'}|label:${letter}|${c.lat},${c.lon}`);
+    if (`https://maps.googleapis.com/maps/api/staticmap?${next}`.length > CMA_STATIC_MAX) return;
+    params.append('markers', `color:${across ? '0xE67E22' : '0x2E75B6'}|label:${letter}|${c.lat},${c.lon}`);
+    added++;
+  });
+  if (!hasSubject && !added) return null;
+  return `https://maps.googleapis.com/maps/api/staticmap?${params}`;
 }
 
 function cmaToggle(mls, on) {
@@ -442,6 +610,7 @@ function cmaPagesHTML(d, header) {
   const keys = [...new Set(d.comps.flatMap(c => c.lines.map(l => l.key)))];
   const label = k => (d.comps.flatMap(c => c.lines).find(l => l.key === k) || {}).label || k;
   const changed = d.adjustments.filter(a => a.edited);
+  const mapUrl = cmaStaticMapUrl(s, d.comps);
   return page(`
       <h2 style="color:#1e3c72;margin-bottom:6px">Comparative Market Analysis</h2>
       <p style="margin-bottom:12px"><b>${zgEsc(s.address)}</b>${s.city ? ', ' + zgEsc(s.city) : ''}</p>
@@ -454,9 +623,10 @@ function cmaPagesHTML(d, header) {
           ${d.listPrice ? `<div style="margin-top:10px">Suggested list price: <b>${cmaMoney(d.listPrice)}</b></div>` : ''}
         </div>
       </div>
+      ${mapUrl ? `<div style="margin-top:14px"><img src="${cmaEsc(mapUrl)}" alt="Map of this home (H) and the comparable sales" style="width:100%;display:block;border:1px solid #ddd;border-radius:6px" onerror="this.parentNode.style.display='none'"></div>` : ''}
       <h3 style="color:#1e3c72;margin:18px 0 6px">Comparable sales</h3>
-      <table class="zg-compact"><tr><th>Address</th><th>Sold</th><th>Price</th><th>Sq ft</th><th>Bd/Ba</th><th>Built</th><th>Distance</th><th>Adjusted</th><th>Adj. $/sq ft</th></tr>
-        ${d.comps.map(c => `<tr><td>${zgEsc(c.address)}${c.acrossWater && c.acrossWater.length ? ' *' : ''}</td><td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
+      <table class="zg-compact"><tr>${mapUrl ? '<th></th>' : ''}<th>Address</th><th>Sold</th><th>Price</th><th>Sq ft</th><th>Bd/Ba</th><th>Built</th><th>Distance</th><th>Adjusted</th><th>Adj. $/sq ft</th></tr>
+        ${d.comps.map((c, i) => `<tr>${mapUrl ? `<td><b>${cmaCompLetter(i)}</b></td>` : ''}<td>${zgEsc(c.address)}${c.acrossWater && c.acrossWater.length ? ' *' : ''}</td><td>${cmaDate(c.closeDate)}</td><td>${cmaMoney(c.closePrice)}</td><td>${(c.sqft || 0).toLocaleString()}</td>
           <td>${c.beds ?? '—'}/${c.baths ?? '—'}</td><td>${c.yearBuilt || '—'}</td><td>${c.distanceMiles != null ? c.distanceMiles + ' mi' : '—'}</td><td><b>${cmaMoney(c.adjustedPrice)}</b></td><td>${cmaMoney(c.adjustedPrice / c.sqft)}</td></tr>`).join('')}</table>
       ${d.comps.some(c => c.acrossWater && c.acrossWater.length) ? '<p style="font-size:.8em;color:#666;margin-top:4px">* Across a major waterway from the subject — less comparable, used because the subject\'s side had too few recent sales.</p>' : ''}
       <h3 style="color:#1e3c72;margin:18px 0 6px">Price per square foot after adjustments</h3>

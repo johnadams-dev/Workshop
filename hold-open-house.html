@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
+<script src="workshop-map.js"></script>
 <style>
 /* Part 2 of the Open House tool: browse listings other agents have made
    available, reserve a date, and get a dated plan (open-house-event.html).
@@ -36,6 +37,15 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 2
 .filters label { font-size: .75rem; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .filters input, .filters select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: .9rem; min-width: 0; }
 .count { color: var(--muted); font-size: .85rem; margin: 0 0 10px; }
+.view-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+.view-toggle .btn[aria-pressed="true"] { background: var(--navy); color: #fff; }
+#ohMap { width: 100%; height: min(70vh, 560px); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.pin-info { width: 240px; max-width: 100%; font-size: 13px; line-height: 1.4; color: var(--text); }
+.pin-info img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; display: block; margin-bottom: 6px; }
+.pin-info b { display: block; }
+.pin-info div { margin-top: 2px; }
+.pin-info .btn { margin-top: 8px; width: 100%; }
+.card.flash { outline: 3px solid var(--gold); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; display: grid; grid-template-columns: 150px minmax(0, 1fr); overflow: hidden; }
 .card img, .noimg { width: 150px; height: 100%; min-height: 120px; object-fit: cover; background: #e5e7eb; display: block; }
 .card-body { padding: 12px 14px; min-width: 0; }
@@ -136,6 +146,14 @@ main { max-width: 1000px; margin: 0 auto; padding-inline: 16px; padding-block: 2
       </select></label>
     </div>
     <p class="count" id="count"></p>
+    <div class="view-toggle" role="group" aria-label="View listings as">
+      <button type="button" class="btn" id="viewList" aria-pressed="true" onclick="setView('list')">List</button>
+      <button type="button" class="btn" id="viewMap" aria-pressed="false" onclick="setView('map')">Map</button>
+    </div>
+    <div id="mapWrap" hidden>
+      <div id="ohMap"></div>
+      <p class="count" id="mapNote"></p>
+    </div>
     <div id="results"><div class="msg">Loading…</div></div>
   </section>
 
@@ -265,6 +283,110 @@ function render() {
   document.getElementById('results').innerHTML = groups.length ? groups.map(cardHtml).join('')
     : '<div class="empty">No listings are available for those filters right now. Listing agents add dates in Open House Listing Manager.</div>';
   for (const g of groups) if (S.picked[g.transaction_id]?.size) updatePreview(g.transaction_id);
+  if (S.view === 'map') renderMap();
+}
+
+// ── Map (workshop-map.js) ──────────────────────────────────────────────────
+// List stays the default: nothing here runs, and nothing is charged, until someone
+// taps Map. Locations come from POST /open-house/locations, separately from the
+// list so the list never waits on the MLS.
+const OH_MAP = { map: null, pins: new Map(), info: null };
+S.view = 'list';
+S.locations = {};
+
+function setView(view) {
+  S.view = view;
+  document.getElementById('viewList').setAttribute('aria-pressed', String(view === 'list'));
+  document.getElementById('viewMap').setAttribute('aria-pressed', String(view === 'map'));
+  document.getElementById('results').hidden = view === 'map';
+  document.getElementById('mapWrap').hidden = view !== 'map';
+  if (view === 'map') renderMap();
+}
+
+function mapFailed() {
+  document.getElementById('ohMap').hidden = true;
+  document.getElementById('mapNote').textContent = "The map couldn't load just now — the list still has every listing.";
+}
+
+async function renderMap() {
+  const thisRequest = slotsRequest;
+  const note = document.getElementById('mapNote');
+  const groups = grouped();
+  const unknown = groups.map(g => g.transaction_id).filter(id => !S.locations[id]);
+  if (unknown.length) note.textContent = 'Finding these listings on the map…';
+  try {
+    await WorkshopMap.load();
+    if (unknown.length) {
+      const data = await api('/open-house/locations', { method: 'POST', body: JSON.stringify({ transactionIds: unknown }) });
+      Object.assign(S.locations, data.locations);
+    }
+  } catch (e) {
+    if (WorkshopMap.failed) return mapFailed();
+    note.textContent = `Couldn't place the listings on the map: ${e.message}`;
+    return;
+  }
+  if (WorkshopMap.failed) return mapFailed();
+  // Only the newest filter may draw; it also needs the map still showing
+  if (thisRequest !== slotsRequest || S.view !== 'map') return;
+  drawMap(groups);
+}
+
+function drawMap(groups) {
+  const placed = groups.filter(g => S.locations[g.transaction_id]);
+  const missed = groups.filter(g => !S.locations[g.transaction_id]);
+  const first = placed[0] && S.locations[placed[0].transaction_id];
+  if (!OH_MAP.map) {
+    WorkshopMap.onFailure(mapFailed);
+    // The middle of Volusia and Flagler, until there's a listing to centre on
+    OH_MAP.map = WorkshopMap.create(document.getElementById('ohMap'), { center: first ? { lat: first.lat, lng: first.lon } : { lat: 29.25, lng: -81.1 }, zoom: 10 });
+    OH_MAP.info = new google.maps.InfoWindow();
+  }
+  OH_MAP.info.close();
+  OH_MAP.pins.forEach(m => m.setMap(null));
+  OH_MAP.pins.clear();
+  for (const g of placed) {
+    const p = S.locations[g.transaction_id];
+    const marker = new google.maps.Marker({
+      map: OH_MAP.map, position: { lat: p.lat, lng: p.lon }, title: g.property_address,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#1B3A5C', fillOpacity: 1, strokeColor: '#C9A84C', strokeWeight: 2 },
+    });
+    marker.addListener('click', () => { OH_MAP.info.setContent(pinContent(g)); OH_MAP.info.open({ map: OH_MAP.map, anchor: marker }); });
+    OH_MAP.pins.set(g.transaction_id, marker);
+  }
+  WorkshopMap.fit(OH_MAP.map, placed.map(g => ({ lat: S.locations[g.transaction_id].lat, lng: S.locations[g.transaction_id].lon })));
+  document.getElementById('mapNote').textContent = missed.length
+    ? `Not on the map (we couldn't find ${missed.length === 1 ? 'its' : 'their'} location): ${missed.map(g => g.property_address).join('; ')}. See List.`
+    : '';
+}
+
+// Built as elements, with listing text escaped, so the button needs no inline handler
+function pinContent(g) {
+  const box = document.createElement('div');
+  box.className = 'pin-info';
+  const facts = [money(g.current_price), g.bedrooms ? `${Number(g.bedrooms)} bd` : '', g.bathrooms ? `${Number(g.bathrooms)} ba` : '', g.property_type].filter(Boolean);
+  const when = g.anytime ? 'Open anytime' : g.slots.slice(0, 4).map(s => fmtDay(s.date)).join(', ') + (g.slots.length > 4 ? ` and ${g.slots.length - 4} more` : '');
+  box.innerHTML = `${g.photo_url ? `<img src="${esc(photoSrc(g.photo_url))}" alt="" onerror="this.remove()">` : ''}
+    <b>${esc(g.property_address)}</b>
+    <div>${esc(g.city)}</div>
+    <div>${facts.map(esc).join(' · ')}</div>
+    <div>Listing agent: ${esc(g.listing_agent_name)}</div>
+    <div>${esc(when)}</div>`;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn primary';
+  btn.textContent = 'See dates & reserve';
+  btn.addEventListener('click', () => goToCard(g.transaction_id));
+  box.appendChild(btn);
+  return box;
+}
+
+function goToCard(id) {
+  setView('list');
+  const card = document.getElementById('c-' + id);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 2500);
 }
 
 function cardHtml(g) {
