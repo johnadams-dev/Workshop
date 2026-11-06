@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1B3A5C">
+<title>Event Photos — Adams, Cameron &amp; Co.</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+/* Event Photos, the guest page. Guests reach it from a QR code with no sign-in,
+   so it doesn't load auth.js. Backed by server/event-photos-routes.js. Photos
+   are shrunk here before upload; files go straight to the bucket. */
+:root {
+  --navy:#1B3A5C; --gold:#C9A84C; --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#5F6875; --red:#B42318; --green:#15803D;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 22px 16px 20px; text-align: center; border-bottom: 3px solid var(--gold); }
+header .eyebrow { margin: 0 0 4px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: #d9c58a; }
+header h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; overflow-wrap: anywhere; }
+header .when { margin: 4px 0 0; font-size: .9rem; color: #d6e2ef; }
+main { max-width: 1000px; margin: 0 auto; padding: 14px 12px 130px; }
+main.closed { padding-bottom: 32px; }
+.note { margin: 2px 4px 12px; font-size: .84rem; color: var(--muted); text-align: center; }
+.ext-link { display: block; margin: 0 auto 14px; max-width: 360px; padding: 10px 14px; text-align: center; font-weight: 600; color: var(--navy); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; overflow-wrap: anywhere; }
+.msg { padding: 44px 16px; text-align: center; color: var(--muted); }
+.msg strong { display: block; margin-bottom: 4px; color: var(--text); font-size: 1.05rem; }
+
+/* Add button, always within reach */
+.add-bar { position: fixed; inset-inline: 0; bottom: 0; z-index: 5; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: rgba(244,246,249,.95); border-top: 1px solid var(--border); }
+.add-btn { display: flex; align-items: center; justify-content: center; max-width: 480px; min-height: 56px; margin: 0 auto; border-radius: 12px; background: var(--navy); color: #fff; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+.add-btn:active { background: #142c46; }
+.add-bar input:focus-visible + .add-btn { outline: 3px solid var(--gold); outline-offset: 2px; }
+.sr-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+/* Uploads in progress */
+.uploads { display: grid; gap: 8px; margin-bottom: 14px; }
+.up { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.up-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: #E5E9F0; }
+.up-text { font-size: .86rem; overflow-wrap: anywhere; }
+.up-text.err { color: var(--red); }
+.up-text.ok { color: var(--green); font-weight: 600; }
+.bar { height: 6px; margin-top: 5px; background: #E5E9F0; border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--navy); transition: width .2s; }
+.retry { min-height: 40px; padding: 0 12px; border: 1px solid var(--navy); border-radius: 8px; background: var(--surface); color: var(--navy); font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; }
+
+/* Gallery */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 5px; }
+@media (min-width: 700px) { .gallery { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; } }
+.tile { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: #DDE3EB; cursor: pointer; }
+.tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tile:focus-visible { outline: 3px solid var(--gold); outline-offset: 1px; }
+.play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.play span { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding-left: 3px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 1.1rem; }
+
+/* Full-size view */
+.viewer { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: #000; }
+.viewer img, .viewer video { max-width: 100%; max-height: 100%; object-fit: contain; }
+.v-btn { position: absolute; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 0; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.v-btn:focus-visible { outline: 3px solid var(--gold); }
+.v-close { top: calc(10px + env(safe-area-inset-top)); right: 10px; }
+.v-prev { left: 8px; top: 50%; transform: translateY(-50%); }
+.v-next { right: 8px; top: 50%; transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <p class="eyebrow">Event Photos</p>
+  <h1 id="evName">Loading…</h1>
+  <p class="when" id="evDate"></p>
+</header>
+<main id="main">
+  <div id="extra"></div>
+  <div class="uploads" id="uploads" aria-live="polite"></div>
+  <div class="gallery" id="gallery"></div>
+  <div class="msg" id="message" hidden></div>
+</main>
+<div class="add-bar" id="addBar" hidden>
+  <input class="sr-file" type="file" id="picker" multiple accept="image/*,video/*" aria-label="Add photos and videos">
+  <label class="add-btn" for="picker">Add Photos &amp; Videos</label>
+</div>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Full-size view" hidden>
+  <div id="viewerBody" style="display:contents"></div>
+  <button class="v-btn v-prev" id="vPrev" aria-label="Previous">‹</button>
+  <button class="v-btn v-next" id="vNext" aria-label="Next">›</button>
+  <button class="v-btn v-close" id="vClose" aria-label="Close">×</button>
+</div>
+
+<script>
+const API = 'https://mls-proxy-975684028597.us-east1.run.app';
+const CODE = new URLSearchParams(location.search).get('e') || '';
+const REFRESH_MS = 30000;
+const MAX_EDGE = 3000, PREVIEW_EDGE = 800;
+const MAX_VIDEO_BYTES = 250 * 1024 * 1024;
+const MAX_SIMULTANEOUS = 2;
+const HEIC_CONVERTER = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+
+const $ = (id) => document.getElementById(id);
+const S = { items: new Map(), order: [], uploadsOpen: false, active: 0, queue: [], viewing: null };
+
+// ── Loading the event and gallery ──
+async function load() {
+  let res, data;
+  try {
+    res = await fetch(`${API}/event-photos/${encodeURIComponent(CODE)}`);
+    data = await res.json();
+  } catch {
+    if (!S.loaded) showMessage("We couldn't load this page.", 'Check your connection and try again.');
+    return;
+  }
+  if (!res.ok) {
+    if (!S.loaded) {
+      $('evName').textContent = 'Event Photos';
+      showMessage("We couldn't find this event.", 'Please scan the QR code again.');
+    }
+    return;
+  }
+  S.loaded = true;
+  renderEvent(data.event);
+  renderGallery(data.items);
+}
+
+function renderEvent(ev) {
+  $('evName').textContent = ev.name;
+  document.title = `${ev.name} Photos`;
+  $('evDate').textContent = new Date(`${ev.event_date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  S.uploadsOpen = ev.uploads_open;
+  $('addBar').hidden = !ev.uploads_open;
+  $('main').classList.toggle('closed', !ev.uploads_open);
+  const extra = $('extra');
+  extra.textContent = '';
+  const note = document.createElement('p');
+  note.className = 'note';
+  note.textContent = ev.uploads_open ? 'Anyone with this link can see what you add.' : 'Uploads for this event have closed. Thanks for sharing!';
+  extra.append(note);
+  if (ev.link_url) {
+    const a = document.createElement('a');
+    a.className = 'ext-link'; a.href = ev.link_url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = ev.link_label || 'Learn more';
+    extra.append(a);
+  }
+}
+
+function showMessage(title, body) {
+  const m = $('message');
+  m.textContent = '';
+  const t = document.createElement('strong');
+  t.textContent = title;
+  m.append(t, document.createTextNode(body));
+  m.hidden = false;
+}
+
+function makeTile(item) {
+  const tile = document.createElement('button');
+  tile.type = 'button'; tile.className = 'tile';
+  tile.setAttribute('aria-label', item.kind === 'video' ? 'Open video' : 'Open photo');
+  const src = item.preview_url || (item.kind === 'photo' ? item.url : null);
+  if (src) {
+    const img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy'; img.src = src;
+    // A long-open page can outlive a link: fall back to the newest one.
+    img.onerror = () => {
+      const now = S.items.get(item.id);
+      const fresh = now && (now.preview_url || (now.kind === 'photo' ? now.url : null));
+      if (fresh && fresh !== img.src) img.src = fresh;
+    };
+    tile.append(img);
+  }
+  if (item.kind === 'video') {
+    const p = document.createElement('div'); p.className = 'play';
+    const s = document.createElement('span'); s.textContent = '▶'; p.append(s);
+    tile.append(p);
+  }
+  tile.onclick = () => openViewer(item.id);
+  return tile;
+}
+
+// Keeps tiles already on screen, so a refresh doesn't reload or flicker them.
+function renderGallery(serverItems) {
+  const seen = new Set(serverItems.map((i) => i.id));
+  for (const [id, it] of S.items) {
+    // Just-uploaded items stay until the server's short-lived list catches up.
+    if (!seen.has(id) && !it.local) { it.el.remove(); S.items.delete(id); }
+  }
+  for (const item of serverItems) {
+    const have = S.items.get(item.id);
+    if (have) Object.assign(have, item, { local: false, el: have.el });
+    else S.items.set(item.id, { ...item, el: makeTile(item) });
+  }
+  const locals = [...S.items.values()].filter((i) => i.local).sort((a, b) => b.added_at.localeCompare(a.added_at));
+  S.order = [...locals.map((i) => i.id), ...serverItems.map((i) => i.id)];
+  const gallery = $('gallery');
+  const inPlace = S.order.length === gallery.children.length && S.order.every((id, i) => gallery.children[i] === S.items.get(id).el);
+  if (!inPlace) S.order.forEach((id) => gallery.append(S.items.get(id).el));
+  if (S.order.length) $('message').hidden = true;
+  else if (!$('uploads').children.length) {
+    S.uploadsOpen ? showMessage('No photos yet', 'Be the first to add one.') : showMessage('No photos yet', '');
+  }
+}
+
+// ── Preparing a file for upload ──
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('converter'));
+    document.head.append(s);
+  });
+}
+
+// An <img> applies the phone's rotation, so sideways photos stay upright.
+function decodeImage(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode')); };
+    img.src = url;
+  });
+}
+
+function isHeic(file) { return /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name); }
+
+async function decodePhoto(file) {
+  try {
+    return await decodeImage(file);
+  } catch (e) {
+    if (!isHeic(file)) throw e;
+  }
+  if (!window.heic2any) await loadScript(HEIC_CONVERTER);
+  const converted = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+  return decodeImage(Array.isArray(converted) ? converted[0] : converted);
+}
+
+function shrink(source, width, height, maxEdge, quality) {
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve) => canvas.toBlob((blob) => { canvas.width = canvas.height = 0; resolve(blob); }, 'image/jpeg', quality));
+}
+
+// A frame for the gallery. Not every browser can give one; a play icon stands in.
+function videoFrame(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    let finished = false;
+    const finish = (blob) => {
+      if (finished) return;
+      finished = true; clearTimeout(timer); URL.revokeObjectURL(url); v.removeAttribute('src'); v.load();
+      resolve(blob || null);
+    };
+    const timer = setTimeout(() => finish(null), 6000);
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.onloadeddata = () => { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); };
+    v.onseeked = () => shrink(v, v.videoWidth, v.videoHeight, PREVIEW_EDGE, 0.75).then(finish, () => finish(null));
+    v.onerror = () => finish(null);
+    v.src = url;
+  });
+}
+
+function videoType(file) {
+  if (file.type === 'video/mp4' || file.type === 'video/quicktime') return file.type;
+  if (!file.type || file.type === 'application/octet-stream') {
+    if (/\.mp4$/i.test(file.name)) return 'video/mp4';
+    if (/\.mov$/i.test(file.name)) return 'video/quicktime';
+  }
+  return null;
+}
+
+// ── Uploading ──
+function newRow() {
+  const row = document.createElement('div'); row.className = 'up';
+  const thumb = document.createElement('img'); thumb.className = 'up-thumb'; thumb.alt = '';
+  const body = document.createElement('div');
+  const text = document.createElement('div'); text.className = 'up-text';
+  const bar = document.createElement('div'); bar.className = 'bar';
+  const fill = document.createElement('i'); bar.append(fill);
+  body.append(text, bar);
+  const action = document.createElement('div');
+  row.append(thumb, body, action);
+  $('uploads').prepend(row);
+  $('message').hidden = true;
+  return { row, thumb, text, bar, fill, action };
+}
+
+function setStatus(job, message, tone) {
+  job.ui.text.textContent = message;
+  job.ui.text.className = 'up-text' + (tone ? ` ${tone}` : '');
+}
+
+function put(link, blob, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', link.url);
+    Object.entries(link.headers).forEach(([k, v]) => x.setRequestHeader(k, v));
+    if (onProgress) x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new Error(`status ${x.status}`)));
+    x.onerror = () => reject(new Error('network'));
+    x.onabort = () => reject(new Error('aborted'));
+    x.send(blob);
+  });
+}
+
+async function prepare(job) {
+  const file = job.file;
+  const isVideo = file.type.startsWith('video/') || /\.(mp4|mov)$/i.test(file.name);
+  if (isVideo) {
+    job.kind = 'video';
+    job.type = videoType(file);
+    if (!job.type) throw new Error('This video type isn’t supported. Please use MP4 or MOV.');
+    if (file.size > MAX_VIDEO_BYTES) throw new Error('This video is too long. The limit is 250 MB, so please pick a shorter clip.');
+    job.blob = file;
+    job.preview = await videoFrame(file);
+  } else if (file.type.startsWith('image/') || isHeic(file)) {
+    job.kind = 'photo';
+    job.type = 'image/jpeg';
+    let img;
+    try {
+      img = await decodePhoto(file);
+    } catch {
+      throw new Error('We couldn’t read this photo. Please try a different one.');
+    }
+    job.blob = await shrink(img, img.naturalWidth, img.naturalHeight, MAX_EDGE, 0.88);
+    job.preview = await shrink(img, img.naturalWidth, img.naturalHeight, PREVIEW_EDGE, 0.75);
+    if (!job.blob) throw new Error('We couldn’t prepare this photo. Please try a different one.');
+  } else {
+    throw new Error('Only photos and videos can be added.');
+  }
+  if (job.preview) {
+    job.previewUrl = URL.createObjectURL(job.preview);
+    job.ui.thumb.src = job.previewUrl;
+  }
+  job.prepared = true;
+}
+
+async function runJob(job) {
+  job.ui.action.textContent = '';
+  job.ui.bar.hidden = false;
+  job.ui.fill.style.width = '0';
+  try {
+    if (!job.prepared) {
+      setStatus(job, 'Getting ready…');
+      await prepare(job);
+    }
+  } catch (e) {
+    job.ui.bar.hidden = true;
+    setStatus(job, e.message, 'err');
+    return;
+  }
+  try {
+    setStatus(job, 'Uploading…');
+    const res = await fetch(`${API}/event-photos/${encodeURIComponent(CODE)}/uploads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: job.kind, type: job.type, size: job.blob.size }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'Upload failed.');
+      err.final = [400, 403, 413, 507].includes(res.status);
+      err.fromServer = true;
+      throw err;
+    }
+    // The preview goes first, so a photo never shows up without one. A missing
+    // preview isn't worth failing the upload over.
+    if (job.preview) await put(data.preview, job.preview).catch(() => { job.preview = null; });
+    await put(data.upload, job.blob, (share) => { job.ui.fill.style.width = `${Math.round(share * 100)}%`; });
+    job.ui.fill.style.width = '100%';
+    job.done = true;
+    addLocalItem(job, data.id);
+    setStatus(job, 'Added!', 'ok');
+    setTimeout(() => job.ui.row.remove(), 2500);
+  } catch (e) {
+    job.ui.bar.hidden = true;
+    setStatus(job, e.fromServer ? e.message : 'That upload didn’t finish. Check your connection and try again.', 'err');
+    if (!e.final) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'retry'; b.textContent = 'Retry';
+      b.onclick = () => { b.remove(); enqueue(job); };
+      job.ui.action.append(b);
+    }
+  }
+}
+
+// Shows a finished upload right away, before the server's list catches up.
+function addLocalItem(job, id) {
+  if (S.items.has(id)) return;
+  const url = URL.createObjectURL(job.blob);
+  const item = {
+    id, kind: job.kind, url,
+    preview_url: job.previewUrl || (job.kind === 'photo' ? url : null),
+    added_at: new Date().toISOString(), local: true,
+  };
+  item.el = makeTile(item);
+  S.items.set(id, item);
+  S.order.unshift(id);
+  $('gallery').prepend(item.el);
+  $('message').hidden = true;
+}
+
+function enqueue(job) {
+  S.queue.push(job);
+  pump();
+}
+
+function pump() {
+  while (S.active < MAX_SIMULTANEOUS && S.queue.length) {
+    const job = S.queue.shift();
+    S.active += 1;
+    runJob(job).finally(() => { S.active -= 1; pump(); });
+  }
+}
+
+$('picker').addEventListener('change', (e) => {
+  for (const file of e.target.files) {
+    const ui = newRow();
+    const job = { file, ui };
+    setStatus(job, 'Waiting…');
+    enqueue(job);
+  }
+  e.target.value = ''; // so the same file can be picked again
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (S.active || S.queue.length) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ── Full-size view ──
+function openViewer(id) {
+  S.viewing = id;
+  const item = S.items.get(id);
+  const body = $('viewerBody');
+  body.textContent = '';
+  if (item.kind === 'video') {
+    const v = document.createElement('video');
+    v.controls = true; v.playsInline = true; v.autoplay = true; v.src = item.url;
+    if (item.preview_url) v.poster = item.preview_url;
+    body.append(v);
+  } else {
+    const img = document.createElement('img');
+    img.alt = 'Event photo'; img.src = item.url;
+    body.append(img);
+  }
+  const at = S.order.indexOf(id);
+  $('vPrev').hidden = at <= 0;
+  $('vNext').hidden = at < 0 || at >= S.order.length - 1;
+  if (!S.lastFocus) S.lastFocus = document.activeElement;
+  $('viewer').hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('vClose').focus();
+}
+
+function closeViewer() {
+  $('viewerBody').textContent = ''; // also stops a playing video
+  $('viewer').hidden = true;
+  document.body.style.overflow = '';
+  S.viewing = null;
+  if (S.lastFocus) { S.lastFocus.focus(); S.lastFocus = null; }
+}
+
+function step(by) {
+  const next = S.order[S.order.indexOf(S.viewing) + by];
+  if (next) openViewer(next);
+}
+
+$('vClose').onclick = closeViewer;
+$('vPrev').onclick = () => step(-1);
+$('vNext').onclick = () => step(1);
+document.addEventListener('keydown', (e) => {
+  if ($('viewer').hidden) return;
+  if (e.key === 'Escape') closeViewer();
+  if (e.key === 'ArrowLeft') step(-1);
+  if (e.key === 'ArrowRight') step(1);
+});
+let touchX = null;
+$('viewer').addEventListener('touchstart', (e) => { touchX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+$('viewer').addEventListener('touchend', (e) => {
+  if (touchX === null) return;
+  const moved = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(moved) > 60) step(moved < 0 ? 1 : -1);
+  touchX = null;
+});
+
+// ── Start ──
+load();
+setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>

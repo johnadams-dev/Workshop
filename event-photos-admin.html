@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Event Photos Admin — Adams Cameron Workshop</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+/* Event Photos, the staff page. Create an event, copy its link for the QR code,
+   hide anything that shouldn't be in the gallery, and save everything to a
+   folder afterward. Backed by server/event-photos-routes.js. */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#5F6875; --red:#B42318; --green:#15803D; --green-lt:#E3F5EC; --grey-lt:#EEF0F4;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr a { color: #d6e2ef; font-size: .85rem; text-decoration: none; }
+main { max-width: 1000px; margin: 0 auto; padding: 16px 16px 48px; }
+#gate { margin: 48px auto; max-width: 380px; padding: 24px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+h2 { margin: 0; font-size: 1.05rem; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--navy); font: inherit; font-size: .87rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+.btn:hover { background: var(--grey-lt); }
+.btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.primary:hover { background: #142c46; }
+.btn:disabled { opacity: .6; cursor: default; }
+.ev-name { font-weight: 700; overflow-wrap: anywhere; }
+.ev-meta { margin: 2px 0 10px; color: var(--muted); font-size: .86rem; }
+.ev-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--grey-lt); color: var(--muted); font-size: .72rem; font-weight: 700; vertical-align: 1px; }
+.pill.open { background: var(--green-lt); color: var(--green); }
+form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 600px) { form { grid-template-columns: minmax(0, 1fr); } }
+label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; font-weight: 600; }
+label .hint { color: var(--muted); font-weight: 400; font-size: .8rem; }
+.full { grid-column: 1 / -1; }
+input { width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-weight: 400; background: #fff; }
+.form-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+.msg { padding: 28px 12px; text-align: center; color: var(--muted); }
+.progress { margin: 0 0 10px; font-size: .88rem; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.tile.is-hidden { border-color: var(--red); }
+.tile.is-hidden img, .tile.is-hidden .thumb-empty { opacity: .35; }
+.tile a { position: relative; display: block; aspect-ratio: 1; background: #DDE3EB; }
+.tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.thumb-empty { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: var(--muted); font-size: .85rem; }
+.tag { position: absolute; left: 6px; top: 6px; padding: 1px 7px; border-radius: 4px; background: rgba(0,0,0,.65); color: #fff; font-size: .72rem; font-weight: 700; }
+.tag.red { background: var(--red); }
+.tile .btn { width: 100%; border: 0; border-top: 1px solid var(--border); border-radius: 0; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10; max-width: 90%; padding: 9px 16px; border-radius: 8px; background: var(--navy); color: #fff; font-size: .9rem; }
+.toast.err { background: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Event Photos</h1>
+    <a href="index.html">Back to Workshop</a>
+  </div>
+</header>
+<main>
+  <div id="gate" hidden>
+    <p>Sign in with your Adams Cameron Google account to manage event photos.</p>
+    <div id="g-signin-btn" style="display:inline-block"></div>
+  </div>
+  <p class="msg" id="denied" hidden></p>
+
+  <div id="app" hidden>
+    <section id="listView">
+      <div class="row-between">
+        <h2>Events</h2>
+        <button class="btn primary" id="newBtn" type="button">New event</button>
+      </div>
+      <div class="card" id="formCard" hidden>
+        <form id="eventForm">
+          <label class="full">Event name
+            <input id="fName" required maxlength="150" autocomplete="off">
+          </label>
+          <label>Event date
+            <input id="fDate" type="date" required>
+          </label>
+          <label>Uploads close after
+            <input id="fClose" type="date">
+            <span class="hint">Leave blank for 7 days after the event.</span>
+          </label>
+          <label>Link button (optional)
+            <input id="fLink" placeholder="www.adamscameronfoundation.com" autocomplete="off">
+          </label>
+          <label>Button text
+            <input id="fLabel" maxlength="80" placeholder="Learn more" autocomplete="off">
+          </label>
+          <div class="form-actions">
+            <button class="btn primary" id="saveBtn" type="submit">Save event</button>
+            <button class="btn" id="cancelBtn" type="button">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div id="events"></div>
+    </section>
+
+    <section id="itemsView" hidden>
+      <div class="row-between">
+        <div>
+          <button class="btn" id="backBtn" type="button">‹ All events</button>
+        </div>
+        <button class="btn primary" id="saveAllBtn" type="button">Save all to a folder</button>
+      </div>
+      <h2 id="itemsTitle" style="margin-bottom:4px"></h2>
+      <p class="progress" id="itemsNote"></p>
+      <div class="tiles" id="tiles"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const SITE = 'https://johnadams.org';
+const REFRESH_MS = 30000;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const todayLocal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const guestLink = (ev) => `${SITE}/event-photos.html?e=${encodeURIComponent(ev.code)}`;
+const S = { events: [], editing: null, open: null, items: [], signature: '', saving: false };
+
+function toast(msg, err) {
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div');
+  t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg; t.setAttribute('role', 'status');
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+Auth.ready({
+  tool: 'Event Photos',
+  button: $('g-signin-btn'),
+  onSignInNeeded: () => { $('gate').hidden = false; },
+}).then(() => {
+  $('gate').hidden = true;
+  start();
+});
+
+async function start() {
+  try {
+    await loadEvents();
+    $('app').hidden = false;
+  } catch (e) {
+    $('denied').textContent = /staff/i.test(e.message) ? 'Event Photos is for staff only.' : `Couldn't load events: ${e.message}`;
+    $('denied').hidden = false;
+  }
+  setInterval(() => { if (S.open && !document.hidden && !S.saving) loadItems(); }, REFRESH_MS);
+}
+
+// ── Events ──
+async function loadEvents() {
+  S.events = (await Auth.api('/event-photos/admin/events')).events;
+  renderEvents();
+}
+
+function renderEvents() {
+  const today = todayLocal();
+  $('events').innerHTML = S.events.length ? S.events.map((ev) => {
+    const open = today <= ev.uploads_close_on;
+    return `<div class="card">
+      <div class="ev-name">${esc(ev.name)}<span class="pill ${open ? 'open' : ''}">${open ? 'Uploads open' : 'Uploads closed'}</span></div>
+      <div class="ev-meta">${esc(fmtDate(ev.event_date))} · Uploads ${open ? 'close after' : 'closed after'} ${esc(fmtDate(ev.uploads_close_on))}</div>
+      <div class="ev-actions">
+        <button class="btn primary" type="button" data-act="items" data-id="${ev.id}">Photos</button>
+        <button class="btn" type="button" data-act="copy" data-id="${ev.id}">Copy link for QR code</button>
+        <a class="btn" href="${esc(guestLink(ev))}" target="_blank" rel="noopener">Open guest page</a>
+        <button class="btn" type="button" data-act="edit" data-id="${ev.id}">Edit</button>
+      </div>
+    </div>`;
+  }).join('') : '<p class="msg">No events yet. Create one to get a link for its QR code.</p>';
+}
+
+$('events').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const ev = S.events.find((x) => String(x.id) === b.dataset.id);
+  if (b.dataset.act === 'edit') showForm(ev);
+  if (b.dataset.act === 'items') openItems(ev);
+  if (b.dataset.act === 'copy') {
+    try {
+      await navigator.clipboard.writeText(guestLink(ev));
+      toast('Link copied.');
+    } catch {
+      window.prompt('Copy this link:', guestLink(ev));
+    }
+  }
+});
+
+function showForm(ev) {
+  S.editing = ev || null;
+  $('fName').value = ev?.name || '';
+  $('fDate').value = ev?.event_date || '';
+  $('fClose').value = ev?.uploads_close_on || '';
+  $('fLink').value = ev?.link_url || '';
+  $('fLabel').value = ev?.link_label || '';
+  $('saveBtn').textContent = ev ? 'Save changes' : 'Create event';
+  $('formCard').hidden = false;
+  $('fName').focus();
+}
+
+$('newBtn').onclick = () => showForm(null);
+$('cancelBtn').onclick = () => { $('formCard').hidden = true; };
+
+$('eventForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  try {
+    const body = {
+      name: $('fName').value,
+      event_date: $('fDate').value,
+      uploads_close_on: $('fClose').value || null,
+      link_url: $('fLink').value,
+      link_label: $('fLabel').value,
+    };
+    if (S.editing) await Auth.api(`/event-photos/admin/events/${S.editing.id}`, { method: 'PUT', body });
+    else await Auth.api('/event-photos/admin/events', { method: 'POST', body });
+    $('formCard').hidden = true;
+    await loadEvents();
+    toast('Saved.');
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Photos for one event ──
+async function openItems(ev) {
+  S.open = ev;
+  S.signature = '';
+  $('listView').hidden = true;
+  $('itemsView').hidden = false;
+  $('itemsTitle').textContent = ev.name;
+  $('tiles').textContent = '';
+  $('itemsNote').textContent = 'Loading…';
+  $('saveAllBtn').hidden = !window.showDirectoryPicker;
+  await loadItems();
+}
+
+$('backBtn').onclick = () => {
+  S.open = null;
+  $('itemsView').hidden = true;
+  $('listView').hidden = false;
+};
+
+async function loadItems() {
+  const open = S.open;
+  try {
+    const data = await Auth.api(`/event-photos/admin/events/${open.id}/items`);
+    if (S.open !== open) return;
+    S.items = data.items;
+    renderItems();
+  } catch (e) {
+    if (S.open === open) $('itemsNote').textContent = `Couldn't load photos: ${e.message}`;
+  }
+}
+
+function renderItems() {
+  const hiddenCount = S.items.filter((i) => i.hidden).length;
+  const photos = S.items.filter((i) => i.kind === 'photo').length;
+  if (!S.saving) {
+    $('itemsNote').textContent = S.items.length
+      ? `${photos} photo${photos === 1 ? '' : 's'}, ${S.items.length - photos} video${S.items.length - photos === 1 ? '' : 's'}${hiddenCount ? `, ${hiddenCount} hidden` : ''}. Refreshes on its own.`
+      : 'Nothing has been added yet.';
+    if (!window.showDirectoryPicker && S.items.length) $('itemsNote').textContent += ' To save everything to a folder, use Chrome or Edge on a computer.';
+  }
+  // Redraw only on a real change, so images don't flicker on each refresh.
+  const signature = S.items.map((i) => `${i.id}:${i.hidden}`).join();
+  if (signature === S.signature) {
+    S.items.forEach((i) => {
+      const link = document.querySelector(`[data-tile="${i.id}"] a`);
+      if (link) link.href = i.url;
+    });
+    return;
+  }
+  S.signature = signature;
+  $('tiles').innerHTML = S.items.map((i) => `
+    <div class="tile ${i.hidden ? 'is-hidden' : ''}" data-tile="${esc(i.id)}">
+      <a href="${esc(i.url)}" target="_blank" rel="noopener" aria-label="Open full size">
+        ${i.preview_url || i.kind === 'photo' ? `<img loading="lazy" alt="" src="${esc(i.preview_url || i.url)}">` : '<div class="thumb-empty">Video</div>'}
+        ${i.hidden ? '<span class="tag red">Hidden</span>' : i.kind === 'video' ? '<span class="tag">Video</span>' : ''}
+      </a>
+      <button class="btn" type="button" data-hide="${esc(i.id)}">${i.hidden ? 'Show again' : 'Hide'}</button>
+    </div>`).join('');
+}
+
+$('tiles').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-hide]');
+  if (!b) return;
+  const item = S.items.find((i) => i.id === b.dataset.hide);
+  if (!item) return;
+  b.disabled = true;
+  try {
+    await Auth.api(`/event-photos/admin/events/${S.open.id}/items/${item.id}`, { method: 'PUT', body: { hidden: !item.hidden } });
+    item.hidden = !item.hidden;
+    renderItems();
+  } catch (err) {
+    b.disabled = false;
+    toast(err.message, true);
+  }
+});
+
+// ── Save everything to a folder ──
+function fileName(ev, item) {
+  const slug = ev.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'event';
+  const stamp = String(item.added_at).replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  return `${slug}-${stamp}-${item.id.slice(0, 6)}.${item.ext}`;
+}
+
+async function exists(folder, name) {
+  try {
+    await folder.getFileHandle(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+$('saveAllBtn').onclick = async () => {
+  const ev = S.open;
+  let folder;
+  try {
+    folder = await window.showDirectoryPicker({ mode: 'readwrite' });
+  } catch {
+    return; // they cancelled the folder picker
+  }
+  const btn = $('saveAllBtn');
+  btn.disabled = true;
+  S.saving = true;
+  try {
+    const { items } = await Auth.api(`/event-photos/admin/events/${ev.id}/items`);
+    const visible = items.filter((i) => !i.hidden);
+    let saved = 0, skipped = 0, failed = 0, at = 0;
+    for (const item of visible) {
+      at += 1;
+      $('itemsNote').textContent = `Saving ${at} of ${visible.length}…`;
+      const name = fileName(ev, item);
+      // Already saved on an earlier run, so running it again only adds what's new.
+      if (await exists(folder, name)) { skipped += 1; continue; }
+      let handle;
+      try {
+        const res = await fetch(item.url);
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        handle = await folder.getFileHandle(name, { create: true });
+        const out = await handle.createWritable();
+        try {
+          await res.body.pipeTo(out);
+        } catch (e) {
+          await folder.removeEntry(name).catch(() => {});
+          throw e;
+        }
+        saved += 1;
+      } catch (e) {
+        console.error('Could not save', name, e);
+        failed += 1;
+      }
+    }
+    const parts = [`${saved} saved`];
+    if (skipped) parts.push(`${skipped} already there`);
+    if (failed) parts.push(`${failed} failed; run it again to pick those up`);
+    $('itemsNote').textContent = `${parts.join(', ')}. ${failed ? '' : 'Drag the folder’s files into your Google Photos album.'}`;
+  } catch (e) {
+    $('itemsNote').textContent = `Couldn't save: ${e.message}`;
+  } finally {
+    S.saving = false;
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
