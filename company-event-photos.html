@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Event Photos — Adams Cameron Workshop</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+/* Event Photos for everyone signed in: past events' photos in Google Drive, and
+   a way into each current event's guest page (event-photos.html) to add photos.
+   Staff also get a link to event-photos-admin.html. This is the tool's one card.
+   Backed by GET /event-photos/current in server/event-photos-routes.js. */
+:root {
+  --navy:#1B3A5C; --gold:#C9A84C; --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#5F6875;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+header { background: var(--navy); color: #fff; padding: 14px 16px; }
+.hdr { max-width: 720px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hdr h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.hdr a { color: #d6e2ef; font-size: .85rem; text-decoration: none; }
+main { max-width: 720px; margin: 0 auto; padding: 18px 16px 48px; }
+#gate { margin: 48px auto; max-width: 380px; padding: 24px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+h2 { margin: 0 0 4px; font-size: 1.05rem; }
+section { margin-bottom: 26px; }
+.sub { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+.card { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.ev-name { font-weight: 700; overflow-wrap: anywhere; }
+.ev-meta { color: var(--muted); font-size: .86rem; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 16px; border-radius: 9px; background: var(--navy); color: #fff; font-size: .92rem; font-weight: 700; text-decoration: none; }
+.btn:hover { background: #142c46; }
+.btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.msg { padding: 18px 14px; text-align: center; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hdr">
+    <h1>Event Photos</h1>
+    <a href="index.html">Back to Workshop</a>
+  </div>
+</header>
+<main>
+  <div id="gate" hidden>
+    <p>Sign in with your Adams Cameron Google account to see event photos.</p>
+    <div id="g-signin-btn" style="display:inline-block"></div>
+  </div>
+
+  <div id="app" hidden>
+    <section>
+      <h2>Current events</h2>
+      <p class="sub">See the photos from an event and add your own.</p>
+      <div id="events"><p class="msg">Loading…</p></div>
+    </section>
+    <section>
+      <h2>Past events</h2>
+      <p class="sub">Photos from earlier company events are in our Google Drive.</p>
+      <a class="btn" href="https://drive.google.com/drive/folders/0AIc-f1_tdBLnUk9PVA" target="_blank" rel="noopener">Open past event photos</a>
+    </section>
+    <section id="staffTools" hidden>
+      <h2>Staff</h2>
+      <p class="sub">Set up an event, get its link for a QR code, and hide or save its photos.</p>
+      <a class="btn" href="./event-photos-admin.html">Manage events</a>
+    </section>
+  </div>
+</main>
+
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+Auth.ready({
+  tool: 'Event Photos',
+  button: document.getElementById('g-signin-btn'),
+  onSignInNeeded: () => { document.getElementById('gate').hidden = false; },
+}).then(() => {
+  document.getElementById('gate').hidden = true;
+  document.getElementById('app').hidden = false;
+  loadEvents();
+  showStaffTools();
+});
+
+// Same check as index.html's staff cards. This only shows the link; the
+// admin page and its routes enforce staff access themselves.
+async function showStaffTools() {
+  try {
+    const me = await Auth.api('/lockbox/me');
+    document.getElementById('staffTools').hidden = !(me.role === 'manager' || me.role === 'staff');
+  } catch {
+    // Not knowing the role just leaves the link hidden.
+  }
+}
+
+async function loadEvents() {
+  const box = document.getElementById('events');
+  try {
+    const { events } = await Auth.api('/event-photos/current');
+    box.innerHTML = events.length ? events.map((ev) => `
+      <div class="card">
+        <div>
+          <div class="ev-name">${esc(ev.name)}</div>
+          <div class="ev-meta">${esc(fmtDate(ev.event_date))}</div>
+        </div>
+        <a class="btn" href="./event-photos.html?e=${encodeURIComponent(ev.code)}">View &amp; add photos</a>
+      </div>`).join('') : '<p class="msg">There are no current events right now.</p>';
+  } catch (e) {
+    box.innerHTML = `<p class="msg">Couldn't load current events: ${esc(e.message)}</p>`;
+  }
+}
+</script>
+</body>
+</html>
