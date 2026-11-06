@@ -2770,6 +2770,16 @@ async function init() {
   }
 
   await renderAll();
+  openPageFromHash();
+}
+
+// Opens a page from the address, e.g. daily-desk.html#untracked — the links in
+// the office scoreboard email (Server/agent-digest.js).
+function openPageFromHash() {
+  const name = location.hash.slice(1);
+  if (name === 'report-virtual-tours' && !['manager', 'staff'].includes(STATE.userRole)) return;
+  if (!['today', 'untracked', 'statusmismatch', 'report-virtual-tours'].includes(name)) return;
+  showPage(name, document.querySelector(`.nav-tab[data-page="${name}"]`));
 }
 
 function toggleTheme() {
