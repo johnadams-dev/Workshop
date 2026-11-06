@@ -151,7 +151,7 @@ const WORKSHOP_RESOURCES = [
     tags: ["time tracking","minutes","hours"], managerOnly: true, feedbackGroup: "Business Growth", hubSidebarCategory: "Office and Operations", hubSidebarAccess: "manager" },
   { kind: "workshop", slug: "event-photos", name: "Event Photos", url: "./company-event-photos.html", icon: "📸",
     description: "See and add photos from current company events, or browse photos from past events in Google Drive. Staff can also set up events and get their QR code links.",
-    tags: ["qr code","party","gallery","pictures","christmas party","foundation"], feedbackGroup: "Office & Operations", hubSidebarCategory: "Office and Operations" },
+    tags: ["qr code","party","gallery","pictures","christmas party","foundation"], feedbackGroup: "Maintain Relationships", hubSidebarCategory: "Maintain Relationships" },
   { kind: "workshop", slug: "bi-chat", name: "Mr. Johnson from Accounts", url: "./bi-chat.html", icon: "📊",
     description: "Ask questions about company data in plain English — closings, listing activity, and more — and see the exact SQL and results behind every answer.",
     managerOnly: true, feedbackGroup: "Business Growth", hubSidebarCategory: "Office and Operations", hubSidebarAccess: "manager" },
