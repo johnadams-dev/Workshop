@@ -27,6 +27,7 @@
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
   .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; display: flex; gap: 8px; align-items: baseline; }
   .card h2 .step { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+  .card .sub { font-size: 13px; color: var(--muted); margin: -6px 0 12px; line-height: 1.45; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
   .wide { grid-column: 1 / -1; }
   label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
@@ -37,6 +38,7 @@
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
   .src { font-size: 11px; color: var(--green); margin-top: 3px; }
+  .needed { font-size: 12px; color: var(--red); margin-top: 3px; font-weight: 600; }
   .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn:hover { background: var(--blue); }
   .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
@@ -52,18 +54,17 @@
   .breakdown { margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: var(--navy); color: #fff; }
   .breakdown .line { font-size: 18px; font-weight: 700; letter-spacing: .01em; }
   .breakdown .dollars { margin-top: 6px; font-size: 13px; color: rgba(255,255,255,.8); font-variant-numeric: tabular-nums; }
-  .qs { display: grid; gap: 10px; }
-  .q { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
-  .q:last-child { border-bottom: 0; }
+  .q { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .qwrap:last-child .q { border-bottom: 0; }
   .q .qt { font-size: 14px; flex: 1 1 260px; }
-  .q .qt .hint { margin-top: 2px; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-wrap: wrap; }
   .seg button { background: #fff; border: 0; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button.on { background: var(--navy); color: #fff; }
   .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
-  .q input[type=number], .q select { width: 140px; }
-  .q input[type=text], .q input[type=email], .q input[type=tel], .q input[type=date] { width: 260px; max-width: 100%; }
+  .followups { margin: 0 0 10px; padding: 12px 14px; background: var(--bg); border-radius: 8px; display: grid; gap: 10px; }
+  .followups .fq label { margin-bottom: 4px; }
+  .followups input[type=text], .followups input[type=date], .followups input[type=number] { max-width: 320px; }
   table.forms { width: 100%; border-collapse: collapse; font-size: 13px; }
   table.forms td { padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
   table.forms td.why { color: var(--muted); }
@@ -89,7 +90,7 @@
 
 <div class="content">
   <h1>Prepare a Listing</h1>
-  <p class="lede">Look up the property, tell us a few things about the listing, and we'll pick the forms the listing needs and fill in what we know. Nothing is sent to Form Simplicity yet; that's the next step.</p>
+  <p class="lede">Look up the property, tell us about the seller, and we'll pick the forms the listing needs and fill in what we know. You can do this before you've set a price. Nothing is sent to Form Simplicity yet; that's the next step.</p>
 
   <div class="card" id="signin" hidden>
     <h2>Sign in</h2>
@@ -110,26 +111,40 @@
       <div id="factsBox" hidden>
         <div class="grid" style="margin-top:14px">
           <div class="wide"><label for="f-address">Property address</label><input type="text" id="f-address" data-fact="address"><div class="src" data-src="address"></div></div>
-          <div class="wide"><label for="f-owner">Seller (owner as recorded)</label><input type="text" id="f-owner" data-fact="owner"><div class="src" data-src="owner"></div></div>
           <div class="wide"><label for="f-legal">Legal description</label><textarea id="f-legal" data-fact="legalDescription"></textarea><div class="src" data-src="legalDescription"></div></div>
           <div><label for="f-parcel">Parcel</label><input type="text" id="f-parcel" data-fact="parcel"><div class="src" data-src="parcel"></div></div>
           <div><label for="f-county">County</label><input type="text" id="f-county" data-fact="county"><div class="src" data-src="county"></div></div>
           <div><label for="f-type">Property type</label>
             <select id="f-type" data-fact="propertyType"><option value="">Choose…</option><option value="sfr">Single-family home</option><option value="condo">Condominium</option><option value="land">Vacant land</option></select>
             <div class="src" data-src="propertyType"></div></div>
-          <div><label for="f-year">Year built</label><input type="number" id="f-year" data-fact="yearBuilt" min="1800" max="2100"><div class="src" data-src="yearBuilt"></div></div>
+          <div id="yearBox"><label for="f-year">Year built</label><input type="number" id="f-year" data-fact="yearBuilt" min="1800" max="2100"><div class="src" data-src="yearBuilt"></div>
+            <div class="needed" id="yearNeeded" hidden>Needed: it decides the lead-based paint disclosure. The property appraiser or RPR has it.</div></div>
+        </div>
+        <div class="q" style="margin-top:6px">
+          <div class="qt">Is there a homeowners association?</div>
+          <div class="seg" role="group" aria-label="Homeowners association">
+            <button type="button" data-yn="hasHoa" data-v="true">Yes</button><button type="button" data-yn="hasHoa" data-v="false">No</button></div>
+        </div>
+        <div class="followups" id="hoaFollow" hidden>
+          <div class="fq"><label for="a-hoaName">Name of the association</label><input type="text" id="a-hoaName" data-answer="hoaName"></div>
         </div>
         <div class="notes" id="lookupNotes"></div>
       </div>
     </div>
 
-    <!-- 2. Price, dates, commission -->
+    <!-- 2. Seller -->
+    <div class="card" id="sellerCard" hidden>
+      <h2><span class="step">Step 2</span> Seller</h2>
+      <div class="grid" id="sellerFields"></div>
+    </div>
+
+    <!-- 3. Price, dates, commission -->
     <div class="card" id="moneyCard" hidden>
-      <h2><span class="step">Step 2</span> Price, dates and commission</h2>
+      <h2><span class="step">Step 3</span> Price, dates and commission</h2>
       <div class="grid">
-        <div><label for="a-listPrice">List price, if you know it</label><input type="number" id="a-listPrice" data-answer="listPrice" min="0" step="1000" placeholder="500000"></div>
+        <div><label for="a-listPrice">List price, if you know it</label><input type="number" id="a-listPrice" data-answer="listPrice" min="0" step="1000" placeholder="Set it later"><div class="hint">You can leave this for after you've seen the home.</div></div>
         <div><label for="a-termStart">Listing starts</label><input type="date" id="a-termStart" data-answer="termStart"></div>
-        <div><label for="a-termEnd">Listing ends</label><input type="date" id="a-termEnd" data-answer="termEnd"><div class="hint">Defaults to one year after it starts.</div></div>
+        <div><label for="a-termEnd">Listing ends</label><input type="date" id="a-termEnd" data-answer="termEnd"><div class="hint">Set to 12 months after it starts; change it if needed.</div></div>
       </div>
       <div class="grid" style="margin-top:12px">
         <div><label for="a-totalPct">Total commission (%)</label><input type="number" id="a-totalPct" data-answer="totalPct" min="0" max="20" step="0.25" value="6"><div class="hint">Everything the seller pays, including the buyer's broker's share.</div></div>
@@ -140,16 +155,11 @@
       <div class="notes" id="commissionNotes"></div>
     </div>
 
-    <!-- 3. Questions -->
-    <div class="card" id="qCard" hidden>
-      <h2><span class="step">Step 3</span> Anything else I need to know</h2>
-      <div class="qs" id="questions"></div>
-    </div>
-
-    <!-- 4. Details -->
-    <div class="card" id="dCard" hidden>
-      <h2><span class="step">Step 4</span> Listing details</h2>
-      <div class="qs" id="details"></div>
+    <!-- 4. Anything else -->
+    <div class="card" id="elseCard" hidden>
+      <h2><span class="step">Step 4</span> Anything else I need to know?</h2>
+      <p class="sub">These are usually no, so they start that way. Change any that apply.</p>
+      <div id="elseList"></div>
     </div>
 
     <!-- 5. Forms -->
@@ -169,12 +179,11 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { facts: {}, sources: {}, answers: {}, questionDefs: {}, plan: null };
-  const SKIP_DETAILS = new Set(["listPrice", "totalPct", "totalFlat", "buyerPct", "termStart", "termEnd"]);
+  const state = { facts: {}, sources: {}, answers: {}, plan: null, built: false };
   const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-
+  const INPUT_TYPE = { year: "number", money: "number", percent: "number", date: "date", email: "email", phone: "tel" };
   function noteHtml(n) { return `<div class="note ${n.level === "warn" ? "warn" : n.level === "error" ? "error" : ""}">${esc(n.text)}</div>`; }
 
   // ── Step 1: look up ──
@@ -187,13 +196,14 @@
       state.facts = { ...r.facts }; state.sources = r.sources || {};
       for (const el of document.querySelectorAll("[data-fact]")) el.value = state.facts[el.dataset.fact] ?? "";
       for (const el of document.querySelectorAll("[data-src]")) el.textContent = state.sources[el.dataset.src] ? "From " + state.sources[el.dataset.src] : "";
-      $("lookupNotes").innerHTML = (r.notes || []).map((t) => noteHtml({ level: "info", text: t })).join("");
+      $("lookupNotes").innerHTML = (r.notes || []).filter((t) => !/year built/i.test(t)).map((t) => noteHtml({ level: "info", text: t })).join("");
       $("lookupMsg").textContent = r.facts.address ? "Check these against what you know; you can change any of them." : "We couldn't find this property in the records. Fill in what you know.";
       $("factsBox").hidden = false;
-      ["moneyCard", "qCard", "dCard", "formsCard"].forEach((id) => ($(id).hidden = false));
-      if (!$("a-termStart").value) { $("a-termStart").value = today(); state.answers.termStart = today(); }
-      readMoney();
-      replan();
+      ["sellerCard", "moneyCard", "elseCard", "formsCard"].forEach((id) => ($(id).hidden = false));
+      if (!$("a-termStart").value) { $("a-termStart").value = today(); $("a-termStart").dispatchEvent(new Event("change", { bubbles: true })); }
+      const seller = $("s-sellerName");
+      if (seller && state.facts.sellerName) { seller.value = state.facts.sellerName; setRecorded(); }
+      readInputs(); showYearNeeded(); replan();
     } catch (e) {
       $("lookupMsg").className = "msg err"; $("lookupMsg").textContent = e.message;
     } finally { $("lookupBtn").disabled = false; }
@@ -201,6 +211,39 @@
   $("lookupBtn").addEventListener("click", lookup);
   $("addr").addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
 
+  function showYearNeeded() { $("yearNeeded").hidden = !!state.facts.yearBuilt || state.facts.propertyType === "land"; $("yearBox").hidden = state.facts.propertyType === "land"; }
+  function setRecorded() {
+    const el = $("s-sellerName-src");
+    if (el) el.textContent = state.facts.owner ? `Owner of record: “${state.facts.owner}”` : "";
+  }
+
+  // ── Build the seller and "anything else" sections once, from the server's lists ──
+  function buildSections(r) {
+    if (state.built) return;
+    state.built = true;
+    $("sellerFields").innerHTML = (r.sellerQuestions || []).map((q) => {
+      const list = q.suggestions ? `<datalist id="dl-${q.key}">${q.suggestions.map((s) => `<option value="${esc(s)}">`).join("")}</datalist>` : "";
+      const wide = q.key === "sellerName" || q.key === "forwardingAddress" ? ' class="wide"' : "";
+      return `<div${wide}><label for="s-${q.key}">${esc(q.label)}${q.optional ? ' <span class="tag">optional</span>' : ""}</label>
+        <input type="${INPUT_TYPE[q.type] || "text"}" id="s-${q.key}" data-answer="${q.key}" ${q.suggestions ? `list="dl-${q.key}"` : ""} autocomplete="off">${list}
+        ${q.key === "sellerName" ? `<div class="src" id="s-sellerName-src"></div>` : ""}${q.help ? `<div class="hint">${esc(q.help)}</div>` : ""}</div>`;
+    }).join("");
+    if (state.facts.sellerName) { $("s-sellerName").value = state.facts.sellerName; setRecorded(); }
+
+    $("elseList").innerHTML = (r.anythingElse || []).map((q) => {
+      if (state.answers[q.key] === undefined) state.answers[q.key] = false; // "usually no" (John Adams, 2026-11-07)
+      const follow = (q.followUps || []).map((f) => {
+        if (f.type === "choice") return `<div class="fq"><label>${esc(f.label)}</label><div class="seg" role="group" aria-label="${esc(f.label)}">${f.options.map(([v, t]) =>
+          `<button type="button" data-choice="${f.key}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>${f.help ? `<div class="hint">${esc(f.help)}</div>` : ""}</div>`;
+        return `<div class="fq"><label for="e-${f.key}">${esc(f.label)}${f.optional ? ' <span class="tag">optional</span>' : ""}</label><input type="${INPUT_TYPE[f.type] || "text"}" id="e-${f.key}" data-answer="${f.key}"></div>`;
+      }).join("");
+      return `<div class="qwrap"><div class="q"><div class="qt">${esc(q.label)}${q.help ? `<div class="hint">${esc(q.help)}</div>` : ""}</div>
+        <div class="seg" role="group" aria-label="${esc(q.label)}"><button type="button" data-yn="${q.key}" data-v="true">Yes</button><button type="button" data-yn="${q.key}" data-v="false" class="on">No</button></div></div>
+        ${follow ? `<div class="followups" id="f-${q.key}" hidden>${follow}</div>` : ""}</div>`;
+    }).join("");
+  }
+
+  // ── Inputs ──
   document.addEventListener("input", (e) => {
     const t = e.target;
     if (t.dataset.fact) {
@@ -208,21 +251,46 @@
       if (v === "") delete state.facts[t.dataset.fact];
       else state.facts[t.dataset.fact] = t.dataset.fact === "yearBuilt" ? Number(v) : v;
       const src = document.querySelector(`[data-src="${t.dataset.fact}"]`); if (src) src.textContent = v ? "Entered by you" : "";
-      replanSoon();
-    } else if (t.dataset.answer) { readMoney(); replanSoon(); }
-    else if (t.dataset.detail) { setAnswer(t.dataset.detail, t.value.trim() === "" ? undefined : t.value); replanSoon(); }
+      showYearNeeded(); replanSoon();
+    } else if (t.dataset.answer) { readInputs(); replanSoon(); }
   });
-
-  function readMoney() {
+  document.addEventListener("change", (e) => {
+    if (e.target.dataset.fact === "propertyType") { showYearNeeded(); replan(); }
+    // A new start date sets the end date 12 months out; the agent can change it (John Adams, 2026-11-07).
+    if (e.target.id === "a-termStart" && e.target.value) {
+      const [y, m, d] = e.target.value.split("-").map(Number);
+      const end = new Date(Date.UTC(y + 1, m - 1, d));
+      if (end.getUTCDate() !== d) end.setUTCDate(0); // Feb 29 -> Feb 28
+      $("a-termEnd").value = end.toISOString().slice(0, 10);
+      readInputs(); replan();
+    }
+  });
+  function readInputs() {
     for (const el of document.querySelectorAll("[data-answer]")) {
       const v = el.value.trim();
       if (v === "") delete state.answers[el.dataset.answer];
       else state.answers[el.dataset.answer] = el.type === "number" ? Number(v) : v;
     }
   }
-  function setAnswer(k, v) { if (v === undefined) delete state.answers[k]; else state.answers[k] = v; }
 
-  // ── Plan: questions, commission, forms ──
+  document.addEventListener("click", (e) => {
+    const yn = e.target.closest("button[data-yn]");
+    if (yn) {
+      const k = yn.dataset.yn, v = yn.dataset.v === "true";
+      state.answers[k] = v;
+      for (const b of document.querySelectorAll(`button[data-yn="${k}"]`)) b.classList.toggle("on", b === yn);
+      const f = k === "hasHoa" ? $("hoaFollow") : $("f-" + k); if (f) f.hidden = !v;
+      replan(); return;
+    }
+    const ch = e.target.closest("button[data-choice]");
+    if (ch) {
+      state.answers[ch.dataset.choice] = ch.dataset.v;
+      for (const b of document.querySelectorAll(`button[data-choice="${ch.dataset.choice}"]`)) b.classList.toggle("on", b === ch);
+      replan();
+    }
+  });
+
+  // ── Plan: commission, forms, what's still needed ──
   let timer = null, seq = 0;
   function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
   async function replan() {
@@ -231,9 +299,8 @@
       const r = await Auth.api("/listing-prep/plan", { body: { facts: state.facts, answers: state.answers } });
       if (mine !== seq) return;
       state.plan = r;
-      for (const q of [...(r.questions || []), ...(r.details || [])]) state.questionDefs[q.key] = q;
+      if (!state.built) { buildSections(r); readInputs(); return replan(); } // apply the "No" defaults
       renderCommission(r.commission);
-      renderQuestions(r);
       renderForms(r);
     } catch (e) {
       $("formsWarnings").innerHTML = noteHtml({ level: "error", text: e.message });
@@ -241,72 +308,29 @@
   }
 
   function renderCommission(c) {
-    const has = c && c.total != null;
     $("breakdown").hidden = !c || !c.summary;
     if (c && c.summary) {
       $("bdLine").textContent = c.summary;
-      $("bdDollars").textContent = has
+      $("bdDollars").textContent = c.total != null
         ? `${money(c.total)} total · ${money(c.buyer)} to the buyer's broker · ${money(c.listingSide)} for the listing side`
-        : "Enter the list price to see the dollars.";
+        : "Add the list price to see the dollars.";
     }
     const notes = (c?.notes || []).filter((n) => !/^Total commission:|^Buyer's broker:|^Enter the list price/.test(n.text));
-    $("commissionNotes").innerHTML = notes.map((n) => /on the table/.test(n.text)
-      ? `<div class="note alert">${esc(n.text)}</div>` : noteHtml(n)).join("");
+    $("commissionNotes").innerHTML = notes.map((n) => /on the table/.test(n.text) ? `<div class="note alert">${esc(n.text)}</div>` : noteHtml(n)).join("");
   }
 
-  // Yes/no and choice questions. Answered ones stay on screen so they can be changed.
-  function questionRow(q, value) {
-    const hint = q.help ? `<div class="hint">${esc(q.help)}</div>` : "";
-    let control = "";
-    if (q.type === "yesno") {
-      control = `<div class="seg" role="group" aria-label="${esc(q.label)}">
-        <button type="button" data-q="${q.key}" data-v="true" class="${value === true ? "on" : ""}">Yes</button>
-        <button type="button" data-q="${q.key}" data-v="false" class="${value === false ? "on" : ""}">No</button></div>`;
-    } else if (q.type === "choice") {
-      control = `<div class="seg" role="group" aria-label="${esc(q.label)}">${q.options.map(([v, t]) =>
-        `<button type="button" data-q="${q.key}" data-v="${esc(v)}" class="${value === v ? "on" : ""}">${esc(t)}</button>`).join("")}</div>`;
-    } else {
-      const type = { year: "number", money: "number", percent: "number", date: "date", email: "email", phone: "tel" }[q.type] || "text";
-      control = `<input type="${type}" id="d-${q.key}" data-detail="${q.key}" value="${esc(value ?? "")}" aria-label="${esc(q.label)}">`;
-    }
-    return `<div class="q"><div class="qt">${esc(q.label)}${q.optional ? ' <span class="tag">optional</span>' : ""}${hint}</div>${control}</div>`;
-  }
-
-  function renderQuestions(r) {
-    // Step 3: the questions that decide forms (still needed, or already answered)
-    const asked = new Set((r.questions || []).map((q) => q.key));
-    const formKeys = ["propertyType", "yearBuilt", "hasHoa", "sellerDiscloses", "mlsOptOut", "signOnProperty", "agentInterest", "shortSale", "homeWarranty"];
-    const shown = formKeys.filter((k) => state.questionDefs[k] && (asked.has(k) || k in state.answers) && !(k === "propertyType" && state.facts.propertyType) && !(k === "yearBuilt" && state.facts.yearBuilt));
-    const focus = document.activeElement && document.activeElement.dataset.detail;
-    if (!(focus && $("questions").contains(document.activeElement))) {
-      $("questions").innerHTML = shown.length ? shown.map((k) => questionRow(state.questionDefs[k], state.answers[k])).join("")
-        : '<p class="hint">Nothing to ask yet.</p>';
-    }
-    // Step 4: listing details for the forms that are included
-    const details = (r.details || []).filter((q) => !SKIP_DETAILS.has(q.key));
-    if (focus && details.some((q) => q.key === focus)) return; // don't redraw under the cursor
-    $("details").innerHTML = details.map((q) => questionRow(q, state.answers[q.key])).join("");
-  }
-
-  document.addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-q]");
-    if (!b) return;
-    const k = b.dataset.q, raw = b.dataset.v;
-    const v = raw === "true" ? true : raw === "false" ? false : raw;
-    setAnswer(k, state.answers[k] === v ? undefined : v); // tap again to clear
-    if (k === "propertyType") { state.facts.propertyType = state.answers[k]; $("f-type").value = state.answers[k] || ""; }
-    replan();
-  });
-
+  const ASK_LABELS = { propertyType: "The property type (Step 1)", yearBuilt: "The year built (Step 1)", hasHoa: "Whether there's a homeowners association (Step 1)", specialSign: "The sign (Step 4)" };
   function renderForms(r) {
-    const warnings = [...(r.warnings || [])];
-    $("formsWarnings").innerHTML = warnings.map((t) => noteHtml({ level: "warn", text: t })).join("");
+    $("formsWarnings").innerHTML = (r.warnings || []).map((t) => noteHtml({ level: "warn", text: t })).join("");
     const forms = r.forms || [];
     $("formsList").innerHTML = forms.length ? forms.map((f) => `<tr><td>${esc(f.fsTitle)}${f.kind === "file" ? '<span class="tag">attached PDF</span>' : ""}${f.set ? `<span class="tag">${f.set === "daytona" ? "Daytona" : "Stellar"}</span>` : ""}</td><td class="why">${esc(f.reason)}</td></tr>`).join("")
-      : '<tr><td class="why">Answer the questions above to see the forms.</td></tr>';
-    const missing = (r.values?.missing || []);
+      : '<tr><td class="why">Choose the property type in Step 1 to see the forms.</td></tr>';
+    const missing = [
+      ...(r.questions || []).map((q) => ASK_LABELS[q.key] || q.label),
+      ...(r.values?.missing || []).map((m) => m.label),
+    ];
     $("missingBox").hidden = !missing.length;
-    $("missingList").innerHTML = missing.map((m) => `<li>${esc(m.label)}</li>`).join("");
+    $("missingList").innerHTML = missing.map((m) => `<li>${esc(m)}</li>`).join("");
   }
 
   Auth.ready({ tool: "Prepare a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
