@@ -71,6 +71,11 @@
   .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
   .missing { margin-top: 12px; font-size: 13px; }
   .missing li { margin-left: 18px; line-height: 1.6; }
+  ul.steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+  ul.steps li { padding: 4px 0; border-bottom: 1px solid var(--line, #e5e7eb); }
+  ul.steps li.ok { color: #166534; }
+  ul.steps li.bad { color: #b91c1c; }
+  ul.steps .why { color: var(--muted); }
   [hidden] { display: none !important; }
   #signin .gbtn { margin-top: 12px; }
   @media (max-width: 600px) { .breakdown .line { font-size: 16px; } }
@@ -120,14 +125,6 @@
           <div id="yearBox"><label for="f-year">Year built</label><input type="number" id="f-year" data-fact="yearBuilt" min="1800" max="2100"><div class="src" data-src="yearBuilt"></div>
             <div class="needed" id="yearNeeded" hidden>Needed: it decides the lead-based paint disclosure. The property appraiser or RPR has it.</div></div>
         </div>
-        <div class="q" style="margin-top:6px">
-          <div class="qt">Is there a homeowners association?</div>
-          <div class="seg" role="group" aria-label="Homeowners association">
-            <button type="button" data-yn="hasHoa" data-v="true">Yes</button><button type="button" data-yn="hasHoa" data-v="false">No</button></div>
-        </div>
-        <div class="followups" id="hoaFollow" hidden>
-          <div class="fq"><label for="a-hoaName">Name of the association</label><input type="text" id="a-hoaName" data-answer="hoaName"></div>
-        </div>
         <div class="notes" id="lookupNotes"></div>
       </div>
     </div>
@@ -149,7 +146,7 @@
       <div class="grid" style="margin-top:12px">
         <div><label for="a-totalPct">Total commission (%)</label><input type="number" id="a-totalPct" data-answer="totalPct" min="0" max="20" step="0.25" value="6"><div class="hint">Everything the seller pays, including the buyer's broker's share.</div></div>
         <div><label for="a-totalFlat">Plus ($)</label><input type="number" id="a-totalFlat" data-answer="totalFlat" min="0" step="50" value="250"></div>
-        <div><label for="a-buyerPct">Buyer's broker gets (%)</label><input type="number" id="a-buyerPct" data-answer="buyerPct" min="0" max="20" step="0.25" placeholder="3"><div class="hint">Part of the total, not added to it.</div></div>
+        <div><label for="a-buyerPct">Buyer's broker gets (%)</label><input type="number" id="a-buyerPct" data-answer="buyerPct" min="0" max="20" step="0.25" placeholder="3"><div class="hint">Part of the total, not added to it. Enter 0 if no compensation is offered.</div></div>
       </div>
       <div class="breakdown" id="breakdown" hidden><div class="line" id="bdLine"></div><div class="dollars" id="bdDollars"></div></div>
       <div class="notes" id="commissionNotes"></div>
@@ -169,9 +166,19 @@
       <table class="forms"><tbody id="formsList"></tbody></table>
       <div class="missing" id="missingBox" hidden><strong>Still needed before the forms can be filled:</strong><ul id="missingList"></ul></div>
       <div class="row" style="margin-top:16px">
-        <button class="btn" type="button" disabled title="Coming next: creating the transaction in Form Simplicity">Create in Form Simplicity</button>
-        <span class="hint">Coming next. For now this shows what will be created.</span>
+        <button class="btn" type="button" id="createBtn" disabled>Create in Form Simplicity</button>
+        <span class="hint" id="createHint">Creates the transaction in your Form Simplicity account, adds these forms and fills them in.</span>
       </div>
+      <div class="msg" id="createMsg"></div>
+    </div>
+
+    <!-- 6. Progress -->
+    <div class="card" id="runCard" hidden>
+      <h2><span class="step">Step 6</span> Form Simplicity: <span id="runTitle"></span></h2>
+      <p class="sub" id="runStatus"></p>
+      <ul class="steps" id="runSteps"></ul>
+      <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a></div>
+      <div class="missing" id="runLeft" hidden><strong>Check before sending:</strong><ul id="runLeftList"></ul></div>
     </div>
   </div>
 </div>
@@ -203,7 +210,7 @@
       if (!$("a-termStart").value) { $("a-termStart").value = today(); $("a-termStart").dispatchEvent(new Event("change", { bubbles: true })); }
       const seller = $("s-sellerName");
       if (seller && state.facts.sellerName) { seller.value = state.facts.sellerName; setRecorded(); }
-      readInputs(); showYearNeeded(); replan();
+      readInputs(); showYearNeeded(); syncCondo(); replan();
     } catch (e) {
       $("lookupMsg").className = "msg err"; $("lookupMsg").textContent = e.message;
     } finally { $("lookupBtn").disabled = false; }
@@ -237,10 +244,24 @@
           `<button type="button" data-choice="${f.key}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>${f.help ? `<div class="hint">${esc(f.help)}</div>` : ""}</div>`;
         return `<div class="fq"><label for="e-${f.key}">${esc(f.label)}${f.optional ? ' <span class="tag">optional</span>' : ""}</label><input type="${INPUT_TYPE[f.type] || "text"}" id="e-${f.key}" data-answer="${f.key}"></div>`;
       }).join("");
-      return `<div class="qwrap"><div class="q"><div class="qt">${esc(q.label)}${q.help ? `<div class="hint">${esc(q.help)}</div>` : ""}</div>
+      return `<div class="qwrap" data-q="${q.key}"><div class="q"><div class="qt">${esc(q.label)}${q.help ? `<div class="hint">${esc(q.help)}</div>` : ""}${q.notForCondo ? `<div class="hint" id="condoNote" hidden>It's a condominium, so there always is one.</div>` : ""}</div>
         <div class="seg" role="group" aria-label="${esc(q.label)}"><button type="button" data-yn="${q.key}" data-v="true">Yes</button><button type="button" data-yn="${q.key}" data-v="false" class="on">No</button></div></div>
         ${follow ? `<div class="followups" id="f-${q.key}" hidden>${follow}</div>` : ""}</div>`;
     }).join("");
+    syncCondo();
+  }
+
+  // A condominium always has a condominium association: answer it yes and lock it.
+  function syncCondo() {
+    const condo = state.facts.propertyType === "condo";
+    const yes = document.querySelector('button[data-yn="hasCoa"][data-v="true"]'), no = document.querySelector('button[data-yn="hasCoa"][data-v="false"]');
+    if (!yes) return;
+    if (condo) state.answers.hasCoa = true;
+    else if (yes.disabled) state.answers.hasCoa = false; // was locked by condo; back to the default
+    yes.disabled = no.disabled = condo;
+    yes.classList.toggle("on", state.answers.hasCoa === true); no.classList.toggle("on", state.answers.hasCoa !== true);
+    $("f-hasCoa").hidden = state.answers.hasCoa !== true;
+    $("condoNote").hidden = !condo;
   }
 
   // ── Inputs ──
@@ -255,7 +276,7 @@
     } else if (t.dataset.answer) { readInputs(); replanSoon(); }
   });
   document.addEventListener("change", (e) => {
-    if (e.target.dataset.fact === "propertyType") { showYearNeeded(); replan(); }
+    if (e.target.dataset.fact === "propertyType") { showYearNeeded(); syncCondo(); replan(); }
     // A new start date sets the end date 12 months out; the agent can change it (John Adams, 2026-11-07).
     if (e.target.id === "a-termStart" && e.target.value) {
       const [y, m, d] = e.target.value.split("-").map(Number);
@@ -279,7 +300,7 @@
       const k = yn.dataset.yn, v = yn.dataset.v === "true";
       state.answers[k] = v;
       for (const b of document.querySelectorAll(`button[data-yn="${k}"]`)) b.classList.toggle("on", b === yn);
-      const f = k === "hasHoa" ? $("hoaFollow") : $("f-" + k); if (f) f.hidden = !v;
+      const f = $("f-" + k); if (f) f.hidden = !v;
       replan(); return;
     }
     const ch = e.target.closest("button[data-choice]");
@@ -319,7 +340,7 @@
     $("commissionNotes").innerHTML = notes.map((n) => /on the table/.test(n.text) ? `<div class="note alert">${esc(n.text)}</div>` : noteHtml(n)).join("");
   }
 
-  const ASK_LABELS = { propertyType: "The property type (Step 1)", yearBuilt: "The year built (Step 1)", hasHoa: "Whether there's a homeowners association (Step 1)", specialSign: "The sign (Step 4)" };
+  const ASK_LABELS = { propertyType: "The property type (Step 1)", yearBuilt: "The year built (Step 1)", hasHoa: "Whether there's an HOA (Step 4)", hasCoa: "Whether there's a condominium association (Step 4)", specialSign: "The sign (Step 4)" };
   function renderForms(r) {
     $("formsWarnings").innerHTML = (r.warnings || []).map((t) => noteHtml({ level: "warn", text: t })).join("");
     const forms = r.forms || [];
@@ -331,10 +352,64 @@
     ];
     $("missingBox").hidden = !missing.length;
     $("missingList").innerHTML = missing.map((m) => `<li>${esc(m)}</li>`).join("");
+    const blocked = !!(r.questions || []).length || !forms.length || !state.facts.address;
+    if (!state.runId) $("createBtn").disabled = blocked;
+    $("createHint").textContent = blocked ? "Answer what's still needed above first."
+      : "Creates the transaction in your Form Simplicity account, adds these forms and fills them in.";
+  }
+
+  // ── Create in Form Simplicity, then follow the robot ──
+  $("createBtn").addEventListener("click", async () => {
+    readInputs();
+    $("createBtn").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Creating the transaction…";
+    try {
+      const r = await Auth.api("/listing-prep/create", { body: { facts: state.facts, answers: state.answers } });
+      startFollowing(r.runId);
+    } catch (e) {
+      $("createMsg").className = "msg err"; $("createMsg").textContent = e.message;
+      if (e.data && e.data.runId) startFollowing(e.data.runId); // transaction made, robot didn't start
+      else $("createBtn").disabled = false;
+    }
+  });
+
+  const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account" };
+  let pollTimer = null;
+  function startFollowing(runId) {
+    state.runId = runId;
+    $("createMsg").textContent = "";
+    $("runCard").hidden = false;
+    history.replaceState(null, "", "?run=" + encodeURIComponent(runId));
+    $("runCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    poll();
+  }
+  async function poll() {
+    clearTimeout(pollTimer);
+    let r;
+    try { r = await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId)); }
+    catch (e) { $("runStatus").textContent = e.status === 404 ? "We couldn't find that run." : "Checking again in a moment…"; if (e.status !== 404) pollTimer = setTimeout(poll, 8000); return; }
+    $("runTitle").textContent = r.fs_trans_name || r.address || "";
+    if (r.fs_url) { $("runOpen").href = r.fs_url; $("runOpen").hidden = false; }
+    const steps = r.steps || [];
+    $("runSteps").innerHTML = steps.map((s) => `<li class="${s.ok ? "ok" : "bad"}">${s.ok ? "✓" : "✗"} ${esc(STEP_NAMES[s.step] || s.step[0].toUpperCase() + s.step.slice(1))}${!s.ok && s.detail ? ` <span class="why">— ${esc(s.detail)}</span>` : ""}</li>`).join("");
+    // The robot's skipped list is field codes (for the office); the agent gets a count.
+    const left = (r.result?.skipped || []).length;
+    $("runLeft").hidden = !left;
+    $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the forms over before sending them.</li>` : "";
+    if (r.status === "done") $("runStatus").textContent = "All done. The transaction and its forms are ready in Form Simplicity. We've emailed you the link too.";
+    else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. What's checked above is done; the office has been told.`;
+    else {
+      $("runStatus").textContent = r.status === "queued" ? "Starting up. This usually takes a few minutes; you can leave this page and we'll email you when it's ready."
+        : "Adding and filling the forms. This usually takes a few minutes; you can leave this page and we'll email you when it's ready.";
+      pollTimer = setTimeout(poll, 5000);
+    }
   }
 
   Auth.ready({ tool: "Prepare a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
-    .then(() => { $("signin").hidden = true; $("app").hidden = false; $("addr").focus(); });
+    .then(() => {
+      $("signin").hidden = true; $("app").hidden = false;
+      const run = new URLSearchParams(location.search).get("run");
+      if (run) { $("createBtn").disabled = true; startFollowing(run); } else $("addr").focus();
+    });
 })();
 </script>
 </body>
