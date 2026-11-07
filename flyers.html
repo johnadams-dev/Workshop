@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Property Flyers</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+:root { --navy:#123a5e; --blue:#2b77ab; --gold:#e3b23c; --bg:#f4f6f9; --line:#dde1e9; --text:#1a2c3d; --muted:#5f6875; --bad:#b3261e; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+.topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 20px; background:var(--navy); color:#fff; }
+.topbar b { font-size:17px; }
+.topbar a { color:#fff; text-decoration:none; font-size:14px; margin-left:16px; white-space:nowrap; }
+.wrap { max-width:1240px; margin:0 auto; padding:18px 16px 40px; }
+.card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:14px; }
+.card h2 { margin:0 0 10px; font-size:15px; color:var(--navy); }
+label { display:block; font-size:13px; font-weight:600; margin:0 0 4px; color:var(--muted); }
+input, select, textarea { width:100%; font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--text); }
+textarea { min-height:190px; resize:vertical; }
+.row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; align-items:end; }
+.btn { font:inherit; font-weight:600; padding:9px 16px; border-radius:6px; border:1px solid var(--navy); background:var(--navy); color:#fff; cursor:pointer; white-space:nowrap; }
+.btn.alt { background:#fff; color:var(--navy); }
+.btn:disabled { opacity:.55; cursor:default; }
+.msg { margin:10px 0 0; font-size:14px; color:var(--muted); }
+.msg.bad { color:var(--bad); font-weight:600; }
+.work { display:grid; grid-template-columns:minmax(300px,1fr) minmax(320px,560px); gap:14px; align-items:start; }
+@media (max-width:900px) { .work { grid-template-columns:1fr; } }
+.slots { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
+.slots button { position:relative; padding:0; border:3px solid transparent; border-radius:6px; background:none; cursor:pointer; aspect-ratio:4/3; overflow:hidden; }
+.slots button.on { border-color:var(--gold); }
+.slots img, .grid img { width:100%; height:100%; object-fit:cover; display:block; }
+.slots span { position:absolute; left:0; bottom:0; padding:1px 5px; background:rgba(0,0,0,.65); color:#fff; font-size:11px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:5px; max-height:320px; overflow:auto; }
+.grid button { padding:0; border:2px solid transparent; border-radius:4px; background:none; cursor:pointer; aspect-ratio:4/3; overflow:hidden; }
+.grid button.used { opacity:.35; }
+.grid button:hover { border-color:var(--blue); }
+.sheet { width:100%; aspect-ratio:8.5/11; overflow:hidden; background:#fff; border:1px solid var(--line); position:relative; }
+.sheet iframe { position:absolute; top:0; left:0; width:816px; height:1056px; border:0; transform-origin:0 0; pointer-events:none; }
+.count.over { color:var(--bad); font-weight:600; }
+.hide { display:none !important; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <b>Property Flyers</b>
+  <div><a href="./feedback.html?tool=flyers">Feedback</a><a href="./index.html">&#8592; Tools</a></div>
+</div>
+<div class="wrap">
+  <div id="signin" class="card hide"><h2>Sign in to make a flyer</h2><div id="g-signin-btn"></div></div>
+  <div id="closed" class="card hide">Property Flyers isn't open yet.</div>
+
+  <div id="app" class="hide">
+    <form class="card" id="startForm">
+      <div class="row">
+        <div><label for="mls">MLS number</label><input id="mls" required autocomplete="off" placeholder="1232341"></div>
+        <div><label for="type">Flyer</label>
+          <select id="type">
+            <option value="open_house">Open House</option>
+            <option value="neighbor_notice">Open House Notice to Neighbors</option>
+            <option value="new_listing">New Listing</option>
+            <option value="for_sale">For Sale</option>
+          </select></div>
+        <div><label for="agent">Agent on the flyer</label><select id="agent" required><option value="">Loading…</option></select></div>
+        <div id="featureBox"><label for="feature">Anything to feature? (optional)</label><input id="feature" maxlength="200" placeholder="the pool, a new roof"></div>
+        <div><button class="btn" id="startBtn" type="submit">Make the flyer</button></div>
+      </div>
+      <p class="msg" id="startMsg" role="status"></p>
+    </form>
+
+    <div class="work hide" id="work">
+      <div>
+        <div class="card" id="whenCard">
+          <h2>Open house date and time</h2>
+          <select id="whenPick" class="hide" style="margin-bottom:8px"></select>
+          <input id="when" maxlength="100" placeholder="Sunday, November 8 2:00 pm to 5:00 pm">
+          <p class="msg" id="whenMsg"></p>
+        </div>
+        <div class="card" id="photoCard">
+          <h2>Photos</h2>
+          <p class="msg" style="margin:0 0 8px">Click a spot on the flyer, then the photo you'd like there.</p>
+          <div class="slots" id="slots"></div>
+          <div class="grid" id="grid"></div>
+        </div>
+        <div class="card" id="descCard">
+          <h2>Description</h2>
+          <textarea id="desc" aria-label="Description"></textarea>
+          <p class="msg"><span class="count" id="count"></span></p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn" id="pdfBtn" type="button">Download PDF</button>
+          <button class="btn alt" id="redoBtn" type="button">Choose again</button>
+        </div>
+        <p class="msg" id="pdfMsg" role="status" style="margin:0 0 10px"></p>
+        <div class="sheet" id="sheet"><iframe id="preview" title="Flyer preview"></iframe></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const DESCRIPTION_GUIDE = 700;
+const state = { draft: null, slot: 0, photos: [], timer: null, seq: 0 };
+
+function setMsg(el, text, bad) { el.textContent = text || ''; el.classList.toggle('bad', !!bad); }
+
+async function post(path, body) {
+  const r = await fetch(`${Auth.API}${path}`, {
+    method: 'POST',
+    headers: Auth.headers({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body),
+  });
+  return r;
+}
+
+async function loadAgents(ownId) {
+  const r = await fetch(`${Auth.API}/roster/agents`, { headers: Auth.headers() });
+  const data = await r.json();
+  const agents = (Array.isArray(data) ? data : data.agents || [])
+    .slice().sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
+  $('agent').innerHTML = '<option value="">Choose an agent</option>' + agents.map(a => `<option value="${a.id}">${escapeHtml(`${a.last_name}, ${a.first_name}`)}</option>`).join('');
+  if (ownId) $('agent').value = String(ownId);
+}
+
+function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+const isNotice = () => state.draft && state.draft.type === 'neighbor_notice';
+const needsDate = () => state.draft && (state.draft.type === 'open_house' || isNotice());
+
+function body() {
+  return {
+    mls: state.draft.listing.mls, type: state.draft.type, agentId: state.draft.agent.id,
+    openHouse: $('when').value.trim(), description: $('desc').value, photos: state.photos,
+  };
+}
+
+function renderPhotos() {
+  const slots = isNotice() ? 1 : 5;
+  $('slots').style.gridTemplateColumns = `repeat(5,1fr)`;
+  $('slots').innerHTML = state.photos.slice(0, slots).map((url, i) =>
+    `<button type="button" data-slot="${i}" class="${i === state.slot ? 'on' : ''}" aria-label="${i ? `Photo ${i + 1}` : 'Main photo'}"><img src="${url}" alt=""><span>${i ? i + 1 : 'Main'}</span></button>`).join('');
+  $('grid').innerHTML = state.draft.listing.photos.map((url, i) =>
+    `<button type="button" data-url="${url}" class="${state.photos.includes(url) ? 'used' : ''}" aria-label="Listing photo ${i + 1}"><img loading="lazy" src="${url}" alt=""></button>`).join('');
+}
+
+function updateCount() {
+  const n = $('desc').value.length;
+  $('count').textContent = `${n} characters. About ${DESCRIPTION_GUIDE} fits at 11 pt.`;
+  $('count').classList.toggle('over', n > DESCRIPTION_GUIDE);
+}
+
+function fitPreview() {
+  const width = $('sheet').clientWidth;
+  $('preview').style.transform = `scale(${width / 816})`;
+}
+
+function schedulePreview(delay = 500) {
+  clearTimeout(state.timer);
+  state.timer = setTimeout(refreshPreview, delay);
+}
+
+async function refreshPreview() {
+  if (!state.draft) return;
+  if (needsDate() && !$('when').value.trim()) {
+    setMsg($('whenMsg'), 'DeltaNet has no upcoming open house for this listing. Enter the date and time to see the flyer.', true);
+    $('pdfBtn').disabled = true;
+    return;
+  }
+  setMsg($('whenMsg'), needsDate() && state.draft.openHouses.length ? 'From DeltaNet. You can change it here.' : '');
+  const seq = ++state.seq;
+  try {
+    const r = await post('/flyers/preview', body());
+    const data = await r.json();
+    if (seq !== state.seq) return;
+    if (!r.ok) throw new Error(data.error);
+    $('preview').srcdoc = data.html;
+    $('pdfBtn').disabled = false;
+    setMsg($('pdfMsg'), '');
+  } catch (e) {
+    if (seq === state.seq) { setMsg($('pdfMsg'), e.message, true); $('pdfBtn').disabled = true; }
+  }
+}
+
+function showDraft(draft) {
+  state.draft = draft;
+  state.slot = 0;
+  state.photos = draft.photos.slice();
+  $('desc').value = draft.description || '';
+  $('when').value = draft.openHouse || '';
+  const options = draft.openHouses || [];
+  $('whenPick').classList.toggle('hide', options.length < 2);
+  $('whenPick').innerHTML = options.map(o => `<option>${escapeHtml(o)}</option>`).join('');
+  $('whenCard').classList.toggle('hide', !needsDate());
+  $('descCard').classList.toggle('hide', isNotice());
+  $('photoCard').querySelector('h2').textContent = isNotice() ? 'Photo' : 'Photos';
+  renderPhotos();
+  updateCount();
+  $('work').classList.remove('hide');
+  fitPreview();
+  refreshPreview();
+}
+
+async function start(e) {
+  if (e) e.preventDefault();
+  const btn = $('startBtn');
+  btn.disabled = true; $('redoBtn').disabled = true;
+  const notice = $('type').value === 'neighbor_notice';
+  setMsg($('startMsg'), notice ? 'Getting the listing from DeltaNet…' : 'Getting the listing from DeltaNet and choosing photos. This takes up to a minute…');
+  try {
+    const r = await post('/flyers/draft', { mls: $('mls').value.trim(), type: $('type').value, agentId: Number($('agent').value), feature: $('feature').value.trim() });
+    const data = await r.json();
+    if (r.status === 401) { await Auth.signOut(); location.reload(); return; }
+    if (!r.ok) throw new Error(data.error);
+    showDraft(data);
+    setMsg($('startMsg'), data.chosenBy === 'upload order' && !notice ? "Claude couldn't choose this time, so these are the listing's first photos and remarks. Please review them." : '');
+  } catch (err) {
+    setMsg($('startMsg'), err.message || "That didn't work. Please try again.", true);
+  } finally {
+    btn.disabled = false; $('redoBtn').disabled = false;
+  }
+}
+
+async function downloadPdf() {
+  const btn = $('pdfBtn');
+  btn.disabled = true;
+  setMsg($('pdfMsg'), 'Making the PDF. The first one can take up to a minute…');
+  try {
+    const r = await post('/flyers/pdf', body());
+    if (!r.ok) throw new Error((await r.json()).error);
+    const label = $('type').selectedOptions[0].textContent;
+    const name = `${label} - ${state.draft.listing.street}.pdf`.replace(/[^\w .#,-]/g, '').replace(/\s+/g, ' ');
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setMsg($('pdfMsg'), 'Downloaded.');
+  } catch (e) {
+    setMsg($('pdfMsg'), e.message || "The PDF couldn't be made. Please try again.", true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('startForm').addEventListener('submit', start);
+$('redoBtn').addEventListener('click', () => start());
+$('pdfBtn').addEventListener('click', downloadPdf);
+$('type').addEventListener('change', () => { $('featureBox').classList.toggle('hide', $('type').value === 'neighbor_notice'); });
+$('desc').addEventListener('input', () => { updateCount(); schedulePreview(); });
+$('when').addEventListener('input', () => schedulePreview());
+$('whenPick').addEventListener('change', () => { $('when').value = $('whenPick').value; schedulePreview(0); });
+$('slots').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.slot = Number(b.dataset.slot); renderPhotos();
+});
+$('grid').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const url = b.dataset.url, other = state.photos.indexOf(url);
+  // Picking a photo already on the flyer swaps the two spots, so nothing repeats.
+  if (other >= 0) state.photos[other] = state.photos[state.slot];
+  state.photos[state.slot] = url;
+  renderPhotos(); schedulePreview(0);
+});
+window.addEventListener('resize', fitPreview);
+
+Auth.ready({
+  button: $('g-signin-btn'),
+  tool: 'Property Flyers',
+  onSignInNeeded: () => $('signin').classList.remove('hide'),
+}).then(async () => {
+  if (!Auth.user) return;
+  $('signin').classList.add('hide');
+  const r = await fetch(`${Auth.API}/flyers/access`, { headers: Auth.headers() });
+  const access = await r.json();
+  if (!access.allowed) { $('closed').classList.remove('hide'); return; }
+  $('app').classList.remove('hide');
+  await loadAgents(access.agentId);
+  // Deep links, such as from an open house plan or an email.
+  const q = new URLSearchParams(location.search);
+  if (q.get('mls')) $('mls').value = q.get('mls');
+  if (q.get('type')) $('type').value = q.get('type');
+  if (q.get('agentId')) $('agent').value = q.get('agentId');
+  $('type').dispatchEvent(new Event('change'));
+  if (q.get('mls') && $('agent').value) start();
+});
+</script>
+</body>
+</html>
