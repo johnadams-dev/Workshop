@@ -638,6 +638,7 @@
       .cards { grid-template-columns: 1fr; }
       .header-note { display: none; }
     }
+body:not(.flyers-open) .flyers-card { display: none !important; }
   </style>
 </head>
 <body>
@@ -791,6 +792,17 @@
       </div>
     </a>
 
+    <!-- Property Flyers — cross-listed with Buyer Assistance; shown once /flyers/access allows it -->
+    <a href="./flyers.html" class="card flyers-card">
+      <div class="card-icon">🏡</div>
+      <h2>Property Flyers</h2>
+      <p>Make an Open House, New Listing or For Sale flyer, or an Open House Notice to Neighbors, from any MLS number. Photos and description are chosen for you, and you can change them.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
     <!-- MLS Magic -->
     <a href="./mls-magic.html" class="card">
       <div class="card-icon">✨</div>
@@ -918,6 +930,17 @@
       <div class="card-icon">📋</div>
       <h2>ACC Binder</h2>
       <p>Upload a contract or listing packet and let AI split it into individual forms, then upload them straight to Form Simplicity.</p>
+      <div class="card-arrow">
+        Open Tool
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </a>
+
+    <!-- Property Flyers — cross-listed with Listing Marketing; shown once /flyers/access allows it -->
+    <a href="./flyers.html" class="card flyers-card">
+      <div class="card-icon">🏡</div>
+      <h2>Property Flyers</h2>
+      <p>Make an Open House, New Listing or For Sale flyer, or an Open House Notice to Neighbors, from any MLS number. Photos and description are chosen for you, and you can change them.</p>
       <div class="card-arrow">
         Open Tool
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -1365,6 +1388,8 @@ async function onSignedIn(user) {
     localStorage.setItem('ac_is_manager', isManager ? '1' : '0');
     showManagerOnly(isManager);
   } catch (_) {}
+  // Property Flyers' cards appear only for people the tool is open to.
+  Auth.api('/flyers/access').then(a => document.body.classList.toggle('flyers-open', !!a.allowed)).catch(() => {});
   checkHomePage();
 }
 
