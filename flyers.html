@@ -42,7 +42,11 @@ textarea { min-height:190px; resize:vertical; }
 .grid button.used::after { content:"On flyer"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:1px 6px; border-radius:3px; background:var(--navy); color:#fff; font-size:11px; font-weight:600; white-space:nowrap; }
 .grid button:hover { border-color:var(--blue); }
 .sheet { width:100%; aspect-ratio:8.5/11; overflow:hidden; background:#fff; border:1px solid var(--line); position:relative; }
+.sheet.two { aspect-ratio:8.5/22; }
 .sheet iframe { position:absolute; top:0; left:0; width:816px; height:1056px; border:0; transform-origin:0 0; pointer-events:none; }
+.sheet.two iframe { height:2112px; }
+.check { display:flex; align-items:center; gap:8px; margin:0 0 10px; font-size:14px; font-weight:600; color:var(--text); cursor:pointer; }
+.check input { width:auto; }
 .count.over { color:var(--bad); font-weight:600; }
 .hide { display:none !important; }
 </style>
@@ -105,6 +109,7 @@ textarea { min-height:190px; resize:vertical; }
           <button class="btn" id="pdfBtn" type="button">Download PDF</button>
           <button class="btn alt" id="redoBtn" type="button">Choose again</button>
         </div>
+        <label class="check" id="detailsBox"><input type="checkbox" id="details"> Add listing details on the back</label>
         <p class="msg" id="pdfMsg" role="status" style="margin:0 0 10px"></p>
         <div class="sheet" id="sheet"><iframe id="preview" title="Flyer preview"></iframe></div>
       </div>
@@ -146,6 +151,7 @@ function body() {
   return {
     mls: state.draft.listing.mls, type: state.draft.type, agentId: state.draft.agent.id,
     openHouse: $('when').value.trim(), description: $('desc').value, photos: state.photos,
+    includeDetails: !isNotice() && $('details').checked,
   };
 }
 
@@ -212,6 +218,9 @@ function showDraft(draft) {
   $('whenPick').innerHTML = options.map(o => `<option>${escapeHtml(o)}</option>`).join('');
   $('whenCard').classList.toggle('hide', !needsDate());
   $('descCard').classList.toggle('hide', isNotice());
+  $('detailsBox').classList.toggle('hide', isNotice());
+  $('details').checked = !!draft.includeDetails;
+  $('sheet').classList.toggle('two', !!draft.includeDetails);
   renderPhotos();
   updateCount();
   $('work').classList.remove('hide');
@@ -263,6 +272,7 @@ async function downloadPdf() {
 $('startForm').addEventListener('submit', start);
 $('redoBtn').addEventListener('click', () => start());
 $('pdfBtn').addEventListener('click', downloadPdf);
+$('details').addEventListener('change', () => { $('sheet').classList.toggle('two', $('details').checked); fitPreview(); schedulePreview(0); });
 $('type').addEventListener('change', () => { $('featureBox').classList.toggle('hide', $('type').value === 'neighbor_notice'); });
 $('desc').addEventListener('input', () => { updateCount(); schedulePreview(); });
 $('when').addEventListener('input', () => schedulePreview());
