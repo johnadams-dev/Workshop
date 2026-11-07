@@ -30,17 +30,18 @@ textarea { min-height:190px; resize:vertical; }
 .work { display:grid; grid-template-columns:minmax(300px,1fr) minmax(320px,560px); gap:14px; align-items:start; }
 @media (max-width:900px) { .work { grid-template-columns:1fr; } }
 .slots { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:10px; }
-.slots button { position:relative; padding:0; border:3px solid transparent; border-radius:6px; background:none; cursor:pointer; aspect-ratio:4/3; overflow:hidden; }
+/* Photos are the tiles' backgrounds: on iPhones an image inside a button spills out of it and covers its neighbors. */
+.slots button, .grid button { position:relative; padding:0; background:#dfe5ea center/cover no-repeat; cursor:pointer; aspect-ratio:4/3; }
+.slots button { border:3px solid transparent; border-radius:6px; }
 .slots button.on { border-color:var(--gold); }
-.slots img, .grid img { width:100%; height:100%; object-fit:cover; display:block; }
 .slots span { position:absolute; left:0; bottom:0; padding:1px 5px; background:rgba(0,0,0,.65); color:#fff; font-size:11px; }
 .tray { padding:12px; margin-bottom:14px; background:#fdf6e3; border:2px solid var(--gold); border-radius:8px; }
 .tray h3, .library h3 { margin:0 0 2px; font-size:14px; color:var(--navy); }
 .tray p, .library p { margin:0 0 8px; font-size:13px; color:var(--muted); }
 .library { padding-top:12px; border-top:1px solid var(--line); }
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:5px; max-height:320px; overflow:auto; }
-.grid button { position:relative; padding:0; border:2px solid transparent; border-radius:4px; background:none; cursor:pointer; aspect-ratio:4/3; overflow:hidden; }
-.grid button.used img { opacity:.35; }
+.grid button { border:2px solid transparent; border-radius:4px; }
+.grid button.used::before { content:""; position:absolute; inset:0; background:rgba(255,255,255,.65); }
 .grid button.used::after { content:"On flyer"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); padding:1px 6px; border-radius:3px; background:var(--navy); color:#fff; font-size:11px; font-weight:600; white-space:nowrap; }
 .grid button:hover { border-color:var(--blue); }
 .sheet { width:100%; aspect-ratio:8.5/11; overflow:hidden; background:#fff; border:1px solid var(--line); position:relative; }
@@ -229,18 +230,23 @@ function body() {
   };
 }
 
+// A small copy of the photo as the tile's background; a listing can have 79 of them.
+function tileStyle(url) {
+  return `background-image:url(&quot;${url}${url.includes('?') ? '&amp;' : '?'}width=300&quot;)`;
+}
+
 function renderPhotos() {
   const slots = isNotice() ? 1 : 5;
   $('slots').style.gridTemplateColumns = `repeat(5,1fr)`;
   $('slots').innerHTML = state.photos.slice(0, slots).map((url, i) =>
-    `<button type="button" data-slot="${i}" class="${i === state.slot ? 'on' : ''}" aria-label="${i ? `Photo ${i + 1}` : 'Main photo'}"><img src="${url}" alt=""><span>${i ? i + 1 : 'Main'}</span></button>`).join('');
+    `<button type="button" data-slot="${i}" class="${i === state.slot ? 'on' : ''}" style="${tileStyle(url)}" aria-label="${i ? `Photo ${i + 1}` : 'Main photo'}"><span>${i ? i + 1 : 'Main'}</span></button>`).join('');
   const onFlyer = state.photos.slice(0, slots);
   $('grid').innerHTML = state.draft.listing.photos.map((url, i) =>
-    `<button type="button" data-url="${url}" class="${onFlyer.includes(url) ? 'used' : ''}" aria-label="Listing photo ${i + 1}${onFlyer.includes(url) ? ', on the flyer' : ''}"><img loading="lazy" src="${url}" alt=""></button>`).join('');
+    `<button type="button" data-url="${url}" class="${onFlyer.includes(url) ? 'used' : ''}" style="${tileStyle(url)}" aria-label="Listing photo ${i + 1}${onFlyer.includes(url) ? ', on the flyer' : ''}"></button>`).join('');
   const spot = state.slot ? `photo ${state.slot + 1}` : 'the main photo';
-  $('trayHelp').textContent = slots > 1 ? `Click a photo here to change it. Now changing: ${spot}.` : 'This is the photo on the notice.';
+  $('trayHelp').textContent = slots > 1 ? `Choose a photo here to change it. Now changing: ${spot}.` : 'This is the photo on the notice.';
   $('libraryTitle').textContent = `All ${state.draft.listing.photos.length} listing photos`;
-  $('libraryHelp').textContent = `Click one to put it in ${spot}.`;
+  $('libraryHelp').textContent = `Choose one to put it in ${spot}.`;
 }
 
 function updateCount() {
