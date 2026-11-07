@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prepare a Listing | John Adams Real Estate Tools</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+  /* Same family as seller-net.html / market-update.html: navy topbar + gold accent, white cards. */
+  :root {
+    --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+    --red:#C0392B; --red-lt:#FBEDEB; --green:#1A7A4C; --green-lt:#E8F4EE;
+    --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--navy); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 50px; border-bottom: 3px solid var(--gold); }
+  .topbar-logo { color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.2); }
+  .topbar a { font-size: 12px; color: rgba(255,255,255,.55); text-decoration: none; letter-spacing: .03em; }
+  .content { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; display: flex; gap: 8px; align-items: baseline; }
+  .card h2 .step { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=date], input[type=email], input[type=tel], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+  }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .src { font-size: 11px; color: var(--green); margin-top: 3px; }
+  .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: var(--blue); }
+  .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 260px; }
+  .msg { font-size: 13px; margin-top: 10px; line-height: 1.45; }
+  .msg.err { color: var(--red); }
+  .notes { margin-top: 12px; display: grid; gap: 6px; }
+  .note { font-size: 13px; line-height: 1.45; padding: 8px 12px; border-radius: 6px; background: var(--bg); border-left: 4px solid var(--border); }
+  .note.warn { background: var(--gold-lt); border-left-color: var(--gold); }
+  .note.error { background: var(--red-lt); border-left-color: var(--red); }
+  .note.alert { background: var(--red-lt); border-left-color: var(--red); font-weight: 600; color: var(--red); font-size: 14px; }
+  .breakdown { margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: var(--navy); color: #fff; }
+  .breakdown .line { font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+  .breakdown .dollars { margin-top: 6px; font-size: 13px; color: rgba(255,255,255,.8); font-variant-numeric: tabular-nums; }
+  .qs { display: grid; gap: 10px; }
+  .q { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .q:last-child { border-bottom: 0; }
+  .q .qt { font-size: 14px; flex: 1 1 260px; }
+  .q .qt .hint { margin-top: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: #fff; border: 0; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--navy); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .q input[type=number], .q select { width: 140px; }
+  .q input[type=text], .q input[type=email], .q input[type=tel], .q input[type=date] { width: 260px; max-width: 100%; }
+  table.forms { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.forms td { padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.forms td.why { color: var(--muted); }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
+  .missing { margin-top: 12px; font-size: 13px; }
+  .missing li { margin-left: 18px; line-height: 1.6; }
+  [hidden] { display: none !important; }
+  #signin .gbtn { margin-top: 12px; }
+  @media (max-width: 600px) { .breakdown .line { font-size: 16px; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Prepare a Listing</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./feedback.html?tool=listing-prep">Feedback</a>
+    <a href="./index.html">&#8592; Tools</a>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Prepare a Listing</h1>
+  <p class="lede">Look up the property, tell us a few things about the listing, and we'll pick the forms the listing needs and fill in what we know. Nothing is sent to Form Simplicity yet; that's the next step.</p>
+
+  <div class="card" id="signin" hidden>
+    <h2>Sign in</h2>
+    <p class="hint">Sign in with your Adams Cameron Google account.</p>
+    <div class="gbtn" id="g-signin-btn"></div>
+  </div>
+
+  <div id="app" hidden>
+    <!-- 1. Property -->
+    <div class="card">
+      <h2><span class="step">Step 1</span> Property</h2>
+      <div class="row">
+        <div class="grow"><label for="addr">Address</label><input type="text" id="addr" placeholder="412 E Kentucky Ave, DeLand, FL 32724" autocomplete="off"></div>
+        <div style="width:110px"><label for="unit">Unit</label><input type="text" id="unit" autocomplete="off"></div>
+        <button class="btn" id="lookupBtn" type="button">Look up</button>
+      </div>
+      <div class="msg" id="lookupMsg" role="status"></div>
+      <div id="factsBox" hidden>
+        <div class="grid" style="margin-top:14px">
+          <div class="wide"><label for="f-address">Property address</label><input type="text" id="f-address" data-fact="address"><div class="src" data-src="address"></div></div>
+          <div class="wide"><label for="f-owner">Seller (owner as recorded)</label><input type="text" id="f-owner" data-fact="owner"><div class="src" data-src="owner"></div></div>
+          <div class="wide"><label for="f-legal">Legal description</label><textarea id="f-legal" data-fact="legalDescription"></textarea><div class="src" data-src="legalDescription"></div></div>
+          <div><label for="f-parcel">Parcel</label><input type="text" id="f-parcel" data-fact="parcel"><div class="src" data-src="parcel"></div></div>
+          <div><label for="f-county">County</label><input type="text" id="f-county" data-fact="county"><div class="src" data-src="county"></div></div>
+          <div><label for="f-type">Property type</label>
+            <select id="f-type" data-fact="propertyType"><option value="">Choose…</option><option value="sfr">Single-family home</option><option value="condo">Condominium</option><option value="land">Vacant land</option></select>
+            <div class="src" data-src="propertyType"></div></div>
+          <div><label for="f-year">Year built</label><input type="number" id="f-year" data-fact="yearBuilt" min="1800" max="2100"><div class="src" data-src="yearBuilt"></div></div>
+        </div>
+        <div class="notes" id="lookupNotes"></div>
+      </div>
+    </div>
+
+    <!-- 2. Price, dates, commission -->
+    <div class="card" id="moneyCard" hidden>
+      <h2><span class="step">Step 2</span> Price, dates and commission</h2>
+      <div class="grid">
+        <div><label for="a-listPrice">List price, if you know it</label><input type="number" id="a-listPrice" data-answer="listPrice" min="0" step="1000" placeholder="500000"></div>
+        <div><label for="a-termStart">Listing starts</label><input type="date" id="a-termStart" data-answer="termStart"></div>
+        <div><label for="a-termEnd">Listing ends</label><input type="date" id="a-termEnd" data-answer="termEnd"><div class="hint">Defaults to one year after it starts.</div></div>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div><label for="a-totalPct">Total commission (%)</label><input type="number" id="a-totalPct" data-answer="totalPct" min="0" max="20" step="0.25" value="6"><div class="hint">Everything the seller pays, including the buyer's broker's share.</div></div>
+        <div><label for="a-totalFlat">Plus ($)</label><input type="number" id="a-totalFlat" data-answer="totalFlat" min="0" step="50" value="250"></div>
+        <div><label for="a-buyerPct">Buyer's broker gets (%)</label><input type="number" id="a-buyerPct" data-answer="buyerPct" min="0" max="20" step="0.25" placeholder="3"><div class="hint">Part of the total, not added to it.</div></div>
+      </div>
+      <div class="breakdown" id="breakdown" hidden><div class="line" id="bdLine"></div><div class="dollars" id="bdDollars"></div></div>
+      <div class="notes" id="commissionNotes"></div>
+    </div>
+
+    <!-- 3. Questions -->
+    <div class="card" id="qCard" hidden>
+      <h2><span class="step">Step 3</span> Anything else I need to know</h2>
+      <div class="qs" id="questions"></div>
+    </div>
+
+    <!-- 4. Details -->
+    <div class="card" id="dCard" hidden>
+      <h2><span class="step">Step 4</span> Listing details</h2>
+      <div class="qs" id="details"></div>
+    </div>
+
+    <!-- 5. Forms -->
+    <div class="card" id="formsCard" hidden>
+      <h2><span class="step">Step 5</span> The forms this listing needs</h2>
+      <div id="formsWarnings" class="notes" style="margin:0 0 10px"></div>
+      <table class="forms"><tbody id="formsList"></tbody></table>
+      <div class="missing" id="missingBox" hidden><strong>Still needed before the forms can be filled:</strong><ul id="missingList"></ul></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" disabled title="Coming next: creating the transaction in Form Simplicity">Create in Form Simplicity</button>
+        <span class="hint">Coming next. For now this shows what will be created.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = { facts: {}, sources: {}, answers: {}, questionDefs: {}, plan: null };
+  const SKIP_DETAILS = new Set(["listPrice", "totalPct", "totalFlat", "buyerPct", "termStart", "termEnd"]);
+  const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+
+  function noteHtml(n) { return `<div class="note ${n.level === "warn" ? "warn" : n.level === "error" ? "error" : ""}">${esc(n.text)}</div>`; }
+
+  // ── Step 1: look up ──
+  async function lookup() {
+    const address = $("addr").value.trim();
+    if (!address) { $("lookupMsg").textContent = "Enter the address."; return; }
+    $("lookupBtn").disabled = true; $("lookupMsg").className = "msg"; $("lookupMsg").textContent = "Looking it up in county records and the MLS…";
+    try {
+      const r = await Auth.api("/listing-prep/lookup", { body: { address, unit: $("unit").value.trim() } });
+      state.facts = { ...r.facts }; state.sources = r.sources || {};
+      for (const el of document.querySelectorAll("[data-fact]")) el.value = state.facts[el.dataset.fact] ?? "";
+      for (const el of document.querySelectorAll("[data-src]")) el.textContent = state.sources[el.dataset.src] ? "From " + state.sources[el.dataset.src] : "";
+      $("lookupNotes").innerHTML = (r.notes || []).map((t) => noteHtml({ level: "info", text: t })).join("");
+      $("lookupMsg").textContent = r.facts.address ? "Check these against what you know; you can change any of them." : "We couldn't find this property in the records. Fill in what you know.";
+      $("factsBox").hidden = false;
+      ["moneyCard", "qCard", "dCard", "formsCard"].forEach((id) => ($(id).hidden = false));
+      if (!$("a-termStart").value) { $("a-termStart").value = today(); state.answers.termStart = today(); }
+      readMoney();
+      replan();
+    } catch (e) {
+      $("lookupMsg").className = "msg err"; $("lookupMsg").textContent = e.message;
+    } finally { $("lookupBtn").disabled = false; }
+  }
+  $("lookupBtn").addEventListener("click", lookup);
+  $("addr").addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
+
+  document.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.fact) {
+      const v = t.value.trim();
+      if (v === "") delete state.facts[t.dataset.fact];
+      else state.facts[t.dataset.fact] = t.dataset.fact === "yearBuilt" ? Number(v) : v;
+      const src = document.querySelector(`[data-src="${t.dataset.fact}"]`); if (src) src.textContent = v ? "Entered by you" : "";
+      replanSoon();
+    } else if (t.dataset.answer) { readMoney(); replanSoon(); }
+    else if (t.dataset.detail) { setAnswer(t.dataset.detail, t.value.trim() === "" ? undefined : t.value); replanSoon(); }
+  });
+
+  function readMoney() {
+    for (const el of document.querySelectorAll("[data-answer]")) {
+      const v = el.value.trim();
+      if (v === "") delete state.answers[el.dataset.answer];
+      else state.answers[el.dataset.answer] = el.type === "number" ? Number(v) : v;
+    }
+  }
+  function setAnswer(k, v) { if (v === undefined) delete state.answers[k]; else state.answers[k] = v; }
+
+  // ── Plan: questions, commission, forms ──
+  let timer = null, seq = 0;
+  function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
+  async function replan() {
+    const mine = ++seq;
+    try {
+      const r = await Auth.api("/listing-prep/plan", { body: { facts: state.facts, answers: state.answers } });
+      if (mine !== seq) return;
+      state.plan = r;
+      for (const q of [...(r.questions || []), ...(r.details || [])]) state.questionDefs[q.key] = q;
+      renderCommission(r.commission);
+      renderQuestions(r);
+      renderForms(r);
+    } catch (e) {
+      $("formsWarnings").innerHTML = noteHtml({ level: "error", text: e.message });
+    }
+  }
+
+  function renderCommission(c) {
+    const has = c && c.total != null;
+    $("breakdown").hidden = !c || !c.summary;
+    if (c && c.summary) {
+      $("bdLine").textContent = c.summary;
+      $("bdDollars").textContent = has
+        ? `${money(c.total)} total · ${money(c.buyer)} to the buyer's broker · ${money(c.listingSide)} for the listing side`
+        : "Enter the list price to see the dollars.";
+    }
+    const notes = (c?.notes || []).filter((n) => !/^Total commission:|^Buyer's broker:|^Enter the list price/.test(n.text));
+    $("commissionNotes").innerHTML = notes.map((n) => /on the table/.test(n.text)
+      ? `<div class="note alert">${esc(n.text)}</div>` : noteHtml(n)).join("");
+  }
+
+  // Yes/no and choice questions. Answered ones stay on screen so they can be changed.
+  function questionRow(q, value) {
+    const hint = q.help ? `<div class="hint">${esc(q.help)}</div>` : "";
+    let control = "";
+    if (q.type === "yesno") {
+      control = `<div class="seg" role="group" aria-label="${esc(q.label)}">
+        <button type="button" data-q="${q.key}" data-v="true" class="${value === true ? "on" : ""}">Yes</button>
+        <button type="button" data-q="${q.key}" data-v="false" class="${value === false ? "on" : ""}">No</button></div>`;
+    } else if (q.type === "choice") {
+      control = `<div class="seg" role="group" aria-label="${esc(q.label)}">${q.options.map(([v, t]) =>
+        `<button type="button" data-q="${q.key}" data-v="${esc(v)}" class="${value === v ? "on" : ""}">${esc(t)}</button>`).join("")}</div>`;
+    } else {
+      const type = { year: "number", money: "number", percent: "number", date: "date", email: "email", phone: "tel" }[q.type] || "text";
+      control = `<input type="${type}" id="d-${q.key}" data-detail="${q.key}" value="${esc(value ?? "")}" aria-label="${esc(q.label)}">`;
+    }
+    return `<div class="q"><div class="qt">${esc(q.label)}${q.optional ? ' <span class="tag">optional</span>' : ""}${hint}</div>${control}</div>`;
+  }
+
+  function renderQuestions(r) {
+    // Step 3: the questions that decide forms (still needed, or already answered)
+    const asked = new Set((r.questions || []).map((q) => q.key));
+    const formKeys = ["propertyType", "yearBuilt", "hasHoa", "sellerDiscloses", "mlsOptOut", "signOnProperty", "agentInterest", "shortSale", "homeWarranty"];
+    const shown = formKeys.filter((k) => state.questionDefs[k] && (asked.has(k) || k in state.answers) && !(k === "propertyType" && state.facts.propertyType) && !(k === "yearBuilt" && state.facts.yearBuilt));
+    const focus = document.activeElement && document.activeElement.dataset.detail;
+    if (!(focus && $("questions").contains(document.activeElement))) {
+      $("questions").innerHTML = shown.length ? shown.map((k) => questionRow(state.questionDefs[k], state.answers[k])).join("")
+        : '<p class="hint">Nothing to ask yet.</p>';
+    }
+    // Step 4: listing details for the forms that are included
+    const details = (r.details || []).filter((q) => !SKIP_DETAILS.has(q.key));
+    if (focus && details.some((q) => q.key === focus)) return; // don't redraw under the cursor
+    $("details").innerHTML = details.map((q) => questionRow(q, state.answers[q.key])).join("");
+  }
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-q]");
+    if (!b) return;
+    const k = b.dataset.q, raw = b.dataset.v;
+    const v = raw === "true" ? true : raw === "false" ? false : raw;
+    setAnswer(k, state.answers[k] === v ? undefined : v); // tap again to clear
+    if (k === "propertyType") { state.facts.propertyType = state.answers[k]; $("f-type").value = state.answers[k] || ""; }
+    replan();
+  });
+
+  function renderForms(r) {
+    const warnings = [...(r.warnings || [])];
+    $("formsWarnings").innerHTML = warnings.map((t) => noteHtml({ level: "warn", text: t })).join("");
+    const forms = r.forms || [];
+    $("formsList").innerHTML = forms.length ? forms.map((f) => `<tr><td>${esc(f.fsTitle)}${f.kind === "file" ? '<span class="tag">attached PDF</span>' : ""}${f.set ? `<span class="tag">${f.set === "daytona" ? "Daytona" : "Stellar"}</span>` : ""}</td><td class="why">${esc(f.reason)}</td></tr>`).join("")
+      : '<tr><td class="why">Answer the questions above to see the forms.</td></tr>';
+    const missing = (r.values?.missing || []);
+    $("missingBox").hidden = !missing.length;
+    $("missingList").innerHTML = missing.map((m) => `<li>${esc(m.label)}</li>`).join("");
+  }
+
+  Auth.ready({ tool: "Prepare a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
+    .then(() => { $("signin").hidden = true; $("app").hidden = false; $("addr").focus(); });
+})();
+</script>
+</body>
+</html>
