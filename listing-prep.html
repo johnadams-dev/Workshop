@@ -256,6 +256,7 @@
       const follow = (q.followUps || []).map((f) => {
         if (f.type === "choice") return `<div class="fq"><label>${esc(f.label)}</label><div class="seg" role="group" aria-label="${esc(f.label)}">${f.options.map(([v, t]) =>
           `<button type="button" data-choice="${f.key}" data-v="${esc(v)}">${esc(t)}</button>`).join("")}</div>${f.help ? `<div class="hint">${esc(f.help)}</div>` : ""}</div>`;
+        if (f.type === "longtext") return `<div class="fq wide"><label for="e-${f.key}">${esc(f.label)}</label><textarea id="e-${f.key}" data-answer="${f.key}" rows="4" maxlength="1400"></textarea></div>`;
         return `<div class="fq"><label for="e-${f.key}">${esc(f.label)}${f.optional ? ' <span class="tag">optional</span>' : ""}</label><input type="${INPUT_TYPE[f.type] || "text"}" id="e-${f.key}" data-answer="${f.key}"></div>`;
       }).join("");
       return `<div class="qwrap" data-q="${q.key}"><div class="q"><div class="qt">${esc(q.label)}${q.help ? `<div class="hint">${esc(q.help)}</div>` : ""}${q.notForCondo ? `<div class="hint" id="condoNote" hidden>It's a condominium, so there always is one.</div>` : ""}</div>
@@ -356,7 +357,9 @@
 
   const ASK_LABELS = { propertyType: "The property type (Step 1)", yearBuilt: "The year built (Step 1)", hasHoa: "Whether there's an HOA (Step 4)", hasCoa: "Whether there's a condominium association (Step 4)", specialSign: "The sign (Step 4)" };
   function renderForms(r) {
-    $("formsWarnings").innerHTML = (r.warnings || []).map((t) => noteHtml({ level: "warn", text: t })).join("");
+    const legalNote = String(state.facts.legalDescription || "").length > 88
+      ? ["The legal description is longer than the agreement's line, so the agreement will say \"Long legal, see additional terms.\" and give it in full in Additional Terms."] : [];
+    $("formsWarnings").innerHTML = [...(r.warnings || []), ...legalNote].map((t) => noteHtml({ level: "warn", text: t })).join("");
     const forms = r.forms || [];
     $("formsList").innerHTML = forms.length ? forms.map((f) => `<tr><td>${esc(f.fsTitle)}${f.kind === "file" ? '<span class="tag">attached PDF</span>' : ""}${f.set ? `<span class="tag">${f.set === "daytona" ? "Daytona" : "Stellar"}</span>` : ""}</td><td class="why">${esc(f.reason)}</td></tr>`).join("")
       : '<tr><td class="why">Choose the property type in Step 1 to see the forms.</td></tr>';
