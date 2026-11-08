@@ -109,6 +109,14 @@
   </div>
 
   <div id="app" hidden>
+    <!-- Whose listing (staff and team leaders), and whether their Form Simplicity is connected -->
+    <div class="card" id="whoCard" hidden>
+      <div class="row" id="pickRow" hidden>
+        <div class="grow"><label for="agentPick">Preparing this listing for</label>
+          <select id="agentPick"></select></div>
+      </div>
+      <div id="fsNote"></div>
+    </div>
     <!-- 1. Property -->
     <div class="card">
       <h2><span class="step">Step 1</span> Property</h2>
@@ -332,7 +340,7 @@
   async function replan() {
     const mine = ++seq;
     try {
-      const r = await Auth.api("/listing-prep/plan", { body: { facts: state.facts, answers: state.answers } });
+      const r = await Auth.api("/listing-prep/plan", { body: { facts: state.facts, answers: state.answers, agentId: state.agentId } });
       if (mine !== seq) return;
       state.plan = r;
       if (!state.built) { buildSections(r); readInputs(); return replan(); } // apply the "No" defaults
@@ -369,10 +377,12 @@
     ];
     $("missingBox").hidden = !missing.length;
     $("missingList").innerHTML = missing.map((m) => `<li>${esc(m)}</li>`).join("");
-    const blocked = !!(r.questions || []).length || !forms.length || !state.facts.address;
+    const notConnected = state.fsConnected === false;
+    const blocked = notConnected || !!(r.questions || []).length || !forms.length || !state.facts.address;
     if (!state.runId) $("createBtn").disabled = blocked;
-    $("createHint").textContent = blocked ? "Answer what's still needed above first."
-      : "Creates the transaction in your Form Simplicity account, adds these forms and fills them in.";
+    $("createHint").textContent = notConnected ? "Form Simplicity isn't connected yet (see the top of the page)."
+      : blocked ? "Answer what's still needed above first."
+      : `Creates the transaction in ${state.agentId ? "the agent's" : "your"} Form Simplicity account, adds these forms and fills them in.`;
   }
 
   // ── Create in Form Simplicity, then follow the robot ──
@@ -393,7 +403,7 @@
     readInputs();
     $("createBtn").disabled = $("dupGo").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Creating the transaction…";
     try {
-      const r = await Auth.api("/listing-prep/create", { body: { facts: state.facts, answers: state.answers, override } });
+      const r = await Auth.api("/listing-prep/create", { body: { facts: state.facts, answers: state.answers, override, agentId: state.agentId } });
       $("dupBox").hidden = true;
       startFollowing(r.runId);
     } catch (e) {
@@ -452,11 +462,37 @@
     finally { $("runRetry").disabled = false; }
   });
 
+  // Whose listing, and is their Form Simplicity connected? Checked as the page
+  // opens so nobody answers everything first (John Adams, 2026-11-08).
+  async function loadStart(agentId) {
+    try {
+      const r = await Auth.api("/listing-prep/start" + (agentId ? `?agentId=${encodeURIComponent(agentId)}` : ""));
+      state.agentId = r.agent && !r.self ? r.agent.id : undefined;
+      state.fsConnected = r.fsConnected;
+      if (r.agents && r.agents.length) {
+        $("agentPick").innerHTML = r.agents.map((a) => `<option value="${a.id}"${r.agent && a.id === r.agent.id ? " selected" : ""}>${esc(a.name)}</option>`).join("");
+        if (!r.agent) $("agentPick").insertAdjacentHTML("afterbegin", '<option value="" selected>Choose the agent…</option>');
+        $("pickRow").hidden = false;
+      }
+      $("fsNote").innerHTML = !r.agent ? noteHtml({ level: "warn", text: "Choose whose listing this is." })
+        : r.fsConnected ? "" : noteHtml({ level: "error", text: r.fsMessage });
+      $("whoCard").hidden = $("pickRow").hidden && !$("fsNote").innerHTML;
+      if (state.plan) replan();
+    } catch (e) {
+      $("fsNote").innerHTML = noteHtml({ level: "error", text: e.message });
+      $("whoCard").hidden = false;
+    }
+  }
+  $("agentPick").addEventListener("change", (e) => { if (e.target.value) loadStart(e.target.value); });
+
   Auth.ready({ tool: "Prepare a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
     .then(() => {
       $("signin").hidden = true; $("app").hidden = false;
-      const run = new URLSearchParams(location.search).get("run");
-      if (run) { $("createBtn").disabled = true; startFollowing(run); } else $("addr").focus();
+      const q = new URLSearchParams(location.search);
+      const run = q.get("run");
+      if (run) { $("createBtn").disabled = true; startFollowing(run); return; }
+      loadStart(q.get("agentId"));
+      $("addr").focus();
     });
 })();
 </script>
