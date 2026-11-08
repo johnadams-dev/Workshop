@@ -177,7 +177,9 @@
       <h2><span class="step">Step 6</span> Form Simplicity: <span id="runTitle"></span></h2>
       <p class="sub" id="runStatus"></p>
       <ul class="steps" id="runSteps"></ul>
-      <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a></div>
+      <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
+        <button class="btn" type="button" id="runRetry" hidden>Try again</button>
+        <span class="hint" id="runRetryHint" hidden>Runs again on the same transaction; anything already done is left as it is.</span></div>
       <div class="missing" id="runLeft" hidden><strong>Check before sending:</strong><ul id="runLeftList"></ul></div>
     </div>
   </div>
@@ -395,14 +397,28 @@
     const left = (r.result?.skipped || []).length;
     $("runLeft").hidden = !left;
     $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the forms over before sending them.</li>` : "";
+    const stuck = r.status === "running" && Date.now() - new Date(r.updated_at).getTime() > 45 * 60 * 1000;
+    $("runRetry").hidden = $("runRetryHint").hidden = !(r.status === "failed" || stuck);
+    if (stuck) { $("runStatus").textContent = "This seems to have stalled. Try again to pick up where it left off."; return; }
     if (r.status === "done") $("runStatus").textContent = "All done. The transaction and its forms are ready in Form Simplicity. We've emailed you the link too.";
-    else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. What's checked above is done; the office has been told.`;
+    else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. What's checked above is done; John Adams has been told, or use Try again.`;
     else {
       $("runStatus").textContent = r.status === "queued" ? "Starting up. This usually takes a few minutes; you can leave this page and we'll email you when it's ready."
         : "Adding and filling the forms. This usually takes a few minutes; you can leave this page and we'll email you when it's ready.";
       pollTimer = setTimeout(poll, 5000);
     }
   }
+
+  $("runRetry").addEventListener("click", async () => {
+    $("runRetry").disabled = true;
+    try {
+      await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId) + "/retry", { method: "POST", body: {} });
+      $("runRetry").hidden = $("runRetryHint").hidden = true;
+      $("runStatus").textContent = "Starting again…";
+      setTimeout(poll, 3000);
+    } catch (e) { $("runStatus").textContent = e.message; }
+    finally { $("runRetry").disabled = false; }
+  });
 
   Auth.ready({ tool: "Prepare a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
     .then(() => {
