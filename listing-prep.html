@@ -72,6 +72,11 @@
   .missing { margin-top: 12px; font-size: 13px; }
   .missing li { margin-left: 18px; line-height: 1.6; }
   ul.steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+  .dupes { margin-top: 10px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: 8px; background: #fffbeb; font-size: 14px; }
+  .dupes ul { margin: 0; padding-left: 18px; }
+  .dupes li { margin: 6px 0; line-height: 1.5; }
+  .dupes .why { color: var(--muted); font-size: 13px; }
+  .tag.warn { border-color: #f59e0b; color: #92400e; background: #fef3c7; }
   ul.steps li { padding: 4px 0; border-bottom: 1px solid var(--line, #e5e7eb); }
   ul.steps li.ok { color: #166534; }
   ul.steps li.bad { color: #b91c1c; }
@@ -170,6 +175,13 @@
         <span class="hint" id="createHint">Creates the transaction in your Form Simplicity account, adds these forms and fills them in.</span>
       </div>
       <div class="msg" id="createMsg"></div>
+      <div class="dupes" id="dupBox" hidden>
+        <ul id="dupList"></ul>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" type="button" id="dupGo">Create a new one anyway</button>
+          <span class="hint">For a relisting, a resale or new owners. It's noted on the new transaction's record.</span>
+        </div>
+      </div>
     </div>
 
     <!-- 6. Progress -->
@@ -361,18 +373,35 @@
   }
 
   // ── Create in Form Simplicity, then follow the robot ──
-  $("createBtn").addEventListener("click", async () => {
+  // An earlier transaction for the same property: show it; the agent can still go ahead
+  // (relisting, resale, new owners).
+  function showDuplicates(list) {
+    $("dupList").innerHTML = list.map((d) => {
+      const link = d.runId ? `listing-prep.html?run=${encodeURIComponent(d.runId)}` : d.url;
+      const who = d.sellers && d.sellers.length ? `Sellers: ${esc(d.sellers.join(", "))}` : "No sellers recorded";
+      return `<li><strong>${esc(d.name || "Untitled")}</strong> · created ${esc(d.created || "?")}${d.status ? ` · ${esc(d.status)}` : ""}
+        <span class="tag ${d.sameSellers ? "warn" : ""}">${d.sameSellers ? "same sellers" : "different sellers"}</span><br>
+        <span class="why">${who}${d.source === "workshop" ? " · made here" : " · in Form Simplicity"}</span>
+        ${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener">Open it</a>` : ""}</li>`;
+    }).join("");
+    $("dupBox").hidden = false;
+  }
+  async function create(override) {
     readInputs();
-    $("createBtn").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Creating the transaction…";
+    $("createBtn").disabled = $("dupGo").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Creating the transaction…";
     try {
-      const r = await Auth.api("/listing-prep/create", { body: { facts: state.facts, answers: state.answers } });
+      const r = await Auth.api("/listing-prep/create", { body: { facts: state.facts, answers: state.answers, override } });
+      $("dupBox").hidden = true;
       startFollowing(r.runId);
     } catch (e) {
       $("createMsg").className = "msg err"; $("createMsg").textContent = e.message;
-      if (e.data && e.data.runId) startFollowing(e.data.runId); // transaction made, robot didn't start
+      if (e.data && e.data.duplicates) { showDuplicates(e.data.duplicates); $("createBtn").disabled = false; }
+      else if (e.data && e.data.runId) startFollowing(e.data.runId); // transaction made, robot didn't start
       else $("createBtn").disabled = false;
-    }
-  });
+    } finally { $("dupGo").disabled = false; }
+  }
+  $("createBtn").addEventListener("click", () => create(false));
+  $("dupGo").addEventListener("click", () => create(true));
 
   const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account" };
   let pollTimer = null;
