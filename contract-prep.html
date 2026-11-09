@@ -307,9 +307,8 @@
   function renderDocs() {
     const docs = state.listing?.documents || [];
     if (!state.answers.attachDocs) state.answers.attachDocs = docs.filter((d) => d.forContract).map((d) => d.id);
-    // A compensation agreement is forbidden in the MLS: shown, never attached (John Adams, 2026-11-09)
-    $("docsList").innerHTML = docs.map((d) => `<label><input type="checkbox" data-doc="${esc(d.id)}" ${d.kind === "compensation" ? "disabled" : state.answers.attachDocs.includes(d.id) ? "checked" : ""}>
-      <span>${esc(d.name)}${d.kind === "compensation" ? '<span class="tag warn">compensation agreements aren\'t allowed in the MLS; never attached</span>' : d.kind === "hoa_docs" ? '<span class="tag">association document</span>' : d.kind === "survey" ? '<span class="tag">for the buyer to read</span>' : ""}</span></label>`).join("");
+    $("docsList").innerHTML = docs.map((d) => `<label><input type="checkbox" data-doc="${esc(d.id)}" ${state.answers.attachDocs.includes(d.id) ? "checked" : ""}>
+      <span>${esc(d.name)}${d.kind === "hoa_docs" ? '<span class="tag">association document</span>' : d.kind === "survey" ? '<span class="tag">for the buyer to read</span>' : ""}</span></label>`).join("");
   }
   document.addEventListener("change", (e) => {
     if (e.target.dataset.doc != null) {
