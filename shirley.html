@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shirley, Transaction Coordinator | John Adams Real Estate Tools</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+  :root {
+    --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+    --red:#C0392B; --red-lt:#FBEDEB; --green:#1A7A4C; --green-lt:#E8F4EE;
+    --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--navy); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 50px; border-bottom: 3px solid var(--gold); }
+  .topbar-logo { color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.2); }
+  .topbar a { font-size: 12px; color: rgba(255,255,255,.55); text-decoration: none; letter-spacing: .03em; }
+  .content { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; display: flex; gap: 8px; align-items: baseline; }
+  .card h2 .step { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+  .card .sub { font-size: 13px; color: var(--muted); margin: -6px 0 12px; line-height: 1.45; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=date], input[type=email], input[type=tel], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+  }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .src { font-size: 11px; color: var(--green); margin-top: 3px; }
+  .needed { font-size: 12px; color: var(--red); margin-top: 3px; font-weight: 600; }
+  .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: var(--blue); }
+  .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 260px; }
+  .msg { font-size: 13px; margin-top: 10px; line-height: 1.45; }
+  .msg.err { color: var(--red); }
+  .notes { margin-top: 12px; display: grid; gap: 6px; }
+  .note { font-size: 13px; line-height: 1.45; padding: 8px 12px; border-radius: 6px; background: var(--bg); border-left: 4px solid var(--border); }
+  .note.warn { background: var(--gold-lt); border-left-color: var(--gold); }
+  .note.error { background: var(--red-lt); border-left-color: var(--red); }
+  .note.alert { background: var(--red-lt); border-left-color: var(--red); font-weight: 600; color: var(--red); font-size: 14px; }
+  .breakdown { margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: var(--navy); color: #fff; }
+  .breakdown .line { font-size: 18px; font-weight: 700; letter-spacing: .01em; }
+  .breakdown .dollars { margin-top: 6px; font-size: 13px; color: rgba(255,255,255,.8); font-variant-numeric: tabular-nums; }
+  .q { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .qwrap:last-child .q { border-bottom: 0; }
+  .q .qt { font-size: 14px; flex: 1 1 260px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: #fff; border: 0; padding: 7px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--navy); color: #fff; }
+  .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .followups { margin: 0 0 10px; padding: 12px 14px; background: var(--bg); border-radius: 8px; display: grid; gap: 10px; }
+  .followups .fq label { margin-bottom: 4px; }
+  .followups input[type=text], .followups input[type=date], .followups input[type=number] { max-width: 320px; }
+  table.forms { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.forms td { padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.forms td.why { color: var(--muted); }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
+  .missing { margin-top: 12px; font-size: 13px; }
+  .missing li { margin-left: 18px; line-height: 1.6; }
+  ul.steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+  .dupes { margin-top: 10px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: 8px; background: #fffbeb; font-size: 14px; }
+  .dupes ul { margin: 0; padding-left: 18px; }
+  .dupes li { margin: 6px 0; line-height: 1.5; }
+  .dupes .why { color: var(--muted); font-size: 13px; }
+  .tag.warn { border-color: #f59e0b; color: #92400e; background: #fef3c7; }
+  ul.steps li { padding: 4px 0; border-bottom: 1px solid var(--line, #e5e7eb); }
+  ul.steps li.ok { color: #166534; }
+  ul.steps li.bad { color: #b91c1c; }
+  ul.steps .why { color: var(--muted); }
+  [hidden] { display: none !important; }
+  #signin .gbtn { margin-top: 12px; }
+  @media (max-width: 600px) { .breakdown .line { font-size: 16px; } }
+  .hello { display: flex; gap: 16px; align-items: center; margin-bottom: 22px; }
+  .avatar { flex: 0 0 64px; height: 64px; border-radius: 50%; background: var(--navy); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; border: 3px solid var(--gold); }
+  .hello h1 { margin: 0 0 4px; }
+  .hello p { font-size: 15px; color: var(--text); line-height: 1.5; }
+  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .choice { display: block; text-decoration: none; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; transition: border-color .15s, box-shadow .15s; }
+  a.choice:hover, a.choice:focus-visible { border-color: var(--navy); box-shadow: 0 2px 10px rgba(27,58,92,.12); outline: none; }
+  .choice .ic { font-size: 22px; margin-bottom: 6px; }
+  .choice strong { display: block; font-size: 15px; color: var(--navy); margin-bottom: 4px; }
+  .choice span { font-size: 13px; color: var(--muted); line-height: 1.45; display: block; }
+  .choice.soon { background: var(--bg); cursor: default; }
+  .choice.soon strong { color: var(--muted); }
+  .soon-tag { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
+  h2.group { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 26px 0 10px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Transaction Coordinator</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./index.html">&#8592; Tools</a>
+    <a href="./feedback.html?tool=shirley">Feedback</a>
+  </div>
+</div>
+
+<div class="content">
+  <div class="hello">
+    <div class="avatar" aria-hidden="true">S</div>
+    <div>
+      <h1>Hi<span id="who"></span>, I'm Shirley, your Transaction Coordinator.</h1>
+      <p>How can I help you today? Pick what you're working on and I'll get the paperwork started in Form Simplicity.</p>
+    </div>
+  </div>
+
+  <div class="choices">
+    <a class="choice" href="./listing-prep.html">
+      <div class="ic">📝</div>
+      <strong>Write a listing agreement</strong>
+      <span>Preparing for a listing appointment, or ready to list. I look up the property and owners, pick the forms and fill them in.</span>
+    </a>
+    <a class="choice" href="./contract-prep.html?mode=ebba">
+      <div class="ic">🤝</div>
+      <strong>Get a buyer brokerage agreement</strong>
+      <span>Showing property to a buyer. I prepare the Exclusive Buyer Brokerage Agreement (EBBA) with the company's terms.</span>
+    </a>
+    <a class="choice" href="./contract-prep.html">
+      <div class="ic">✍️</div>
+      <strong>Write a contract</strong>
+      <span>Your buyer is making an offer. From the MLS number, I prepare the AS IS contract with the addenda it needs and the seller's MLS disclosures.</span>
+    </a>
+  </div>
+
+  <h2 class="group">Coming soon</h2>
+  <div class="choices">
+    <div class="choice soon" aria-disabled="true">
+      <div class="ic">📨</div>
+      <strong>I have a contract on one of my listings</strong>
+      <span>Bring in the offer you received and set up the contract dates.</span>
+      <div class="soon-tag">Coming soon</div>
+    </div>
+    <div class="choice soon" aria-disabled="true">
+      <div class="ic">🏷️</div>
+      <strong>A listing needs a change</strong>
+      <span>Price change, extending the listing, changing the commission, or taking it off the market for a while.</span>
+      <div class="soon-tag">Coming soon</div>
+    </div>
+    <div class="choice soon" aria-disabled="true">
+      <div class="ic">🔁</div>
+      <strong>A property under contract needs a change</strong>
+      <span>Closing or other dates, price or repair credits, adding or removing a party, or cancelling the contract.</span>
+      <div class="soon-tag">Coming soon</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Signing in isn't needed to see the choices; each one asks when it opens. Signed in,
+  // Shirley greets you by name, and the visit is counted on Tool Usage.
+  Auth.ready({ tool: "Transaction Coordinator", optional: true }).then((s) => {
+    const name = ((s && s.name) || "").split(" ")[0];
+    if (name) document.getElementById("who").textContent = ", " + name;
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
