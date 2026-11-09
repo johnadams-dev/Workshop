@@ -439,7 +439,9 @@
     try { r = await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId)); }
     catch (e) { $("runStatus").textContent = e.status === 404 ? "We couldn't find that run." : "Checking again in a moment…"; if (e.status !== 404) pollTimer = setTimeout(poll, 8000); return; }
     $("runTitle").textContent = r.fs_trans_name || r.address || "";
-    if (r.fs_url) { $("runOpen").href = r.fs_url; $("runOpen").hidden = false; }
+    // The link only once the robot is done (or stopped): before that the transaction is still empty
+    $("runOpen").hidden = !(r.fs_url && (r.status === "done" || r.status === "failed"));
+    if (r.fs_url) $("runOpen").href = r.fs_url;
     const steps = r.steps || [];
     $("runSteps").innerHTML = steps.map((s) => `<li class="${s.ok ? "ok" : "bad"}">${s.ok ? "✓" : "✗"} ${esc(STEP_NAMES[s.step] || s.step[0].toUpperCase() + s.step.slice(1))}${!s.ok && s.detail ? ` <span class="why">— ${esc(s.detail)}</span>` : ""}</li>`).join("");
     // The robot's skipped list is field codes (for the office); the agent gets a count.
