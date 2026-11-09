@@ -217,7 +217,8 @@
       <ul class="steps" id="runSteps"></ul>
       <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
         <button class="btn" type="button" id="runRetry" hidden>Try again</button>
-        <span class="hint" id="runRetryHint" hidden>Runs again on the same transaction; anything already done is left as it is.</span></div>
+        <span class="hint" id="runRetryHint" hidden>Runs again on the same transaction; anything already done is left as it is.</span>
+        <a class="btn" id="newBtn" href="contract-prep.html">Start a new one</a></div>
       <div class="missing" id="runLeft" hidden><strong>Check before sending:</strong><ul id="runLeftList"></ul></div>
     </div>
   </div>
@@ -251,12 +252,26 @@
   document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
   // ── Step 1: the listing and the county record ──
+  // A new property is a new deal: everything from the last one goes except the buyer
+  // (often making several offers). 2026-11-09: a second offer kept the first one's
+  // price, seller, answers and document ticks, and the Create button stayed locked.
+  function newDeal() {
+    const keep = {};
+    for (const k of ["buyerName", "buyerEmail", "buyerCell"]) if (state.answers[k] != null) keep[k] = state.answers[k];
+    state.answers = keep;
+    state.asked = []; state.built = false; state.listPrice = undefined; state.runId = undefined;
+    clearTimeout(pollTimer);
+    $("ruleQs").innerHTML = $("offerQs").innerHTML = $("elseList").innerHTML = $("docsList").innerHTML = "";
+    $("runCard").hidden = true; $("createMsg").textContent = "";
+    if (/[?&]run=/.test(location.search)) history.replaceState(null, "", location.pathname);
+  }
   async function lookup() {
     const mlsNumber = $("mls").value.trim(), address = $("addr").value.trim();
     if (!mlsNumber && !address) { $("lookupMsg").textContent = "Enter the MLS number or the address."; return; }
     $("lookupBtn").disabled = true; $("lookupMsg").className = "msg"; $("lookupMsg").textContent = "Looking it up in the MLS and county records…";
     try {
       const r = await Auth.api("/contract-prep/lookup", { body: mlsNumber ? { mlsNumber, unit: $("unit").value.trim() } : { address, unit: $("unit").value.trim() } });
+      newDeal();
       state.facts = { ...r.facts }; state.sources = r.sources || {}; state.listing = r.listing;
       for (const el of document.querySelectorAll("[data-fact]")) el.value = state.facts[el.dataset.fact] ?? "";
       for (const el of document.querySelectorAll("[data-src]")) el.textContent = state.sources[el.dataset.src] ? "From " + state.sources[el.dataset.src] : "";
@@ -488,11 +503,21 @@
   }
   $("agentPick").addEventListener("change", (e) => { if (e.target.value) loadStart(e.target.value); });
 
+  // Back/Forward can restore this page from the browser's memory with the last deal in
+  // it; load it fresh instead
+  window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+
   Auth.ready({ tool: "Contract Writer", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
     .then(() => {
       $("signin").hidden = true; $("app").hidden = false;
+      // Browsers refill boxes on a refresh; start empty so what's shown is what's sent
+      for (const el of document.querySelectorAll("[data-fact], [data-answer], #mls, #addr, #unit")) el.value = "";
       const q = new URLSearchParams(location.search);
-      if (q.get("run")) { $("createBtn").disabled = true; startFollowing(q.get("run")); return; }
+      // A run's own link (the email, a refresh, Back): just that run, with "Start a new one"
+      if (q.get("run")) {
+        for (const c of document.querySelectorAll("#app > .card")) if (c.id !== "runCard") c.hidden = true;
+        startFollowing(q.get("run")); return;
+      }
       loadStart(q.get("agentId"));
       if (q.get("mode") === "ebba") setMode("ebba");
       if (q.get("mls")) { $("mls").value = q.get("mls"); lookup(); } else $("mls").focus();
