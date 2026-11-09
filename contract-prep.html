@@ -298,7 +298,7 @@
     const agent = [l.listAgent?.name, l.listAgent?.phone, l.listAgent?.email].filter(Boolean).map(esc).join(" · ");
     $("listingBox").innerHTML = `<strong>${l.source === "daytona" ? "Daytona" : "Stellar"} MLS #${esc(l.mlsNumber)}</strong> · ${esc(l.status || "")}${l.listPrice ? ` · listed at ${money(l.listPrice)}` : ""}<br>
       Listing agent: ${agent || "not given"}${l.listOffice?.name ? `<br>Listing office: ${esc(l.listOffice.name)}${l.listOffice.phone ? ` · ${esc(l.listOffice.phone)}` : ""}` : ""}
-      ${l.hasHoa ? `<br>HOA${l.hoaFee ? `: ${money(l.hoaFee)}${l.hoaFrequency ? " " + esc(String(l.hoaFrequency).toLowerCase()) : ""}` : ""}` : ""}
+      ${l.hasHoa ? `<br>Association${l.hoaName ? `: ${esc(l.hoaName)}` : ""}${l.hoaPhone ? ` · ${esc(l.hoaPhone)}` : ""}${l.hoaFee ? ` · ${money(l.hoaFee)}${l.hoaFrequency ? " " + esc(String(l.hoaFrequency).toLowerCase()) : ""}` : ""}` : ""}
       <br>Documents in the MLS: ${l.source === "stellar" ? "Stellar doesn't share them with us; check the MLS for disclosures the seller signed" : l.documents.length ? `${l.documents.length} (see Step 5)` : "none attached"}
       ${others ? `<br><span class="hint">${others} other MLS record${others === 1 ? "" : "s"} at this address; this is the newest.</span>` : ""}`;
     if (l.listPrice && !$("q-price")) state.listPrice = l.listPrice;
