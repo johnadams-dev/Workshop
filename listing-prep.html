@@ -345,6 +345,13 @@
       state.plan = r;
       if (!state.built) { buildSections(r); readInputs(); return replan(); } // apply the "No" defaults
       renderCommission(r.commission);
+      // Advice under the personal property box (already included items; furnished -> inventory)
+      const ppBox = $("e-personalProperty");
+      if (ppBox) {
+        let adv = $("pp-advice");
+        if (!adv) { adv = document.createElement("div"); adv.id = "pp-advice"; ppBox.insertAdjacentElement("afterend", adv); }
+        adv.innerHTML = (r.personalPropertyAdvice || []).map((t) => noteHtml({ level: "warn", text: t })).join("");
+      }
       renderForms(r);
     } catch (e) {
       $("formsWarnings").innerHTML = noteHtml({ level: "error", text: e.message });
