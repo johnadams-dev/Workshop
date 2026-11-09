@@ -130,6 +130,7 @@ header{background:var(--ink);padding:0 1.5rem;position:sticky;top:56px;z-index:1
 .pc-name{font-weight:600;font-size:.9rem}
 .pc-row.you-row .pc-name{color:#fff}
 .pc-office{font-size:.8rem;color:var(--muted)}
+.pc-team{font-size:.78rem;color:var(--muted);font-weight:400}
 .pc-row.you-row .pc-office{color:rgba(255,255,255,.55)}
 .pc-ellipsis{
   text-align:center;padding:10px;
@@ -394,13 +395,23 @@ function houseStreet(value, maxValue, maxHouses = 10) {
 }
 
 // ── Data + ranking ────────────────────────────────────────────────────────────
+// Teams (award eligibility "Team", John Adams 2026-11-08): each team is one entry
+// adding up its Team-marked agents; they're shown only under "Teams", and All
+// Offices / each office show individual (Standard) agents.
 function scopedAgents() {
   const officeId = document.getElementById('office-select').value;
   if (!leaderboard) return [];
+  if (officeId === 'teams') return leaderboard.teams || [];
   return officeId
     ? leaderboard.agents.filter(a => String(a.office_id) === officeId)
     : leaderboard.agents;
 }
+const isTeam = a => a && a.kind === 'team';
+const nameOf = a => isTeam(a) ? a.name : `${a.first_name} ${a.last_name}`;
+const sortKey = a => isTeam(a) ? a.name : `${a.last_name} ${a.first_name}`;
+const isMine = a => !!a && (isTeam(a)
+  ? (a.emails || []).includes(userEmail.toLowerCase())
+  : (a.email || '').toLowerCase() === userEmail.toLowerCase());
 
 const salesCmp = (a, b) => b.sales_volume - a.sales_volume;
 const listingCmp = (a, b) => (b.listing_count - a.listing_count) || (b.listing_price_sum - a.listing_price_sum);
@@ -420,8 +431,8 @@ function renderPodium(elId, ranked, valueKey, formatFn, emptyMsg) {
     <div class="rank-card rank-${i + 1}">
       <div class="medal">${medal(i)}</div>
       <div class="rank-num">Rank ${i + 1}</div>
-      <div class="rank-name">${esc(a.first_name)} ${esc(a.last_name)}</div>
-      <div class="rank-office">${esc(a.office_name || 'No Office')}</div>
+      <div class="rank-name">${esc(nameOf(a))}</div>
+      <div class="rank-office">${isTeam(a) ? esc((a.members || []).join(', ')) : esc(a.office_name || 'No Office')}</div>
       <div class="rank-value">${formatFn(a[valueKey])}</div>
       <div class="street">${houseStreet(a[valueKey], maxValue)}</div>
     </div>
@@ -430,14 +441,14 @@ function renderPodium(elId, ranked, valueKey, formatFn, emptyMsg) {
 
 function renderYouCard(scoped) {
   const card = document.getElementById('you-card');
-  const me = scoped.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
+  const me = scoped.find(isMine);
   if (!me) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
   const salesRanked   = [...scoped].sort(salesCmp);
   const listingRanked = [...scoped].sort(listingCmp);
-  const salesRank   = salesRanked.findIndex(a => a.agent_id === me.agent_id) + 1;
-  const listingRank = listingRanked.findIndex(a => a.agent_id === me.agent_id) + 1;
+  const salesRank   = salesRanked.indexOf(me) + 1;
+  const listingRank = listingRanked.indexOf(me) + 1;
   const salesMax   = salesRanked[0]?.sales_volume   || me.sales_volume   || 1;
   const listingMax = listingRanked[0]?.listing_count || me.listing_count  || 1;
 
@@ -477,12 +488,13 @@ function renderPresidentsClub() {
     return;
   }
 
-  // Determine top 25 by GCI, then sort that group alphabetically
+  // Determine top 25 by GCI, then sort that group alphabetically. A team is one
+  // entry (its Team-marked agents' GCI combined) and takes one seat.
   const top25 = withGci.slice(0, 25)
-    .sort((a, b) => a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name));
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
 
-  const myEntry   = agents.find(a => (a.email || '').toLowerCase() === userEmail.toLowerCase());
-  const meInTop25 = myEntry ? withGci.slice(0, 25).some(a => a.agent_id === myEntry.agent_id) : false;
+  const myEntry   = agents.find(isMine);
+  const meInTop25 = myEntry ? withGci.slice(0, 25).includes(myEntry) : false;
 
   const year = pcData.year || new Date().getFullYear();
 
@@ -493,10 +505,10 @@ function renderPresidentsClub() {
     </div>`;
 
   const rows = top25.map(a => {
-    const isMe = myEntry && a.agent_id === myEntry.agent_id;
+    const isMe = myEntry && a === myEntry;
     return `
       <div class="pc-row${isMe ? ' you-row' : ''}">
-        <span class="pc-name">${esc(a.first_name)} ${esc(a.last_name)}${isMe ? ' ★' : ''}</span>
+        <span class="pc-name">${esc(nameOf(a))}${isTeam(a) ? ` <span class="pc-team">(${esc((a.members || []).join(', '))})</span>` : ''}${isMe ? ' ★' : ''}</span>
         <span class="pc-office">${esc(a.office_name || '—')}</span>
       </div>`;
   }).join('');
@@ -584,7 +596,8 @@ async function load() {
 
     const sel = document.getElementById('office-select');
     sel.innerHTML = '<option value="">All Offices</option>' +
-      offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+      offices.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('') +
+      '<option value="teams">Teams</option>';
 
     await loadProduction();
   } catch (e) {
