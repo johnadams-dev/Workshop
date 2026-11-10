@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
+<script src="needed-panel.js"></script>
 <style>
   :root {
     --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
@@ -248,7 +249,7 @@
     $("buyerCard").hidden = $("formsCard").hidden = !started;
     $("termsCard").hidden = $("elseCard").hidden = !(offer && started);
     $("docsCard").hidden = !(offer && started && state.listing && state.listing.documents.length);
-    if (started) replan();
+    if (started) replan(); else needLookup();
   }
   document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
@@ -424,7 +425,8 @@
       rows.push(["Buyer's broker compensation", `${e.p02tf011}%${e.p02tf008 ? ` plus ${money(e.p02tf008)}` : ""} (lease ${e.p02tf010}%, option ${e.p02tf013}%), protection period ${e.p02tf014} days`]);
     }
     $("termsList").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
-    const missing = [...(r.questions || []).map((q) => q.label), ...(r.missing || []).filter((m) => m.key !== "address" || state.mode === "offer").map((m) => m.label)];
+    const needed = [...(r.questions || []).map((q) => ({ key: q.key, label: q.label })), ...(r.missing || []).filter((m) => m.key !== "address" || state.mode === "offer")];
+    const missing = needed.map((m) => m.label);
     $("missingBox").hidden = !missing.length;
     $("missingList").innerHTML = missing.map((m) => `<li>${esc(m)}</li>`).join("");
     const notConnected = state.fsConnected === false;
@@ -433,7 +435,19 @@
     $("createHint").textContent = notConnected ? "Form Simplicity isn't connected yet (see the top of the page)."
       : blocked ? "Answer what's still needed above first."
       : `Creates a purchase transaction in ${state.agentId ? "the agent's" : "your"} Form Simplicity account, adds these forms and fills them in${docs.length && state.mode === "offer" ? ", and attaches the ticked MLS documents" : ""}.`;
+    showNeeded(needed, { ready: !blocked, readyText: $("createHint").textContent, blockedText: notConnected ? "Form Simplicity isn't connected yet; see the top of the page." : "" });
   }
+
+  // The "Still needed" panel (needed-panel.js): the fields still blank, marked in red, a
+  // panel on the right that follows the page (a bar on phones), and Create once they're in.
+  const NEED_ALIASES = { buyerName: "#b-name", buyerEmail: "#b-email", buyerCell: "#b-cell", sellerName: "#f-seller", address: "#f-address", lookup: "#mls" };
+  function showNeeded(items, o = {}) {
+    if (!window.NeededPanel) return;
+    if (state.runId) return NeededPanel.update([], { show: false });
+    NeededPanel.update(items, { ...o, aliases: NEED_ALIASES, onCreate: () => { if (!$("createBtn").disabled) $("createBtn").click(); } });
+  }
+  // Before the property is looked up, the one thing needed is the lookup
+  function needLookup() { if (state.mode === "offer" && $("factsBox").hidden) showNeeded([{ key: "lookup", label: "Look up the property: MLS number or address" }]); }
 
   // ── Create in Form Simplicity, then follow the robot (runs are shared with Prepare a Listing) ──
   $("createBtn").addEventListener("click", async () => {
@@ -449,6 +463,7 @@
   const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account" };
   let pollTimer = null;
   function startFollowing(runId) {
+    if (window.NeededPanel) NeededPanel.update([], { show: false });
     state.runId = runId;
     $("createMsg").textContent = "";
     $("runCard").hidden = false;
@@ -519,6 +534,7 @@
         startFollowing(q.get("run")); return;
       }
       loadStart(q.get("agentId"));
+      needLookup();
       if (q.get("mode") === "ebba") setMode("ebba");
       if (q.get("mls")) { $("mls").value = q.get("mls"); lookup(); } else $("mls").focus();
     });

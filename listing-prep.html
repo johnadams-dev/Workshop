@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
+<script src="needed-panel.js"></script>
 <style>
   /* Same family as seller-net.html / market-update.html: navy topbar + gold accent, white cards. */
   :root {
@@ -379,10 +380,11 @@
     const forms = r.forms || [];
     $("formsList").innerHTML = forms.length ? forms.map((f) => `<tr><td>${esc(f.fsTitle)}${f.kind === "file" ? '<span class="tag">attached PDF</span>' : ""}${f.set ? `<span class="tag">${f.set === "daytona" ? "Daytona" : "Stellar"}</span>` : ""}</td><td class="why">${esc(f.reason)}</td></tr>`).join("")
       : '<tr><td class="why">Choose the property type in Step 1 to see the forms.</td></tr>';
-    const missing = [
-      ...(r.questions || []).map((q) => ASK_LABELS[q.key] || q.label),
-      ...(r.values?.missing || []).map((m) => m.label),
+    const needed = [
+      ...(r.questions || []).map((q) => ({ key: q.key, label: ASK_LABELS[q.key] || q.label })),
+      ...(r.values?.missing || []),
     ];
+    const missing = needed.map((m) => m.label);
     $("missingBox").hidden = !missing.length;
     $("missingList").innerHTML = missing.map((m) => `<li>${esc(m)}</li>`).join("");
     const notConnected = state.fsConnected === false;
@@ -391,6 +393,16 @@
     $("createHint").textContent = notConnected ? "Form Simplicity isn't connected yet (see the top of the page)."
       : blocked ? "Answer what's still needed above first."
       : `Creates the transaction in ${state.agentId ? "the agent's" : "your"} Form Simplicity account, adds these forms and fills them in.`;
+    showNeeded(needed, { ready: !blocked, readyText: $("createHint").textContent, blockedText: notConnected ? "Form Simplicity isn't connected yet; see the top of the page." : "" });
+  }
+
+  // The "Still needed" panel (needed-panel.js): the fields still blank, marked in red, a
+  // panel on the right that follows the page (a bar on phones), and Create once they're in.
+  const NEED_ALIASES = { "Property.Location.Address.Full": "#f-address", "Property.Legal.Description.Full": "#f-legal", "Seller.Entity.Name": "#s-sellerName", lookup: "#addr" };
+  function showNeeded(items, o = {}) {
+    if (!window.NeededPanel) return;
+    if (state.runId) return NeededPanel.update([], { show: false });
+    NeededPanel.update(items, { ...o, aliases: NEED_ALIASES, onCreate: () => { if (!$("createBtn").disabled) $("createBtn").click(); } });
   }
 
   // ── Create in Form Simplicity, then follow the robot ──
@@ -427,6 +439,7 @@
   const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account" };
   let pollTimer = null;
   function startFollowing(runId) {
+    if (window.NeededPanel) NeededPanel.update([], { show: false });
     state.runId = runId;
     $("createMsg").textContent = "";
     $("runCard").hidden = false;
@@ -502,6 +515,7 @@
       const run = q.get("run");
       if (run) { $("createBtn").disabled = true; startFollowing(run); return; }
       loadStart(q.get("agentId"));
+      showNeeded([{ key: "lookup", label: "Look up the property address" }]);
       $("addr").focus();
     });
 })();
