@@ -4754,7 +4754,11 @@ function confirmCommissionAmount(values, type, fieldLabels) {
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
     if (v == null || isNaN(v)) continue;
-    if (!isFixed && v > 10) {
+    if (!isFixed && v > 100) {
+      // Over 100% can only be a dollar amount in the wrong type (2026-11-10)
+      alert(`${fieldLabels[i]}: ${v}% can't be right. If it's a dollar amount ($${Number(v).toLocaleString()}), set Commission Type to "fixed" and enter both commissions in dollars.`);
+      return false;
+    } else if (!isFixed && v > 10) {
       if (!confirm(`${fieldLabels[i]}: ${v}% is a high commission — are you sure that's correct?`)) return false;
     } else if (isFixed && v < 2500 && !/co-broke|buyer broker/i.test(fieldLabels[i])) {
       if (!confirm(`${fieldLabels[i]}: $${v} is a low flat-fee commission — are you sure that's correct?`)) return false;
@@ -7717,6 +7721,19 @@ async function submitFieldCorrection() {
       fieldName === 'listing_non_shared_commission' ? 'Non-Shared Commission (Listing)' : 'Non-Shared Commission (Buyer)'
     );
     if (nscError) { alert(nscError); return; }
+  }
+  // The same "are you sure?" check as the closing and listing screens (2026-11-10:
+  // a $12,000 commission was saved here as 12,000%). Changing the type checks the
+  // figures already on the transaction against the new type.
+  if (!customerId && _fcTxnData) {
+    const type = fieldName === 'commission_type' ? newValue : (_fcTxnData.commission_type || 'percent');
+    const vals = { commission_rate: _fcTxnData.commission_rate, cooperating_commission: _fcTxnData.cooperating_commission };
+    if (fieldName === 'commission_rate' || fieldName === 'cooperating_commission') vals[fieldName] = newValue;
+    if (fieldName === 'commission_type' || fieldName === 'commission_rate' || fieldName === 'cooperating_commission') {
+      const toNum = (v) => (v === '' || v == null ? null : Number(v));
+      if (!confirmCommissionAmount([toNum(vals.commission_rate), toNum(vals.cooperating_commission)], type,
+        ['Total Commission', 'Co-Broke Commission'])) return;
+    }
   }
 
   // A cleared NUMERIC field must be sent as null, not '' -- the server does
