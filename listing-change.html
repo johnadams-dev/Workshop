@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Change a Listing | John Adams Real Estate Tools</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script src="needed-panel.js"></script>
+<style>
+  :root {
+    --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+    --red:#C0392B; --red-lt:#FBEDEB; --green:#1A7A4C; --green-lt:#E8F4EE;
+    --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--navy); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 50px; border-bottom: 3px solid var(--gold); }
+  .topbar-logo { color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.2); }
+  .topbar a { font-size: 12px; color: rgba(255,255,255,.55); text-decoration: none; letter-spacing: .03em; }
+  .content { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; display: flex; gap: 8px; align-items: baseline; }
+  .card h2 .step { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+  .card .sub { font-size: 13px; color: var(--muted); margin: -6px 0 12px; line-height: 1.45; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=date], input[type=search], select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+  }
+  input:focus, select:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block; }
+  .btn:hover { background: var(--blue); }
+  .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 260px; }
+  .msg { font-size: 13px; margin-top: 10px; line-height: 1.45; }
+  .msg.err { color: var(--red); }
+  .notes { margin-top: 12px; display: grid; gap: 6px; }
+  .note { font-size: 13px; line-height: 1.45; padding: 8px 12px; border-radius: 6px; background: var(--bg); border-left: 4px solid var(--border); }
+  .note.warn { background: var(--gold-lt); border-left-color: var(--gold); }
+  .note.error { background: var(--red-lt); border-left-color: var(--red); }
+  [hidden] { display: none !important; }
+  #signin .gbtn { margin-top: 12px; }
+
+  /* The agent's listings */
+  .txns { display: grid; gap: 8px; max-height: 420px; overflow: auto; margin-top: 10px; padding: 2px; }
+  .txn { text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; cursor: pointer; font-family: inherit; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+  .txn:hover { border-color: var(--blue); }
+  .txn.on { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); background: var(--gold-lt); }
+  .txn strong { font-size: 14px; color: var(--navy); }
+  .txn .meta { font-size: 12px; color: var(--muted); }
+  .txn .price { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 14px; margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: var(--bg); }
+  dl.terms dt { color: var(--muted); }
+  dl.terms dd { font-variant-numeric: tabular-nums; }
+  @media (max-width: 600px) { dl.terms { grid-template-columns: 1fr; } dl.terms dd { margin-bottom: 6px; } .txn { grid-template-columns: 1fr; } .txn .price { text-align: left; } }
+
+  /* What's changing */
+  .changes { display: grid; gap: 10px; }
+  .chg { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .chg.on { border-color: var(--navy); background: var(--gold-lt); }
+  .chg > label.pick { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 600; color: var(--text); margin: 0; cursor: pointer; }
+  .chg > label.pick input { margin-top: 3px; width: 16px; height: 16px; }
+  .chg .pick span { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .chg .more { margin: 10px 0 0 26px; max-width: 280px; }
+
+  /* Forms and summary */
+  ul.plain { list-style: none; font-size: 14px; display: grid; gap: 6px; }
+  ul.plain li::before { content: "•"; color: var(--gold); font-weight: 800; margin-right: 8px; }
+  .missing { margin-top: 12px; font-size: 13px; }
+  .missing li { margin-left: 18px; line-height: 1.6; }
+  ul.steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+  ul.steps li { padding: 4px 0; border-bottom: 1px solid #e5e7eb; }
+  ul.steps li.ok { color: #166534; }
+  ul.steps li.bad { color: #b91c1c; }
+  ul.steps .why { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Change a Listing</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./index.html">&#8592; Tools</a>
+    <a href="./shirley.html">&#8592; Shirley</a>
+    <a href="./feedback.html?tool=listing-change">Feedback</a>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Change a Listing</h1>
+  <p class="lede">An extension, a price change or a conditional termination goes on the Modification to Listing Agreement; taking a Stellar listing temporarily off the market uses Stellar's status change form. Pick the listing's transaction in Form Simplicity, say what's changing, and we add the form to that transaction and fill it in for the seller to sign.</p>
+
+  <div class="card" id="signin" hidden>
+    <h2>Sign in</h2>
+    <p class="hint">Sign in with your Adams Cameron Google account.</p>
+    <div class="gbtn" id="g-signin-btn"></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="card" id="whoCard" hidden>
+      <div class="row" id="pickRow" hidden>
+        <div class="grow"><label for="agentPick">Preparing this for</label><select id="agentPick"></select></div>
+      </div>
+      <div id="fsNote"></div>
+    </div>
+
+    <!-- 1. Which listing -->
+    <div class="card" id="txnCard">
+      <h2><span class="step">Step 1</span> Which listing?</h2>
+      <p class="sub">Your listings in Form Simplicity, most recently updated first.</p>
+      <input type="search" id="txnFilter" placeholder="Search by address or seller" autocomplete="off" aria-label="Search your listings">
+      <div class="txns" id="txnList" role="listbox" aria-label="Your listings"><div class="hint">Loading your listings…</div></div>
+      <dl class="terms" id="txnFacts" hidden></dl>
+    </div>
+
+    <!-- 2. What's changing -->
+    <div class="card" id="changeCard" hidden>
+      <h2><span class="step">Step 2</span> What's changing?</h2>
+      <p class="sub">Choose one or more. A termination goes on its own.</p>
+      <div class="changes" id="changeList">
+        <div class="chg" data-kind="extension">
+          <label class="pick"><input type="checkbox" value="extension"><div>Extend the listing<span>A new termination (expiration) date</span></div></label>
+          <div class="more" hidden><label for="c-extension">New termination date</label><input type="date" id="c-extension"></div>
+        </div>
+        <div class="chg" data-kind="price">
+          <label class="pick"><input type="checkbox" value="price"><div>Change the price<span>The new list price</span></div></label>
+          <div class="more" hidden><label for="c-price">New price</label><input type="text" id="c-price" inputmode="decimal" placeholder="$" autocomplete="off"></div>
+        </div>
+        <div class="chg" data-kind="termination">
+          <label class="pick"><input type="checkbox" value="termination"><div>Conditionally terminate the listing<span>The seller pays the cancellation fee in the listing agreement</span></div></label>
+          <div class="more" hidden><label for="c-termination">Conditional termination date</label><input type="date" id="c-termination"></div>
+        </div>
+        <div class="chg" data-kind="tom">
+          <label class="pick"><input type="checkbox" value="tom"><div>Take it temporarily off the market<span>Stellar listings: Stellar's status change form. Daytona: you change it in Flexmls.</span></div></label>
+          <div class="more" hidden><label for="c-tom">Off the market from</label><input type="date" id="c-tom"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. The paperwork -->
+    <div class="card" id="planCard" hidden>
+      <h2><span class="step">Step 3</span> The paperwork</h2>
+      <ul class="plain" id="summary"></ul>
+      <div class="notes" id="planNotes"></div>
+      <div style="margin-top:14px"><label>Forms we'll add and fill</label><ul class="plain" id="formsList"></ul></div>
+      <div class="missing" id="missingBox" hidden><strong>Still needed:</strong><ul id="missingList"></ul></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" id="createBtn" disabled>Add to Form Simplicity</button>
+      </div>
+      <div class="msg" id="createMsg"></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="runCard" hidden>
+      <h2>Form Simplicity: <span id="runTitle"></span></h2>
+      <p class="sub" id="runStatus"></p>
+      <ul class="steps" id="runSteps"></ul>
+      <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
+        <button class="btn" type="button" id="runRetry" hidden>Try again</button>
+        <span class="hint" id="runRetryHint" hidden>Runs again on the same transaction.</span>
+        <a class="btn" href="listing-change.html">Change another listing</a></div>
+      <div class="missing" id="runLeft" hidden><strong>Check before sending:</strong><ul id="runLeftList"></ul></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const money = (n) => (n == null || n === "" || isNaN(Number(n)) ? "—" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+  const longDate = (s) => { if (!s) return "—"; const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" }); };
+  const noteHtml = (level, text) => `<div class="note ${level}">${esc(text)}</div>`;
+  const state = { agentId: undefined, txns: [], txn: null, today: null };
+
+  // ── Step 1: the agent's listings ──
+  async function loadTxns() {
+    $("txnList").innerHTML = '<div class="hint">Loading your listings…</div>';
+    state.txn = null; $("txnFacts").hidden = true; $("changeCard").hidden = true; $("planCard").hidden = true;
+    try {
+      const r = await Auth.api("/listing-change/transactions" + (state.agentId ? `?agentId=${encodeURIComponent(state.agentId)}` : ""));
+      state.txns = r.transactions || []; state.today = r.today;
+      renderTxns();
+      const want = new URLSearchParams(location.search).get("transId");
+      if (want && state.txns.some((t) => t.transId === want)) pickTxn(want);
+    } catch (e) { $("txnList").innerHTML = noteHtml("error", e.message); }
+    showNeeded();
+  }
+  function renderTxns() {
+    const f = $("txnFilter").value.trim().toLowerCase();
+    const list = state.txns.filter((t) => !f || `${t.transName} ${t.address} ${(t.sellers || []).join(" ")}`.toLowerCase().includes(f));
+    $("txnList").innerHTML = list.length ? list.map((t) => `<button type="button" class="txn${state.txn && state.txn.transId === t.transId ? " on" : ""}" data-id="${esc(t.transId)}" role="option" aria-selected="${state.txn && state.txn.transId === t.transId}">
+        <strong>${esc(t.transName)}</strong><span class="price">${t.price ? money(t.price) : ""}</span>
+        <span class="meta">${esc(t.address || "")}</span><span class="meta">${t.expDate ? "ends " + esc(longDate(t.expDate)) : ""}</span></button>`).join("")
+      : `<div class="hint">${state.txns.length ? "No listing matches that." : "No listing transactions in Form Simplicity for this agent."}</div>`;
+  }
+  $("txnFilter").addEventListener("input", renderTxns);
+  $("txnList").addEventListener("click", (e) => { const b = e.target.closest(".txn"); if (b) pickTxn(b.dataset.id); });
+  function pickTxn(id) {
+    state.txn = state.txns.find((t) => t.transId === id) || null;
+    renderTxns();
+    if (!state.txn) return;
+    const t = state.txn;
+    $("txnFacts").innerHTML = `<dt>Transaction</dt><dd>${esc(t.transName)}</dd><dt>Property</dt><dd>${esc(t.address || "—")}</dd>
+      <dt>Seller${(t.sellers || []).length > 1 ? "s" : ""}</dt><dd>${esc((t.sellers || []).join(", ") || "—")}</dd>
+      <dt>List price</dt><dd>${money(t.price)}</dd><dt>Listing period</dt><dd>${esc(longDate(t.startDate))} to ${esc(longDate(t.expDate))}</dd>`;
+    $("txnFacts").hidden = false; $("changeCard").hidden = false;
+    replan();
+  }
+
+  // ── Step 2: what's changing ──
+  const boxes = () => [...document.querySelectorAll("#changeList input[type=checkbox]")];
+  $("changeList").addEventListener("change", (e) => {
+    const cb = e.target.closest("input[type=checkbox]");
+    if (cb) {
+      // A termination goes on its own
+      if (cb.checked && cb.value === "termination") for (const o of boxes()) if (o !== cb) o.checked = false;
+      if (cb.checked && cb.value !== "termination") boxes().find((o) => o.value === "termination").checked = false;
+      for (const o of boxes()) {
+        const card = o.closest(".chg"); card.classList.toggle("on", o.checked); card.querySelector(".more").hidden = !o.checked;
+        // Dates that are usually today start that way
+        const input = card.querySelector(".more input");
+        if (o.checked && !input.value && (o.value === "termination" || o.value === "tom") && state.today) input.value = state.today;
+      }
+      if (cb.checked) { const i = cb.closest(".chg").querySelector(".more input"); if (!i.value) i.focus(); }
+    }
+    replanSoon();
+  });
+  $("changeList").addEventListener("input", (e) => { if (!e.target.matches("input[type=checkbox]")) replanSoon(); });
+  function changes() {
+    const out = {};
+    for (const o of boxes()) if (o.checked) {
+      const v = $("c-" + o.value).value;
+      out[o.value] = o.value === "price" ? { amount: v } : { date: v };
+    }
+    return out;
+  }
+
+  // ── Step 3: the paperwork ──
+  let timer = null, seq = 0;
+  function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
+  async function replan() {
+    if (!state.txn) return showNeeded();
+    const c = changes();
+    if (!Object.keys(c).length) { $("planCard").hidden = true; state.plan = null; return showNeeded(); }
+    const my = ++seq;
+    try {
+      const r = await Auth.api("/listing-change/plan", { body: { agentId: state.agentId, transId: state.txn.transId, changes: c } });
+      if (my !== seq) return;
+      state.plan = r.plan;
+      const p = r.plan;
+      $("summary").innerHTML = p.summary.length ? p.summary.map((s) => `<li>${esc(s)}</li>`).join("") : '<li>Fill in the change above.</li>';
+      $("planNotes").innerHTML = [...p.warnings.map((w) => noteHtml("warn", w)), ...p.notes.map((n) => noteHtml("", n))].join("");
+      $("formsList").innerHTML = p.forms.length ? p.forms.map((f) => `<li>${esc(f.title === "Status Change Form" ? "Stellar MLS Status Change Form" : "Modification to Listing Agreement (MLA-6)")}</li>`).join("") : "<li>None</li>";
+      $("missingBox").hidden = !p.missing.length;
+      $("missingList").innerHTML = p.missing.map((m) => `<li>${esc(m.label)}</li>`).join("");
+      $("createBtn").disabled = !p.ready;
+      $("planCard").hidden = false;
+      showNeeded();
+    } catch (e) { if (my === seq) { $("planCard").hidden = false; $("planNotes").innerHTML = noteHtml("error", e.message); $("createBtn").disabled = true; } }
+  }
+
+  // The "Still needed" panel (needed-panel.js)
+  const NEED_ALIASES = { transaction: "#txnFilter", changes: "#changeList", "extension.date": "#c-extension", "price.amount": "#c-price", "termination.date": "#c-termination", "tom.date": "#c-tom" };
+  function showNeeded() {
+    if (!window.NeededPanel) return;
+    if (state.runId) return NeededPanel.update([], { show: false });
+    const items = !state.txn ? [{ key: "transaction", label: "Choose the listing" }]
+      : !state.plan ? [{ key: "changes", label: "Choose what's changing" }]
+      : state.plan.missing;
+    const ready = !!(state.plan && state.plan.ready);
+    NeededPanel.update(items, { ready, createLabel: "Add to Form Simplicity", aliases: NEED_ALIASES,
+      blockedText: state.plan && !state.plan.forms.length ? "There's no form to prepare for this change; see the note in Step 3." : undefined,
+      onCreate: () => { if (!$("createBtn").disabled) $("createBtn").click(); } });
+  }
+
+  // ── Create, then follow the robot (runs are shared with Prepare a Listing) ──
+  $("createBtn").addEventListener("click", async () => {
+    $("createBtn").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Starting…";
+    try {
+      const r = await Auth.api("/listing-change/create", { body: { agentId: state.agentId, transId: state.txn.transId, changes: changes() } });
+      startFollowing(r.runId);
+    } catch (e) {
+      $("createMsg").className = "msg err"; $("createMsg").textContent = e.message;
+      if (e.data && e.data.runId) startFollowing(e.data.runId); else $("createBtn").disabled = false;
+    }
+  });
+  const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account", "find the transaction": "Found the transaction" };
+  let pollTimer = null;
+  function startFollowing(runId) {
+    state.runId = runId;
+    if (window.NeededPanel) NeededPanel.update([], { show: false });
+    for (const c of document.querySelectorAll("#app > .card")) if (c.id !== "runCard") c.hidden = true;
+    $("runCard").hidden = false;
+    history.replaceState(null, "", "?run=" + encodeURIComponent(runId));
+    poll();
+  }
+  async function poll() {
+    clearTimeout(pollTimer);
+    let r;
+    try { r = await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId)); }
+    catch (e) { $("runStatus").textContent = e.status === 404 ? "We couldn't find that run." : "Checking again in a moment…"; if (e.status !== 404) pollTimer = setTimeout(poll, 8000); return; }
+    $("runTitle").textContent = r.fs_trans_name || r.address || "";
+    $("runOpen").hidden = !(r.fs_url && (r.status === "done" || r.status === "failed"));
+    if (r.fs_url) $("runOpen").href = r.fs_url;
+    $("runSteps").innerHTML = (r.steps || []).map((s) => `<li class="${s.ok ? "ok" : "bad"}">${s.ok ? "✓" : "✗"} ${esc(STEP_NAMES[s.step] || s.step[0].toUpperCase() + s.step.slice(1))}${!s.ok && s.detail ? ` <span class="why">— ${esc(s.detail)}</span>` : ""}</li>`).join("");
+    const left = (r.result?.skipped || []).length;
+    $("runLeft").hidden = !left;
+    $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the form over before sending it.</li>` : "";
+    const stuck = r.status === "running" && Date.now() - new Date(r.updated_at).getTime() > 45 * 60 * 1000;
+    $("runRetry").hidden = $("runRetryHint").hidden = !(r.status === "failed" || stuck);
+    if (stuck) { $("runStatus").textContent = "This seems to have stalled. Try again to pick it up."; return; }
+    if (r.status === "done") $("runStatus").textContent = "All done. The form is on the transaction in Form Simplicity, filled in and ready for the seller to sign. We've emailed you the link too.";
+    else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. John Adams has been told, or use Try again.`;
+    else { $("runStatus").textContent = "Adding and filling the form. This usually takes a few minutes; you can leave this page and we'll email you when it's ready."; pollTimer = setTimeout(poll, 5000); }
+  }
+  $("runRetry").addEventListener("click", async () => {
+    $("runRetry").disabled = true;
+    try {
+      await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId) + "/retry", { method: "POST", body: {} });
+      $("runRetry").hidden = $("runRetryHint").hidden = true; $("runStatus").textContent = "Starting again…"; setTimeout(poll, 3000);
+    } catch (e) { $("runStatus").textContent = e.message; }
+    finally { $("runRetry").disabled = false; }
+  });
+
+  // Whose listing (same rule as Prepare a Listing), then their listings
+  async function loadStart(agentId) {
+    try {
+      const r = await Auth.api("/listing-prep/start" + (agentId ? `?agentId=${encodeURIComponent(agentId)}` : ""));
+      state.agentId = r.agent && !r.self ? r.agent.id : undefined;
+      if (r.agents && r.agents.length) {
+        $("agentPick").innerHTML = r.agents.map((x) => `<option value="${x.id}"${r.agent && x.id === r.agent.id ? " selected" : ""}>${esc(x.name)}</option>`).join("");
+        if (!r.agent) $("agentPick").insertAdjacentHTML("afterbegin", '<option value="" selected>Choose the agent…</option>');
+        $("pickRow").hidden = false;
+      }
+      $("fsNote").innerHTML = !r.agent ? noteHtml("warn", "Choose whose listing this is.") : r.fsConnected ? "" : noteHtml("error", r.fsMessage);
+      $("whoCard").hidden = $("pickRow").hidden && !$("fsNote").innerHTML;
+      if (r.agent && r.fsConnected) loadTxns();
+      else { $("txnList").innerHTML = `<div class="hint">${r.agent ? "Connect Form Simplicity first (see above)." : "Choose the agent first."}</div>`; showNeeded(); }
+    } catch (e) { $("fsNote").innerHTML = noteHtml("error", e.message); $("whoCard").hidden = false; }
+  }
+  $("agentPick").addEventListener("change", (e) => { if (e.target.value) loadStart(e.target.value); });
+
+  window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+
+  Auth.ready({ tool: "Change a Listing", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
+    .then(() => {
+      $("signin").hidden = true; $("app").hidden = false;
+      for (const el of document.querySelectorAll("#changeList input")) { if (el.type === "checkbox") el.checked = false; else el.value = ""; }
+      const q = new URLSearchParams(location.search);
+      if (q.get("run")) return startFollowing(q.get("run"));
+      loadStart(q.get("agentId"));
+    });
+})();
+</script>
+</body>
+</html>
