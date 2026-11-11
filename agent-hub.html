@@ -1146,19 +1146,21 @@ function sortChecklistItems(items) {
 
 // Shared row renderer — used by both the Pending Steps list above and the
 // transaction detail modal, so a checkbox toggled in either place looks and
-// behaves identically. Only the agent's own pending items are actually
-// clickable; everything else (completed/dismissed/coordinator-owned) stays
-// the same static status dot it always was.
+// behaves identically. The agent's own items are clickable: a pending one to
+// mark it complete, and one the agent completed to put it back to incomplete
+// (John Adams, 2026-11-11). Items the office completed, dismissed ones and
+// coordinator-owned ones stay the static status dot they always were.
 function renderChecklistItemRow(i, txnId) {
   const meta = CHECKLIST_STATUS_META[i.progress_status] || CHECKLIST_STATUS_META.pending;
   const isAgentItem = i.responsible_party === 'agent';
-  const checkable = isAgentItem && i.progress_status === 'pending';
+  const reopenable = isAgentItem && i.progress_status === 'completed' && !i.completed_by_staff;
+  const checkable = (isAgentItem && i.progress_status === 'pending') || reopenable;
   const href = i.resource_url ? (isAgentItem ? withTxnParam(i.resource_url, txnId) : i.resource_url) : '';
   const link = i.resource_url
     ? `<a class="checklist-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(i.resource_label || 'Open')}</a>`
     : '';
   const partyBadge = isAgentItem ? `<span class="checklist-party">Your task</span>` : '';
-  const checkAttrs = checkable ? `class="checklist-check ${meta.cls} checkable" onclick="toggleChecklistItem('${i.progress_id}', '${txnId}')" title="Mark complete"` : `class="checklist-check ${meta.cls}"`;
+  const checkAttrs = checkable ? `class="checklist-check ${meta.cls} checkable" onclick="toggleChecklistItem('${i.progress_id}', '${txnId}')" title="${reopenable ? 'Completed. Click to mark it incomplete' : 'Mark complete'}"` : `class="checklist-check ${meta.cls}"`;
   const descHtml = i.description ? `<div class="checklist-desc">${escapeHtml(i.description)}</div>` : '';
   return `<div class="checklist-item ${meta.rowCls}" data-progress-id="${i.progress_id}">
     <span ${checkAttrs}>${meta.icon}</span>
@@ -1168,16 +1170,16 @@ function renderChecklistItemRow(i, txnId) {
   </div>`;
 }
 
-// Marks an agent-owned item complete (check-off only — there's no un-check
-// affordance here; reopening a completed step is a coordinator/Daily Desk
-// action, same as it already is for every other checklist item in this
-// system). Updates S.hubData in place and re-renders from it rather than
-// re-fetching the whole hub over the network.
+// Marks an agent-owned item complete, or puts one the agent completed back to
+// incomplete (the server refuses to reopen what the office completed). Updates
+// S.hubData in place and re-renders from it rather than re-fetching the whole
+// hub over the network.
 async function toggleChecklistItem(progressId, txnId) {
   const row = (S.hubData.checklist || []).find(c => String(c.progress_id) === String(progressId));
   if (!row) return;
   const prevStatus = row.progress_status;
-  row.progress_status = 'completed'; // optimistic
+  const next = prevStatus === 'completed' ? 'pending' : 'completed';
+  row.progress_status = next; // optimistic
   renderPendingSteps();
   renderSituation(S.hubData);
   if (document.getElementById('txnModal').classList.contains('open')) openTxnModal(txnId);
@@ -1186,7 +1188,7 @@ async function toggleChecklistItem(progressId, txnId) {
     const res = await fetch(`${PROXY_BASE}/daily-desk/checklist-progress/${progressId}`, {
       method: 'PATCH',
       headers: Auth.headers(),
-      body: JSON.stringify({ status: 'completed' }),
+      body: JSON.stringify({ status: next }),
     });
     const result = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(result.error || res.statusText);
@@ -1195,7 +1197,7 @@ async function toggleChecklistItem(progressId, txnId) {
     renderPendingSteps();
     renderSituation(S.hubData);
     if (document.getElementById('txnModal').classList.contains('open')) openTxnModal(txnId);
-    alert("Couldn't mark that complete: " + e.message);
+    alert((next === 'pending' ? "Couldn't mark that incomplete: " : "Couldn't mark that complete: ") + e.message);
   }
 }
 
