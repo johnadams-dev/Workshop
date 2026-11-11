@@ -199,7 +199,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <span class="topbar-title">Feedback &amp; Support</span>
     </div>
     <div class="topbar-right">
-      <a class="topbar-guide" href="./staff-guide.html#feedback">Guide</a>
+      <a class="topbar-guide" id="guideLink" href="./workshop-guide.html#feedback-tool">Guide</a>
       <a class="topbar-link" href="./index.html">← Tools</a>
       <span class="topbar-user" id="topbar-user"></span>
     </div>
@@ -391,6 +391,8 @@ async function init() {
   }
 
   try { const me = await GET('/lockbox/me'); userRole = me?.role || 'unknown'; } catch {}
+  // Guide: agents get the general Workshop guide; staff and managers the staff guide
+  if (userRole === 'staff' || userRole === 'manager') document.getElementById('guideLink').href = './staff-guide.html#feedback';
 
   loadBrowse();
   loadLeaderboard();
