@@ -167,7 +167,7 @@
       <div class="grid" style="margin-top:12px">
         <div><label for="a-totalPct">Total commission (%)</label><input type="number" id="a-totalPct" data-answer="totalPct" min="0" max="20" step="0.25" value="6"><div class="hint">Everything the seller pays, including the buyer's broker's share.</div></div>
         <div><label for="a-totalFlat">Plus ($)</label><input type="number" id="a-totalFlat" data-answer="totalFlat" min="0" step="50" value="250"></div>
-        <div><label for="a-buyerPct">Buyer's broker gets (%)</label><input type="number" id="a-buyerPct" data-answer="buyerPct" min="0" max="20" step="0.25" placeholder="3"><div class="hint">Part of the total, not added to it. Enter 0 if no compensation is offered.</div></div>
+        <div><label for="a-buyerPct">Buyer's broker gets (%)</label><input type="number" id="a-buyerPct" data-answer="buyerPct" min="0" max="20" step="0.25" value="3"><div class="hint">Part of the total, not added to it. Starts at 3% or half the total, whichever is less. Enter 0 if no compensation is offered.</div></div>
       </div>
       <div class="breakdown" id="breakdown" hidden><div class="line" id="bdLine"></div><div class="dollars" id="bdDollars"></div></div>
       <div class="notes" id="commissionNotes"></div>
@@ -324,8 +324,18 @@
   }
 
   // ── Inputs ──
+  // The buyer's broker's share starts at 3% or half the total, whichever is less (John
+  // Adams, 2026-11-12), and follows the total until the agent enters their own.
+  let buyerPctOwn = false;
+  function defaultBuyerPct() {
+    if (buyerPctOwn) return;
+    const total = Number($("a-totalPct").value);
+    $("a-buyerPct").value = Number.isFinite(total) && total > 0 ? String(Math.round(Math.min(3, total / 2) * 100) / 100) : "";
+  }
   document.addEventListener("input", (e) => {
     const t = e.target;
+    if (t.id === "a-buyerPct") buyerPctOwn = t.value.trim() !== "";
+    if (t.id === "a-totalPct") defaultBuyerPct();
     if (t.dataset.fact) {
       const v = t.value.trim();
       if (v === "") delete state.facts[t.dataset.fact];

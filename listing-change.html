@@ -46,6 +46,10 @@
   .note.warn { background: var(--gold-lt); border-left-color: var(--gold); }
   .note.error { background: var(--red-lt); border-left-color: var(--red); }
   [hidden] { display: none !important; }
+  .wait { margin: 0 0 14px; padding: 16px 18px; border-radius: 10px; background: var(--navy); color: #fff; border-left: 6px solid var(--gold); }
+  .wait .big { font-size: 19px; font-weight: 800; letter-spacing: .01em; }
+  .wait p { font-size: 14px; line-height: 1.5; margin-top: 6px; color: rgba(255,255,255,.9); }
+  .wait p b { color: var(--gold); }
   #signin .gbtn { margin-top: 12px; }
 
   /* The agent's listings */
@@ -162,6 +166,12 @@
     <!-- Progress -->
     <div class="card" id="runCard" hidden>
       <h2>Form Simplicity: <span id="runTitle"></span></h2>
+      <!-- Agents left for Form Simplicity part way through (John Adams, 2026-11-12) -->
+      <div class="wait" id="runWait" role="status" hidden>
+        <div class="big">This takes several minutes.</div>
+        <p>You can watch the progress here, or close this page: I'll email you<span id="runWaitText"></span> when it's done.</p>
+        <p><b>Please don't open the transaction in Form Simplicity until then.</b> The form is still being added and filled in.</p>
+      </div>
       <p class="sub" id="runStatus"></p>
       <ul class="steps" id="runSteps"></ul>
       <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
@@ -318,10 +328,12 @@
     $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the form over before sending it.</li>` : "";
     const stuck = r.status === "running" && Date.now() - new Date(r.updated_at).getTime() > 45 * 60 * 1000;
     $("runRetry").hidden = $("runRetryHint").hidden = !(r.status === "failed" || stuck);
+    $("runWait").hidden = !(r.status === "queued" || r.status === "running") || stuck;
+    $("runWaitText").textContent = r.willText ? " and text you" : "";
     if (stuck) { $("runStatus").textContent = "This seems to have stalled. Try again to pick it up."; return; }
     if (r.status === "done") $("runStatus").textContent = "All done. The form is on the transaction in Form Simplicity, filled in and ready for the seller to sign. We've emailed you the link too.";
     else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. John Adams has been told, or use Try again.`;
-    else { $("runStatus").textContent = "Adding and filling the form. This usually takes a few minutes; you can leave this page and we'll email you when it's ready."; pollTimer = setTimeout(poll, 5000); }
+    else { $("runStatus").textContent = r.status === "queued" ? "Starting up…" : "Adding and filling in the form…"; pollTimer = setTimeout(poll, 5000); }
   }
   $("runRetry").addEventListener("click", async () => {
     $("runRetry").disabled = true;

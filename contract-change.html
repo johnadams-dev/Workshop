@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Change a Contract | John Adams Real Estate Tools</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<script src="needed-panel.js"></script>
+<style>
+  /* Same family as listing-change.html */
+  :root {
+    --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
+    --red:#C0392B; --red-lt:#FBEDEB; --green:#1A7A4C; --green-lt:#E8F4EE;
+    --bg:#F4F6F9; --surface:#FFFFFF; --border:#DDE1E9; --text:#1A1D23; --muted:#6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--navy); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 50px; border-bottom: 3px solid var(--gold); }
+  .topbar-logo { color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; margin-left: 12px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.2); }
+  .topbar a { font-size: 12px; color: rgba(255,255,255,.55); text-decoration: none; letter-spacing: .03em; }
+  .content { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; color: var(--navy); margin-bottom: 4px; }
+  .lede { font-size: 14px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; color: var(--navy); margin-bottom: 12px; display: flex; gap: 8px; align-items: baseline; }
+  .card h2 .step { font-size: 11px; font-weight: 800; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; }
+  .card .sub { font-size: 13px; color: var(--muted); margin: -6px 0 12px; line-height: 1.45; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=date], input[type=number], input[type=search], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+  }
+  textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block; }
+  .btn:hover { background: var(--blue); }
+  .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 260px; }
+  .msg { font-size: 13px; margin-top: 10px; line-height: 1.45; }
+  .msg.err { color: var(--red); }
+  .notes { margin-top: 12px; display: grid; gap: 6px; }
+  .note { font-size: 13px; line-height: 1.45; padding: 8px 12px; border-radius: 6px; background: var(--bg); border-left: 4px solid var(--border); }
+  .note.warn { background: var(--gold-lt); border-left-color: var(--gold); }
+  .note.error { background: var(--red-lt); border-left-color: var(--red); }
+  [hidden] { display: none !important; }
+  .wait { margin: 0 0 14px; padding: 16px 18px; border-radius: 10px; background: var(--navy); color: #fff; border-left: 6px solid var(--gold); }
+  .wait .big { font-size: 19px; font-weight: 800; letter-spacing: .01em; }
+  .wait p { font-size: 14px; line-height: 1.5; margin-top: 6px; color: rgba(255,255,255,.9); }
+  .wait p b { color: var(--gold); }
+  #signin .gbtn { margin-top: 12px; }
+
+  /* The agent's transactions */
+  .txns { display: grid; gap: 8px; max-height: 420px; overflow: auto; margin-top: 10px; padding: 2px; }
+  .txn { text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; cursor: pointer; font-family: inherit; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+  .txn:hover { border-color: var(--blue); }
+  .txn.on { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); background: var(--gold-lt); }
+  .txn strong { font-size: 14px; color: var(--navy); }
+  .txn .meta { font-size: 12px; color: var(--muted); }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; align-self: start; }
+  .badge.uc { background: var(--green-lt); color: var(--green); }
+  .badge.no { background: var(--bg); color: var(--muted); }
+  .showall { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 8px; font-weight: 400; }
+  dl.terms { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 14px; margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: var(--bg); }
+  dl.terms dt { color: var(--muted); }
+  dl.terms dd { font-variant-numeric: tabular-nums; }
+  .eff { margin-top: 12px; max-width: 280px; }
+  @media (max-width: 600px) { dl.terms { grid-template-columns: 1fr; } dl.terms dd { margin-bottom: 6px; } .txn { grid-template-columns: 1fr; } }
+
+  /* What's changing */
+  .changes { display: grid; gap: 10px; }
+  .chg { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .chg.on { border-color: var(--navy); background: var(--gold-lt); }
+  .chg > label.pick { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 600; color: var(--text); margin: 0; cursor: pointer; }
+  .chg > label.pick input { margin-top: 3px; width: 16px; height: 16px; }
+  .chg .pick span { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .chg .more { margin: 10px 0 0 26px; display: grid; gap: 10px; }
+  .chg .more .narrow { max-width: 280px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: #fff; border: 0; padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: inherit; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--navy); color: #fff; }
+
+  /* Forms and summary */
+  ul.plain { list-style: none; font-size: 14px; display: grid; gap: 6px; }
+  ul.plain li::before { content: "•"; color: var(--gold); font-weight: 800; margin-right: 8px; }
+  .missing { margin-top: 12px; font-size: 13px; }
+  .missing li { margin-left: 18px; line-height: 1.6; }
+  ul.steps { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
+  ul.steps li { padding: 4px 0; border-bottom: 1px solid #e5e7eb; }
+  ul.steps li.ok { color: #166534; }
+  ul.steps li.bad { color: #b91c1c; }
+  ul.steps .why { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center">
+    <span class="topbar-logo">Adams Cameron</span>
+    <span class="topbar-title">Change a Contract</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="./index.html">&#8592; Tools</a>
+    <a href="./shirley.html">&#8592; Shirley</a>
+    <a href="./feedback.html?tool=contract-change">Feedback</a>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Change a Contract</h1>
+  <p class="lede">Extending the closing date or the inspection period goes on the Extension Addendum to Contract; a seller credit (or other terms) goes on the Addendum to Contract. Pick the deal's transaction in Form Simplicity, say what's changing, and we add the form to that transaction and fill it in for the buyers and sellers to sign.</p>
+
+  <div class="card" id="signin" hidden>
+    <h2>Sign in</h2>
+    <p class="hint">Sign in with your Adams Cameron Google account.</p>
+    <div class="gbtn" id="g-signin-btn"></div>
+  </div>
+
+  <div id="app" hidden>
+    <div class="card" id="whoCard" hidden>
+      <div class="row" id="pickRow" hidden>
+        <div class="grow"><label for="agentPick">Preparing this for</label><select id="agentPick"></select></div>
+      </div>
+      <div id="fsNote"></div>
+    </div>
+
+    <!-- 1. Which contract -->
+    <div class="card" id="txnCard">
+      <h2><span class="step">Step 1</span> Which contract?</h2>
+      <p class="sub">Your purchases and listings in Form Simplicity. Those under contract in Daily Desk are listed first.</p>
+      <input type="search" id="txnFilter" placeholder="Search by address, buyer or seller" autocomplete="off" aria-label="Search your transactions">
+      <label class="showall" id="showAllBox" hidden><input type="checkbox" id="showAll"> Show transactions that aren't under contract in Daily Desk too</label>
+      <div class="txns" id="txnList" role="listbox" aria-label="Your transactions"><div class="hint">Loading your transactions…</div></div>
+      <dl class="terms" id="txnFacts" hidden></dl>
+      <div class="eff" id="effBox" hidden><label for="effDate">Contract's effective date</label><input type="date" id="effDate"><div class="hint" id="effHint"></div></div>
+    </div>
+
+    <!-- 2. What's changing -->
+    <div class="card" id="changeCard" hidden>
+      <h2><span class="step">Step 2</span> What's changing?</h2>
+      <p class="sub">Choose one or more. Both extensions go on one Extension Addendum; a credit goes on an Addendum to Contract.</p>
+      <div class="changes" id="changeList">
+        <div class="chg" data-kind="closing">
+          <label class="pick"><input type="checkbox" value="closing"><div>Extend the closing date<span id="closeNow">The new closing date</span></div></label>
+          <div class="more" hidden><div class="narrow"><label for="c-closing">New closing date</label><input type="date" id="c-closing"></div></div>
+        </div>
+        <div class="chg" data-kind="inspection">
+          <label class="pick"><input type="checkbox" value="inspection"><div>Extend the inspection period<span id="inspNow">Until a date, or for a number of extra days</span></div></label>
+          <div class="more" hidden>
+            <div class="seg" role="group" aria-label="How the extension is given"><button type="button" data-insp="date" class="on">Until a date</button><button type="button" data-insp="days">Extra days</button></div>
+            <div class="narrow" id="inspDateBox"><label for="c-inspection">Inspection period ends</label><input type="date" id="c-inspection"></div>
+            <div class="narrow" id="inspDaysBox" hidden><label for="c-inspection-days">Additional days</label><input type="number" id="c-inspection-days" min="1" max="365" step="1"></div>
+          </div>
+        </div>
+        <div class="chg" data-kind="credit">
+          <label class="pick"><input type="checkbox" value="credit"><div>Seller credit, or other terms<span>For a credit after the inspection. You can change the wording, for a repair for example.</span></div></label>
+          <div class="more" hidden>
+            <div class="row">
+              <div style="flex:0 1 200px"><label for="c-credit">Credit amount</label><input type="text" id="c-credit" inputmode="decimal" placeholder="$" autocomplete="off"></div>
+              <div style="flex:0 1 140px"><label for="c-addno">Addendum No. <span style="font-weight:400">(optional)</span></label><input type="text" id="c-addno" maxlength="6" autocomplete="off"></div>
+            </div>
+            <div><label for="c-credit-text">Terms on the Addendum to Contract</label><textarea id="c-credit-text" maxlength="2000"></textarea>
+              <div class="hint">Typed for you from the amount; edit it as needed.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. The paperwork -->
+    <div class="card" id="planCard" hidden>
+      <h2><span class="step">Step 3</span> The paperwork</h2>
+      <ul class="plain" id="summary"></ul>
+      <div class="notes" id="planNotes"></div>
+      <div style="margin-top:14px"><label>Forms we'll add and fill</label><ul class="plain" id="formsList"></ul></div>
+      <div class="missing" id="missingBox" hidden><strong>Still needed:</strong><ul id="missingList"></ul></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" type="button" id="createBtn" disabled>Add to Form Simplicity</button>
+      </div>
+      <div class="msg" id="createMsg"></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" id="runCard" hidden>
+      <h2>Form Simplicity: <span id="runTitle"></span></h2>
+      <div class="wait" id="runWait" role="status" hidden>
+        <div class="big">This takes several minutes.</div>
+        <p>You can watch the progress here, or close this page: I'll email you<span id="runWaitText"></span> when it's done.</p>
+        <p><b>Please don't open the transaction in Form Simplicity until then.</b> The form is still being added and filled in.</p>
+      </div>
+      <p class="sub" id="runStatus"></p>
+      <ul class="steps" id="runSteps"></ul>
+      <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
+        <button class="btn" type="button" id="runRetry" hidden>Try again</button>
+        <span class="hint" id="runRetryHint" hidden>Runs again on the same transaction.</span>
+        <a class="btn" href="contract-change.html">Change another contract</a></div>
+      <div class="missing" id="runLeft" hidden><strong>Check before sending:</strong><ul id="runLeftList"></ul></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const longDate = (s) => { if (!s) return "—"; const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", day: "numeric", year: "numeric" }); };
+  const shortDate = (s) => { if (!s) return ""; const [y, m, d] = s.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" }); };
+  const noteHtml = (level, text) => `<div class="note ${level}">${esc(text)}</div>`;
+  const state = { agentId: undefined, txns: [], txn: null, today: null, inspBy: "date", creditOwn: false };
+
+  // John Adams, 2026-11-12: the credit sentence, typed for the agent
+  const creditText = (amount) => `Seller agrees to provide a credit to Buyer at closing in the amount of ${amount || "$x"} toward Buyer's prepaids and closing costs.`;
+  const fmtMoney = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return Number.isFinite(n) && n > 0 ? "$" + n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }) : ""; };
+
+  // ── Step 1: the agent's transactions ──
+  async function loadTxns() {
+    $("txnList").innerHTML = '<div class="hint">Loading your transactions…</div>';
+    state.txn = null; $("txnFacts").hidden = true; $("effBox").hidden = true; $("changeCard").hidden = true; $("planCard").hidden = true;
+    try {
+      const r = await Auth.api("/contract-change/transactions" + (state.agentId ? `?agentId=${encodeURIComponent(state.agentId)}` : ""));
+      state.txns = r.transactions || []; state.today = r.today;
+      const anyUc = state.txns.some((t) => t.underContract);
+      $("showAllBox").hidden = !anyUc || state.txns.every((t) => t.underContract);
+      $("showAll").checked = !anyUc;
+      renderTxns();
+      const want = new URLSearchParams(location.search).get("transId");
+      if (want && state.txns.some((t) => t.transId === want)) { $("showAll").checked = true; renderTxns(); pickTxn(want); }
+    } catch (e) { $("txnList").innerHTML = noteHtml("error", e.message); }
+    showNeeded();
+  }
+  function renderTxns() {
+    const f = $("txnFilter").value.trim().toLowerCase();
+    const all = $("showAll").checked;
+    const list = state.txns.filter((t) => (all || t.underContract) && (!f || `${t.transName} ${t.address} ${(t.sellers || []).join(" ")} ${(t.buyers || []).join(" ")}`.toLowerCase().includes(f)));
+    $("txnList").innerHTML = list.length ? list.map((t) => `<button type="button" class="txn${state.txn && state.txn.transId === t.transId ? " on" : ""}" data-id="${esc(t.transId)}" role="option" aria-selected="${state.txn && state.txn.transId === t.transId}">
+        <strong>${esc(t.transName)}</strong>${t.underContract ? `<span class="badge uc">Under contract${t.deal.closeDate ? ` · closes ${esc(shortDate(t.deal.closeDate))}` : ""}</span>` : '<span class="badge no">Not under contract in Daily Desk</span>'}
+        <span class="meta">${esc(t.address || "")}</span><span class="meta">${esc(t.type || "")}</span></button>`).join("")
+      : `<div class="hint">${state.txns.length ? (f ? "Nothing matches that." : "None under contract in Daily Desk. Tick the box above to see all your transactions.") : "No purchase or listing transactions in Form Simplicity for this agent."}</div>`;
+  }
+  $("txnFilter").addEventListener("input", renderTxns);
+  $("showAll").addEventListener("change", renderTxns);
+  $("txnList").addEventListener("click", (e) => { const b = e.target.closest(".txn"); if (b) pickTxn(b.dataset.id); });
+  function pickTxn(id) {
+    state.txn = state.txns.find((t) => t.transId === id) || null;
+    renderTxns();
+    if (!state.txn) return;
+    const t = state.txn, d = t.deal || {};
+    $("txnFacts").innerHTML = `<dt>Transaction</dt><dd>${esc(t.transName)}</dd><dt>Property</dt><dd>${esc(t.address || "—")}</dd>
+      <dt>Buyer${(t.buyers || []).length > 1 ? "s" : ""}</dt><dd>${esc((t.buyers || []).join(", ") || "—")}</dd>
+      <dt>Seller${(t.sellers || []).length > 1 ? "s" : ""}</dt><dd>${esc((t.sellers || []).join(", ") || "—")}</dd>
+      <dt>Closing date</dt><dd>${esc(longDate(d.closeDate))}</dd>
+      <dt>Inspection period ends</dt><dd>${d.inspectionEnd ? esc(longDate(d.inspectionEnd)) : "Not in Daily Desk"}</dd>`;
+    $("txnFacts").hidden = false;
+    $("effDate").value = d.effectiveDate || "";
+    $("effHint").textContent = d.effectiveDate ? "From Daily Desk. Change it if the contract says otherwise." : "Not in Daily Desk: enter it from the contract.";
+    $("effBox").hidden = false; $("changeCard").hidden = false;
+    $("closeNow").textContent = d.closeDate ? `Now ${longDate(d.closeDate)}` : "The new closing date";
+    $("inspNow").textContent = d.inspectionEnd ? `Now ends ${longDate(d.inspectionEnd)}. Until a date, or for a number of extra days` : "Until a date, or for a number of extra days";
+    replan();
+  }
+  $("effDate").addEventListener("input", () => replanSoon());
+
+  // ── Step 2: what's changing ──
+  const boxes = () => [...document.querySelectorAll("#changeList input[type=checkbox]")];
+  $("changeList").addEventListener("change", (e) => {
+    const cb = e.target.closest("input[type=checkbox]");
+    if (cb) {
+      const card = cb.closest(".chg"); card.classList.toggle("on", cb.checked); card.querySelector(".more").hidden = !cb.checked;
+      if (cb.checked && cb.value === "credit" && !$("c-credit-text").value) $("c-credit-text").value = creditText(fmtMoney($("c-credit").value));
+      if (cb.checked) { const i = card.querySelector(".more input"); if (i && !i.value) i.focus(); }
+    }
+    replanSoon();
+  });
+  $("changeList").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-insp]");
+    if (!b) return;
+    state.inspBy = b.dataset.insp;
+    document.querySelectorAll("button[data-insp]").forEach((x) => x.classList.toggle("on", x === b));
+    $("inspDateBox").hidden = state.inspBy !== "date"; $("inspDaysBox").hidden = state.inspBy !== "days";
+    replanSoon();
+  });
+  $("changeList").addEventListener("input", (e) => {
+    if (e.target.id === "c-credit-text") state.creditOwn = true;
+    // The pretyped sentence follows the amount until the agent edits it
+    if (e.target.id === "c-credit" && !state.creditOwn) $("c-credit-text").value = creditText(fmtMoney(e.target.value));
+    if (!e.target.matches("input[type=checkbox]")) replanSoon();
+  });
+  function changes() {
+    const out = {};
+    for (const o of boxes()) if (o.checked) {
+      if (o.value === "closing") out.closing = { date: $("c-closing").value };
+      if (o.value === "inspection") out.inspection = state.inspBy === "days" ? { days: $("c-inspection-days").value } : { date: $("c-inspection").value };
+      if (o.value === "credit") { out.credit = { amount: $("c-credit").value, text: $("c-credit-text").value }; if ($("c-addno").value.trim()) out.addendumNo = $("c-addno").value.trim(); }
+    }
+    if ($("effDate").value) out.effectiveDate = $("effDate").value;
+    return out;
+  }
+  const anyChange = () => boxes().some((o) => o.checked);
+
+  // ── Step 3: the paperwork ──
+  const FORM_NAMES = { ea4: "Extension Addendum to Contract (EA-4)", acsp4: "Addendum to Contract (ACSP-4)" };
+  let timer = null, seq = 0;
+  function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
+  async function replan() {
+    if (!state.txn) return showNeeded();
+    if (!anyChange()) { $("planCard").hidden = true; state.plan = null; return showNeeded(); }
+    const my = ++seq;
+    try {
+      const r = await Auth.api("/contract-change/plan", { body: { agentId: state.agentId, transId: state.txn.transId, changes: changes() } });
+      if (my !== seq) return;
+      state.plan = r.plan;
+      const p = r.plan;
+      $("summary").innerHTML = p.summary.length ? p.summary.map((s) => `<li>${esc(s)}</li>`).join("") : '<li>Fill in the change above.</li>';
+      $("planNotes").innerHTML = [...p.warnings.map((w) => noteHtml("warn", w)), ...p.notes.map((n) => noteHtml("", n))].join("");
+      $("formsList").innerHTML = p.forms.length ? p.forms.map((f) => `<li>${esc(FORM_NAMES[f.key] || f.title)}</li>`).join("") : "<li>None yet</li>";
+      $("missingBox").hidden = !p.missing.length;
+      $("missingList").innerHTML = p.missing.map((m) => `<li>${esc(m.label)}</li>`).join("");
+      $("createBtn").disabled = !p.ready;
+      $("planCard").hidden = false;
+      showNeeded();
+    } catch (e) { if (my === seq) { $("planCard").hidden = false; $("planNotes").innerHTML = noteHtml("error", e.message); $("createBtn").disabled = true; } }
+  }
+
+  // The "Still needed" panel (needed-panel.js)
+  const NEED_ALIASES = { transaction: "#txnFilter", changes: "#changeList", effectiveDate: "#effDate", "closing.date": "#c-closing", "inspection.date": "#c-inspection", "credit.text": "#c-credit-text", "credit.amount": "#c-credit" };
+  function showNeeded() {
+    if (!window.NeededPanel) return;
+    if (state.runId) return NeededPanel.update([], { show: false });
+    const items = !state.txn ? [{ key: "transaction", label: "Choose the contract" }]
+      : !state.plan ? [{ key: "changes", label: "Choose what's changing" }]
+      : state.plan.missing;
+    NeededPanel.update(items, { ready: !!(state.plan && state.plan.ready), createLabel: "Add to Form Simplicity", aliases: NEED_ALIASES,
+      onCreate: () => { if (!$("createBtn").disabled) $("createBtn").click(); } });
+  }
+
+  // ── Create, then follow the robot (runs are shared with Prepare a Listing) ──
+  $("createBtn").addEventListener("click", async () => {
+    $("createBtn").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Starting…";
+    try {
+      const r = await Auth.api("/contract-change/create", { body: { agentId: state.agentId, transId: state.txn.transId, changes: changes() } });
+      startFollowing(r.runId);
+    } catch (e) {
+      $("createMsg").className = "msg err"; $("createMsg").textContent = e.message;
+      if (e.data && e.data.runId) startFollowing(e.data.runId); else $("createBtn").disabled = false;
+    }
+  });
+  const STEP_NAMES = { "sign in": "Signed in to Form Simplicity", "switch user": "Switched to your account", "find the transaction": "Found the transaction" };
+  let pollTimer = null;
+  function startFollowing(runId) {
+    state.runId = runId;
+    if (window.NeededPanel) NeededPanel.update([], { show: false });
+    for (const c of document.querySelectorAll("#app > .card")) if (c.id !== "runCard") c.hidden = true;
+    $("runCard").hidden = false;
+    history.replaceState(null, "", "?run=" + encodeURIComponent(runId));
+    poll();
+  }
+  async function poll() {
+    clearTimeout(pollTimer);
+    let r;
+    try { r = await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId)); }
+    catch (e) { $("runStatus").textContent = e.status === 404 ? "We couldn't find that run." : "Checking again in a moment…"; if (e.status !== 404) pollTimer = setTimeout(poll, 8000); return; }
+    $("runTitle").textContent = r.fs_trans_name || r.address || "";
+    $("runOpen").hidden = !(r.fs_url && (r.status === "done" || r.status === "failed"));
+    if (r.fs_url) $("runOpen").href = r.fs_url;
+    $("runSteps").innerHTML = (r.steps || []).map((s) => `<li class="${s.ok ? "ok" : "bad"}">${s.ok ? "✓" : "✗"} ${esc(STEP_NAMES[s.step] || s.step[0].toUpperCase() + s.step.slice(1))}${!s.ok && s.detail ? ` <span class="why">— ${esc(s.detail)}</span>` : ""}</li>`).join("");
+    const left = (r.result?.skipped || []).length;
+    $("runLeft").hidden = !left;
+    $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the form over before sending it.</li>` : "";
+    const stuck = r.status === "running" && Date.now() - new Date(r.updated_at).getTime() > 45 * 60 * 1000;
+    $("runRetry").hidden = $("runRetryHint").hidden = !(r.status === "failed" || stuck);
+    $("runWait").hidden = !(r.status === "queued" || r.status === "running") || stuck;
+    $("runWaitText").textContent = r.willText ? " and text you" : "";
+    if (stuck) { $("runStatus").textContent = "This seems to have stalled. Try again to pick it up."; return; }
+    if (r.status === "done") $("runStatus").textContent = "All done. The form is on the transaction in Form Simplicity, filled in and ready for the buyers and sellers to sign. We've emailed you the link too.";
+    else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. John Adams has been told, or use Try again.`;
+    else { $("runStatus").textContent = r.status === "queued" ? "Starting up…" : "Adding and filling in the form…"; pollTimer = setTimeout(poll, 5000); }
+  }
+  $("runRetry").addEventListener("click", async () => {
+    $("runRetry").disabled = true;
+    try {
+      await Auth.api("/listing-prep/runs/" + encodeURIComponent(state.runId) + "/retry", { method: "POST", body: {} });
+      $("runRetry").hidden = $("runRetryHint").hidden = true; $("runStatus").textContent = "Starting again…"; setTimeout(poll, 3000);
+    } catch (e) { $("runStatus").textContent = e.message; }
+    finally { $("runRetry").disabled = false; }
+  });
+
+  // Whose contract (same rule as Prepare a Listing), then their transactions
+  async function loadStart(agentId) {
+    try {
+      const r = await Auth.api("/listing-prep/start" + (agentId ? `?agentId=${encodeURIComponent(agentId)}` : ""));
+      state.agentId = r.agent && !r.self ? r.agent.id : undefined;
+      if (r.agents && r.agents.length) {
+        $("agentPick").innerHTML = r.agents.map((x) => `<option value="${x.id}"${r.agent && x.id === r.agent.id ? " selected" : ""}>${esc(x.name)}</option>`).join("");
+        if (!r.agent) $("agentPick").insertAdjacentHTML("afterbegin", '<option value="" selected>Choose the agent…</option>');
+        $("pickRow").hidden = false;
+      }
+      $("fsNote").innerHTML = !r.agent ? noteHtml("warn", "Choose whose contract this is.") : r.fsConnected ? "" : noteHtml("error", r.fsMessage);
+      $("whoCard").hidden = $("pickRow").hidden && !$("fsNote").innerHTML;
+      if (r.agent && r.fsConnected) loadTxns();
+      else { $("txnList").innerHTML = `<div class="hint">${r.agent ? "Connect Form Simplicity first (see above)." : "Choose the agent first."}</div>`; showNeeded(); }
+    } catch (e) { $("fsNote").innerHTML = noteHtml("error", e.message); $("whoCard").hidden = false; }
+  }
+  $("agentPick").addEventListener("change", (e) => { if (e.target.value) loadStart(e.target.value); });
+
+  window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+
+  Auth.ready({ tool: "Change a Contract", button: $("g-signin-btn"), onSignInNeeded: () => ($("signin").hidden = false) })
+    .then(() => {
+      $("signin").hidden = true; $("app").hidden = false;
+      for (const el of document.querySelectorAll("#changeList input, #changeList textarea, #effDate")) { if (el.type === "checkbox") el.checked = false; else el.value = ""; }
+      const q = new URLSearchParams(location.search);
+      if (q.get("run")) return startFollowing(q.get("run"));
+      loadStart(q.get("agentId"));
+    });
+})();
+</script>
+</body>
+</html>
