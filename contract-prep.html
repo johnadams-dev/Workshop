@@ -9,6 +9,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
 <script src="needed-panel.js"></script>
+<script src="property-picker.js"></script>
 <style>
   :root {
     --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C; --gold-lt:#FDF6E3;
@@ -82,6 +83,10 @@
   ul.steps li.bad { color: #b91c1c; }
   ul.steps .why { color: var(--muted); }
   [hidden] { display: none !important; }
+  .wait { margin: 0 0 14px; padding: 16px 18px; border-radius: 10px; background: var(--navy); color: #fff; border-left: 6px solid var(--gold); }
+  .wait .big { font-size: 19px; font-weight: 800; letter-spacing: .01em; }
+  .wait p { font-size: 14px; line-height: 1.5; margin-top: 6px; color: rgba(255,255,255,.9); }
+  .wait p b { color: var(--gold); }
   #signin .gbtn { margin-top: 12px; }
   @media (max-width: 600px) { .breakdown .line { font-size: 16px; } }
   .modes { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -149,6 +154,7 @@
         <button class="btn" id="lookupBtn" type="button">Look up</button>
       </div>
       <div class="msg" id="lookupMsg" role="status"></div>
+      <div id="pickBox"></div>
       <div id="factsBox" hidden>
         <div class="listing" id="listingBox" hidden></div>
         <div class="grid" style="margin-top:14px">
@@ -215,6 +221,12 @@
     <!-- Progress -->
     <div class="card" id="runCard" hidden>
       <h2>Form Simplicity: <span id="runTitle"></span></h2>
+      <!-- Agents left for Form Simplicity part way through (John Adams, 2026-11-12) -->
+      <div class="wait" id="runWait" role="status" hidden>
+        <div class="big">This takes about 10 to 15 minutes.</div>
+        <p>You can watch the progress here, or close this page: I'll email you<span id="runWaitText"></span> when it's done.</p>
+        <p><b>Please don't open the transaction in Form Simplicity until then.</b> The forms are still being added and filled in.</p>
+      </div>
       <p class="sub" id="runStatus"></p>
       <ul class="steps" id="runSteps"></ul>
       <div class="row" style="margin-top:12px"><a class="btn" id="runOpen" target="_blank" rel="noopener" hidden>Open in Form Simplicity</a>
@@ -267,12 +279,33 @@
     $("runCard").hidden = true; $("createMsg").textContent = "";
     if (/[?&]run=/.test(location.search)) history.replaceState(null, "", location.pathname);
   }
-  async function lookup() {
+  // The agent confirms the parcel (or picks it) before anything is filled in (John Adams,
+  // 2026-11-12: 2301 S Atlantic #320 came back as #321 with no way to change it).
+  // property-picker.js.
+  async function lookup(extra = {}) {
     const mlsNumber = $("mls").value.trim(), address = $("addr").value.trim();
     if (!mlsNumber && !address) { $("lookupMsg").textContent = "Enter the MLS number or the address."; return; }
     $("lookupBtn").disabled = true; $("lookupMsg").className = "msg"; $("lookupMsg").textContent = "Looking it up in the MLS and county records…";
+    $("factsBox").hidden = true; setMode(state.mode || "offer");
     try {
-      const r = await Auth.api("/contract-prep/lookup", { body: mlsNumber ? { mlsNumber, unit: $("unit").value.trim() } : { address, unit: $("unit").value.trim() } });
+      const r = await Auth.api("/contract-prep/lookup", { body: { ...(mlsNumber ? { mlsNumber } : { address }), unit: $("unit").value.trim(), ...extra } });
+      $("lookupMsg").textContent = "";
+      if (extra.choice) return apply(r, r.chosen); // picked from the list: that's the confirmation
+      PropertyPicker.show($("pickBox"), r, {
+        onPick: (c) => lookup({ choice: { county: c.county, key: c.key } }),
+        onConfirm: () => apply(r, r.chosen),
+        onChange: () => lookup({ listAll: true }),
+        onManual: () => apply(r, null),
+      });
+    } catch (e) {
+      PropertyPicker.clear($("pickBox"));
+      $("lookupMsg").className = "msg err"; $("lookupMsg").textContent = e.message;
+    } finally { $("lookupBtn").disabled = false; }
+  }
+  function apply(r, chosen) {
+    PropertyPicker.confirmed($("pickBox"), chosen, { onChange: () => lookup({ listAll: true }) });
+    if (chosen && chosen.unit) $("unit").value = chosen.unit;
+    {
       newDeal();
       state.facts = { ...r.facts }; state.sources = r.sources || {}; state.listing = r.listing;
       for (const el of document.querySelectorAll("[data-fact]")) el.value = state.facts[el.dataset.fact] ?? "";
@@ -287,12 +320,10 @@
       $("factsBox").hidden = false;
       renderDocs();
       setMode("offer");
-    } catch (e) {
-      $("lookupMsg").className = "msg err"; $("lookupMsg").textContent = e.message;
-    } finally { $("lookupBtn").disabled = false; }
+    }
   }
-  $("lookupBtn").addEventListener("click", lookup);
-  for (const id of ["mls", "addr"]) $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
+  $("lookupBtn").addEventListener("click", () => lookup());
+  for (const id of ["mls", "addr", "unit"]) $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
 
   function showListing(l, others) {
     $("listingBox").hidden = !l;
@@ -486,10 +517,12 @@
     $("runLeftList").innerHTML = left ? `<li>${left} blank${left === 1 ? "" : "s"} couldn't be filled automatically. Look the forms over before sending them.</li>` : "";
     const stuck = r.status === "running" && Date.now() - new Date(r.updated_at).getTime() > 45 * 60 * 1000;
     $("runRetry").hidden = $("runRetryHint").hidden = !(r.status === "failed" || stuck);
+    $("runWait").hidden = !(r.status === "queued" || r.status === "running") || stuck;
+    $("runWaitText").textContent = r.willText ? " and text you" : "";
     if (stuck) { $("runStatus").textContent = "This seems to have stalled. Try again to pick up where it left off."; return; }
     if (r.status === "done") $("runStatus").textContent = "All done. The transaction and its forms are ready in Form Simplicity. We've emailed you the link too.";
     else if (r.status === "failed") $("runStatus").textContent = `It stopped before finishing: ${r.error || "something went wrong"}. What's checked above is done; John Adams has been told, or use Try again.`;
-    else { $("runStatus").textContent = "Adding and filling the forms. This usually takes 10 to 15 minutes; you can leave this page and we'll email you when it's ready."; pollTimer = setTimeout(poll, 5000); }
+    else { $("runStatus").textContent = r.status === "queued" ? "Starting up…" : "Adding and filling in the forms…"; pollTimer = setTimeout(poll, 5000); }
   }
   $("runRetry").addEventListener("click", async () => {
     $("runRetry").disabled = true;
