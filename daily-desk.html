@@ -6172,7 +6172,7 @@ async function startTracking(deltaListingId) {
   if (row.possible_match) {
     const label = possibleMatchLabel(row.possible_match);
     if (confirm(`This looks like a listing that's already in Daily Desk:\n\n${label}\n\n`
-        + `It's probably the same property on the other MLS board. OK links this DeltaNet listing to that deal (recommended). Cancel for other options.`)) {
+        + `It's probably the same property in the other MLS. OK links this DeltaNet listing to that deal (recommended). Cancel for other options.`)) {
       return linkToPossibleMatch(deltaListingId, true);
     }
     if (!confirm(`Create a separate, second record for ${row.address} anyway?\n\nOnly do this if it really is a different listing from:\n${label}`)) return;
@@ -8096,12 +8096,18 @@ function vtRenderTable() {
                 && (o.address || '').trim().toLowerCase() === (r.address || '').trim().toLowerCase()
                 && (o.city || '').trim().toLowerCase() === (r.city || '').trim().toLowerCase())
             : [];
+          // The tour each board's MLS actually links to (its vtour_url), not the tour
+          // we'd recommend (cs_tour_id, the same for every board of the property):
+          // showing that made two boards linking #241 and #547 both read "other
+          // board: #547" (50 Palm Harbor Pkwy #32, John Adams, 2026-11-13).
+          const linkedTour = (o) => {
+            const id = (/camerons-stage-view\.html\?(?:.*&)?id=(\d+)/.exec(o.vtour_url || '') || [])[1];
+            return id ? `<a href="${escapeHtml(o.vtour_url)}" target="_blank" rel="noopener">#${escapeHtml(id)}</a>` : escapeHtml(o.provider_label || 'none');
+          };
           const mismatchNote = r.tour_mismatch
-            ? `<div class="td-muted" style="color:var(--red);margin-top:2px;">⚠ Boards disagree${
-                siblings.length ? ' — other board: ' + siblings.map(s => s.cs_tour_url
-                  ? `<a href="${escapeHtml(s.cs_tour_url)}" target="_blank" rel="noopener">#${escapeHtml(String(s.cs_tour_id))}</a>`
-                  : escapeHtml(s.provider_label)).join(', ') : ''
-              }</div>`
+            ? `<div class="td-muted" style="color:var(--red);margin-top:2px;">⚠ The MLSs disagree: this MLS links to ${linkedTour(r)}${
+                siblings.length ? ' · other MLS: ' + siblings.map(s => `${linkedTour(s)} (${escapeHtml(s.mls_id || '')})`).join(', ') : ''
+              }${r.cs_tour_id ? ` · paste #${escapeHtml(String(r.cs_tour_id))} into every MLS` : ''}</div>`
             : '';
           return `
           <tr>
