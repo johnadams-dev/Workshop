@@ -309,6 +309,20 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   if (t.represents_buyer && coopCommAdj != null)         { gci += coopCommAdj;        hasAnyComm = true; }
   if (!hasAnyComm) gci = null;
 
+  // Commission Amount (John Adams, 2026-11-13): the commission Adams, Cameron & Co.
+  // receives, NOT including NSC -- the List Side if we represent the seller, the
+  // Buy Side if we represent the buyer, net of any concession. However the closing
+  // agent splits the checks, this is the commission part of them; NSC is shown
+  // apart, one line per side, never added to it or to each other.
+  let commissionAmount = null;
+  if (t.represents_seller && listingSideCommAdj != null) commissionAmount = (commissionAmount || 0) + listingSideCommAdj;
+  if (t.represents_buyer && coopCommAdj != null)         commissionAmount = (commissionAmount || 0) + coopCommAdj;
+  const sideRate = (v) => commissionDisplay(v, t.commission_type);
+  const listRate = (t.commission_rate != null && t.cooperating_commission != null)
+    ? commissionDisplay(Math.round((Number(t.commission_rate) - Number(t.cooperating_commission)) * 10000) / 10000, t.commission_type) : '';
+  const sideCell = (rate, amt, ours) => [rate, amt != null ? fmtMoney(amt) : null].filter(Boolean).join(' — ')
+    + (amt != null || rate ? ` <span style="font-size:8pt;color:#555;">(${ours ? 'Adams, Cameron &amp; Co.' : 'other brokerage'})</span>` : '');
+
   // The pledging agent's OWN side of the actual commission split, for
   // Foundation percentage pledges -- deliberately EXCLUDES NSC. NSC is a
   // flat administrative/technology fee, not commission earned as a
@@ -353,11 +367,10 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
 
     <table>
       <tr><td class="label">Property Address</td><td class="val" colspan="3">${fullAddress(t.property_address, t.city, t.state, t.zip)}</td></tr>
-      ${row2('Sale Price', fmtMoney(salePrice), 'Commission', commissionDisplay(t.commission_rate, t.commission_type))}
-      ${row2('Commission Check Amount', fmtMoney(totalComm), 'Non-Shared Commission', [
-        listingNsc != null ? `${fmtMoney(listingNsc)} (Listing)` : null,
-        buyerNsc != null ? `${fmtMoney(buyerNsc)} (Buyer)` : null,
-      ].filter(Boolean).join(' / '))}
+      ${row2('Sale Price', fmtMoney(salePrice), 'Total Commission', [commissionDisplay(t.commission_rate, t.commission_type), totalComm != null ? fmtMoney(totalComm) : null].filter(Boolean).join(' — '))}
+      <tr><td class="label">Commission Amount</td><td class="val" colspan="3"><b>${fmtMoney(commissionAmount)}</b> <span style="font-size:8pt;color:#555;">received by Adams, Cameron &amp; Co., not including NSC${(sellerAdjTotal && t.represents_seller) || (buyerAdjTotal && t.represents_buyer) ? ', after concessions' : ''}</span></td></tr>
+      ${row2('List Side Commission', sideCell(listRate, listingSideComm, t.represents_seller), 'Buy Side Commission', sideCell(sideRate(t.cooperating_commission), coopComm, t.represents_buyer))}
+      ${row2('NSC — List Side', listingNsc != null ? fmtMoney(listingNsc) : '—', 'NSC — Buy Side', buyerNsc != null ? fmtMoney(buyerNsc) : '—')}
     </table>
 
     <div class="section-head">Closing Information</div>
@@ -385,34 +398,39 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
     ${referralBlock('Listing Side', listingRefs, listingSideCommAdj, coopCommAdj)}
     ${referralBlock('Buyer Side', buyerRefs, listingSideCommAdj, coopCommAdj)}
 
-    <div class="section-head">Commission Summary</div>
+    <div class="section-head">Commission Summary — retained by Adams, Cameron &amp; Co.</div>
     <table class="disbursement-table">
-      <tr>
-        <td>Total Commission (${commissionDisplay(t.commission_rate, t.commission_type) || '&nbsp;'})</td>
-        <td class="amt">${fmtMoney(totalComm)}</td>
+      ${t.represents_seller ? `<tr>
+        <td>List Side Commission (${listRate || '&nbsp;'})</td>
+        <td class="amt">${fmtMoney(listingSideComm)}</td>
         <td style="width:50%">&nbsp;</td>
-      </tr>
-      <tr>
-        <td>Co-Op Commission (${commissionDisplay(t.cooperating_commission, t.commission_type) || '&nbsp;'})</td>
+      </tr>` : ''}
+      ${t.represents_seller ? adjustmentRows(sellerAdjustments, 'List Side') : ''}
+      ${t.represents_buyer ? `<tr>
+        <td>Buy Side Commission (${sideRate(t.cooperating_commission) || '&nbsp;'})</td>
         <td class="amt">${fmtMoney(coopComm)}</td>
-        <td style="font-size:8pt; color:#555;">${t.represents_buyer ? "Retained — our buyer-side commission" : "Paid to buyer's brokerage"}</td>
+        <td style="width:50%">&nbsp;</td>
+      </tr>` : ''}
+      ${t.represents_buyer ? adjustmentRows(buyerAdjustments, 'Buy Side') : ''}
+      <tr style="font-weight:700;">
+        <td>Commission Amount</td>
+        <td class="amt">${fmtMoney(commissionAmount)}</td>
+        <td style="font-size:8pt; color:#555; font-weight:400;">Not including NSC</td>
       </tr>
-      ${adjustmentRows(sellerAdjustments, 'Listing')}
-      ${adjustmentRows(buyerAdjustments, 'Buyer')}
       ${listingNsc != null ? `<tr>
-        <td>Non-Shared Commission (Listing)</td>
+        <td>NSC — List Side</td>
         <td class="amt">${fmtMoney(listingNsc)}</td>
         <td>&nbsp;</td>
       </tr>` : ''}
       ${buyerNsc != null ? `<tr>
-        <td>Non-Shared Commission (Buyer)</td>
+        <td>NSC — Buy Side</td>
         <td class="amt">${fmtMoney(buyerNsc)}</td>
         <td>&nbsp;</td>
       </tr>` : ''}
       <tr class="total-row">
         <td>Gross Commission Income (GCI)</td>
         <td class="amt">${fmtMoney(gci)}</td>
-        <td>&nbsp;</td>
+        <td style="font-size:8pt; color:#555; font-weight:400;">Commission Amount plus NSC</td>
       </tr>
       ${foundationTotal > 0 ? `<tr style="background:#fdf3d8">
         <td>🌱 Foundation Contribution — ${foundationParticipants.map(([a]) => agentName(a)).join(', ')}</td>

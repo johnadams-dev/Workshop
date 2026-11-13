@@ -42,7 +42,7 @@
 const WORKSHOP_RESOURCES = [
 
   { kind: "workshop", slug: "floor-time", name: "Floor Time", url: "./floor-time.html", icon: "📅",
-    description: "Manage floor duty scheduling — configure shifts, set agent eligibility, collect availability, and publish monthly schedules to Google Calendar.",
+    description: "Manage floor time scheduling — configure shifts, set agent eligibility, collect availability, and publish monthly schedules to Google Calendar.",
     feedbackGroup: "Find New Prospects", hubSidebarCategory: "Find New Prospects" },
   { kind: "workshop", slug: "hold-open-house", name: "Hold an Open House", url: "./hold-open-house.html", icon: "🏠",
     description: "Reserve an open house on another agent's listing and get a dated plan — social posts, signage, neighbor outreach and follow-up, with reminders on your Google Calendar. Market to your sphere and meet new prospects.",
