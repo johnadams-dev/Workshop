@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B3A5C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sign Jobs">
+<title>Sign Jobs — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+/* Sign Manager — the installer's queue. Phone first: one column, big type,
+   big buttons, nothing that needs zooming. Backed by sign-manager-routes.js. */
+:root {
+  --navy:#1B3A5C; --gold:#C9A84C; --bg:#F1F3F6; --surface:#fff; --border:#D7DCE3;
+  --text:#14171C; --muted:#5B6472;
+  --install:#15803D; --install-bg:#ECFDF3;
+  --remove:#B91C1C;  --remove-bg:#FEF2F2;
+  --repair:#B45309;  --repair-bg:#FFF7E8;
+  --flag:#6D28D9;    --flag-bg:#F5F0FF;
+  --note-bg:#FFF4C2; --note-border:#E8C547;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:17px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:#1D5FA8}
+
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy);padding:16px}
+.signin-card{background:#fff;border-radius:14px;padding:32px 24px;text-align:center;max-width:360px;width:100%}
+.signin-card h2{color:var(--navy);margin:10px 0 6px;font-size:22px}
+.signin-card p{color:var(--muted);font-size:15px;margin-bottom:20px}
+.signin-google{display:flex;justify-content:center}
+
+/* Header */
+.top{background:var(--navy);color:#fff;position:sticky;top:0;z-index:20;padding:10px 16px calc(10px);padding-top:max(10px, env(safe-area-inset-top));border-bottom:3px solid var(--gold)}
+.top-row{display:flex;align-items:center;gap:10px}
+.top h1{font-size:19px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top a{color:rgba(255,255,255,.75);font-size:14px;text-decoration:none;white-space:nowrap}
+.icon-btn{background:rgba(255,255,255,.12);border:none;color:#fff;border-radius:10px;min-width:44px;height:44px;font-size:20px;cursor:pointer}
+.tabs{display:flex;gap:8px;margin-top:10px}
+.tabs button{flex:1;height:44px;border-radius:10px;border:none;background:rgba(255,255,255,.12);color:#fff;font-weight:600;font-size:16px;cursor:pointer}
+.tabs button.on{background:#fff;color:var(--navy)}
+
+.wrap{max-width:640px;margin:0 auto;padding:12px 12px 120px}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.bar .count{flex:1;font-size:15px;color:var(--muted)}
+.btn{min-height:48px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-weight:600;font-size:16px;padding:0 16px;cursor:pointer}
+.btn:active{transform:scale(.98)}
+.btn-filter.active{border-color:var(--navy);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
+
+/* Filters */
+.filters{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;display:none}
+.filters.show{display:block}
+.f-group{margin-bottom:12px}
+.f-group:last-child{margin-bottom:0}
+.f-label{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--border);background:#fff;font-size:15px;font-weight:600;cursor:pointer}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.f-select{width:100%;min-height:48px;border:1px solid var(--border);border-radius:12px;padding:0 12px;background:#fff;font-size:16px}
+.f-clear{margin-top:12px;width:100%}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-left:7px solid var(--muted);border-radius:14px;padding:14px 14px 12px;margin-bottom:12px}
+.card.install{border-left-color:var(--install)}
+.card.remove{border-left-color:var(--remove)}
+.card.repair{border-left-color:var(--repair)}
+.card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.type{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:8px;padding:4px 10px}
+.type.install{background:var(--install-bg);color:var(--install)}
+.type.remove{background:var(--remove-bg);color:var(--remove)}
+.type.repair{background:var(--repair-bg);color:var(--repair)}
+.age{font-size:14px;color:var(--muted);margin-left:auto}
+.addr{display:block;font-size:21px;font-weight:700;line-height:1.25;text-decoration:none;color:#0F4C8A}
+.addr .pin{font-size:17px}
+.city{font-size:15px;color:var(--muted);margin-top:2px}
+.flag{background:var(--flag-bg);color:var(--flag);border-radius:10px;padding:8px 10px;font-size:15px;font-weight:600;margin:10px 0 0}
+.access{background:var(--note-bg);border:1px solid var(--note-border);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:16px;white-space:pre-wrap}
+.access b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.facts{margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:16px}
+.facts dt{color:var(--muted);font-size:14px;padding-top:2px}
+.facts dd{font-weight:600;word-break:break-word}
+.agent-sign{color:var(--remove)}
+.comments{margin-top:10px;font-size:16px;white-space:pre-wrap;border-top:1px dashed var(--border);padding-top:8px}
+.contact{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.call{flex:1;min-width:150px;display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;border-radius:12px;border:1px solid var(--border);text-decoration:none;color:var(--navy);font-weight:600;font-size:16px;background:#F7F9FC}
+.plan{display:flex;align-items:center;gap:8px;margin-top:10px}
+.plan button{min-height:44px;border-radius:22px;border:1px dashed #9AA3AF;background:#fff;padding:0 14px;font-size:15px;font-weight:600;cursor:pointer}
+.plan button.set{border-style:solid;border-color:var(--navy);background:#EEF3FA;color:var(--navy)}
+.actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.done-btn{min-height:56px;border-radius:12px;border:none;color:#fff;font-size:18px;font-weight:700;cursor:pointer}
+.done-btn.install{background:var(--install)}
+.done-btn.remove{background:var(--remove)}
+.done-btn.repair{background:var(--repair)}
+.cant-btn{min-height:48px;border-radius:12px;border:1px solid var(--border);background:#fff;font-size:16px;font-weight:600;color:var(--flag);cursor:pointer}
+.small{font-size:14px;color:var(--muted);margin-top:8px}
+.completed-note{font-size:15px;margin-top:8px}
+
+.empty,.loading,.denied{background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:32px 16px;text-align:center;color:var(--muted)}
+.denied{border-style:solid;color:#991B1B;background:#FEF2F2;border-color:#FECACA}
+
+/* Bottom sheet dialogs */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:50}
+.sheet-bg.show{display:flex}
+.sheet{background:#fff;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:20px 16px;padding-bottom:max(20px, env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.sheet h2{font-size:21px;line-height:1.3;margin-bottom:6px}
+.sheet p{color:var(--muted);font-size:15px;margin-bottom:12px}
+.sheet textarea,.sheet input[type=text]{width:100%;border:1px solid var(--border);border-radius:12px;padding:12px;font-size:17px;margin-bottom:12px}
+.sheet textarea{min-height:90px;resize:vertical}
+.sheet .chips{margin-bottom:12px}
+.sheet-actions{display:flex;gap:10px}
+.sheet-actions button{flex:1;min-height:56px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer}
+.sheet-cancel{background:#fff;border:1px solid var(--border)}
+.sheet-ok{border:none;background:var(--navy);color:#fff}
+.sheet-ok.install{background:var(--install)} .sheet-ok.remove{background:var(--remove)} .sheet-ok.repair{background:var(--repair)} .sheet-ok.flag{background:var(--flag)}
+.sheet-ok:disabled{opacity:.5}
+
+.toast{position:fixed;left:50%;bottom:max(20px, env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:12px;font-size:16px;opacity:0;transition:opacity .2s;z-index:60;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1}
+.toast.err{background:#B91C1C}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="signin-card">
+    <div style="font-size:40px">🪧</div>
+    <h2>Sign Jobs</h2>
+    <p>Sign in with your Adams Cameron Google account.</p>
+    <div class="signin-google"><div id="g-signin-btn"></div></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <header class="top">
+    <div class="top-row">
+      <h1>🪧 Sign Jobs</h1>
+      <a href="./feedback.html?tool=sign-manager">Feedback</a>
+      <a href="./index.html">← Tools</a>
+      <button class="icon-btn" id="refresh-btn" aria-label="Refresh" onclick="load(true)">↻</button>
+    </div>
+    <div class="tabs">
+      <button id="tab-open" class="on" onclick="setView('open')">Open</button>
+      <button id="tab-done" onclick="setView('done')">Done recently</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="denied" class="denied" style="display:none">This page is for the sign installer and office staff. Ask an admin to add you in Sign Manager → Settings.</div>
+    <div id="content">
+      <div class="bar" id="open-bar">
+        <span class="count" id="count"></span>
+        <button class="btn btn-filter" id="filter-btn" onclick="toggleFilters()">Filter</button>
+      </div>
+      <div class="filters" id="filters"></div>
+      <div id="list"><div class="loading">Loading…</div></div>
+    </div>
+  </main>
+
+  <!-- Confirm (done / undo) -->
+  <div class="sheet-bg" id="confirm-sheet" onclick="if(event.target===this)closeSheets()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-sub"></p>
+      <textarea id="confirm-notes" placeholder="Field notes (optional)"></textarea>
+      <div class="sheet-actions">
+        <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+        <button class="sheet-ok" id="confirm-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Can't complete -->
+  <div class="sheet-bg" id="cant-sheet" onclick="if(event.target===this)closeSheets()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cant-title">
+      <h2 id="cant-title">Can't complete</h2>
+      <p>The job stays on your list and the office sees why.</p>
+      <div class="chips" id="cant-reasons"></div>
+      <textarea id="cant-notes" placeholder="Anything else the office should know (optional)"></textarea>
+      <div class="sheet-actions">
+        <button class="sheet-cancel" onclick="closeSheets()">Cancel</button>
+        <button class="sheet-ok flag" id="cant-ok" disabled>Send to office</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planned day -->
+  <div class="sheet-bg" id="plan-sheet" onclick="if(event.target===this)closeSheets()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="plan-title">
+      <h2 id="plan-title">When will you do it?</h2>
+      <p id="plan-sub"></p>
+      <div class="chips" id="plan-choices"></div>
+      <input type="text" id="plan-text" maxlength="60" placeholder="Or type a day or note">
+      <div class="sheet-actions">
+        <button class="sheet-cancel" onclick="savePlan('')">Clear</button>
+        <button class="sheet-ok" onclick="savePlan(document.getElementById('plan-text').value)">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const TYPE = {
+  install: { label: 'Install', done: 'Mark Installed', verb: 'installed' },
+  remove:  { label: 'Remove',  done: 'Mark Removed',   verb: 'removed' },
+  repair:  { label: 'Repair',  done: 'Mark Repaired',  verb: 'repaired' },
+};
+const PLAN_PRESETS = ['Today', 'Tomorrow', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Next DeLand trip', 'Next Palm Coast trip', "Hold for agent's sign"];
+const FILTER_KEY = 'sign_installer_filters';
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+const S = { view: 'open', open: [], done: [], lookups: null, filters: { type: [], planned: [], city: '', office: '', signType: '' }, sheetFor: null, cantReason: '' };
+try { Object.assign(S.filters, JSON.parse(localStorage.getItem(FILTER_KEY) || '{}')); } catch {}
+
+Auth.ready({ tool: 'Sign Manager — Installer', button: document.getElementById('g-signin-btn') }).then(async () => {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  try {
+    const me = await Auth.api('/signs/me');
+    if (!me.installer && !me.staff) return denied();
+    S.lookups = await Auth.api('/signs/lookups');
+  } catch (e) { return e.status === 403 ? denied() : toast(e.message, true); }
+  await load();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+  setInterval(() => { if (document.visibilityState === 'visible' && !openSheet()) load(); }, 5 * 60e3);
+});
+
+function denied() {
+  document.getElementById('denied').style.display = 'block';
+  document.getElementById('content').style.display = 'none';
+}
+
+async function load(showSpinner) {
+  if (showSpinner) document.getElementById('refresh-btn').textContent = '…';
+  try {
+    const [open, done] = await Promise.all([Auth.api('/signs/requests?view=queue'), Auth.api('/signs/requests?view=recent')]);
+    S.open = open; S.done = done;
+    render();
+  } catch (e) {
+    if (e.status === 403) return denied();
+    toast('Could not load: ' + e.message, true);
+  } finally {
+    document.getElementById('refresh-btn').textContent = '↻';
+  }
+}
+
+function setView(v) {
+  S.view = v;
+  document.getElementById('tab-open').classList.toggle('on', v === 'open');
+  document.getElementById('tab-done').classList.toggle('on', v === 'done');
+  document.getElementById('filter-btn').style.display = v === 'open' ? '' : 'none';
+  if (v !== 'open') document.getElementById('filters').classList.remove('show');
+  render();
+  window.scrollTo(0, 0);
+}
+
+/* ── Filters ── */
+function toggleFilters() { document.getElementById('filters').classList.toggle('show'); renderFilters(); }
+function saveFilters() { try { localStorage.setItem(FILTER_KEY, JSON.stringify(S.filters)); } catch {} }
+function toggleChip(key, value) {
+  const list = S.filters[key];
+  const i = list.indexOf(value);
+  i >= 0 ? list.splice(i, 1) : list.push(value);
+  saveFilters(); render();
+}
+function setSelect(key, value) { S.filters[key] = value; saveFilters(); render(); }
+function clearFilters() { S.filters = { type: [], planned: [], city: '', office: '', signType: '' }; saveFilters(); render(); }
+function filtersActive() { const f = S.filters; return f.type.length || f.planned.length || f.city || f.office || f.signType; }
+
+function renderFilters() {
+  const el = document.getElementById('filters');
+  if (!el.classList.contains('show')) return;
+  const f = S.filters;
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const cities = uniq(S.open.map(r => r.city));
+  const offices = uniq(S.open.map(r => r.office_name));
+  const types = uniq(S.open.map(r => r.sign_type || r.current_sign_type));
+  const planned = uniq(S.open.map(r => r.planned_day));
+  const chip = (key, v, label) => `<button class="chip ${f[key].includes(v) ? 'on' : ''}" onclick="toggleChip('${key}', ${attrJs(v)})">${esc(label)}</button>`;
+  const select = (key, label, values) => `<div class="f-group"><div class="f-label">${label}</div>
+      <select class="f-select" onchange="setSelect('${key}', this.value)"><option value="">All</option>
+      ${values.map(v => `<option ${f[key] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></div>`;
+  el.innerHTML = `
+    <div class="f-group"><div class="f-label">Job</div><div class="chips">${['install', 'remove', 'repair'].map(t => chip('type', t, TYPE[t].label)).join('')}</div></div>
+    <div class="f-group"><div class="f-label">Planned day</div><div class="chips">${chip('planned', '(none)', 'Not planned')}${planned.map(p => chip('planned', p, p)).join('')}</div></div>
+    ${select('city', 'City', cities)}${select('office', 'Office', offices)}${select('signType', 'Sign type', types)}
+    <button class="btn f-clear" onclick="clearFilters()">Clear filters</button>`;
+}
+
+function applyFilters(rows) {
+  const f = S.filters;
+  return rows.filter(r =>
+    (!f.type.length || f.type.includes(r.request_type)) &&
+    (!f.planned.length || f.planned.includes(r.planned_day || '(none)')) &&
+    (!f.city || r.city === f.city) &&
+    (!f.office || r.office_name === f.office) &&
+    (!f.signType || (r.sign_type || r.current_sign_type) === f.signType));
+}
+
+/* ── Render ── */
+function render() {
+  const list = document.getElementById('list');
+  document.getElementById('filter-btn').classList.toggle('active', !!filtersActive());
+  document.getElementById('filter-btn').textContent = filtersActive() ? 'Filter ●' : 'Filter';
+  document.getElementById('tab-open').textContent = `Open (${S.open.length})`;
+  if (S.view === 'open') {
+    renderFilters();
+    const rows = applyFilters(S.open);
+    document.getElementById('count').textContent = filtersActive() ? `${rows.length} of ${S.open.length} jobs` : `${S.open.length} job${S.open.length === 1 ? '' : 's'}, oldest first`;
+    list.innerHTML = rows.length ? rows.map(openCard).join('') :
+      `<div class="empty">${S.open.length ? 'No jobs match these filters.' : 'Nothing waiting. 🎉'}</div>`;
+  } else {
+    document.getElementById('count').textContent = 'Last 7 days, newest first';
+    list.innerHTML = S.done.length ? S.done.map(doneCard).join('') : '<div class="empty">Nothing marked done in the last 7 days.</div>';
+  }
+}
+
+function signFacts(r) {
+  const signType = r.sign_type || r.current_sign_type;
+  const riders = (r.riders && r.riders.length ? r.riders : r.request_type !== 'install' ? r.current_riders : null) || [];
+  const ownership = r.ownership || r.current_ownership;
+  const location = r.agent_sign_location || r.current_agent_sign_location;
+  const rows = [];
+  if (signType) rows.push(['Sign', esc(signType)]);
+  if (riders.length) rows.push([r.request_type === 'repair' ? 'Riders after' : 'Riders', esc(riders.join(', '))]);
+  if (ownership === 'agent') rows.push(['Whose', `<span class="agent-sign">Agent's own sign${location ? ` — ${r.request_type === 'remove' ? 'leave at' : 'pick up at'}: ${esc(location)}` : ''}</span>`]);
+  else if (ownership === 'company') rows.push(['Whose', 'Company sign']);
+  if (r.sign_phone) rows.push(['Sign #', esc(fmtPhone(r.sign_phone))]);
+  if (r.mls_number) rows.push(['MLS', esc(r.mls_number)]);
+  if (r.office_name) rows.push(['Office', esc(r.office_name)]);
+  return rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';
+}
+
+function addressBlock(r) {
+  const full = [r.address, r.city, 'FL', r.zip].filter(Boolean).join(', ');
+  const url = IS_IOS ? `https://maps.apple.com/?q=${encodeURIComponent(full)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}`;
+  return `<a class="addr" href="${url}" target="_blank" rel="noopener"><span class="pin">📍</span> ${esc(r.address || 'No address')}</a>
+    <div class="city">${esc([r.city, r.zip].filter(Boolean).join(' '))}${r.listing_status_label ? ` · ${esc(r.listing_status_label)}` : ''}</div>`;
+}
+
+function openCard(r) {
+  const t = TYPE[r.request_type];
+  const agentCall = r.agent_cell ? `<a class="call" href="tel:${telDigits(r.agent_cell)}">📞 ${esc(r.agent_name || 'Agent')} · ${esc(fmtPhone(r.agent_cell))}</a>` :
+    (r.agent_name ? `<span class="small">Agent: ${esc(r.agent_name)}</span>` : '');
+  return `
+  <article class="card ${r.request_type}">
+    <div class="card-top"><span class="type ${r.request_type}">${t.label}</span><span class="age">${ageText(r.requested_at)}</span></div>
+    ${addressBlock(r)}
+    ${r.status === 'cannot_complete' ? `<div class="flag">⚠ Can't complete: ${esc(r.cannot_complete_reason)}<br><span style="font-weight:400">Waiting on the office.</span></div>` : ''}
+    ${r.access_notes ? `<div class="access"><b>Access</b>${esc(r.access_notes)}</div>` : ''}
+    ${signFacts(r)}
+    ${r.comments ? `<div class="comments">💬 ${esc(r.comments)}</div>` : ''}
+    ${r.directions ? `<div class="comments">🧭 ${esc(r.directions)}</div>` : ''}
+    <div class="contact">${agentCall}</div>
+    <div class="plan"><button class="${r.planned_day ? 'set' : ''}" onclick="openPlan(${r.id})">📅 ${esc(r.planned_day || 'Plan a day')}</button></div>
+    <div class="actions">
+      <button class="done-btn ${r.request_type}" onclick="openConfirm(${r.id})">✓ ${t.done}</button>
+      ${r.status === 'cannot_complete' ? '' : `<button class="cant-btn" onclick="openCant(${r.id})">Can't complete</button>`}
+    </div>
+    <div class="small">Requested ${fmtDate(r.requested_at)}${r.requested_by_name ? ` by ${esc(r.requested_by_name)}` : ''}</div>
+  </article>`;
+}
+
+function doneCard(r) {
+  const t = TYPE[r.request_type];
+  return `
+  <article class="card ${r.request_type}">
+    <div class="card-top"><span class="type ${r.request_type}">${t.label}</span><span class="age">Done ${fmtDateTime(r.completed_at)}</span></div>
+    ${addressBlock(r)}
+    ${r.completion_notes ? `<div class="completed-note">📝 ${esc(r.completion_notes)}</div>` : ''}
+    ${r.can_undo ? `<div class="actions"><button class="cant-btn" style="color:var(--text)" onclick="openUndo(${r.id})">↩ Undo — not done yet</button></div>`
+                 : '<div class="small">Too long ago to undo here. Ask the office for a new request.</div>'}
+  </article>`;
+}
+
+/* ── Sheets ── */
+const find = (id) => S.open.find(r => r.id === id) || S.done.find(r => r.id === id);
+function openSheet() { return document.querySelector('.sheet-bg.show'); }
+function closeSheets() { document.querySelectorAll('.sheet-bg').forEach(s => s.classList.remove('show')); S.sheetFor = null; }
+
+function openConfirm(id) {
+  const r = find(id); if (!r) return;
+  S.sheetFor = id;
+  document.getElementById('confirm-title').textContent = `Confirm sign ${TYPE[r.request_type].verb} at ${r.address}?`;
+  document.getElementById('confirm-sub').textContent = r.city || '';
+  const notes = document.getElementById('confirm-notes');
+  notes.style.display = ''; notes.value = '';
+  const ok = document.getElementById('confirm-ok');
+  ok.className = `sheet-ok ${r.request_type}`; ok.textContent = 'Confirm';
+  ok.onclick = () => act(id, 'complete', { notes: notes.value }, `Marked ${TYPE[r.request_type].verb}`);
+  document.getElementById('confirm-sheet').classList.add('show');
+}
+
+function openUndo(id) {
+  const r = find(id); if (!r) return;
+  S.sheetFor = id;
+  document.getElementById('confirm-title').textContent = `Undo: the ${TYPE[r.request_type].label.toLowerCase()} at ${r.address} isn't done?`;
+  document.getElementById('confirm-sub').textContent = 'It goes back on your open list.';
+  document.getElementById('confirm-notes').style.display = 'none';
+  const ok = document.getElementById('confirm-ok');
+  ok.className = 'sheet-ok'; ok.textContent = 'Undo';
+  ok.onclick = () => act(id, 'undo', {}, 'Back on your list');
+  document.getElementById('confirm-sheet').classList.add('show');
+}
+
+function openCant(id) {
+  const r = find(id); if (!r) return;
+  S.sheetFor = id; S.cantReason = '';
+  document.getElementById('cant-title').textContent = `Can't complete: ${r.address}`;
+  document.getElementById('cant-notes').value = '';
+  const reasons = (S.lookups && S.lookups.cannotCompleteReasons) || [];
+  document.getElementById('cant-reasons').innerHTML = [...reasons, 'Other'].map(x =>
+    `<button class="chip" onclick="pickReason(this, ${attrJs(x)})">${esc(x)}</button>`).join('');
+  const ok = document.getElementById('cant-ok');
+  ok.disabled = true;
+  ok.onclick = () => {
+    const notes = document.getElementById('cant-notes').value.trim();
+    const reason = S.cantReason === 'Other' ? '' : S.cantReason;
+    if (!reason && !notes) return toast('Say what the problem is.', true);
+    act(id, 'cannot-complete', { reason, notes }, 'Sent to the office');
+  };
+  document.getElementById('cant-sheet').classList.add('show');
+}
+function pickReason(btn, reason) {
+  S.cantReason = reason;
+  document.querySelectorAll('#cant-reasons .chip').forEach(c => c.classList.toggle('on', c === btn));
+  document.getElementById('cant-ok').disabled = false;
+  if (reason === 'Other') document.getElementById('cant-notes').focus();
+}
+
+function openPlan(id) {
+  const r = find(id); if (!r) return;
+  S.sheetFor = id;
+  document.getElementById('plan-sub').textContent = r.address;
+  document.getElementById('plan-text').value = r.planned_day || '';
+  const used = [...new Set(S.open.map(x => x.planned_day).filter(Boolean))];
+  const choices = [...new Set([...PLAN_PRESETS, ...used])];
+  document.getElementById('plan-choices').innerHTML = choices.map(c =>
+    `<button class="chip ${c === r.planned_day ? 'on' : ''}" onclick="savePlan(${attrJs(c)})">${esc(c)}</button>`).join('');
+  document.getElementById('plan-sheet').classList.add('show');
+}
+async function savePlan(value) {
+  const id = S.sheetFor; if (!id) return;
+  try {
+    const out = await Auth.api(`/signs/requests/${id}/planned-day`, { method: 'PATCH', body: { planned_day: value } });
+    const r = S.open.find(x => x.id === id); if (r) r.planned_day = out.planned_day;
+    closeSheets(); render();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function act(id, action, body, okMsg) {
+  const btns = document.querySelectorAll('.sheet-ok');
+  btns.forEach(b => b.disabled = true);
+  try {
+    await Auth.api(`/signs/requests/${id}/${action}`, { method: 'POST', body });
+    closeSheets();
+    toast(okMsg);
+    await load();
+  } catch (e) {
+    toast(e.message, true);
+    await load();
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+/* ── Util ── */
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function attrJs(v) { return esc(JSON.stringify(v)); }
+function telDigits(p) { const d = String(p).replace(/[^\d+]/g, ''); return d; }
+function fmtPhone(p) {
+  const d = String(p || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : String(p || '');
+}
+function fmtDate(iso) { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
+function fmtDateTime(iso) { return new Date(iso).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+function ageText(iso) {
+  const d = Math.floor((Date.now() - new Date(iso)) / 86400e3);
+  return d <= 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d} days ago`;
+}
+function toast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.toggle('err', !!isErr); t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

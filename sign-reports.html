@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign Reports — Adams Cameron</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="auth.js"></script>
+<style>
+/* Sign Manager reports for managers: signs out in the field, stale signs,
+   waiting requests, turnaround, volume and problems. GET /signs/reports;
+   every table downloads as CSV. sign-manager-routes.js. */
+:root {
+  --navy:#1B3A5C; --blue:#2E75B6; --gold:#C9A84C;
+  --bg:#F4F6F9; --surface:#fff; --border:#DDE1E9;
+  --text:#1A1D23; --muted:#6B7280; --red:#DC2626;
+  --install:#15803D; --remove:#B91C1C; --repair:#B45309; --flag:#6D28D9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+button,input,select{font:inherit;color:inherit}
+
+#auth-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--navy)}
+.signin-card{background:#fff;border-radius:12px;padding:40px 48px;text-align:center;max-width:380px;width:90%}
+.signin-card h2{font-size:20px;color:var(--navy);margin:10px 0 8px}
+.signin-card p{font-size:13px;color:var(--muted);margin-bottom:24px}
+.signin-google{display:flex;justify-content:center}
+
+.topbar{background:var(--navy);border-bottom:3px solid var(--gold);min-height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:100;gap:10px}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.topbar-logo{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px}
+.topbar-sep{color:rgba(255,255,255,.3)}
+.topbar-title{color:#fff;font-size:15px;font-weight:500;white-space:nowrap}
+.topbar-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+.topbar-link{font-size:12px;color:rgba(255,255,255,.65);text-decoration:none;white-space:nowrap}
+.topbar-link:hover{color:#fff}
+
+.main{max-width:1180px;margin:20px auto;padding:0 16px 80px}
+h1{font-size:20px;color:var(--navy);margin-bottom:4px}
+.intro{font-size:13px;color:var(--muted);margin-bottom:14px;max-width:720px}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+.control{display:flex;flex-direction:column;gap:3px}
+.control label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.control select,.control input{padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:#fff}
+.grow{flex:1}
+.btn{border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--navy)}
+.btn-sm{padding:3px 9px;font-size:12px}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.tile .n{font-size:26px;font-weight:700;color:var(--navy);line-height:1.1}
+.tile .l{font-size:12px;color:var(--muted)}
+.tile.warn .n{color:var(--red)}
+
+section{margin-bottom:22px}
+.section-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.section-sub{font-size:12.5px;color:var(--muted);margin:-4px 0 8px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:0}
+.panel-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.panel-title{font-weight:700;color:var(--navy);font-size:13.5px;flex:1}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #F0F2F5;vertical-align:top}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.total td{font-weight:700;border-top:1px solid var(--border)}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:6px;padding:1px 7px;text-transform:uppercase}
+.tag.install{background:#ECFDF3;color:var(--install)} .tag.remove{background:#FEF2F2;color:var(--remove)} .tag.repair{background:#FFF7E8;color:var(--repair)}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);font-size:13px;padding:6px 0}
+.loading,.err{padding:28px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px}
+.err{color:#991B1B;background:#FEF2F2;border:1px solid #FECACA}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<div id="auth-gate">
+  <div class="signin-card">
+    <div style="font-size:36px">📊</div>
+    <h2>Sign Reports</h2>
+    <p>Sign in with your Adams Cameron Google account.</p>
+    <div class="signin-google"><div id="g-signin-btn"></div></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-logo">ACC</span><span class="topbar-sep">/</span><span class="topbar-title">Sign Reports</span></div>
+    <div class="topbar-right">
+      <a class="topbar-link" href="./sign-manager.html">Sign Manager</a>
+      <a class="topbar-link" href="./sign-installer.html">Installer's list</a>
+      <a class="topbar-link" href="./feedback.html?tool=sign-manager">Feedback</a>
+      <a class="topbar-link" href="./index.html">← Tools</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <h1>Sign Reports</h1>
+    <p class="intro">Yard signs out in the field, signs on listings that are no longer active, and how requests are moving. Every table downloads as a spreadsheet (CSV).</p>
+    <div class="controls">
+      <div class="control"><label for="months">Turnaround, volume &amp; problems over</label>
+        <select id="months" onchange="load()"><option value="3">3 months</option><option value="6">6 months</option><option value="12" selected>12 months</option><option value="24">24 months</option><option value="60">5 years</option><option value="72">Since 2021</option></select></div>
+      <div class="control"><label for="aging">Waiting longer than</label>
+        <select id="aging" onchange="load()"><option value="3">3 days</option><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select></div>
+      <span class="grow"></span>
+      <div class="control"><label for="csv-from">All requests from</label><input type="date" id="csv-from"></div>
+      <div class="control"><label for="csv-to">to</label><input type="date" id="csv-to"></div>
+      <button class="btn" onclick="downloadAll()">⬇ Download requests</button>
+    </div>
+    <div id="out"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<script>
+const TYPES = { install: 'Install', remove: 'Remove', repair: 'Repair' };
+const TABLES = {};   // id -> { columns: [[header, fn]], rows }
+let DATA = null;
+
+Auth.ready({ tool: 'Sign Manager — Reports', button: document.getElementById('g-signin-btn') }).then(async () => {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const y = new Date(); document.getElementById('csv-from').value = `${y.getFullYear()}-01-01`;
+  load();
+});
+
+async function load() {
+  const out = document.getElementById('out');
+  out.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    DATA = await Auth.api(`/signs/reports?months=${document.getElementById('months').value}&aging_days=${document.getElementById('aging').value}`);
+  } catch (e) {
+    out.innerHTML = `<div class="err">${e.status === 403 ? 'Sign reports are for managers and admins.' : esc(e.message)}</div>`;
+    return;
+  }
+  out.innerHTML = render(DATA);
+}
+
+/* A table that can download itself. columns: [[header, row => text, { num, html }]] */
+function table(id, title, rows, columns, { sub = '', totals = null, empty = 'Nothing to show.' } = {}) {
+  TABLES[id] = { title, rows, columns };
+  const head = columns.map(([h, , o = {}]) => `<th class="${o.num ? 'num' : ''}">${esc(h)}</th>`).join('');
+  const body = rows.map(r => `<tr>${columns.map(([, fn, o = {}]) => `<td class="${o.num ? 'num' : ''}">${o.html ? o.html(r) : esc(fmt(fn(r)))}</td>`).join('')}</tr>`).join('');
+  const total = totals ? `<tr class="total">${columns.map(([, , o = {}], i) => `<td class="${o.num ? 'num' : ''}">${esc(fmt(totals[i] ?? ''))}</td>`).join('')}</tr>` : '';
+  return `<div class="panel"><div class="panel-head"><span class="panel-title">${esc(title)}</span>
+      ${rows.length ? `<button class="btn btn-sm" onclick="csv('${id}')">CSV</button>` : ''}</div>
+    ${sub ? `<div class="section-sub">${sub}</div>` : ''}
+    ${rows.length ? `<div class="tbl-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}${total}</tbody></table></div>` : `<div class="empty">${empty}</div>`}
+  </div>`;
+}
+const countCols = (label) => [[label, r => r.label], ['Signs', r => r.n, { num: true }]];
+const sum = (rows, k) => rows.reduce((s, r) => s + (+r[k] || 0), 0);
+
+function render(d) {
+  const inv = d.inventory;
+  const company = (inv.byOwnership.find(x => x.label === 'company') || {}).n || 0;
+  const agent = (inv.byOwnership.find(x => x.label === 'agent') || {}).n || 0;
+  const unknownOwner = (inv.byOwnership.find(x => x.label === 'unknown') || {}).n || 0;
+  const tile = (n, l, warn) => `<div class="tile ${warn && n ? 'warn' : ''}"><div class="n">${(n || 0).toLocaleString()}</div><div class="l">${l}</div></div>`;
+  // Share of the signs whose owner is known
+  const known = company + agent;
+  const pct = (n) => known ? ` (${Math.round(n / known * 100)}% of known)` : '';
+  const reqCols = [
+    ['Type', r => TYPES[r.request_type], { html: r => `<span class="tag ${r.request_type}">${TYPES[r.request_type]}</span>` }],
+    ['Address', r => [r.address, r.city].filter(Boolean).join(', '), { html: r => listingLink(r.transaction_id, [r.address, r.city].filter(Boolean).join(', ')) }],
+    ['Office', r => r.office_name], ['Requested', r => day(r.requested_at)], ['By', r => r.requested_by_name || r.requested_by],
+    ['Days waiting', r => daysSince(r.requested_at), { num: true }], ['Planned', r => r.planned_day],
+    ["Can't complete", r => r.cannot_complete_reason],
+  ];
+  const volCols = (label) => [[label, r => r.label || r.month], ['Install', r => r.install, { num: true }], ['Remove', r => r.remove, { num: true }],
+    ['Repair', r => r.repair, { num: true }], ['Total', r => r.total, { num: true }]];
+  const volTotals = (rows) => ['Total', sum(rows, 'install'), sum(rows, 'remove'), sum(rows, 'repair'), sum(rows, 'total')];
+
+  // Turnaround by office: one row per office, a column per type
+  const offices = [...new Set(d.turnaround.byOffice.map(r => r.office))];
+  const turnOffice = offices.map(o => {
+    const row = { office: o };
+    for (const t of Object.keys(TYPES)) { const x = d.turnaround.byOffice.find(r => r.office === o && r.request_type === t); row[t] = x ? x.avg_hours : null; row[t + '_n'] = x ? x.n : 0; }
+    return row;
+  });
+
+  return `
+  <div class="tiles">
+    ${tile(inv.signs_out, 'Signs out in the field')}
+    ${tile(company, 'Company signs' + pct(company))}
+    ${tile(agent, "Agents' own signs" + pct(agent))}
+    ${tile(d.stale.length, 'On listings no longer active', true)}
+    ${tile(d.aging.length, `Requests waiting over ${d.params.aging_days} days`, true)}
+    ${tile(d.problems.flagged.length, "Marked can't complete", true)}
+  </div>
+  ${inv.from_history ? `<p class="section-sub" style="margin:-6px 0 14px">${inv.from_history.toLocaleString()} of the signs out were worked out from the old Google Sheet${inv.without_listing ? `; ${inv.without_listing} of those couldn't be tied to a Daily Desk listing` : ''}.${unknownOwner ? ` ${unknownOwner.toLocaleString()} don't say whose sign they are (the old sheet only noted agents' own signs), so they aren't in the company or agent counts.` : ''}</p>` : ''}
+
+  <section>
+    <div class="section-title">Signs out in the field</div>
+    <div class="cols">
+      ${table('by-type', 'By sign type', inv.byType, countCols('Sign type'), { totals: ['Total', inv.signs_out] })}
+      ${table('by-rider', 'By rider', inv.byRider, countCols('Rider'), { sub: 'A sign with two riders counts under both.' })}
+      ${table('by-office', 'By office', inv.byOffice, countCols('Office'), { totals: ['Total', inv.signs_out] })}
+      ${table('by-city', 'By city', inv.byCity, countCols('City'), { totals: ['Total', inv.signs_out] })}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Stale signs</div>
+    <div class="section-sub">Still up on a listing that's sold, expired, withdrawn, cancelled or temporarily off the market, longest first.</div>
+    ${table('stale', 'Signs to bring in', d.stale, [
+      ['Address', r => [r.address, r.city].filter(Boolean).join(', '), { html: r => listingLink(r.transaction_id, [r.address, r.city].filter(Boolean).join(', ')) }],
+      ['Office', r => r.office_name], ['Agent', r => r.agent_name], ['Listing', r => r.listing_status_label],
+      ['Since', r => r.changed_on ? day(r.changed_on) : ''], ['Days', r => r.days_since_change, { num: true }],
+      ['Sign', r => r.sign_type], ['Whose', r => r.ownership === 'agent' ? "Agent's" : r.ownership === 'company' ? 'Company' : ''],
+      ['Remove request', r => r.remove_request_id ? (r.remove_request_status === 'cannot_complete' ? "Open — can't complete" : `Open since ${day(r.remove_requested_at)}`) : 'None',
+        { html: r => r.remove_request_id ? esc(r.remove_request_status === 'cannot_complete' ? "Open — can't complete" : `Open since ${day(r.remove_requested_at)}`)
+                                         : `<a href="./sign-manager.html?type=remove&transactionId=${encodeURIComponent(r.transaction_id)}">Ask for removal →</a>` }],
+    ], { empty: 'No signs on inactive listings. 🎉' })}
+  </section>
+
+  <section>
+    <div class="section-title">Waiting more than ${d.params.aging_days} days</div>
+    ${table('aging', 'Open requests, oldest first', d.aging, reqCols, { empty: 'Nothing waiting that long.' })}
+  </section>
+
+  <section>
+    <div class="section-title">Turnaround</div>
+    <div class="section-sub">From request to done, over the last ${d.params.months} months. Requests with no completion date (some from the old sheet) are left out.</div>
+    <div class="cols">
+      ${table('turn-type', 'By request type', d.turnaround.byType, [
+        ['Type', r => TYPES[r.request_type]], ['Done', r => r.n, { num: true }],
+        ['Average', r => dur(r.avg_hours), { num: true }], ['Median', r => dur(r.median_hours), { num: true }]])}
+      ${table('turn-office', 'Average by office', turnOffice, [
+        ['Office', r => r.office],
+        ...Object.keys(TYPES).map(t => [TYPES[t], r => r[t] == null ? '' : `${dur(r[t])} (${r[t + '_n']})`, { num: true }])],
+        { sub: 'Number of jobs in brackets.' })}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Volume</div>
+    <div class="section-sub">Requests made over the last ${d.params.months} months, cancelled ones left out.</div>
+    ${table('vol-month', 'By month', d.volume.byMonth, volCols('Month').map((c, i) => i === 0 ? ['Month', r => monthName(r.month)] : c), { totals: volTotals(d.volume.byMonth) })}
+    <div class="cols" style="margin-top:12px">
+      ${table('vol-office', 'By office', d.volume.byOffice, volCols('Office'), { totals: volTotals(d.volume.byOffice) })}
+      ${table('vol-coord', 'By coordinator', d.volume.byCoordinator, volCols('Requested by'), { totals: volTotals(d.volume.byCoordinator) })}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Problems</div>
+    ${table('flagged', "Marked can't complete (waiting on the office)", d.problems.flagged, reqCols, { empty: 'None right now.' })}
+    <div style="height:12px"></div>
+    ${table('notes', 'Missing or damaged signs in field notes', d.problems.notes, [
+      ['Type', r => TYPES[r.request_type], { html: r => `<span class="tag ${r.request_type}">${TYPES[r.request_type]}</span>` }],
+      ['Address', r => [r.address, r.city].filter(Boolean).join(', '), { html: r => listingLink(r.transaction_id, [r.address, r.city].filter(Boolean).join(', ')) }],
+      ['Office', r => r.office_name], ['Done', r => day(r.completed_at)], ['Field notes', r => r.completion_notes]],
+      { sub: `Notes mentioning missing, damaged, broken, stolen or knocked-down signs in the last ${d.params.months} months.`, empty: 'None.' })}
+  </section>`;
+}
+
+/* ── CSV ── */
+function csv(id) {
+  const t = TABLES[id];
+  const cell = v => { const s = v == null ? '' : String(v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const text = [t.columns.map(c => cell(c[0])).join(','), ...t.rows.map(r => t.columns.map(c => cell(fmt(c[1](r)))).join(','))].join('\r\n');
+  save(new Blob(['﻿' + text + '\r\n'], { type: 'text/csv' }), `signs-${id}.csv`);
+}
+async function downloadAll() {
+  const from = document.getElementById('csv-from').value, to = document.getElementById('csv-to').value;
+  const q = new URLSearchParams(); if (from) q.set('from', from); if (to) q.set('to', to);
+  try {
+    const r = await fetch(`${Auth.API}/signs/reports/requests.csv?${q}`, { headers: Auth.headers() });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+    save(await r.blob(), `sign-requests${from ? '-' + from : ''}${to ? '-to-' + to : ''}.csv`);
+  } catch (e) { alertBox(e.message); }
+}
+function save(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function alertBox(msg) { document.getElementById('out').insertAdjacentHTML('afterbegin', `<div class="err" style="margin-bottom:12px">${esc(msg)}</div>`); }
+
+/* ── Util ── */
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function fmt(v) { return v == null ? '' : typeof v === 'number' ? v.toLocaleString() : v; }
+function day(iso) { if (!iso) return ''; const s = String(iso); const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T12:00:00') : new Date(s); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+function daysSince(iso) { return Math.floor((Date.now() - new Date(iso)) / 86400e3); }
+function dur(h) { if (h == null) return ''; h = +h; return h < 48 ? `${Math.round(h)} h` : `${(h / 24).toFixed(1)} days`; }
+function monthName(ym) { const [y, m] = ym.split('-'); return new Date(+y, +m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
+function listingLink(id, text) { return id ? `<a href="./sign-manager.html?transactionId=${encodeURIComponent(id)}">${esc(text)}</a>` : esc(text); }
+</script>
+</body>
+</html>
