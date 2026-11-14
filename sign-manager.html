@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
+<script src="workshop-map.js"></script>
 <style>
 /* Sign Manager — coordinators ask for yard sign installs, removals and repairs
    (Daily Desk's sign tasks open this page with ?transactionId=&type=), watch
@@ -119,6 +120,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tag.st{background:#F3F4F6;color:#4B5563}
 .empty,.loading{padding:28px;text-align:center;color:var(--muted);font-size:13px;background:var(--surface);border:1px dashed var(--border);border-radius:10px}
 
+/* Map */
+#req-map{height:560px;max-height:70vh;border-radius:10px;border:1px solid var(--border);background:#E5E9EF}
+.map-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin-bottom:8px}
+.map-legend span{white-space:nowrap}
+.map-legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:2px solid #fff;box-shadow:0 0 0 1px #9CA3AF}
+.map-note{font-size:12.5px;color:var(--muted);margin-top:8px}
+.pin-info{font-size:13px;line-height:1.45;max-width:260px}
+.pin-info b{display:block;font-size:14px;color:var(--navy);margin:3px 0 1px}
+.pin-info .stale{color:var(--amber);font-weight:600}
+.pin-info button{margin-top:8px}
+
 /* Settings */
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .list-row{display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #F0F2F5}
@@ -203,8 +215,17 @@ button,input,select,textarea{font:inherit;color:inherit}
           </div>
           <select id="open-type" onchange="renderOpen()"><option value="">All types</option><option value="install">Install</option><option value="remove">Remove</option><option value="repair">Repair</option></select>
           <select id="open-office" onchange="renderOpen()"><option value="">All offices</option></select>
+          <div class="seg" id="open-layout" style="margin-left:auto">
+            <button data-l="list" class="on" onclick="setLayout('list')">List</button>
+            <button data-l="map" onclick="setLayout('map')">Map by planned day</button>
+          </div>
         </div>
         <div id="open-list"><div class="loading">Loading…</div></div>
+        <div id="req-map-wrap" hidden>
+          <div class="map-legend" id="map-legend"></div>
+          <div id="req-map"></div>
+          <div class="map-note" id="map-note"></div>
+        </div>
       </section>
 
       <!-- Settings (admins) -->
@@ -491,6 +512,9 @@ async function refreshFlagBadge() {
 function setOpenView(v) {
   S.openView = v;
   document.querySelectorAll('#open-view button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  // Done jobs have no day ahead of them, so that view is a list only
+  document.querySelector('#open-layout [data-l=map]').disabled = v === 'recent';
+  if (v === 'recent' && S.layout === 'map') setLayout('list', true);
   loadOpen();
 }
 async function loadOpen() {
@@ -503,6 +527,7 @@ function renderOpen() {
   const type = document.getElementById('open-type').value, office = document.getElementById('open-office').value;
   const rows = S.openRows.filter(r => (!type || r.request_type === type) && (!office || r.office_name === office));
   if (S.openView === 'queue') rows.sort((a, b) => (b.status === 'cannot_complete') - (a.status === 'cannot_complete'));
+  if (S.layout === 'map') return renderReqMap(rows);
   document.getElementById('open-list').innerHTML = rows.length ? rows.map(reqRow).join('') : '<div class="empty">Nothing here.</div>';
 }
 function reqRow(r) {
@@ -522,6 +547,125 @@ function reqRow(r) {
   </div>`;
 }
 function openListing(id) { setTab('request'); loadListing(id); }
+
+/* ── Map by planned day (workshop-map.js) ──
+   Nothing loads, and nothing is charged, until Map is chosen. Homes are placed
+   by POST /signs/locations; each request is looked up once per visit. The
+   planned day is the installer's own words, so each one he uses gets a colour. */
+const PLAN_ORDER = ['Today', 'Tomorrow', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Next DeLand trip', 'Next Palm Coast trip', "Hold for agent's sign"];
+const PLAN_COLORS = ['#DC2626', '#EA580C', '#2563EB', '#16A34A', '#9333EA', '#0891B2', '#DB2777', '#65A30D', '#CA8A04', '#7C3AED', '#0F766E', '#92400E', '#4F46E5', '#BE123C'];
+const RELATIVE_DAYS = ['today', 'tomorrow'];
+const REQ_MAP = { map: null, pins: [], info: null, locations: {}, planned: {}, asked: new Set(), drawing: 0 };
+S.layout = 'list';
+
+function setLayout(l, quiet) {
+  S.layout = l;
+  document.querySelectorAll('#open-layout button').forEach(b => b.classList.toggle('on', b.dataset.l === l));
+  document.getElementById('open-list').hidden = l === 'map';
+  document.getElementById('req-map-wrap').hidden = l !== 'map';
+  if (!quiet) renderOpen();
+}
+
+// One colour per planned day in use: the presets in week order, then his own words
+function planColors(rows) {
+  const days = [...new Set(rows.map(r => r.planned_day).filter(Boolean))];
+  const rank = (d) => { const i = PLAN_ORDER.findIndex(p => p.toLowerCase() === d.toLowerCase()); return i < 0 ? 99 : i; };
+  days.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  return new Map(days.map((d, i) => [d, PLAN_COLORS[i % PLAN_COLORS.length]]));
+}
+
+function reqMapFailed() {
+  document.getElementById('req-map').style.display = 'none';
+  document.getElementById('map-note').textContent = "The map couldn't load just now. List still has every request.";
+}
+
+async function renderReqMap(rows) {
+  const turn = ++REQ_MAP.drawing;
+  const note = document.getElementById('map-note');
+  const unknown = rows.map(r => r.id).filter(id => !REQ_MAP.asked.has(id));
+  if (unknown.length) note.textContent = 'Finding these homes on the map…';
+  try {
+    await WorkshopMap.load();
+    if (unknown.length) {
+      const out = await Auth.api('/signs/locations', { method: 'POST', body: { requestIds: unknown } });
+      Object.assign(REQ_MAP.locations, out.locations);
+      Object.assign(REQ_MAP.planned, out.planned);
+      unknown.forEach(id => REQ_MAP.asked.add(id));
+    }
+  } catch (e) {
+    if (WorkshopMap.failed) return reqMapFailed();
+    note.textContent = "Couldn't place the requests on the map: " + e.message;
+    return;
+  }
+  if (WorkshopMap.failed) return reqMapFailed();
+  if (turn !== REQ_MAP.drawing || S.layout !== 'map') return;   // a newer draw, or back to List
+
+  const colors = planColors(rows);
+  const placed = rows.filter(r => REQ_MAP.locations[r.id]);
+  const missed = rows.filter(r => !REQ_MAP.locations[r.id]);
+  const count = (d) => rows.filter(r => (r.planned_day || '') === d).length;
+  document.getElementById('map-legend').innerHTML =
+    [...colors].map(([d, c]) => `<span><i style="background:${c}"></i>${esc(d)} (${count(d)})</span>`).join('') +
+    (count('') ? `<span><i style="background:#fff"></i>Not planned (${count('')})</span>` : '');
+  note.textContent = (missed.length
+    ? `Not on the map (couldn't find ${missed.length === 1 ? 'it' : 'them'}): ${missed.map(r => r.address || 'no address').join('; ')}. See List. `
+    : '') + 'Day names are what the installer picked on his list.';
+
+  if (!REQ_MAP.map) {
+    WorkshopMap.onFailure(reqMapFailed);
+    const first = placed[0] && REQ_MAP.locations[placed[0].id];
+    // Volusia / Flagler until there's a request to centre on
+    REQ_MAP.map = WorkshopMap.create(document.getElementById('req-map'), { center: first ? { lat: first.lat, lng: first.lon } : { lat: 29.25, lng: -81.1 }, zoom: 10 });
+    REQ_MAP.info = new google.maps.InfoWindow();
+  }
+  REQ_MAP.info.close();
+  REQ_MAP.pins.forEach(m => m.setMap(null));
+  REQ_MAP.pins = placed.map(r => {
+    const p = REQ_MAP.locations[r.id];
+    const color = r.planned_day ? colors.get(r.planned_day) : null;
+    const flagged = r.status === 'cannot_complete';
+    const m = new google.maps.Marker({
+      map: REQ_MAP.map, position: { lat: p.lat, lng: p.lon },
+      title: `${TYPES[r.request_type]}: ${r.address} (${r.planned_day || 'not planned'})`,
+      zIndex: color ? 2 : 1,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: color || '#fff', fillOpacity: 1,
+              strokeColor: flagged ? '#6D28D9' : color ? '#fff' : '#6B7280', strokeWeight: flagged ? 4 : 2 },
+    });
+    m.addListener('click', () => { REQ_MAP.info.setContent(reqPinContent(r)); REQ_MAP.info.open({ map: REQ_MAP.map, anchor: m }); });
+    return m;
+  });
+  WorkshopMap.fit(REQ_MAP.map, placed.map(r => ({ lat: REQ_MAP.locations[r.id].lat, lng: REQ_MAP.locations[r.id].lon })));
+}
+
+// "Today" / "Tomorrow" mean the day he said it, so say which day that was
+function plannedText(r) {
+  if (!r.planned_day) return 'Not planned yet';
+  const at = REQ_MAP.planned[r.id];
+  if (!at) return esc(r.planned_day);
+  const set = new Date(at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const stale = RELATIVE_DAYS.includes(r.planned_day.toLowerCase()) && new Date(at).toDateString() !== new Date().toDateString();
+  return `${esc(r.planned_day)} <span class="${stale ? 'stale' : 'req-sub'}">(set ${esc(set)})</span>`;
+}
+
+// Built as elements with the text escaped, so the button needs no inline handler
+function reqPinContent(r) {
+  const box = document.createElement('div');
+  box.className = 'pin-info';
+  box.innerHTML = `<span class="tag ${r.request_type}">${TYPES[r.request_type]}</span>
+    <b>${esc(r.address || 'No address')}</b>
+    <div>${esc(r.city || '')}${r.office_name ? ' · ' + esc(r.office_name) : ''}</div>
+    <div>📅 ${plannedText(r)}</div>
+    <div class="req-sub">Asked ${fmtDate(r.requested_at)}${r.requested_by_name ? ' by ' + esc(r.requested_by_name) : ''}</div>
+    ${r.status === 'cannot_complete' ? `<div class="req-flag">⚠ Can't complete: ${esc(r.cannot_complete_reason)}</div>` : ''}`;
+  if (r.transaction_id) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-sm';
+    btn.textContent = 'Open listing';
+    btn.addEventListener('click', () => openListing(r.transaction_id));
+    box.appendChild(btn);
+  }
+  return box;
+}
 function sendBack(id) {
   openModal({ title: 'Send back to the installer', text: 'Say what was sorted out. It goes on the request’s comments.', input: true, ok: 'Send back',
     onOk: async (note) => { await rowAction(id, 'send-back', { note }, 'Back on the installer’s list'); } });

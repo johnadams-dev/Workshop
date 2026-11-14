@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="favicon.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="auth.js"></script>
+<script src="workshop-map.js"></script>
 <style>
 /* Sign Manager — the installer's queue. Phone first: one column, big type,
    big buttons, nothing that needs zooming. Backed by sign-manager-routes.js. */
@@ -119,6 +120,19 @@ a{color:#1D5FA8}
 .sheet-ok.install{background:var(--install)} .sheet-ok.remove{background:var(--remove)} .sheet-ok.repair{background:var(--repair)} .sheet-ok.flag{background:var(--flag)}
 .sheet-ok:disabled{opacity:.5}
 
+/* Map */
+.map-wrap{display:none}
+.map-wrap.show{display:block}
+#job-map{height:calc(100vh - 230px);min-height:320px;border-radius:14px;border:1px solid var(--border);background:#E5E9EF}
+.map-note{font-size:14px;color:var(--muted);margin-top:8px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-bottom:8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pin-info{font-size:15px;line-height:1.4;max-width:240px;color:var(--text)}
+.pin-info b{display:block;font-size:16px;margin:4px 0 2px}
+.pin-info .pin-btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.pin-info .pin-btns a,.pin-info .pin-btns button{flex:1;min-height:40px;border-radius:10px;border:1px solid var(--border);background:#F7F9FC;color:var(--navy);font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;padding:0 10px;white-space:nowrap}
+.card.flash{box-shadow:0 0 0 3px var(--gold)}
+
 .toast{position:fixed;left:50%;bottom:max(20px, env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:12px;font-size:16px;opacity:0;transition:opacity .2s;z-index:60;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1}
 .toast.err{background:#B91C1C}
@@ -146,6 +160,7 @@ a{color:#1D5FA8}
     <div class="tabs">
       <button id="tab-open" class="on" onclick="setView('open')">Open</button>
       <button id="tab-done" onclick="setView('done')">Done recently</button>
+      <button id="tab-map" onclick="setView('map')">Map</button>
     </div>
   </header>
 
@@ -158,6 +173,11 @@ a{color:#1D5FA8}
       </div>
       <div class="filters" id="filters"></div>
       <div id="list"><div class="loading">Loading…</div></div>
+      <div class="map-wrap" id="map-wrap">
+        <div class="legend"><span><i style="background:var(--install)"></i>Install</span><span><i style="background:var(--remove)"></i>Remove</span><span><i style="background:var(--repair)"></i>Repair</span><span><i style="background:#fff;box-shadow:inset 0 0 0 3px var(--flag)"></i>Can't complete</span></div>
+        <div id="job-map"></div>
+        <div class="map-note" id="map-note"></div>
+      </div>
     </div>
   </main>
 
@@ -254,8 +274,9 @@ function setView(v) {
   S.view = v;
   document.getElementById('tab-open').classList.toggle('on', v === 'open');
   document.getElementById('tab-done').classList.toggle('on', v === 'done');
-  document.getElementById('filter-btn').style.display = v === 'open' ? '' : 'none';
-  if (v !== 'open') document.getElementById('filters').classList.remove('show');
+  document.getElementById('tab-map').classList.toggle('on', v === 'map');
+  document.getElementById('filter-btn').style.display = v === 'done' ? 'none' : '';
+  if (v === 'done') document.getElementById('filters').classList.remove('show');
   render();
   window.scrollTo(0, 0);
 }
@@ -309,7 +330,14 @@ function render() {
   document.getElementById('filter-btn').classList.toggle('active', !!filtersActive());
   document.getElementById('filter-btn').textContent = filtersActive() ? 'Filter ●' : 'Filter';
   document.getElementById('tab-open').textContent = `Open (${S.open.length})`;
-  if (S.view === 'open') {
+  document.getElementById('list').style.display = S.view === 'map' ? 'none' : '';
+  document.getElementById('map-wrap').classList.toggle('show', S.view === 'map');
+  if (S.view === 'map') {
+    renderFilters();
+    const rows = applyFilters(S.open);
+    document.getElementById('count').textContent = filtersActive() ? `${rows.length} of ${S.open.length} jobs` : `${S.open.length} open job${S.open.length === 1 ? '' : 's'}`;
+    renderMap(rows);
+  } else if (S.view === 'open') {
     renderFilters();
     const rows = applyFilters(S.open);
     document.getElementById('count').textContent = filtersActive() ? `${rows.length} of ${S.open.length} jobs` : `${S.open.length} job${S.open.length === 1 ? '' : 's'}, oldest first`;
@@ -337,9 +365,13 @@ function signFacts(r) {
   return rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : '';
 }
 
-function addressBlock(r) {
+function mapsUrl(r) {
   const full = [r.address, r.city, 'FL', r.zip].filter(Boolean).join(', ');
-  const url = IS_IOS ? `https://maps.apple.com/?q=${encodeURIComponent(full)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}`;
+  return IS_IOS ? `https://maps.apple.com/?q=${encodeURIComponent(full)}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(full)}`;
+}
+
+function addressBlock(r) {
+  const url = mapsUrl(r);
   return `<a class="addr" href="${url}" target="_blank" rel="noopener"><span class="pin">📍</span> ${esc(r.address || 'No address')}</a>
     <div class="city">${esc([r.city, r.zip].filter(Boolean).join(' '))}${r.listing_status_label ? ` · ${esc(r.listing_status_label)}` : ''}</div>`;
 }
@@ -349,7 +381,7 @@ function openCard(r) {
   const agentCall = r.agent_cell ? `<a class="call" href="tel:${telDigits(r.agent_cell)}">📞 ${esc(r.agent_name || 'Agent')} · ${esc(fmtPhone(r.agent_cell))}</a>` :
     (r.agent_name ? `<span class="small">Agent: ${esc(r.agent_name)}</span>` : '');
   return `
-  <article class="card ${r.request_type}">
+  <article class="card ${r.request_type}" id="job-${r.id}">
     <div class="card-top"><span class="type ${r.request_type}">${t.label}</span><span class="age">${ageText(r.requested_at)}</span></div>
     ${addressBlock(r)}
     ${r.status === 'cannot_complete' ? `<div class="flag">⚠ Can't complete: ${esc(r.cannot_complete_reason)}<br><span style="font-weight:400">Waiting on the office.</span></div>` : ''}
@@ -379,8 +411,98 @@ function doneCard(r) {
   </article>`;
 }
 
+/* ── Map (workshop-map.js) ──
+   Nothing loads, and nothing is charged, until the Map tab is opened. Homes are
+   placed by POST /signs/locations (MLS record, then county parcel); each is
+   looked up once per visit. */
+const JOB_MAP = { map: null, pins: [], info: null, locations: {}, asked: new Set(), drawing: 0 };
+const TYPE_COLOR = { install: '#15803D', remove: '#B91C1C', repair: '#B45309' };
+
+function mapFailed() {
+  document.getElementById('job-map').style.display = 'none';
+  document.getElementById('map-note').textContent = "The map couldn't load just now. The Open list still has every job.";
+}
+
+async function renderMap(rows) {
+  const turn = ++JOB_MAP.drawing;
+  const note = document.getElementById('map-note');
+  const unknown = rows.map(r => r.id).filter(id => !JOB_MAP.asked.has(id));
+  if (unknown.length) note.textContent = 'Finding these homes on the map…';
+  try {
+    await WorkshopMap.load();
+    if (unknown.length) {
+      const out = await Auth.api('/signs/locations', { method: 'POST', body: { requestIds: unknown } });
+      Object.assign(JOB_MAP.locations, out.locations);
+      unknown.forEach(id => JOB_MAP.asked.add(id));
+    }
+  } catch (e) {
+    if (WorkshopMap.failed) return mapFailed();
+    note.textContent = "Couldn't place the jobs on the map: " + e.message;
+    return;
+  }
+  if (WorkshopMap.failed) return mapFailed();
+  if (turn !== JOB_MAP.drawing || S.view !== 'map') return;   // a newer draw, or the tab changed
+
+  const placed = rows.filter(r => JOB_MAP.locations[r.id]);
+  const missed = rows.filter(r => !JOB_MAP.locations[r.id]);
+  note.textContent = missed.length
+    ? `Not on the map (couldn't find ${missed.length === 1 ? 'it' : 'them'}): ${missed.map(r => r.address || 'no address').join('; ')}. They're on the Open list.`
+    : '';
+  if (!JOB_MAP.map) {
+    WorkshopMap.onFailure(mapFailed);
+    const first = placed[0] && JOB_MAP.locations[placed[0].id];
+    // Volusia / Flagler until there's a job to centre on
+    JOB_MAP.map = WorkshopMap.create(document.getElementById('job-map'), {
+      center: first ? { lat: first.lat, lng: first.lon } : { lat: 29.25, lng: -81.1 }, zoom: 10, gestureHandling: 'greedy' });
+    JOB_MAP.info = new google.maps.InfoWindow();
+  }
+  // The 5-minute refresh redraws only when a pin would change, so it doesn't
+  // move the map or close a pin he has open
+  const key = placed.map(r => `${r.id}:${r.status}:${r.planned_day || ''}`).join('|');
+  if (key === JOB_MAP.lastKey && JOB_MAP.pins.length === placed.length) return;
+  JOB_MAP.lastKey = key;
+  JOB_MAP.info.close();
+  JOB_MAP.pins.forEach(m => m.setMap(null));
+  JOB_MAP.pins = placed.map(r => {
+    const p = JOB_MAP.locations[r.id];
+    const flagged = r.status === 'cannot_complete';
+    const m = new google.maps.Marker({
+      map: JOB_MAP.map, position: { lat: p.lat, lng: p.lon }, title: `${TYPE[r.request_type].label}: ${r.address}`,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: TYPE_COLOR[r.request_type], fillOpacity: 1,
+              strokeColor: flagged ? '#6D28D9' : '#fff', strokeWeight: flagged ? 4 : 2 },
+    });
+    m.addListener('click', () => { JOB_MAP.info.setContent(pinContent(r)); JOB_MAP.info.open({ map: JOB_MAP.map, anchor: m }); });
+    return m;
+  });
+  WorkshopMap.fit(JOB_MAP.map, placed.map(r => ({ lat: JOB_MAP.locations[r.id].lat, lng: JOB_MAP.locations[r.id].lon })));
+}
+
+// Built as elements with the text escaped, so the buttons need no inline handlers
+function pinContent(r) {
+  const box = document.createElement('div');
+  box.className = 'pin-info';
+  box.innerHTML = `<span class="type ${r.request_type}">${TYPE[r.request_type].label}</span>
+    <b>${esc(r.address || 'No address')}</b>
+    <div>${esc(r.city || '')} · ${esc(ageText(r.requested_at).toLowerCase())}</div>
+    <div>📅 ${esc(r.planned_day || 'Not planned')}</div>
+    ${r.status === 'cannot_complete' ? `<div style="color:var(--flag);font-weight:600">⚠ ${esc(r.cannot_complete_reason)}</div>` : ''}
+    <div class="pin-btns"><a target="_blank" rel="noopener">Directions</a><button type="button">See job</button></div>`;
+  box.querySelector('a').href = mapsUrl(r);
+  box.querySelector('button').addEventListener('click', () => showJob(r.id));
+  return box;
+}
+
+function showJob(id) {
+  setView('open');
+  const card = document.getElementById('job-' + id);
+  if (!card) return toast('That job is hidden by your filters.', true);
+  card.scrollIntoView({ block: 'center' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 2000);
+}
+
 /* ── Sheets ── */
-const find = (id) => S.open.find(r => r.id === id) || S.done.find(r => r.id === id);
+const find =(id) => S.open.find(r => r.id === id) || S.done.find(r => r.id === id);
 function openSheet() { return document.querySelector('.sheet-bg.show'); }
 function closeSheets() { document.querySelectorAll('.sheet-bg').forEach(s => s.classList.remove('show')); S.sheetFor = null; }
 
