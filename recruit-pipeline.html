@@ -100,6 +100,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .chip{border:1px solid var(--border);background:#fff;border-radius:16px;padding:4px 10px;font-size:12.5px;cursor:pointer}
 .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.texting-off{background:#FFF7E8;border:2px solid #F59E0B;color:#7C2D12;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.texting-off b{display:block;font-size:15.5px;margin-bottom:2px}
+.bubble .st-bad{color:#FCA5A5;font-weight:700}
+.bubble .st-ok{opacity:.85}
 .thread{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:320px;overflow-y:auto}
 .bubble{max-width:85%;padding:7px 10px;border-radius:12px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
 .bubble.out{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:3px}
@@ -387,15 +391,25 @@ function suggestKey(p, sent) {
   if (p.source === 'website') return sent ? 'followup' : 'website';
   return !sent ? 'first' : sent >= 2 ? 'last' : 'followup';
 }
+// Plain words for where a text we sent stands
+function textStatus(t) {
+  const o = String(t.outcome || '');
+  if (/^(undelivered|failed)/.test(o)) return `<span class="st-bad">⚠ NOT delivered${o.match(/\(error \d+\)/) ? ' ' + esc(o.match(/\(error \d+\)/)[0]) : ''}</span>`;
+  if (o === 'delivered') return '<span class="st-ok">✓ Delivered</span>';
+  return '<span class="st-ok">Sent — no delivery report yet</span>';
+}
+const offBanner = reason => `<div class="texting-off"><b>🚫 Texting is NOT live — nothing will be sent.</b>${esc(reason || '')}</div>`;
 function textBoxHtml(p, touches) {
   const thread = touches.filter(t => t.channel === 'text').slice(0, 30).reverse();
   const sent = thread.filter(t => t.direction === 'out').length;
-  const why = !TEXTCFG ? 'Loading…' : !TEXTCFG.ready ? TEXTCFG.notReadyReason : !p.phone_e164 ? 'No mobile number on file.'
+  const off = !TEXTCFG || !TEXTCFG.ready;
+  const why = !TEXTCFG ? 'Loading…' : off ? null : !p.phone_e164 ? 'No mobile number on file.'
     : p.sms_opted_out_at ? 'They replied STOP — no more texts.' : p.do_not_contact ? 'Marked do not contact.' : null;
   const key = suggestKey(p, sent);
   return `<div class="box" id="text-box"><h3>Texts</h3>
-    ${thread.length ? `<div class="thread">${thread.map(t => `<div class="bubble ${t.direction === 'in' ? 'in' : 'out'}">${esc(t.body || '')}<div class="when">${fmtWhen(t.at)}${t.direction === 'out' && t.outcome && !/^(sent|queued|accepted)$/.test(t.outcome) ? ` · ${esc(t.outcome)}` : ''}</div></div>`).join('')}</div>` : '<p class="small muted" style="margin-bottom:6px">No texts yet.</p>'}
-    ${why ? `<p class="small muted">${esc(why)}</p>` : `
+    ${TEXTCFG && off ? offBanner(TEXTCFG.notReadyReason) : ''}
+    ${thread.length ? `<div class="thread">${thread.map(t => `<div class="bubble ${t.direction === 'in' ? 'in' : 'out'}">${esc(t.body || '')}<div class="when">${fmtWhen(t.at)}${t.direction === 'out' ? ` · ${textStatus(t)}` : ''}</div></div>`).join('')}</div>` : '<p class="small muted" style="margin-bottom:6px">No texts yet.</p>'}
+    ${off ? '' : why ? `<p class="small muted">${esc(why)}</p>` : `
       <div class="chips" id="tx-tpl">${Object.entries(TEXTCFG.templates).map(([k, t]) => `<button class="chip ${k === key ? 'on' : ''}" data-v="${k}">${esc(t.label)}</button>`).join('')}</div>
       <textarea id="tx-body" rows="4" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px">${esc(fillText(key, p))}</textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn primary sm" onclick="sendOneText()">Send text</button>
@@ -432,7 +446,7 @@ async function renderTexts() {
           ${OWNERS.map(o => `<option value="${o.id}" ${TEXTS_OWNER === String(o.id) ? 'selected' : ''}>${esc(ownerName(o))}</option>`).join('')}</select></div>
         <span class="grow small muted">Each text goes to one person and is read before it's sent. 8 am–8 pm Eastern, at most ${TEXTCFG.maxPerDay} a day to one person; STOP is always honored.</span>
       </div>
-      ${!d.config.ready ? `<div class="err" style="margin-bottom:12px">${esc(d.config.notReadyReason)}</div>` : ''}
+      ${!d.config.ready ? offBanner(d.config.notReadyReason + ' You can still see who\'s due and read replies; to reach someone now, call them.') : ''}
       <div class="box"><h3>Waiting for a reply from us (${unanswered.length})</h3>
         ${unanswered.length ? unanswered.map(c => `<div class="card" style="margin-bottom:6px"><div class="who" onclick="openProspect(${c.id}, 'text')">
           <div class="name">${esc(c.full_name)}</div><div class="meta">"${esc(String(c.last_body || '').slice(0, 160))}" · ${fmtWhen(c.last_at)}${c.owner_name ? ` · ${esc(c.owner_name)}` : ''}</div></div>
@@ -446,7 +460,8 @@ async function renderTexts() {
               <div class="meta">${esc(p.next_action || '')} · ${fmtPhone(p.phone_e164)}${p.texts_sent ? ` · ${p.texts_sent} sent before` : ' · first text'}${p.owner_name ? ` · ${esc(p.owner_name)}` : ''}</div>
               <select class="tx-tpl-pick" data-id="${p.id}" style="margin:6px 0;padding:4px;border:1px solid var(--border);border-radius:6px">${Object.entries(TEXTCFG.templates).map(([k, t]) => `<option value="${k}" ${k === p.suggested ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
               <textarea class="tx-draft" data-id="${p.id}" rows="3" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:7px">${esc(fillText(p.suggested, p))}</textarea></div></div>`).join('')}
-          <div style="margin-top:8px"><button class="btn primary" id="tx-send-all" onclick="sendTicked()" ${d.config.ready ? '' : 'disabled'}>Send the ticked texts</button></div>`
+          <div style="margin-top:8px">${d.config.ready ? '<button class="btn primary" id="tx-send-all" onclick="sendTicked()">Send the ticked texts</button>'
+            : '<button class="btn" disabled>Sending is off — texting is not live yet</button>'}</div>`
         : '<p class="small muted">Nobody with a mobile number is due today.</p>'}
       </div>
       <div class="box"><h3>Recent conversations</h3>
@@ -716,7 +731,9 @@ function textingBox() {
   const c = TEXTCFG, can = c.canEdit;
   const dis = can ? '' : 'disabled';
   return `<div class="box"><h3>Texting</h3>
-    <p class="small ${c.ready ? 'muted' : ''}" style="margin-bottom:8px;${c.ready ? '' : 'color:var(--red)'}">${c.ready ? `Texts go out from ${esc(c.serviceSid ? `Messaging Service ${c.serviceSid}` : fmtPhone(c.number))}.` : esc(c.notReadyReason)}</p>
+    ${c.ready ? `<p class="small muted" style="margin-bottom:8px">✅ Texting is live. Texts go out from ${esc(c.serviceSid ? `Messaging Service ${c.serviceSid}` : fmtPhone(c.number))}.</p>` : offBanner(c.notReadyReason)}
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;font-size:13.5px"><input type="checkbox" id="tc-live" ${c.live ? 'checked' : ''} ${dis} style="margin-top:3px">
+      <span><b>Texting is live.</b> Turn this on only after Twilio shows the number's carrier registration (A2P 10DLC campaign) as approved and a test text to your own phone arrived. Until then nothing is sent.</span></label>
     <div class="grid2">
       <div class="control"><label for="tc-number">Recruiting text number</label><input id="tc-number" value="${esc(c.number ? fmtPhone(c.number) : '')}" placeholder="(386) 555-0100" ${dis}></div>
       <div class="control"><label for="tc-sid">Twilio Messaging Service SID (optional)</label><input id="tc-sid" value="${esc(c.serviceSid || '')}" placeholder="MG…" ${dis}></div>
@@ -733,7 +750,9 @@ function textingBox() {
 async function saveTexting() {
   const templates = Object.fromEntries(Object.keys(TEXTCFG.templates).map(k => [k, document.getElementById(`tc-t-${k}`).value]));
   try {
-    await Auth.api('/recruit-pipeline/texts/config', { method: 'PUT', body: {
+    const live = document.getElementById('tc-live').checked;
+    if (live && !TEXTCFG.live && !confirm('Turn texting on? Texts sent from the tool will really go out to prospects.')) return;
+    await Auth.api('/recruit-pipeline/texts/config', { method: 'PUT', body: { live,
       number: document.getElementById('tc-number').value.trim(), serviceSid: document.getElementById('tc-sid').value.trim(),
       callForward: document.getElementById('tc-fwd').value.trim(), templates } });
     toast('Texting saved'); renderSettings();
