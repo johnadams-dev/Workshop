@@ -129,6 +129,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="today">Today</button>
       <button class="tab" data-tab="prospects">Prospects</button>
+      <button class="tab" data-tab="mailings">Mailings</button>
+      <button class="tab" data-tab="reports">Reports</button>
       <button class="tab" data-tab="imports">Imports</button>
       <button class="tab" data-tab="settings">Settings</button>
     </div>
@@ -174,7 +176,7 @@ Auth.ready({ tool: 'New Recruit Pipeline', button: document.getElementById('g-si
   }
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => show(b.dataset.tab));
   const h = location.hash.slice(1);
-  show(['today', 'prospects', 'imports', 'settings'].includes(h) ? h : 'today');
+  show(['today', 'prospects', 'mailings', 'reports', 'imports', 'settings'].includes(h) ? h : 'today');
   const m = location.search.match(/[?&]id=(\d+)/); if (m) openProspect(+m[1]);
 });
 
@@ -182,7 +184,7 @@ function show(tab) {
   TAB = tab;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
-  ({ today: renderToday, prospects: renderProspects, imports: renderImports, settings: renderSettings })[tab]();
+  ({ today: renderToday, prospects: renderProspects, mailings: renderMailings, reports: renderReports, imports: renderImports, settings: renderSettings })[tab]();
 }
 async function refreshSummary() { try { SUMMARY = await Auth.api('/recruit-pipeline/summary'); } catch (_) {} }
 
@@ -443,12 +445,14 @@ async function renderImports() {
       <button class="btn primary" id="run-now" onclick="runImport()">Run the import now</button>
       <label class="btn" for="upload">Upload le_cbt.csv…</label><input type="file" id="upload" accept=".csv,text/csv" style="display:none" onchange="uploadImport(this)">
       <button class="btn" onclick="checkLicensee()">Check DBPR licensee files</button>
-    </div><div id="lic-check"></div><div id="imp-list"><div class="loading">Loading…</div></div>`;
+      <button class="btn primary" id="run-lic" onclick="runLicenseCheck()">Run the licensee check now</button>
+    </div>
+    <p class="small muted" style="margin:-4px 0 10px">The licensee check runs weekly: it finds prospects who are now licensed, marks who joined us or another brokerage, and flags anyone licensed in the last 120 days with no brokerage yet as hot — their owner gets an email.</p><div id="lic-check"></div><div id="imp-list"><div class="loading">Loading…</div></div>`;
   try {
     const rows = await Auth.api('/recruit-pipeline/imports');
     document.getElementById('imp-list').innerHTML = rows.length ? `<div class="tbl-wrap"><table><thead><tr><th>When</th><th>What</th><th>Result</th><th class="num">Rows</th><th class="num">Kept</th><th class="num">New</th><th class="num">Already had</th><th>By</th></tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${fmtWhen(r.started_at)}</td><td>${esc({ exam_list: 'DBPR exam list', licensee_file: 'Licensee file', history: 'Sheet import' }[r.kind] || r.kind)}<div class="small muted">${esc(r.file_name || '')}</div></td>
-        <td>${esc({ success: 'Done', unchanged: 'Same file as before', failed: 'Failed', running: 'Running' }[r.status] || r.status)}${r.error_message ? `<div class="small" style="color:var(--red)">${esc(r.error_message)}</div>` : ''}${r.detail?.returning ? `<div class="small muted">${r.detail.returning} back on the list</div>` : ''}</td>
+      ${rows.map(r => `<tr><td>${fmtWhen(r.started_at)}</td><td>${esc({ exam_list: 'DBPR exam list', licensee_file: 'Licensee check', history: 'Sheet import' }[r.kind] || r.kind)}<div class="small muted">${esc(r.file_name || '')}</div></td>
+        <td>${esc({ success: 'Done', unchanged: 'Same file as before', failed: 'Failed', running: 'Running' }[r.status] || r.status)}${r.error_message ? `<div class="small" style="color:var(--red)">${esc(r.error_message)}</div>` : ''}${r.detail?.returning ? `<div class="small muted">${r.detail.returning} back on the list</div>` : ''}${r.kind === 'licensee_file' && r.detail?.matched != null ? `<div class="small muted">${r.detail.matched.toLocaleString()} licensed · ${r.detail.joined} newly joined · ${r.detail.elsewhere} newly elsewhere · ${r.detail.hot} hot</div>` : ''}</td>
         <td class="num">${r.rows_read ?? ''}</td><td class="num">${r.rows_kept ?? ''}</td><td class="num">${r.rows_new ?? ''}</td><td class="num">${r.rows_duplicate ?? ''}</td>
         <td class="small">${esc(String(r.run_by || '').replace('@adamscameron.com', '').replace(/^service:.*/, 'Scheduled'))}</td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">No imports yet.</div>';
@@ -480,17 +484,129 @@ async function checkLicensee() {
   } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 
-// ── Settings: zip routing ───────────────────────────────────────────────────
-let ZIPS = [];
+async function runLicenseCheck() {
+  const b = document.getElementById('run-lic'); b.disabled = true; b.textContent = 'Checking… (about a minute)';
+  try {
+    const r = await Auth.api('/recruit-pipeline/admin/check-licenses', { method: 'POST', body: {} });
+    toast(`Done: ${r.detail.matched.toLocaleString()} prospects licensed; ${r.detail.joined} newly joined, ${r.detail.elsewhere} newly elsewhere, ${r.detail.hot} hot.`);
+    await refreshSummary();
+  } catch (e) { toast(e.message); }
+  renderImports();
+}
+
+// ── Mailings ────────────────────────────────────────────────────────────────
+let MAIL = { letter: 1, people: [], picked: new Set() };
+async function renderMailings() {
+  const v = document.getElementById('view');
+  v.innerHTML = `<div class="controls">
+      <div class="chips" id="m-letter" style="margin:0">${[1, 2].map(n => `<button class="chip ${MAIL.letter === n ? 'on' : ''}" data-v="${n}">${n === 1 ? 'Letter 1' : 'Letter 2 (with the magazine)'}</button>`).join('')}</div>
+      <span class="grow"></span>
+      <button class="btn" onclick="mailPdf('letters')">⬇ Letters PDF</button>
+      <button class="btn" onclick="mailPdf('labels')">⬇ Labels PDF (Avery 5160)</button>
+      <button class="btn primary" onclick="mailConfirm()">✓ Mark as mailed</button>
+    </div><div id="m-list"><div class="loading">Loading…</div></div>`;
+  document.getElementById('m-letter').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; MAIL.letter = +b.dataset.v; renderMailings(); };
+  try {
+    const d = await Auth.api(`/recruit-pipeline/mailings/due?letter=${MAIL.letter}`);
+    MAIL.people = d.people; MAIL.picked = new Set(d.people.map(p => p.id));
+    const el = document.getElementById('m-list');
+    const intro = MAIL.letter === 1
+      ? 'New prospects who haven\'t had letter 1. Letters print on letterhead (top margin on Settings); labels are Avery 5160 / 8160, 30 to a sheet.'
+      : `Contacted prospects whose letter 1 went out ${d.letter2AfterDays}+ days ago and who haven't had letter 2. Put a magazine in with each.`;
+    if (!d.people.length) { el.innerHTML = `<p class="small muted" style="margin-bottom:8px">${intro}</p><div class="empty">Nobody is due for ${esc(d.name)}.${d.noAddress ? ` (${d.noAddress} without a street address can't be mailed.)` : ''}</div>`; return; }
+    el.innerHTML = `<p class="small muted" style="margin-bottom:8px">${intro} Untick anyone you don't want to mail — for a household, you may only want one letter.${d.noAddress ? ` ${d.noAddress} more have no street address and aren't listed.` : ''}</p>
+      <div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="m-all" checked></th><th>Name</th><th>Address</th><th>Owner</th><th>Office sentence</th>${MAIL.letter === 2 ? '<th>Letter 1</th>' : ''}</tr></thead><tbody>
+      ${d.people.map(p => `<tr><td><input type="checkbox" class="m-pick" data-id="${p.id}" checked></td>
+        <td><a href="#" onclick="openProspect(${p.id});return false">${esc(p.full_name)}</a>${p.household_id ? `<span class="tag hh">Household ${p.household_id}</span>` : ''}</td>
+        <td>${esc(p.address1)}<div class="small muted">${esc([p.city, p.state || 'FL'].filter(Boolean).join(', '))} ${esc(p.zip)}</div></td>
+        <td>${esc(p.owner_name || '')}</td><td class="small">${p.office_phrase ? esc(p.office_phrase) : '<span class="tag warn">none — "nearby"</span>'}</td>
+        ${MAIL.letter === 2 ? `<td>${fmtDate(p.letter1_at)}</td>` : ''}</tr>`).join('')}
+      </tbody></table></div><p class="small muted" style="margin-top:6px"><span id="m-count">${d.people.length}</span> selected</p>`;
+    const count = () => document.getElementById('m-count').textContent = MAIL.picked.size;
+    document.getElementById('m-all').onchange = e => { document.querySelectorAll('.m-pick').forEach(c => { c.checked = e.target.checked; c.checked ? MAIL.picked.add(+c.dataset.id) : MAIL.picked.delete(+c.dataset.id); }); count(); };
+    document.querySelectorAll('.m-pick').forEach(c => c.onchange = () => { c.checked ? MAIL.picked.add(+c.dataset.id) : MAIL.picked.delete(+c.dataset.id); count(); });
+  } catch (e) { document.getElementById('m-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+async function mailPdf(kind) {
+  if (!MAIL.picked.size) return toast('Pick at least one person.');
+  toast('Making the PDF…');
+  try {
+    const r = await fetch(`${Auth.API}/recruit-pipeline/mailings/pdf`, { method: 'POST', headers: Auth.headers(), body: JSON.stringify({ letter: MAIL.letter, ids: [...MAIL.picked], kind }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `PDF failed (${r.status}).`);
+    const url = URL.createObjectURL(await r.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: `letter${MAIL.letter}-${kind}-${todayIso()}.pdf` });
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { toast(e.message); }
+}
+async function mailConfirm() {
+  if (!MAIL.picked.size) return toast('Pick at least one person.');
+  if (!confirm(`Mark ${MAIL.picked.size} ${MAIL.letter === 1 ? 'letter 1' : 'letter 2 + magazine'} mailing${MAIL.picked.size === 1 ? '' : 's'} as sent today?`)) return;
+  try {
+    const r = await Auth.api('/recruit-pipeline/mailings/confirm', { method: 'POST', body: { letter: MAIL.letter, ids: [...MAIL.picked] } });
+    toast(`Marked ${r.mailed} as mailed.`); await refreshSummary(); renderMailings();
+  } catch (e) { toast(e.message); }
+}
+
+// ── Reports ─────────────────────────────────────────────────────────────────
+async function renderReports() {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const d = await Auth.api('/recruit-pipeline/reports/brokerages');
+    const m = d.market;
+    const bySource = {};
+    for (const o of d.outcomes) { const s = bySource[o.source] = bySource[o.source] || { total: 0, licensed: 0, joined: 0, elsewhere: 0 }; s.total += o.n; s.licensed += o.licensed; if (o.stage === 'joined') s.joined += o.n; if (o.stage === 'licensed_elsewhere') s.elsewhere += o.n; }
+    const pct = (a, b) => b ? `${Math.round(a / b * 100)}%` : '—';
+    v.innerHTML = `
+      ${m ? `<div class="box"><h3>New licensees in Volusia and Flagler, last 12 months</h3>
+        <p class="small muted" style="margin-bottom:8px">Sales associates first licensed since ${fmtDate(m.from)}, from DBPR's licensee files (checked ${fmtWhen(d.checkedAt)}). The brokerage is where they are today.</p>
+        <div class="tiles"><div class="tile"><div class="n">${m.licensed}</div><div class="l">Newly licensed</div></div>
+          <div class="tile"><div class="n">${m.ours}</div><div class="l">With us (${pct(m.ours, m.licensed)})</div></div>
+          <div class="tile"><div class="n">${m.noBrokerage}</div><div class="l">No brokerage yet</div></div>
+          ${Object.entries(m.byCounty).map(([c, x]) => `<div class="tile"><div class="n">${x.ours} / ${x.licensed}</div><div class="l">${c}: with us / licensed</div></div>`).join('')}</div>
+        <div class="tbl-wrap"><table><thead><tr><th>Brokerage</th><th class="num">New licensees</th><th class="num">Share</th></tr></thead><tbody>
+          ${m.employers.map(e => `<tr${e.ours ? ' style="font-weight:700"' : ''}><td>${esc(e.name)}${e.ours ? ' <span class="tag stage-joined">Us</span>' : ''}</td><td class="num">${e.n}</td><td class="num">${pct(e.n, m.licensed)}</td></tr>`).join('')}
+        </tbody></table></div></div>` : '<div class="empty">Run the licensee check (Imports tab) to see which brokerages new licensees join.</div>'}
+      <div class="box"><h3>Our prospects, by source</h3>
+        <div class="tbl-wrap"><table><thead><tr><th>Source</th><th class="num">Prospects</th><th class="num">Licensed</th><th class="num">Joined us</th><th class="num">Joined / licensed</th><th class="num">Licensed elsewhere</th></tr></thead><tbody>
+        ${Object.entries(bySource).map(([s, x]) => `<tr><td>${esc(SOURCE_LABELS[s] || s)}</td><td class="num">${x.total.toLocaleString()}</td><td class="num">${x.licensed.toLocaleString()}</td><td class="num">${x.joined}</td><td class="num">${pct(x.joined, x.licensed)}</td><td class="num">${x.elsewhere.toLocaleString()}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="small muted" style="margin-top:6px">"Joined us" includes people the old sheet marked hired, back to 2009. Response rates by letter, text and email come with the sequence.</p></div>
+      ${d.prospectsElsewhere.length ? `<div class="box"><h3>Where our prospects went instead</h3><div class="tbl-wrap"><table><tbody>
+        ${d.prospectsElsewhere.map(e => `<tr><td>${esc(e.name)}</td><td class="num">${e.n}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+  } catch (e) { v.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+// ── Settings: letters and zip routing ───────────────────────────────────────
+let ZIPS = [], LETTERS = null;
 async function renderSettings() {
   const v = document.getElementById('view');
   v.innerHTML = '<div class="loading">Loading…</div>';
-  try { ZIPS = await Auth.api('/recruit-pipeline/zip-routing'); } catch (e) { v.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  try { [ZIPS, LETTERS] = await Promise.all([Auth.api('/recruit-pipeline/zip-routing'), Auth.api('/recruit-pipeline/settings/letters')]); }
+  catch (e) { v.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
   drawZips();
+}
+function lettersBox() {
+  const can = ME.manager, s = LETTERS.settings;
+  const field = (k, label, extra = '') => `<div class="control"><label for="ls-${k}">${label}</label><input id="ls-${k}" value="${esc(s[k])}" ${can ? '' : 'disabled'} ${extra}></div>`;
+  return `<div class="box"><h3>Letters</h3>
+    <p class="small muted" style="margin-bottom:8px">A blank line starts a new paragraph; a line starting "- " is a bullet; **bold**; two blank lines leave room for a signature. Merge fields: ${LETTERS.fields.map(f => `<code>{{${f}}}</code>`).join(' ')}. <code>{{reach_out}}</code> reads "either to me directly or to the local office manager, Ashlee Selman," — or just "to me directly" for the signer's own zips.</p>
+    <div class="grid2">${field('recruit_signer_name', 'Signed by')}${field('recruit_signer_title', 'Title')}${field('recruit_phone', 'Call or text number')}${field('recruit_website', 'Website')}${field('recruit_letter_top_margin_in', 'Top margin for letterhead (inches)', 'type="number" step="0.05" min="0.5" max="3.5"')}</div>
+    ${[1, 2].map(n => `<div class="control" style="margin-top:10px"><label for="ls-recruit_letter${n}">${n === 1 ? 'Letter 1' : 'Letter 2 (goes with the magazine)'}</label>
+      <textarea id="ls-recruit_letter${n}" rows="14" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px" ${can ? '' : 'disabled'}>${esc(s[`recruit_letter${n}`])}</textarea>
+      ${can ? `<a href="#" class="small" onclick="document.getElementById('ls-recruit_letter${n}').value=LETTERS.defaults.recruit_letter${n};return false">Put back the original wording</a>` : ''}</div>`).join('')}
+    ${can ? '<div style="margin-top:8px"><button class="btn primary" onclick="saveLetters()">Save letters</button></div>' : '<p class="small muted">Only managers can change the letters.</p>'}
+  </div>`;
+}
+async function saveLetters() {
+  const body = {};
+  for (const k of Object.keys(LETTERS.defaults)) { const el = document.getElementById(`ls-${k}`); if (el) body[k] = el.value; }
+  try { await Auth.api('/recruit-pipeline/settings/letters', { method: 'PUT', body }); toast('Letters saved'); renderSettings(); }
+  catch (e) { toast(e.message); }
 }
 function drawZips() {
   const can = ME.manager;
-  document.getElementById('view').innerHTML = `<div class="box"><h3>Who owns each zip, and the letter's office sentence</h3>
+  document.getElementById('view').innerHTML = lettersBox() + `<div class="box"><h3>Who owns each zip, and the letter's office sentence</h3>
     <p class="small muted" style="margin-bottom:8px">A new prospect goes to the manager for their zip, and the letter says "we have one right by you …" with that zip's sentence. A zip not listed goes to John and is flagged.${can ? '' : ' Only managers can change this list.'}</p>
     <div class="tbl-wrap"><table><thead><tr><th>Zip</th><th>City</th><th>Manager</th><th>Office sentence</th>${can ? '<th></th>' : ''}</tr></thead><tbody>
     ${ZIPS.map((z, i) => can ? `<tr><td><input data-i="${i}" data-k="zip" value="${esc(z.zip)}" style="width:70px"></td><td><input data-i="${i}" data-k="city" value="${esc(z.city || '')}"></td>
