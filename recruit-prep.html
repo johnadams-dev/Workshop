@@ -95,6 +95,11 @@ textarea { resize: vertical; min-height: 90px; }
 .report-head h2 { font-size: 2rem; line-height: 1.1; }
 .report-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 18px; }
+.contact-grid .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+.contact-grid .v { font-size: 14px; overflow-wrap: anywhere; }
+.contact-grid .src { font-size: 11px; color: var(--muted); margin-left: 4px; }
+.contact-actions a { font-size: 12px; margin-right: 8px; }
 .chip { font-size: 12px; background: var(--cream-dark); color: var(--ink-soft); border-radius: 100px; padding: 3px 10px; }
 .warn { background: #fff7e6; border: 1px solid #f0d9a8; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-top: 12px; }
 .section-label { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
@@ -738,6 +743,48 @@ function ppHtml(items, kind) {
 
 function bullets(arr) { return list(arr).length ? `<ul class="list">${list(arr).map(x => `<li>${esc(typeof x === 'string' ? x : JSON.stringify(x))}</li>`).join('')}</ul>` : '<p class="hint">—</p>'; }
 
+// ── Contact: from their MLS record(s), then what the research found published ──
+function contactInfo(row) {
+  const mls = row.mls_stats || {}, snap = (row.report || {}).agent_snapshot || {}, web = snap.contact || {};
+  const boards = [mls, mls.other_board].filter(b => b && b.member);
+  const phones = [], emails = [], offices = [];
+  const digits = v => String(v || '').replace(/\D/g, '').slice(-10);
+  const addPhone = (num, label, src) => { const d = digits(num); if (d.length === 10 && !phones.some(p => p.d === d)) phones.push({ d, num, label, src }); };
+  const addEmail = (e, src) => { const v = String(e || '').trim().toLowerCase(); if (v && /@/.test(v) && !emails.some(x => x.v === v)) emails.push({ v, src }); };
+  for (const b of boards) {
+    const c = b.member.contact || {};
+    addPhone(c.phone, c.phone_label || 'Phone', b.board_name);
+    addEmail(c.email, b.board_name);
+    if (b.member.office && !offices.some(o => o.name === b.member.office)) offices.push({ name: b.member.office, address: c.office_address, phone: c.office_phone, src: b.board_name });
+  }
+  addPhone(web.phone, 'Listed online', web.source || 'public web');
+  addEmail(web.email, web.source || 'public web');
+  const license = boards.map(b => b.member.license).find(Boolean) || null;
+  const profiles = list(web.profiles).filter(p => p && /^https?:\/\//i.test(p.url || ''));
+  const website = /^https?:\/\//i.test(web.website || '') ? web.website : (web.website ? 'https://' + web.website : '');
+  return { phones, emails, offices, license, profiles, website };
+}
+const fmtTel = d => `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+const srcTag = s => s ? `<span class="src">${/^https?:/i.test(s) ? `<a href="${esc(s)}" target="_blank" rel="noopener">source</a>` : esc(s)}</span>` : '';
+function contactHtml(row) {
+  const c = contactInfo(row);
+  const any = c.phones.length || c.emails.length || c.offices.length || c.website || c.profiles.length;
+  return `<div class="card"><p class="section-label">How to reach them</p><h2>Contact</h2>
+    ${any ? `<div class="contact-grid">
+      ${c.phones.map(p => `<div><div class="k">${esc(p.label)}</div><div class="v"><a href="tel:+1${p.d}">${fmtTel(p.d)}</a>${srcTag(p.src)}</div>
+        <div class="contact-actions"><a href="tel:+1${p.d}">Call</a><a href="sms:+1${p.d}">Text</a></div></div>`).join('')}
+      ${c.emails.map(e => `<div><div class="k">Email</div><div class="v"><a href="mailto:${esc(e.v)}">${esc(e.v)}</a>${srcTag(e.src)}</div></div>`).join('')}
+      ${c.offices.map(o => `<div><div class="k">Office</div><div class="v">${esc(o.name)}${srcTag(o.src)}</div>
+        ${o.address ? `<div class="hint">${esc(o.address)}</div>` : ''}${o.phone ? `<div class="hint">Office: <a href="tel:+1${(o.phone.match(/\d/g) || []).join('').slice(-10)}">${esc(o.phone)}</a></div>` : ''}</div>`).join('')}
+      ${c.website ? `<div><div class="k">Website</div><div class="v"><a href="${esc(c.website)}" target="_blank" rel="noopener">${esc(c.website.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))}</a></div></div>` : ''}
+      ${c.license ? `<div><div class="k">License</div><div class="v">${esc(c.license)}</div></div>` : ''}
+    </div>
+    ${c.profiles.length ? `<div class="chips" style="margin-top:10px">${c.profiles.map(p => `<a class="chip" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.site || 'Profile')}</a>`).join('')}</div>` : ''}
+    <p class="hint" style="margin-top:8px">Phone and email from their MLS record when it says so; anything else was found published online — check before relying on it.</p>`
+    : `<p class="hint">No contact details on file for this briefing. ${row.mls_stats ? 'Briefings run before Nov 15, 2026 did not collect them — run a new briefing to get them.' : 'Pick the agent from the MLS search for their phone and email.'}</p>`}
+  </div>`;
+}
+
 function renderReport(row) {
   current = row;
   const el = document.getElementById('report');
@@ -768,6 +815,8 @@ function renderReport(row) {
       </div>
       ${r.identity_note ? `<div class="warn"><b>Identity check:</b> ${esc(r.identity_note)}</div>` : ''}
     </div>
+
+    ${contactHtml(row)}
 
     <div class="card">
       <p class="section-label">Lead with these</p>
@@ -841,6 +890,10 @@ function reportText() {
   L.push(`RECRUITING BRIEFING — ${snap.name || row.agent_name}`);
   L.push([snap.brokerage || row.brokerage, snap.market || row.market_area].filter(Boolean).join(' · '));
   if (r.identity_note) L.push('Identity check: ' + r.identity_note);
+  { const c = contactInfo(row);
+    sec('Contact', [...c.phones.map(p => `${p.label}: ${fmtTel(p.d)}`), ...c.emails.map(e => `Email: ${e.v}`),
+      ...c.offices.map(o => `Office: ${[o.name, o.address, o.phone].filter(Boolean).join(', ')}`),
+      c.website && `Website: ${c.website}`, c.license && `License: ${c.license}`, ...c.profiles.map(p => `${p.site || 'Profile'}: ${p.url}`)]); }
   sec('Talking points', list(r.talking_points).map(t => `${t.point} — ${t.why_it_matters || ''} (${t.source || ''})`));
   sec('Pain', list(r.pain).map(p => `${p.what} (${p.when || ''}; ${p.source || ''}) → ${p.approach || ''}`));
   sec('Pleasure', list(r.pleasure).map(p => `${p.what} (${p.when || ''}; ${p.source || ''}) → ${p.approach || ''}`));
