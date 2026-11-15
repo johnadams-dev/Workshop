@@ -210,6 +210,7 @@
       <div id="formsWarnings" class="notes" style="margin:0 0 10px"></div>
       <table class="forms"><tbody id="formsList"></tbody></table>
       <dl class="terms" id="termsList" style="margin-top:14px"></dl>
+      <div class="missing" id="datesBox" hidden><strong>Key dates if it's signed today</strong> <span class="hint">(same rules as the Contract Date Calculator; the real dates count from the day the last party signs)</span><ul id="datesList"></ul></div>
       <div class="missing" id="missingBox" hidden><strong>Still needed:</strong><ul id="missingList"></ul></div>
       <div class="row" style="margin-top:16px">
         <button class="btn" type="button" id="createBtn" disabled>Create in Form Simplicity</button>
@@ -456,6 +457,9 @@
       rows.push(["Buyer's broker compensation", `${e.p02tf011}%${e.p02tf008 ? ` plus ${money(e.p02tf008)}` : ""} (lease ${e.p02tf010}%, option ${e.p02tf013}%), protection period ${e.p02tf014} days`]);
     }
     $("termsList").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+    const dates = state.mode === "offer" ? (r.values?.dates || []).filter((d) => d.key !== "effective_date" && d.key !== "closing_date") : [];
+    $("datesBox").hidden = !dates.length;
+    $("datesList").innerHTML = dates.map((d) => `<li>${esc(d.label)}: <strong>${esc(fmtDate(d.date))}</strong> <span class="hint">(${esc(d.description)})</span></li>`).join("");
     const needed = [...(r.questions || []).map((q) => ({ key: q.key, label: q.label })), ...(r.missing || []).filter((m) => m.key !== "address" || state.mode === "offer")];
     const missing = needed.map((m) => m.label);
     $("missingBox").hidden = !missing.length;
