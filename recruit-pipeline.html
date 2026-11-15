@@ -100,6 +100,11 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .chip{border:1px solid var(--border);background:#fff;border-radius:16px;padding:4px 10px;font-size:12.5px;cursor:pointer}
 .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.thread{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:320px;overflow-y:auto}
+.bubble{max-width:85%;padding:7px 10px;border-radius:12px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble.out{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:3px}
+.bubble.in{align-self:flex-start;background:#EEF2F7;border-bottom-left-radius:3px}
+.bubble .when{font-size:10.5px;opacity:.7;margin-top:2px}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:300;display:none}
 </style>
 </head>
@@ -128,6 +133,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
     <p class="intro">People heading into a real estate career: DBPR's weekly list of sales associate exam candidates in Volusia and Flagler, website sign-ups and referrals. Everyone has an owner, a stage and a next step, and every letter, call, text and note is kept on their timeline.</p>
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="today">Today</button>
+      <button class="tab" data-tab="texts">Texts</button>
       <button class="tab" data-tab="prospects">Prospects</button>
       <button class="tab" data-tab="mailings">Mailings</button>
       <button class="tab" data-tab="reports">Reports</button>
@@ -176,7 +182,8 @@ Auth.ready({ tool: 'New Recruit Pipeline', button: document.getElementById('g-si
   }
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => show(b.dataset.tab));
   const h = location.hash.slice(1);
-  show(['today', 'prospects', 'mailings', 'reports', 'imports', 'settings'].includes(h) ? h : 'today');
+  Auth.api('/recruit-pipeline/texts/config').then(c => { TEXTCFG = c; }).catch(() => {});
+  show(['today', 'texts', 'prospects', 'mailings', 'reports', 'imports', 'settings'].includes(h) ? h : 'today');
   const m = location.search.match(/[?&]id=(\d+)/); if (m) openProspect(+m[1]);
 });
 
@@ -184,7 +191,7 @@ function show(tab) {
   TAB = tab;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
-  ({ today: renderToday, prospects: renderProspects, mailings: renderMailings, reports: renderReports, imports: renderImports, settings: renderSettings })[tab]();
+  ({ today: renderToday, texts: renderTexts, prospects: renderProspects, mailings: renderMailings, reports: renderReports, imports: renderImports, settings: renderSettings })[tab]();
 }
 async function refreshSummary() { try { SUMMARY = await Auth.api('/recruit-pipeline/summary'); } catch (_) {} }
 
@@ -222,6 +229,7 @@ async function renderToday() {
         </div>
         <div class="act">
           ${p.phone_e164 ? `<a class="btn sm" href="tel:${esc(p.phone_e164)}">📞 Call</a>` : ''}
+          ${p.phone_e164 && !p.sms_opted_out_at ? `<button class="btn sm" onclick="openProspect(${p.id}, 'text')">💬 Text</button>` : ''}
           <button class="btn sm" onclick="openProspect(${p.id}, true)">Log contact</button>
         </div>
       </div>`).join('')}</div>`;
@@ -287,10 +295,12 @@ async function openProspect(id, focusLog) {
   dr.classList.add('open');
   dr.innerHTML = '<div class="d-body"><div class="loading">Loading…</div></div>';
   try {
-    const d = await Auth.api(`/recruit-pipeline/prospects/${id}`);
+    const [d] = await Promise.all([Auth.api(`/recruit-pipeline/prospects/${id}`),
+      TEXTCFG ? null : Auth.api('/recruit-pipeline/texts/config').then(c => { TEXTCFG = c; }).catch(() => {})]);
     CURRENT = d.prospect;
     drawDrawer(d);
-    if (focusLog) document.getElementById('log-box')?.scrollIntoView({ block: 'start' });
+    if (focusLog === 'text') { const b = document.getElementById('text-box'); b?.scrollIntoView({ block: 'start' }); document.getElementById('tx-body')?.focus(); }
+    else if (focusLog) document.getElementById('log-box')?.scrollIntoView({ block: 'start' });
   } catch (e) { dr.innerHTML = `<div class="d-body"><div class="err">${esc(e.message)}</div><button class="btn" onclick="closeDrawer()">Close</button></div>`; }
 }
 function drawDrawer({ prospect: p, touches, household }) {
@@ -326,6 +336,7 @@ function drawDrawer({ prospect: p, touches, household }) {
           <label class="small"><input type="checkbox" id="d-dnc" ${p.do_not_contact ? 'checked' : ''}> Do not contact</label>
         </div>
       </div>
+      ${textBoxHtml(p, touches)}
       <div class="box" id="log-box">
         <h3>Log a contact</h3>
         <div class="chips" id="log-channel">${['call', 'text', 'letter', 'email', 'meeting', 'ringless_vm', 'note'].map((c, i) => `<button class="chip ${i === 0 ? 'on' : ''}" data-v="${c}">${CHANNEL_LABELS[c]}</button>`).join('')}</div>
@@ -345,6 +356,7 @@ function drawDrawer({ prospect: p, touches, household }) {
           <div class="when">${fmtWhen(t.at)}${t.actor_email ? ` · ${esc(t.actor_email.replace('@adamscameron.com', ''))}` : ''}</div></li>`).join('')}</ul>` : '<div class="muted small">Nothing yet.</div>'}
       </div>
     </div>`;
+  wireTextBox(p);
   for (const id of ['log-channel', 'log-dir', 'log-outcome']) {
     document.getElementById(id).onclick = e => {
       const b = e.target.closest('.chip'); if (!b) return;
@@ -360,6 +372,108 @@ function drawDrawer({ prospect: p, touches, household }) {
   }
 }
 const chipVal = id => document.querySelector(`#${id} .chip.on`)?.dataset.v || null;
+
+// ── Texting ─────────────────────────────────────────────────────────────────
+let TEXTCFG = null;
+const meFirst = () => String(ME?.name || '').split(/\s+/)[0];
+function fillText(key, p) {
+  const t = TEXTCFG?.templates?.[key]?.text || '';
+  const f = { first_name: p.first_name || 'there', full_name: p.full_name || '', office_phrase: String(p.office_phrase || 'nearby').replace(/[.!]+$/, ''),
+    sender_first: meFirst(), sender_name: ME?.name || '' };
+  return t.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (m, k) => (k in f ? f[k] : m)).replace(/[ \t]+/g, ' ').trim();
+}
+function suggestKey(p, sent) {
+  if (p.hot && p.licensed_at && !p.employer_name) return 'licensed';
+  if (p.source === 'website') return sent ? 'followup' : 'website';
+  return !sent ? 'first' : sent >= 2 ? 'last' : 'followup';
+}
+function textBoxHtml(p, touches) {
+  const thread = touches.filter(t => t.channel === 'text').slice(0, 30).reverse();
+  const sent = thread.filter(t => t.direction === 'out').length;
+  const why = !TEXTCFG ? 'Loading…' : !TEXTCFG.ready ? TEXTCFG.notReadyReason : !p.phone_e164 ? 'No mobile number on file.'
+    : p.sms_opted_out_at ? 'They replied STOP — no more texts.' : p.do_not_contact ? 'Marked do not contact.' : null;
+  const key = suggestKey(p, sent);
+  return `<div class="box" id="text-box"><h3>Texts</h3>
+    ${thread.length ? `<div class="thread">${thread.map(t => `<div class="bubble ${t.direction === 'in' ? 'in' : 'out'}">${esc(t.body || '')}<div class="when">${fmtWhen(t.at)}${t.direction === 'out' && t.outcome && !/^(sent|queued|accepted)$/.test(t.outcome) ? ` · ${esc(t.outcome)}` : ''}</div></div>`).join('')}</div>` : '<p class="small muted" style="margin-bottom:6px">No texts yet.</p>'}
+    ${why ? `<p class="small muted">${esc(why)}</p>` : `
+      <div class="chips" id="tx-tpl">${Object.entries(TEXTCFG.templates).map(([k, t]) => `<button class="chip ${k === key ? 'on' : ''}" data-v="${k}">${esc(t.label)}</button>`).join('')}</div>
+      <textarea id="tx-body" rows="4" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px">${esc(fillText(key, p))}</textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn primary sm" onclick="sendOneText()">Send text</button>
+        <span class="small muted"><span id="tx-len"></span>${sent ? '' : ` · "${esc(TEXTCFG.footer)}" is added to a first text`} · 8 am–8 pm Eastern, ${TEXTCFG.maxPerDay} a day at most</span></div>`}
+  </div>`;
+}
+function wireTextBox(p) {
+  const tpl = document.getElementById('tx-tpl'); if (!tpl) return;
+  const body = document.getElementById('tx-body'), len = document.getElementById('tx-len');
+  const upd = () => { len.textContent = `${body.value.length} characters`; };
+  tpl.onclick = e => { const b = e.target.closest('.chip'); if (!b) return; tpl.querySelectorAll('.chip').forEach(c => c.classList.remove('on')); b.classList.add('on'); body.value = fillText(b.dataset.v, p); upd(); };
+  body.oninput = upd; upd();
+}
+async function sendOneText() {
+  const body = document.getElementById('tx-body').value.trim();
+  if (!body) return toast('Write the message first.');
+  try {
+    await Auth.api(`/recruit-pipeline/prospects/${CURRENT.id}/text`, { method: 'POST', body: { body, template: chipVal('tx-tpl') } });
+    toast('Text sent'); afterChange();
+  } catch (e) { toast(e.message); }
+}
+
+let TEXTS_OWNER = 'mine';
+async function renderTexts() {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const d = await Auth.api(`/recruit-pipeline/texts${TEXTS_OWNER ? `?owner=${TEXTS_OWNER}` : ''}`);
+    TEXTCFG = { ...(TEXTCFG || {}), ...d.config, footer: TEXTCFG?.footer || 'Reply STOP to opt out.', maxPerDay: TEXTCFG?.maxPerDay || 3 };
+    const unanswered = d.conversations.filter(c => c.last_direction === 'in');
+    v.innerHTML = `<div class="controls">
+        <div class="control"><label for="tx-owner">Whose</label><select id="tx-owner" onchange="TEXTS_OWNER=this.value;renderTexts()">
+          <option value="mine" ${TEXTS_OWNER === 'mine' ? 'selected' : ''}>Mine</option><option value="" ${TEXTS_OWNER === '' ? 'selected' : ''}>Everyone's</option>
+          ${OWNERS.map(o => `<option value="${o.id}" ${TEXTS_OWNER === String(o.id) ? 'selected' : ''}>${esc(ownerName(o))}</option>`).join('')}</select></div>
+        <span class="grow small muted">Each text goes to one person and is read before it's sent. 8 am–8 pm Eastern, at most ${TEXTCFG.maxPerDay} a day to one person; STOP is always honored.</span>
+      </div>
+      ${!d.config.ready ? `<div class="err" style="margin-bottom:12px">${esc(d.config.notReadyReason)}</div>` : ''}
+      <div class="box"><h3>Waiting for a reply from us (${unanswered.length})</h3>
+        ${unanswered.length ? unanswered.map(c => `<div class="card" style="margin-bottom:6px"><div class="who" onclick="openProspect(${c.id}, 'text')">
+          <div class="name">${esc(c.full_name)}</div><div class="meta">"${esc(String(c.last_body || '').slice(0, 160))}" · ${fmtWhen(c.last_at)}${c.owner_name ? ` · ${esc(c.owner_name)}` : ''}</div></div>
+          <div class="act"><button class="btn sm primary" onclick="openProspect(${c.id}, 'text')">Reply</button></div></div>`).join('') : '<p class="small muted">Nobody is waiting on us.</p>'}
+      </div>
+      <div class="box"><h3>Due today (${d.due.length})</h3>
+        ${d.due.length ? `<p class="small muted" style="margin-bottom:8px">A draft for each person from the suggested template — change any of them, untick anyone you'd rather call, then send.</p>
+          ${d.due.map(p => `<div class="card" style="margin-bottom:6px;align-items:stretch">
+            <div style="padding-top:4px"><input type="checkbox" class="tx-pick" data-id="${p.id}" ${p.texts_today >= TEXTCFG.maxPerDay ? 'disabled' : 'checked'}></div>
+            <div class="who" style="cursor:default"><div class="name"><a href="#" onclick="openProspect(${p.id}, 'text');return false">${esc(p.full_name)}</a> ${p.hot ? '<span class="tag hot">Hot</span>' : ''}</div>
+              <div class="meta">${esc(p.next_action || '')} · ${fmtPhone(p.phone_e164)}${p.texts_sent ? ` · ${p.texts_sent} sent before` : ' · first text'}${p.owner_name ? ` · ${esc(p.owner_name)}` : ''}</div>
+              <select class="tx-tpl-pick" data-id="${p.id}" style="margin:6px 0;padding:4px;border:1px solid var(--border);border-radius:6px">${Object.entries(TEXTCFG.templates).map(([k, t]) => `<option value="${k}" ${k === p.suggested ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
+              <textarea class="tx-draft" data-id="${p.id}" rows="3" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:7px">${esc(fillText(p.suggested, p))}</textarea></div></div>`).join('')}
+          <div style="margin-top:8px"><button class="btn primary" id="tx-send-all" onclick="sendTicked()" ${d.config.ready ? '' : 'disabled'}>Send the ticked texts</button></div>`
+        : '<p class="small muted">Nobody with a mobile number is due today.</p>'}
+      </div>
+      <div class="box"><h3>Recent conversations</h3>
+        ${d.conversations.length ? `<div class="tbl-wrap"><table><tbody>${d.conversations.map(c => `<tr class="click" onclick="openProspect(${c.id}, 'text')">
+          <td><b>${esc(c.full_name)}</b>${c.sms_opted_out_at ? ' <span class="tag warn">STOP</span>' : ''}</td><td class="small">${c.last_direction === 'in' ? '⬅' : '➡'} ${esc(String(c.last_body || '').slice(0, 90))}</td><td class="small muted">${fmtWhen(c.last_at)}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="small muted">No texts yet.</p>'}
+      </div>`;
+    const byId = Object.fromEntries(d.due.map(p => [p.id, p]));
+    document.querySelectorAll('.tx-tpl-pick').forEach(s => s.onchange = () => {
+      document.querySelector(`.tx-draft[data-id="${s.dataset.id}"]`).value = fillText(s.value, byId[s.dataset.id]);
+    });
+  } catch (e) { v.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+async function sendTicked() {
+  const items = [...document.querySelectorAll('.tx-pick:checked')].map(c => ({
+    id: +c.dataset.id, body: document.querySelector(`.tx-draft[data-id="${c.dataset.id}"]`).value.trim(),
+    template: document.querySelector(`.tx-tpl-pick[data-id="${c.dataset.id}"]`).value })).filter(i => i.body);
+  if (!items.length) return toast('Tick at least one person.');
+  if (!confirm(`Send ${items.length} text${items.length === 1 ? '' : 's'} now?`)) return;
+  const b = document.getElementById('tx-send-all'); b.disabled = true; b.textContent = 'Sending…';
+  try {
+    const r = await Auth.api('/recruit-pipeline/texts/send', { method: 'POST', body: { items } });
+    const failed = r.results.filter(x => !x.ok);
+    toast(`Sent ${r.sent}${failed.length ? `; ${failed.length} not sent: ${failed[0].error}` : ''}`);
+    await refreshSummary(); renderTexts();
+  } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Send the ticked texts'; }
+}
 
 async function saveStage() {
   try {
@@ -582,7 +696,7 @@ let ZIPS = [], LETTERS = null;
 async function renderSettings() {
   const v = document.getElementById('view');
   v.innerHTML = '<div class="loading">Loading…</div>';
-  try { [ZIPS, LETTERS] = await Promise.all([Auth.api('/recruit-pipeline/zip-routing'), Auth.api('/recruit-pipeline/settings/letters')]); }
+  try { [ZIPS, LETTERS, TEXTCFG] = await Promise.all([Auth.api('/recruit-pipeline/zip-routing'), Auth.api('/recruit-pipeline/settings/letters'), Auth.api('/recruit-pipeline/texts/config')]); }
   catch (e) { v.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
   drawZips();
 }
@@ -598,6 +712,33 @@ function lettersBox() {
     ${can ? '<div style="margin-top:8px"><button class="btn primary" onclick="saveLetters()">Save letters</button></div>' : '<p class="small muted">Only managers can change the letters.</p>'}
   </div>`;
 }
+function textingBox() {
+  const c = TEXTCFG, can = c.canEdit;
+  const dis = can ? '' : 'disabled';
+  return `<div class="box"><h3>Texting</h3>
+    <p class="small ${c.ready ? 'muted' : ''}" style="margin-bottom:8px;${c.ready ? '' : 'color:var(--red)'}">${c.ready ? `Texts go out from ${esc(c.serviceSid ? `Messaging Service ${c.serviceSid}` : fmtPhone(c.number))}.` : esc(c.notReadyReason)}</p>
+    <div class="grid2">
+      <div class="control"><label for="tc-number">Recruiting text number</label><input id="tc-number" value="${esc(c.number ? fmtPhone(c.number) : '')}" placeholder="(386) 555-0100" ${dis}></div>
+      <div class="control"><label for="tc-sid">Twilio Messaging Service SID (optional)</label><input id="tc-sid" value="${esc(c.serviceSid || '')}" placeholder="MG…" ${dis}></div>
+      <div class="control" style="grid-column:1/-1"><label for="tc-fwd">Calls to the number also ring (besides the prospect's owner)</label><input id="tc-fwd" value="${esc(c.callForward)}" placeholder="(386) 555-0101, (386) 555-0102" ${dis}></div>
+    </div>
+    <p class="small muted" style="margin:8px 0">In Twilio, set the number's <b>"A message comes in"</b> to <code>${esc(c.webhooks.sms)}</code> and <b>"A call comes in"</b> to <code>${esc(c.webhooks.voice)}</code> (both HTTP POST).</p>
+    <p class="small muted" style="margin-bottom:8px">Templates — merge fields: ${c.fields.map(f => `<code>{{${f}}}</code>`).join(' ')}. <code>{{sender_first}}</code> is whoever sends it.</p>
+    ${Object.entries(c.templates).map(([k, t]) => `<div class="control" style="margin-bottom:8px"><label for="tc-t-${k}">${esc(t.label)}</label>
+      <textarea id="tc-t-${k}" rows="3" ${dis}>${esc(t.text)}</textarea>
+      ${can ? `<a href="#" class="small" onclick="document.getElementById('tc-t-${k}').value=TEXTCFG.templates['${k}'].default;return false">Put back the original wording</a>` : ''}</div>`).join('')}
+    ${can ? '<button class="btn primary" onclick="saveTexting()">Save texting</button>' : '<p class="small muted">Only managers can change texting.</p>'}
+  </div>`;
+}
+async function saveTexting() {
+  const templates = Object.fromEntries(Object.keys(TEXTCFG.templates).map(k => [k, document.getElementById(`tc-t-${k}`).value]));
+  try {
+    await Auth.api('/recruit-pipeline/texts/config', { method: 'PUT', body: {
+      number: document.getElementById('tc-number').value.trim(), serviceSid: document.getElementById('tc-sid').value.trim(),
+      callForward: document.getElementById('tc-fwd').value.trim(), templates } });
+    toast('Texting saved'); renderSettings();
+  } catch (e) { toast(e.message); }
+}
 async function saveLetters() {
   const body = {};
   for (const k of Object.keys(LETTERS.defaults)) { const el = document.getElementById(`ls-${k}`); if (el) body[k] = el.value; }
@@ -606,7 +747,7 @@ async function saveLetters() {
 }
 function drawZips() {
   const can = ME.manager;
-  document.getElementById('view').innerHTML = lettersBox() + `<div class="box"><h3>Who owns each zip, and the letter's office sentence</h3>
+  document.getElementById('view').innerHTML = textingBox() + lettersBox() + `<div class="box"><h3>Who owns each zip, and the letter's office sentence</h3>
     <p class="small muted" style="margin-bottom:8px">A new prospect goes to the manager for their zip, and the letter says "we have one right by you …" with that zip's sentence. A zip not listed goes to John and is flagged.${can ? '' : ' Only managers can change this list.'}</p>
     <div class="tbl-wrap"><table><thead><tr><th>Zip</th><th>City</th><th>Manager</th><th>Office sentence</th>${can ? '<th></th>' : ''}</tr></thead><tbody>
     ${ZIPS.map((z, i) => can ? `<tr><td><input data-i="${i}" data-k="zip" value="${esc(z.zip)}" style="width:70px"></td><td><input data-i="${i}" data-k="city" value="${esc(z.city || '')}"></td>
