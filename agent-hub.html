@@ -1406,7 +1406,28 @@ function renderSituation(data) {
   } else {
     el.innerHTML = renderOnboardingSection(data.deltanetAudit);
   }
-  el.innerHTML = renderHostedOpenHouses(data.hostedOpenHouses) + el.innerHTML;
+  el.innerHTML = renderKeyDates(data.keyDates) + renderHostedOpenHouses(data.hostedOpenHouses) + el.innerHTML;
+}
+
+// ── Key dates (contract-dates-routes.js) ────────────────────────────────────
+// The next three weeks of contract deadlines on deals under contract, from each
+// deal's current dates: the signed contract or amendment Shirley read at broker
+// review, or the agent's own Contract Date Calculator entry.
+function renderKeyDates(list) {
+  if (!list || !list.length) return '';
+  const todayIso = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const day = d => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const until = d => { const n = Math.round((new Date(d + 'T12:00:00') - new Date(todayIso + 'T12:00:00')) / 86400000); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`; };
+  return `<div class="section">
+    <p class="section-label">Coming Up</p>
+    <h2 class="section-title">Key contract dates</h2>
+    <div class="txn-grid">${list.slice(0, 12).map(k => `
+      <div class="txn-card">
+        <div class="txn-address">${escapeHtml(k.label)} — ${escapeHtml(day(k.date))} <span style="font-weight:400;color:#6B7280">(${until(k.date)})</span></div>
+        <div class="txn-progress-label">${escapeHtml(k.address || '')}</div>
+        <div class="txn-progress-label" style="color:#6B7280">${k.source === 'broker_review' ? 'From the signed contract at broker review' : 'From the Contract Date Calculator'}</div>
+      </div>`).join('')}</div>
+  </div>`;
 }
 
 // ── Open houses (open-house-routes.js) ──────────────────────────────────────

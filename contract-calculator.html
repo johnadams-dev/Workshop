@@ -564,11 +564,6 @@
 <script>
     let calculatedDates = [];
 
-    const holidays2026 = [
-        '2026-01-01','2026-01-19','2026-02-16','2026-05-25',
-        '2026-07-03','2026-09-07','2026-10-12','2026-11-11',
-        '2026-11-26','2026-12-25'
-    ];
 
     // ── MODE SWITCHING ──────────────────────────────────────────────
     document.querySelectorAll('input[name="inputMode"]').forEach(radio => {
@@ -1050,32 +1045,6 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     });
 
     // ── DATE HELPERS ────────────────────────────────────────────────
-    function isWeekend(d)     { return d.getDay() === 0 || d.getDay() === 6; }
-    function isHoliday(d)     { return holidays2026.includes(d.toISOString().split('T')[0]); }
-    function isBusinessDay(d) { return !isWeekend(d) && !isHoliday(d); }
-    function isTRIDDay(d)     { return d.getDay() !== 0 && !isHoliday(d); }
-
-    function addCalendarDaysThenAdjust(start, days) {
-        const r = new Date(start);
-        r.setDate(r.getDate() + days);
-        while (!isBusinessDay(r)) r.setDate(r.getDate() + 1);
-        return r;
-    }
-    function subtractCalendarDaysThenAdjust(end, days) {
-        const r = new Date(end);
-        r.setDate(r.getDate() - days);
-        while (!isBusinessDay(r)) r.setDate(r.getDate() + 1);
-        return r;
-    }
-    function subtractTRIDDays(end, days) {
-        const r = new Date(end);
-        let counted = 0;
-        while (counted < days) {
-            r.setDate(r.getDate() - 1);
-            if (isTRIDDay(r)) counted++;
-        }
-        return r;
-    }
     function fmt(d) {
         return d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     }
@@ -1083,68 +1052,40 @@ Return numbers for all "days" fields. All dates must be YYYY-MM-DD format.`;
     // ── CALCULATE ───────────────────────────────────────────────────
     document.getElementById('contractForm').addEventListener('submit', e => { e.preventDefault(); calculateDates(); });
 
-    function calculateDates() {
-        const propId          = document.getElementById('propertyId').value;
-        const effectiveDate   = new Date(document.getElementById('effectiveDate').value   + 'T00:00:00');
-        const closingDate     = new Date(document.getElementById('closingDate').value     + 'T00:00:00');
-        const initDays        = parseInt(document.getElementById('initialDeposit').value);
-        const addlDays        = parseInt(document.getElementById('additionalDeposit').value);
-        const titleDays       = parseInt(document.getElementById('titleDays').value);
-        const floodDays       = parseInt(document.getElementById('floodDays').value);
-        const inspDays        = parseInt(document.getElementById('inspectionDays').value);
-        const isCash          = document.getElementById('cashRadio').checked;
-        const financingDays   = isCash ? 0 : parseInt(document.getElementById('financingDays').value);
-
+    // The deadlines come from the server's rules (contract-dates/rules.js), the one
+    // copy shared with Shirley's broker-review check — so the dates here always
+    // match what's recorded on the deal. Holidays are worked out for any year.
+    async function calculateDates() {
+        const propId    = document.getElementById('propertyId').value;
+        const effective = document.getElementById('effectiveDate').value;
+        const closing   = document.getElementById('closingDate').value;
+        const isCash    = document.getElementById('cashRadio').checked;
         calculatedDates = [];
         document.getElementById('shareBox').style.display = 'none';
         document.getElementById('shareBtn').textContent = '🔗 Save & Share';
-
-        const push = (label, date, description, warning = null) => calculatedDates.push({ label, date, description, warning });
-
-        push('Effective Date', effectiveDate, 'Contract effective date');
-
-        const initDepDate = addCalendarDaysThenAdjust(effectiveDate, initDays);
-        push('Initial Deposit Due', initDepDate, `${initDays} calendar days from effective date`);
-
-        if (addlDays > 0) {
-            const addlDepDate = addCalendarDaysThenAdjust(effectiveDate, addlDays);
-            push('Additional Deposit Due', addlDepDate, `${addlDays} calendar days from effective date`,
-                addlDepDate >= closingDate ? 'WARNING: Additional deposit is after closing date!' : null);
+        let data;
+        try {
+            const r = await fetch(`${PROXY_BASE}/contract-dates/calculate`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    effectiveDate: effective, closingDate: closing, transactionType: isCash ? 'cash' : 'financed',
+                    initialDepositDays: document.getElementById('initialDeposit').value,
+                    additionalDepositDays: document.getElementById('additionalDeposit').value,
+                    financingDays: isCash ? 0 : document.getElementById('financingDays').value,
+                    titleDays: document.getElementById('titleDays').value,
+                    floodDays: document.getElementById('floodDays').value,
+                    inspectionDays: document.getElementById('inspectionDays').value,
+                }),
+            });
+            data = await r.json();
+            if (!r.ok) throw new Error(data.error || `The date service answered ${r.status}`);
+        } catch (e) {
+            alert(`Couldn't calculate the dates: ${e.message}`);
+            return;
         }
-
-        const inspEnd = addCalendarDaysThenAdjust(effectiveDate, inspDays);
-        push('Inspection Period Ends', inspEnd, `${inspDays} calendar days from effective date`,
-            inspEnd >= closingDate ? 'WARNING: Inspection period ends after closing date!' : null);
-
-        if (!isCash && financingDays > 0) {
-            const loanDate = addCalendarDaysThenAdjust(effectiveDate, financingDays);
-            let warn = null;
-            if (loanDate >= closingDate) warn = 'WARNING: Loan approval date is after closing date!';
-            else if ((closingDate - loanDate) / 86400000 < 3) warn = 'WARNING: Loan approval is too close to closing date!';
-            push('Loan Approval Deadline', loanDate, `${financingDays} calendar days from effective date`, warn);
-            push('Seller Cancellation Deadline', addCalendarDaysThenAdjust(loanDate, 3), '3 calendar days after loan approval deadline');
-        }
-
-        const titleDate = subtractCalendarDaysThenAdjust(closingDate, titleDays);
-        push('Title Insurance / Commitment Due', titleDate, `${titleDays} calendar days before closing`);
-
-        const floodDate = addCalendarDaysThenAdjust(effectiveDate, floodDays);
-        push('Flood Zone Determination Due', floodDate, `${floodDays} calendar days from effective date`);
-
-        push('Insurance Evidence Due', titleDate < floodDate ? titleDate : floodDate,
-            'Earlier of title commitment or flood determination');
-
-        if (!isCash) {
-            push('Closing Disclosure (CD) Due', subtractTRIDDays(closingDate, 3),
-                '3 business days before closing (TRID: Mon–Sat count, not Sunday/holidays)');
-        }
-
-        const walkDate = new Date(closingDate);
-        walkDate.setDate(walkDate.getDate() - 1);
-        push('Final Walk-Through', walkDate, 'Day before closing (recommended)');
-        push('Closing Date', closingDate, 'Transaction closing date');
-
-        displayResults(propId, effectiveDate, closingDate);
+        const asDate = s => new Date(s + 'T00:00:00');
+        calculatedDates = data.items.map(i => ({ label: i.label, date: asDate(i.date), description: i.description, warning: i.warning }));
+        displayResults(propId, asDate(effective), asDate(closing));
     }
 
     function displayResults(propId, effectiveDate, closingDate) {
