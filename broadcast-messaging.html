@@ -110,6 +110,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .badge-sent{background:#DCFCE7;color:#166534}
 .badge-rejected{background:#FEE2E2;color:#991B1B}
 .badge-failed{background:#FEE2E2;color:#991B1B}
+.badge-scheduled{background:#DBEAFE;color:#1E40AF}
+.badge-held{background:#FFEDD5;color:#9A3412}
+.badge-cancelled{background:#F3F4F6;color:#4B5563}
+.when-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.when-row label.opt{display:flex;align-items:center;gap:6px;font-weight:500;color:var(--text,#1A1D23);margin:0;cursor:pointer}
+.when-pick{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.when-pick input{padding:7px 9px;border:1px solid #DDE1E9;border-radius:7px;font:inherit}
+.when-note{font-size:12px;color:#6B7280;margin-top:6px}
+.sched-line{font-size:12.5px;color:#1E40AF;margin-top:4px;font-weight:600}
+.held-line{font-size:12.5px;color:#9A3412;margin-top:4px}
+.edit-box{margin-top:10px;border-top:1px dashed #DDE1E9;padding-top:10px}
+.edit-box textarea{width:100%;min-height:80px;padding:8px;border:1px solid #DDE1E9;border-radius:7px;font:inherit}
 .reject-box{margin-top:10px}
 .reject-box textarea{width:100%;min-height:50px;border:1px solid var(--border);border-radius:6px;padding:7px 9px;font:inherit;font-size:12.5px}
 .expand-detail{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;font-size:12px}
@@ -210,6 +222,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <div class="char-count">"ACC Messaging. Go to https://accr.s.gy/com to control your settings. Reply STOP to unsubscribe." is appended automatically — no need to type it.</div>
           </div>
 
+          <div class="field">
+            <label>When</label>
+            <div class="when-row">
+              <label class="opt"><input type="radio" name="when" value="now" checked onchange="setWhen()"> Send now</label>
+              <label class="opt"><input type="radio" name="when" value="later" onchange="setWhen()"> Schedule for later</label>
+            </div>
+            <div class="when-pick" id="when-pick" style="display:none">
+              <input type="date" id="sched-date"> <input type="time" id="sched-time" step="300" value="09:00">
+              <span class="when-note">Eastern time · between 8 am and 9 pm (emergencies any time) · up to 60 days ahead</span>
+            </div>
+          </div>
+
           <div id="preview-panel" class="preview-panel" style="display:none"></div>
 
           <div class="actions">
@@ -291,7 +315,8 @@ async function init() {
   document.getElementById('tabbed-app').style.display = 'block';
   setupForRole();
   await loadOffices();
-  switchTab('compose');
+  const hashTab = location.hash.slice(1);
+  switchTab(['approvals', 'history', 'replies'].includes(hashTab) && (hashTab !== 'approvals' || isManager()) ? hashTab : 'compose');
   loadHistory();
   if (myRole === 'admin' || myRole === 'sales_manager') loadApprovalQueue();
   loadReplies();
@@ -472,8 +497,13 @@ async function sendBroadcast() {
     const body = Object.assign(currentCampaignBody(), { message });
     if (currentScope === 'offices' && !selectedOfficeIds.size) throw new Error('Pick at least one office.');
     if (currentScope === 'agents' && !selectedAgents.size) throw new Error('Pick at least one agent.');
+    if (scheduling()) {
+      const d = document.getElementById('sched-date').value, t = document.getElementById('sched-time').value;
+      if (!d || !t) throw new Error('Pick the date and time to send it.');
+      body.scheduled_date = d; body.scheduled_time = t;
+    }
 
-    btn.disabled = true; btn.textContent = 'Sending…';
+    btn.disabled = true; btn.textContent = scheduling() ? 'Scheduling…' : 'Sending…';
     const r = await fetch(`${PROXY}/broadcast/campaigns`, {
       method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body),
     });
@@ -482,8 +512,11 @@ async function sendBroadcast() {
 
     statusEl.className = 'compose-status ok';
     statusEl.textContent = data.status === 'pending_approval'
-      ? 'Submitted — a manager will review before this goes out.'
-      : `Sent to ${data.sentCount} agent(s).${data.failedCount ? ` (${data.failedCount} failed)` : ''}`;
+      ? (data.scheduledFor ? `Submitted — once a manager approves it, it goes out ${whenLabel(data.scheduledFor)}.` : 'Submitted — a manager will review before this goes out.')
+      : data.status === 'scheduled'
+        ? `Scheduled for ${whenLabel(data.scheduledFor)}. You can change or cancel it under History until then.`
+        : `Sent to ${data.sentCount} agent(s).${data.failedCount ? ` (${data.failedCount} failed)` : ''}`;
+    document.querySelector('input[name="when"][value="now"]').checked = true; setWhen();
 
     document.getElementById('message-text').value = '';
     updateCharCount();
@@ -498,8 +531,88 @@ async function sendBroadcast() {
     statusEl.className = 'compose-status err';
     statusEl.textContent = e.message;
   } finally {
-    btn.disabled = false; btn.textContent = 'Send';
+    btn.disabled = false; btn.textContent = scheduling() ? 'Schedule' : 'Send';
   }
+}
+
+/* ─────────────────────── SCHEDULING ─────────────────── */
+const scheduling = () => document.querySelector('input[name="when"]:checked')?.value === 'later';
+function easternToday() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+function setWhen() {
+  const later = scheduling();
+  document.getElementById('when-pick').style.display = later ? '' : 'none';
+  const d = document.getElementById('sched-date');
+  if (later && !d.value) d.value = easternToday();
+  d.min = easternToday();
+  document.getElementById('send-btn').textContent = later ? 'Schedule' : 'Send';
+}
+function whenLabel(iso) {
+  return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' Eastern';
+}
+// A stored time -> the date and time inputs, in Eastern
+function easternParts(iso) {
+  const d = new Date(iso);
+  return { date: d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }),
+           time: d.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' }) };
+}
+const isManager = () => myRole === 'admin' || myRole === 'sales_manager';
+const canChange = c => isManager() || String(c.created_by_email).toLowerCase() === String(userEmail).toLowerCase();
+const notYetSent = c => ['scheduled', 'pending_approval', 'held'].includes(c.status);
+
+function scheduleLines(c) {
+  if (c.status === 'held') return `<div class="held-line">⚠ Not sent: ${esc(c.held_reason || 'its time passed.')}</div>`;
+  if (c.scheduled_for && notYetSent(c)) return `<div class="sched-line">🕘 ${c.status === 'pending_approval' ? 'To go out' : 'Goes out'} ${esc(whenLabel(c.scheduled_for))}${c.status === 'pending_approval' ? ' once approved' : ''}</div>`;
+  if (c.status === 'cancelled') return `<div class="row-meta">Cancelled by ${esc(c.cancelled_by_email || '')} · ${formatDate(c.cancelled_at)}</div>`;
+  return '';
+}
+function scheduleActions(c) {
+  if (!notYetSent(c) || !canChange(c)) return '';
+  return `${c.status !== 'pending_approval' || canChange(c) ? `<button class="btn btn-secondary btn-sm" onclick="showEdit(${c.id})">Edit</button>` : ''}
+    ${isManager() && ['scheduled', 'held'].includes(c.status) ? `<button class="btn btn-primary btn-sm" onclick="sendNow(${c.id})">Send now</button>` : ''}
+    <button class="btn btn-danger btn-sm" onclick="cancelCampaign(${c.id})">Cancel</button>`;
+}
+let CAMPAIGNS = {};
+function showEdit(id) {
+  const c = CAMPAIGNS[id]; if (!c) return;
+  const box = document.getElementById(`edit-${id}`);
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  const p = c.scheduled_for ? easternParts(c.scheduled_for) : { date: easternToday(), time: '09:00' };
+  box.innerHTML = `<div class="edit-box">
+    <textarea id="edit-msg-${id}" maxlength="1600">${esc(c.message)}</textarea>
+    ${c.scheduled_for ? `<div class="when-pick"><input type="date" id="edit-date-${id}" value="${p.date}" min="${easternToday()}"> <input type="time" id="edit-time-${id}" step="300" value="${p.time}">
+      <span class="when-note">Eastern time${myRole === 'office_coordinator' ? ' · a change goes back to a manager for approval' : ''}</span></div>` : ''}
+    <div class="actions" style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="showEdit(${id})">Close</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEdit(${id})">Save changes</button></div></div>`;
+}
+async function saveEdit(id) {
+  try {
+    const body = { message: document.getElementById(`edit-msg-${id}`).value.trim() };
+    const d = document.getElementById(`edit-date-${id}`), t = document.getElementById(`edit-time-${id}`);
+    if (d && t) { body.scheduled_date = d.value; body.scheduled_time = t.value; }
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}`, { method: 'PATCH', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not save');
+    loadHistory(); if (isManager()) loadApprovalQueue();
+  } catch (e) { alert(e.message); }
+}
+async function cancelCampaign(id) {
+  if (!confirm('Cancel this message? It will not be sent.')) return;
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}/cancel`, { method: 'POST', headers: authHeaders() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not cancel');
+    loadHistory(); if (isManager()) loadApprovalQueue();
+  } catch (e) { alert(e.message); }
+}
+async function sendNow(id) {
+  if (!confirm('Send this message now instead of at its scheduled time?')) return;
+  try {
+    const r = await fetch(`${PROXY}/broadcast/campaigns/${id}/send-now`, { method: 'POST', headers: authHeaders() });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not send');
+    alert(`Sent to ${data.sentCount} agent(s).${data.failedCount ? ` (${data.failedCount} failed)` : ''}`);
+    loadHistory();
+  } catch (e) { alert(e.message); }
 }
 
 /* ─────────────────────── APPROVAL QUEUE ─────────────── */
@@ -519,9 +632,10 @@ async function loadApprovalQueue() {
           <div>
             <div class="row-category">${esc(CATEGORY_LABEL[c.category] || c.category)}</div>
             <div class="row-meta">${esc(scopeSummary(c))} · from ${esc(c.created_by_email)} · ${formatDate(c.created_at)}</div>
+            ${c.scheduled_for ? `<div class="sched-line">🕘 Scheduled for ${esc(whenLabel(c.scheduled_for))}</div>` : ''}
           </div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-primary btn-sm" onclick="approveCampaign(${c.id})">Approve &amp; Send</button>
+            <button class="btn btn-primary btn-sm" onclick="approveCampaign(${c.id})">${c.scheduled_for && new Date(c.scheduled_for) > new Date() ? 'Approve' : 'Approve &amp; Send'}</button>
             <button class="btn btn-danger btn-sm" onclick="showRejectBox(${c.id})">Reject</button>
           </div>
         </div>
@@ -625,19 +739,23 @@ async function loadHistory() {
     const rows = await r.json();
     if (!r.ok) throw new Error(rows.error || 'Could not load history');
 
+    CAMPAIGNS = Object.fromEntries(rows.map(c => [c.id, c]));
     list.innerHTML = rows.length ? rows.map(c => `
       <div class="history-row" id="history-${c.id}">
         <div class="row-top">
           <div>
             <div class="row-category">${esc(CATEGORY_LABEL[c.category] || c.category)}</div>
             <div class="row-meta">${esc(scopeSummary(c))} · from ${esc(c.created_by_email)} · ${formatDate(c.created_at)}</div>
+            ${scheduleLines(c)}
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
             ${statusBadge(c)}
-            <button class="btn btn-secondary btn-sm" onclick="toggleHistoryDetail(${c.id})">Details</button>
+            ${scheduleActions(c)}
+            ${notYetSent(c) || c.status === 'cancelled' ? '' : `<button class="btn btn-secondary btn-sm" onclick="toggleHistoryDetail(${c.id})">Details</button>`}
           </div>
         </div>
         <div class="row-message">${esc(c.message)}</div>
+        <div id="edit-${c.id}"></div>
         <div class="expand-detail" id="detail-${c.id}" style="display:none"></div>
       </div>`).join('') : '<div class="empty">No broadcasts sent yet.</div>';
   } catch (e) {
@@ -680,10 +798,14 @@ function outcomeLabel(o) {
 
 function statusBadge(c) {
   const map = {
-    pending_approval: ['badge-pending', 'Pending approval'],
+    pending_approval: ['badge-pending', c.scheduled_for ? 'Scheduled · awaiting approval' : 'Pending approval'],
     sent: ['badge-sent', `Sent (${c.sent_count ?? 0}${c.failed_count ? `, ${c.failed_count} failed` : ''})`],
     send_failed: ['badge-failed', 'Send failed'],
     rejected: ['badge-rejected', 'Rejected'],
+    scheduled: ['badge-scheduled', 'Scheduled'],
+    sending: ['badge-scheduled', 'Sending…'],
+    held: ['badge-held', 'Held — not sent'],
+    cancelled: ['badge-cancelled', 'Cancelled'],
   };
   const [cls, label] = map[c.status] || ['badge-pending', c.status];
   return `<span class="badge ${cls}">${esc(label)}</span>`;
