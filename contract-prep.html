@@ -180,6 +180,11 @@
         <div><label for="b-email">Email</label><input type="email" id="b-email" data-answer="buyerEmail" autocomplete="off"></div>
         <div><label for="b-cell">Cell</label><input type="tel" id="b-cell" data-answer="buyerCell" autocomplete="off"></div>
       </div>
+      <div id="agreeBox" hidden style="margin-top:14px">
+        <label>Which Form Simplicity transaction?</label>
+        <div class="hint" style="margin-bottom:6px">If Shirley already made this buyer's brokerage agreement, the contract goes into that same transaction so their files stay together.</div>
+        <div id="agreeList"></div>
+      </div>
     </div>
 
     <!-- 3. Terms (offers) -->
@@ -242,7 +247,7 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { mode: "offer", facts: {}, sources: {}, answers: {}, listing: null, asked: [], built: false };
+  const state = { mode: "offer", facts: {}, sources: {}, answers: {}, listing: null, asked: [], built: false, agreements: [], useTransaction: "" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const money = (n) => (n == null || n === "" || isNaN(Number(n)) ? "" : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 }));
   const INPUT_TYPE = { year: "number", money: "number", number: "number", date: "date", email: "email", phone: "tel" };
@@ -262,6 +267,7 @@
     $("buyerCard").hidden = $("formsCard").hidden = !started;
     $("termsCard").hidden = $("elseCard").hidden = !(offer && started);
     $("docsCard").hidden = !(offer && started && state.listing && state.listing.documents.length);
+    renderAgreements();
     if (started) replan(); else needLookup();
   }
   document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
@@ -416,10 +422,11 @@
   // ── Plan: the forms, the terms, what's still needed ──
   let timer = null, seq = 0;
   function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
+  document.addEventListener("input", (e) => { if (e.target && e.target.id === "b-name") setTimeout(autoPickAgreement, 0); });
   async function replan() {
     const mine = ++seq;
     try {
-      const r = await Auth.api("/contract-prep/plan", { body: { mode: state.mode, facts: state.facts, listing: state.listing, answers: state.answers, agentId: state.agentId } });
+      const r = await Auth.api("/contract-prep/plan", { body: { mode: state.mode, facts: state.facts, listing: state.listing, answers: state.answers, agentId: state.agentId, useTransaction: offerJoins() } });
       if (mine !== seq) return;
       if (state.mode === "offer" && !state.built) { buildSections(r); syncLoan(); return replan(); }
       if (state.mode === "offer") renderRuleQs(r.questions || []);
@@ -488,7 +495,7 @@
   $("createBtn").addEventListener("click", async () => {
     $("createBtn").disabled = true; $("createMsg").className = "msg"; $("createMsg").textContent = "Creating the transaction…";
     try {
-      const r = await Auth.api("/contract-prep/create", { body: { mode: state.mode, facts: state.facts, listing: state.listing, answers: state.answers, agentId: state.agentId } });
+      const r = await Auth.api("/contract-prep/create", { body: { mode: state.mode, facts: state.facts, listing: state.listing, answers: state.answers, agentId: state.agentId, useTransaction: offerJoins() } });
       startFollowing(r.runId);
     } catch (e) {
       $("createMsg").className = "msg err"; $("createMsg").textContent = e.message;
@@ -550,8 +557,47 @@
       }
       $("fsNote").innerHTML = !r.agent ? noteHtml("warn", "Choose whose paperwork this is.") : r.fsConnected ? "" : noteHtml("error", r.fsMessage);
       $("whoCard").hidden = $("pickRow").hidden && !$("fsNote").innerHTML;
+      loadAgreements();
       if (!$("formsCard").hidden) replan();
     } catch (e) { $("fsNote").innerHTML = noteHtml("error", e.message); $("whoCard").hidden = false; }
+  }
+
+  // ── The buyer agreement's transaction (John Adams, 2026-11-15) ──
+  // An EBBA Shirley made for this agent: the offer goes into that transaction.
+  // Picked for the agent when the buyer's last name matches; they can change it.
+  const offerJoins = () => (state.mode === "offer" && state.useTransaction) || undefined;
+  const lastName = (s) => String(s || "").trim().split(/\s+/).pop().toLowerCase().replace(/[^a-z]/g, "");
+  async function loadAgreements() {
+    state.agreements = []; state.useTransaction = ""; state.agreeTouched = false;
+    try {
+      const r = await Auth.api("/contract-prep/buyer-agreements" + (state.agentId ? `?agentId=${encodeURIComponent(state.agentId)}` : ""));
+      state.agreements = r.agreements || [];
+    } catch (_) { state.agreements = []; }
+    renderAgreements();
+  }
+  function autoPickAgreement() {
+    if (state.agreeTouched || !state.agreements.length) return;
+    const ln = lastName(state.answers.buyerName);
+    const hit = ln ? state.agreements.find((a) => String(a.buyer || "").toLowerCase().split(/\s+(?:and|&)\s+|,\s*/).some((n) => lastName(n) === ln)) : null;
+    const want = hit ? hit.fsTransId : "";
+    if (want !== state.useTransaction) { state.useTransaction = want; renderAgreements(); replanSoon(); }
+  }
+  function renderAgreements() {
+    const show = state.mode === "offer" && state.agreements.length > 0;
+    $("agreeBox").hidden = !show;
+    if (!show) return;
+    const day = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    $("agreeList").innerHTML = state.agreements.map((a) => `<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-weight:400">
+        <input type="radio" name="agree" value="${esc(a.fsTransId)}" ${state.useTransaction === a.fsTransId ? "checked" : ""}>
+        <span><b>${esc(a.buyer || a.name)}</b> — add it to "${esc(a.name)}" <span class="hint">(buyer agreement, ${esc(day(a.createdAt))})</span></span></label>`).join("")
+      + `<label style="display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400"><input type="radio" name="agree" value="" ${state.useTransaction ? "" : "checked"}> <span>Start a new transaction</span></label>`;
+    for (const r of $("agreeList").querySelectorAll("input[name=agree]")) r.addEventListener("change", () => {
+      state.agreeTouched = true; state.useTransaction = r.value;
+      const a = state.agreements.find((x) => x.fsTransId === r.value);
+      // An empty buyer box takes the agreement's buyer
+      if (a && a.buyer && !String(state.answers.buyerName || "").trim()) { state.answers.buyerName = a.buyer; $("b-name").value = a.buyer; }
+      replanSoon();
+    });
   }
   $("agentPick").addEventListener("change", (e) => { if (e.target.value) loadStart(e.target.value); });
 
