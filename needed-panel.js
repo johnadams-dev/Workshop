@@ -17,7 +17,8 @@
   const css = `
   .need-missing { background: var(--red-lt, #FBEDEB) !important; border-left: 4px solid var(--red, #C0392B) !important; border-radius: 6px; padding-left: 8px !important; }
   .need-missing input, .need-missing select, .need-missing textarea { border-color: var(--red, #C0392B) !important; }
-  .need-tag { display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--red, #C0392B); border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
+  /* White on dark red, and not overridable by the label it sits in (John Adams, 2026-11-15: black on red, on the pink row, was hard to read) */
+  .need-tag { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff !important; background: #A4161A !important; border-radius: 999px; padding: 2px 8px; vertical-align: middle; line-height: 1.3; text-shadow: none; }
   .need-flash { animation: needFlash 1.2s ease-out 1; }
   @keyframes needFlash { 0% { box-shadow: 0 0 0 4px rgba(192,57,43,.45); } 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); } }
   #needPanel, #needBar { display: none; font-family: inherit; }

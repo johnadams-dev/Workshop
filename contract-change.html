@@ -36,6 +36,7 @@
   textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .btn.ghost { background: #fff; color: var(--navy); border: 1px solid var(--border); }
   .btn { background: var(--navy); color: #fff; border: 0; border-radius: 6px; padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block; }
   .btn:hover { background: var(--blue); }
   .btn:disabled { opacity: .5; cursor: default; background: var(--navy); }
@@ -112,7 +113,7 @@
 
 <div class="content">
   <h1>Change a Contract</h1>
-  <p class="lede">Extending the closing date or the inspection period goes on the Extension Addendum to Contract; a seller credit (or other terms) goes on the Addendum to Contract. Pick the deal's transaction in Form Simplicity, say what's changing, and we add the form to that transaction and fill it in for the buyers and sellers to sign.</p>
+  <p class="lede">Extending the closing date or the inspection period goes on the Extension Addendum to Contract; a seller credit, other terms or new buyers go on the Addendum to Contract; cancelling the contract uses the Release and Cancellation of Contract with an Escrow Request for the deposit refund. Pick the deal's transaction in Form Simplicity, say what's changing, and we add the form to that transaction and fill it in for the buyers and sellers to sign.</p>
 
   <div class="card" id="signin" hidden>
     <h2>Sign in</h2>
@@ -142,7 +143,7 @@
     <!-- 2. What's changing -->
     <div class="card" id="changeCard" hidden>
       <h2><span class="step">Step 2</span> What's changing?</h2>
-      <p class="sub">Choose one or more. Both extensions go on one Extension Addendum; a credit goes on an Addendum to Contract.</p>
+      <p class="sub">Choose one or more. Both extensions go on one Extension Addendum; a credit and new buyers go on one Addendum to Contract. Cancelling is done on its own.</p>
       <div class="changes" id="changeList">
         <div class="chg" data-kind="closing">
           <label class="pick"><input type="checkbox" value="closing"><div>Extend the closing date<span id="closeNow">The new closing date</span></div></label>
@@ -165,6 +166,39 @@
             </div>
             <div><label for="c-credit-text">Terms on the Addendum to Contract</label><textarea id="c-credit-text" maxlength="2000"></textarea>
               <div class="hint">Typed for you from the amount; edit it as needed.</div></div>
+          </div>
+        </div>
+        <div class="chg" data-kind="parties">
+          <label class="pick"><input type="checkbox" value="parties"><div>Change the buyers<span>Add, remove or correct a buyer's name: on the Addendum to Contract.</span></div></label>
+          <div class="more" hidden>
+            <div><label for="c-buyers">The buyer(s), as they'll be on the contract</label><input type="text" id="c-buyers" placeholder="Sam Buyer and Alex Buyer" autocomplete="off"></div>
+            <div style="margin-top:8px"><label for="c-parties-text">Terms on the Addendum to Contract</label><textarea id="c-parties-text" maxlength="2000"></textarea>
+              <div class="hint">Typed for you from the names; edit it as needed.</div></div>
+          </div>
+        </div>
+        <div class="chg" data-kind="cancel">
+          <label class="pick"><input type="checkbox" value="cancel"><div>Cancel the contract<span>Release and Cancellation of Contract, and an Escrow Request to refund the deposit.</span></div></label>
+          <div class="more" hidden>
+            <div class="row">
+              <div style="flex:1 1 260px"><label for="c-ctype">Which contract</label><select id="c-ctype">
+                <option value="asis">"AS IS" Residential Contract (ASIS)</option><option value="crsp">Contract for Residential Sale and Purchase (CRSP)</option>
+                <option value="frbar">Residential Contract for Sale and Purchase (FR/Bar)</option><option value="commercial">Commercial Contract</option><option value="land">Vacant Land Contract</option></select></div>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <div style="flex:1 1 240px"><label for="c-brk1">Brokerage released</label><input type="text" id="c-brk1" autocomplete="off"></div>
+              <div style="flex:1 1 240px"><label for="c-brk2">The other side's brokerage</label><input type="text" id="c-brk2" autocomplete="off"></div>
+            </div>
+            <div style="margin-top:10px"><label>Escrow deposit paid out <span style="font-weight:400">(up to 4 lines on the release)</span></label>
+              <div id="depRows"></div>
+              <div class="row" style="margin-top:4px;align-items:center"><button type="button" class="btn ghost" id="depAdd" style="padding:4px 10px;font-size:12.5px">+ Another line</button>
+                <label style="display:flex;gap:6px;align-items:center;font-weight:400;margin:0 0 0 10px"><input type="checkbox" id="c-nodep"> No escrow deposit</label></div></div>
+            <div id="refundBox" style="margin-top:10px"><label>Escrow Request: refund of deposit <span style="font-weight:400">(to Adams Cameron Title)</span></label>
+              <div class="row">
+                <div style="flex:1 1 200px"><label for="c-ref-to">In favor of</label><input type="text" id="c-ref-to" autocomplete="off"></div>
+                <div style="flex:0 1 150px"><label for="c-ref-amt">Amount</label><input type="text" id="c-ref-amt" inputmode="decimal" placeholder="$" autocomplete="off"></div>
+                <div style="flex:1 1 220px"><label for="c-ref-how">Instructions for sending the check</label><input type="text" id="c-ref-how" placeholder="Mail to the buyer at …" autocomplete="off"></div>
+              </div>
+              <div class="hint">The buyer's deposit line fills this in; change it if the refund is different.</div></div>
           </div>
         </div>
       </div>
@@ -213,6 +247,26 @@
 
   // John Adams, 2026-11-12: the credit sentence, typed for the agent
   const creditText = (amount) => `Seller agrees to provide a credit to Buyer at closing in the amount of ${amount || "$x"} toward Buyer's prepaids and closing costs.`;
+  // John Adams, 2026-11-15: new buyers, typed for the agent (the server's PARTIES_TEXT)
+  const partiesText = (buyers, was) => buyers ? `The Buyer under the Contract is changed to ${buyers}${was ? `, in place of ${was}` : ""}. All other terms and conditions of the Contract remain unchanged.` : "";
+  const OUR_BROKERAGE = "Adams, Cameron & Co., Realtors";
+  let partiesOwn = false, refundOwn = false;
+  // The cancellation's deposit lines
+  function depRow(amount = "", to = "") {
+    const n = document.querySelectorAll("#depRows .dep").length;
+    if (n >= 4) return;
+    $("depRows").insertAdjacentHTML("beforeend", `<div class="row dep" style="margin-top:4px">
+      <div style="flex:0 1 150px"><input type="text" class="dep-amt" inputmode="decimal" placeholder="$ amount" value="${esc(amount)}" aria-label="Amount"></div>
+      <div style="flex:1 1 260px"><input type="text" class="dep-to" placeholder="to (name)" value="${esc(to)}" aria-label="Paid to"></div></div>`);
+    $("depAdd").hidden = n + 1 >= 4;
+  }
+  function syncRefund() {
+    if (refundOwn) return;
+    const rows = [...document.querySelectorAll("#depRows .dep")].map((r) => ({ amt: r.querySelector(".dep-amt").value.trim(), to: r.querySelector(".dep-to").value.trim() }));
+    const keys = ((state.txn && state.txn.buyers) || []).map((b) => b.toLowerCase().split(/\s+/).pop());
+    const r = rows.find((x) => x.to && keys.some((k) => k && x.to.toLowerCase().includes(k))) || rows[0] || {};
+    $("c-ref-to").value = r.to || ""; $("c-ref-amt").value = r.amt || "";
+  }
   const fmtMoney = (v) => { const n = Number(String(v || "").replace(/[$,\s]/g, "")); return Number.isFinite(n) && n > 0 ? "$" + n.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }) : ""; };
 
   // ── Step 1: the agent's transactions ──
@@ -259,17 +313,26 @@
     $("effBox").hidden = false; $("changeCard").hidden = false;
     $("closeNow").textContent = d.closeDate ? `Now ${longDate(d.closeDate)}` : "The new closing date";
     $("inspNow").textContent = d.inspectionEnd ? `Now ends ${longDate(d.inspectionEnd)}. Until a date, or for a number of extra days` : "Until a date, or for a number of extra days";
+    // The cancellation's brokerages and deposit line start from what Form Simplicity knows
+    $("c-brk1").value = OUR_BROKERAGE;
+    $("c-brk2").value = t.buyerBrokerage && !/adams,?\s*cameron/i.test(t.buyerBrokerage) ? t.buyerBrokerage : "";
+    $("depRows").innerHTML = ""; depRow("", (t.buyers || []).join(" and ")); refundOwn = false; syncRefund();
+    partiesOwn = false; $("c-buyers").value = ""; $("c-parties-text").value = "";
     replan();
   }
   $("effDate").addEventListener("input", () => replanSoon());
 
   // ── Step 2: what's changing ──
-  const boxes = () => [...document.querySelectorAll("#changeList input[type=checkbox]")];
+  const boxes = () => [...document.querySelectorAll("#changeList .pick input[type=checkbox]")];   // the kinds of change, not the options inside them
   $("changeList").addEventListener("change", (e) => {
-    const cb = e.target.closest("input[type=checkbox]");
+    const cb = e.target.closest(".pick input[type=checkbox]");
     if (cb) {
       const card = cb.closest(".chg"); card.classList.toggle("on", cb.checked); card.querySelector(".more").hidden = !cb.checked;
       if (cb.checked && cb.value === "credit" && !$("c-credit-text").value) $("c-credit-text").value = creditText(fmtMoney($("c-credit").value));
+      // Cancelling stands alone: ticking it unticks the rest, and ticking another unticks it
+      if (cb.checked) for (const o of boxes()) if (o !== cb && o.checked && (cb.value === "cancel" || o.value === "cancel")) {
+        o.checked = false; const c2 = o.closest(".chg"); c2.classList.remove("on"); c2.querySelector(".more").hidden = true;
+      }
       if (cb.checked) { const i = card.querySelector(".more input"); if (i && !i.value) i.focus(); }
     }
     replanSoon();
@@ -286,6 +349,11 @@
     if (e.target.id === "c-credit-text") state.creditOwn = true;
     // The pretyped sentence follows the amount until the agent edits it
     if (e.target.id === "c-credit" && !state.creditOwn) $("c-credit-text").value = creditText(fmtMoney(e.target.value));
+    if (e.target.id === "c-parties-text") partiesOwn = true;
+    if (e.target.id === "c-buyers" && !partiesOwn) $("c-parties-text").value = partiesText(e.target.value.trim(), ((state.txn && state.txn.buyers) || []).join(" and "));
+    if (["c-ref-to", "c-ref-amt"].includes(e.target.id)) refundOwn = true;
+    if (e.target.matches(".dep-amt, .dep-to")) syncRefund();
+    if (e.target.id === "c-nodep") { $("refundBox").hidden = e.target.checked; $("depRows").style.opacity = e.target.checked ? ".4" : ""; }
     if (!e.target.matches("input[type=checkbox]")) replanSoon();
   });
   function changes() {
@@ -294,6 +362,13 @@
       if (o.value === "closing") out.closing = { date: $("c-closing").value };
       if (o.value === "inspection") out.inspection = state.inspBy === "days" ? { days: $("c-inspection-days").value } : { date: $("c-inspection").value };
       if (o.value === "credit") { out.credit = { amount: $("c-credit").value, text: $("c-credit-text").value }; if ($("c-addno").value.trim()) out.addendumNo = $("c-addno").value.trim(); }
+      if (o.value === "parties") out.parties = { buyers: $("c-buyers").value, text: $("c-parties-text").value };
+      if (o.value === "cancel") out.cancel = {
+        contractType: $("c-ctype").value, brokerages: [$("c-brk1").value, $("c-brk2").value],
+        deposits: [...document.querySelectorAll("#depRows .dep")].map((r) => ({ amount: r.querySelector(".dep-amt").value, to: r.querySelector(".dep-to").value })),
+        noDeposit: $("c-nodep").checked,
+        refund: { to: $("c-ref-to").value, amount: $("c-ref-amt").value, instructions: $("c-ref-how").value },
+      };
     }
     if ($("effDate").value) out.effectiveDate = $("effDate").value;
     return out;
@@ -301,7 +376,10 @@
   const anyChange = () => boxes().some((o) => o.checked);
 
   // ── Step 3: the paperwork ──
-  const FORM_NAMES = { ea4: "Extension Addendum to Contract (EA-4)", acsp4: "Addendum to Contract (ACSP-4)" };
+  const FORM_NAMES = { ea4: "Extension Addendum to Contract (EA-4)", acsp4: "Addendum to Contract (ACSP-4)",
+    rc4: "Release and Cancellation of Contract (RC-4)", escrow: "Escrow Request (refund of deposit)" };
+  $("depAdd").addEventListener("click", () => { depRow(); replanSoon(); });
+  $("c-ctype").addEventListener("change", () => replanSoon());
   let timer = null, seq = 0;
   function replanSoon() { clearTimeout(timer); timer = setTimeout(replan, 350); }
   async function replan() {
@@ -325,7 +403,10 @@
   }
 
   // The "Still needed" panel (needed-panel.js)
-  const NEED_ALIASES = { transaction: "#txnFilter", changes: "#changeList", effectiveDate: "#effDate", "closing.date": "#c-closing", "inspection.date": "#c-inspection", "credit.text": "#c-credit-text", "credit.amount": "#c-credit" };
+  const NEED_ALIASES = { transaction: "#txnFilter", changes: "#changeList", effectiveDate: "#effDate", "closing.date": "#c-closing", "inspection.date": "#c-inspection", "credit.text": "#c-credit-text", "credit.amount": "#c-credit",
+    "parties.buyers": "#c-buyers", "cancel.alone": "#changeList", "cancel.contractType": "#c-ctype", "cancel.brokerages": "#c-brk1", "cancel.deposits": "#depRows",
+    "cancel.refund.to": "#c-ref-to", "cancel.refund.amount": "#c-ref-amt",
+    ...Object.fromEntries([0, 1, 2, 3].flatMap((i) => [[`cancel.deposits.${i}.amount`, `#depRows .dep:nth-child(${i + 1}) .dep-amt`], [`cancel.deposits.${i}.to`, `#depRows .dep:nth-child(${i + 1}) .dep-to`]])) };
   function showNeeded() {
     if (!window.NeededPanel) return;
     if (state.runId) return NeededPanel.update([], { show: false });
