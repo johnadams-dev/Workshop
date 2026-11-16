@@ -71,6 +71,25 @@ tr.total td{font-weight:700;border-top:1px solid var(--border)}
 .tag.install{background:#ECFDF3;color:var(--install)} .tag.remove{background:#FEF2F2;color:var(--remove)} .tag.repair{background:#FFF7E8;color:var(--repair)}
 .muted{color:var(--muted)}
 .empty{color:var(--muted);font-size:13px;padding:6px 0}
+/* Signs by office (the lockbox-style inventory). Status colors: dataviz status palette, always with a label. */
+:root{--st-active:#0ca30c;--st-contract:#8a94a6;--st-off:#d03b3b;--st-none:#fab219}
+.bars{display:flex;flex-direction:column;gap:8px;margin:6px 0 10px}
+.bar-row{display:grid;grid-template-columns:150px 1fr 48px;gap:10px;align-items:center;font-size:13px}
+.bar-row .name{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-row .tot{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.bar{display:flex;gap:2px;height:18px}
+.seg{height:100%;cursor:pointer;min-width:3px}
+.seg:first-child{border-radius:4px 0 0 4px}.seg:last-child{border-radius:0 4px 4px 0}.seg:only-child{border-radius:4px}
+.seg:hover{filter:brightness(1.1);outline:2px solid #fff;outline-offset:-2px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px}
+.legend span{display:flex;align-items:center;gap:5px;cursor:pointer}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.legend span.off{opacity:.35}
+.recall{background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;border-radius:8px;padding:9px 12px;margin:8px 0;font-size:13px}
+.gtag{display:inline-flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
+.gtag i{width:8px;height:8px;border-radius:50%;display:inline-block}
+#inv-tip{position:fixed;pointer-events:none;background:#1A1D23;color:#fff;font-size:12px;padding:6px 9px;border-radius:6px;z-index:300;display:none;white-space:nowrap}
+@media (max-width:600px){.bar-row{grid-template-columns:96px 1fr 36px}}
 .loading,.err{padding:28px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px}
 .err{color:#991B1B;background:#FEF2F2;border:1px solid #FECACA}
 a{color:var(--blue)}
@@ -131,12 +150,16 @@ async function load() {
   const out = document.getElementById('out');
   out.innerHTML = '<div class="loading">Loading…</div>';
   try {
-    DATA = await Auth.api(`/signs/reports?months=${document.getElementById('months').value}&aging_days=${document.getElementById('aging').value}`);
+    [DATA, INV.signs] = await Promise.all([
+      Auth.api(`/signs/reports?months=${document.getElementById('months').value}&aging_days=${document.getElementById('aging').value}`),
+      Auth.api('/signs/inventory').then(r => r.signs).catch(() => null),
+    ]);
   } catch (e) {
     out.innerHTML = `<div class="err">${e.status === 403 ? 'Sign reports are for managers and admins.' : esc(e.message)}</div>`;
     return;
   }
   out.innerHTML = render(DATA);
+  drawInventory();
 }
 
 /* A table that can download itself. columns: [[header, row => text, { num, html }]] */
@@ -192,6 +215,8 @@ function render(d) {
     ${tile(d.problems.flagged.length, "Marked can't complete", true)}
   </div>
   ${inv.from_history ? `<p class="section-sub" style="margin:-6px 0 14px">${inv.from_history.toLocaleString()} of the signs out were worked out from the old Google Sheet${inv.without_listing ? `; ${inv.without_listing} of those couldn't be tied to a Daily Desk listing` : ''}.${unknownOwner ? ` ${unknownOwner.toLocaleString()} don't say whose sign they are (the old sheet only noted agents' own signs), so they aren't in the company or agent counts.` : ''}</p>` : ''}
+
+  <section id="inv-section"></section>
 
   <section>
     <div class="section-title">Signs out in the field</div>
@@ -258,6 +283,89 @@ function render(d) {
   </section>`;
 }
 
+/* ── Signs by office ─────────────────────────────────────────────────────────
+   Every sign up now with its listing's status, by office — like the Lockbox
+   Manager's inventory. GET /signs/inventory. Click a bar segment or a legend
+   entry to filter the list. */
+const GROUPS = [
+  { key: 'active', label: 'Active listing', color: 'var(--st-active)' },
+  { key: 'under_contract', label: 'Under contract', color: 'var(--st-contract)' },
+  { key: 'off_market', label: 'Off market — bring it in', color: 'var(--st-off)' },
+  { key: 'no_listing', label: 'No listing on file', color: 'var(--st-none)' },
+];
+const INV = { signs: null, office: '', group: '', q: '' };
+function drawInventory() {
+  const el = document.getElementById('inv-section');
+  if (!el) return;
+  if (!INV.signs) { el.innerHTML = '<div class="section-title">Signs by office</div><div class="err">The sign inventory could not be loaded.</div>'; return; }
+  const offices = [...new Set(INV.signs.map(s => s.office_name))];
+  const by = {};
+  for (const s of INV.signs) { by[s.office_name] = by[s.office_name] || { total: 0 }; by[s.office_name][s.group] = (by[s.office_name][s.group] || 0) + 1; by[s.office_name].total++; }
+  offices.sort((a, b) => by[b].total - by[a].total);
+  const max = Math.max(1, ...offices.map(o => by[o].total));
+  const present = GROUPS.filter(g => INV.signs.some(s => s.group === g.key));
+  el.innerHTML = `
+    <div class="section-title">Signs by office</div>
+    <div class="section-sub">Every sign up now and its listing's status. Click a bar or a legend entry to filter the list below.</div>
+    <div class="panel">
+      <div class="legend">${present.map(g => `<span class="${INV.group && INV.group !== g.key ? 'off' : ''}" data-group="${g.key}"><i style="background:${g.color}"></i>${g.label}</span>`).join('')}</div>
+      <div class="bars">${offices.map(o => `<div class="bar-row">
+          <span class="name" title="${esc(o)}">${esc(o)}</span>
+          <div class="bar" style="width:${(by[o].total / max * 100).toFixed(1)}%">${GROUPS.filter(g => by[o][g.key]).map(g =>
+            `<div class="seg" style="flex:${by[o][g.key]};background:${g.color}" data-office="${esc(o)}" data-group="${g.key}" data-tip="${esc(o)} · ${g.label}: ${by[o][g.key]}"></div>`).join('')}</div>
+          <span class="tot">${by[o].total}</span></div>`).join('')}</div>
+    </div>
+    <div id="inv-list"></div>`;
+  const tip = document.getElementById('inv-tip');
+  el.querySelectorAll('.seg').forEach(seg => {
+    seg.onmousemove = e => { tip.textContent = seg.dataset.tip; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; };
+    seg.onmouseleave = () => { tip.style.display = 'none'; };
+    seg.onclick = () => { tip.style.display = 'none'; const same = INV.office === seg.dataset.office && INV.group === seg.dataset.group;
+      INV.office = same ? '' : seg.dataset.office; INV.group = same ? '' : seg.dataset.group; drawInventory(); };
+  });
+  el.querySelectorAll('.legend span').forEach(sp => sp.onclick = () => { INV.group = INV.group === sp.dataset.group ? '' : sp.dataset.group; drawInventory(); });
+  drawInventoryList(offices);
+}
+function drawInventoryList(offices) {
+  const q = INV.q.trim().toLowerCase();
+  const rows = INV.signs.filter(s => (!INV.office || s.office_name === INV.office) && (!INV.group || s.group === INV.group)
+    && (!q || [s.address, s.city, s.agent_name, s.sign_type].join(' ').toLowerCase().includes(q)))
+    // What needs doing first: off market with no removal asked for, then the rest of off market, no listing, under contract, active
+    .sort((a, b) => {
+      const rank = s => s.group === 'off_market' ? (s.remove_request_id ? 1 : 0) : s.group === 'no_listing' ? 2 : s.group === 'under_contract' ? 3 : 4;
+      return rank(a) - rank(b) || String(a.office_name).localeCompare(b.office_name) || (b.days_up || 0) - (a.days_up || 0);
+    });
+  const off = rows.filter(s => s.group === 'off_market');
+  const offNoRequest = off.filter(s => !s.remove_request_id).length;
+  const g = k => GROUPS.find(x => x.key === k);
+  document.getElementById('inv-list').innerHTML = `
+    <div class="controls" style="margin-top:12px">
+      <div class="control"><label for="inv-office">Office</label><select id="inv-office">
+        <option value="">All offices</option>${offices.map(o => `<option ${INV.office === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>
+      <div class="control"><label for="inv-group">Listing</label><select id="inv-group">
+        <option value="">Any status</option>${GROUPS.map(x => `<option value="${x.key}" ${INV.group === x.key ? 'selected' : ''}>${x.label}</option>`).join('')}</select></div>
+      <div class="control grow"><label for="inv-q">Search</label><input id="inv-q" placeholder="Address, agent, sign type" value="${esc(INV.q)}"></div>
+      ${INV.office || INV.group || INV.q ? '<button class="btn" id="inv-clear">Clear</button>' : ''}
+    </div>
+    ${off.length ? `<div class="recall"><b>⚠ Removal needed:</b> ${off.length} sign${off.length === 1 ? '' : 's'} on off-market listings${offNoRequest ? ` — ${offNoRequest} with no removal asked for yet` : ', all with a removal already asked for'}.</div>` : ''}
+    ${table('inventory', `Signs up (${rows.length.toLocaleString()})`, rows, [
+      ['Listing', r => r.listing_status_label, { html: r => `<span class="gtag"><i style="background:${g(r.group).color}"></i>${esc(r.listing_status_label)}</span>` }],
+      ['Address', r => [r.address, r.city].filter(Boolean).join(', '), { html: r => listingLink(r.transaction_id, [r.address, r.city].filter(Boolean).join(', ')) }],
+      ['Office', r => r.office_name], ['Agent', r => r.agent_name], ['Sign', r => r.sign_type],
+      ['Riders', r => (r.riders || []).join(', ')], ['Whose', r => r.ownership === 'agent' ? "Agent's" : r.ownership === 'company' ? 'Company' : ''],
+      ['Up since', r => r.installed_at ? day(r.installed_at) : (r.source === 'import' ? 'From the old sheet' : '')], ['Days up', r => r.days_up, { num: true }],
+      ['Removal', r => r.group !== 'off_market' ? '' : r.remove_request_id ? 'Asked for' : 'Not asked for',
+        { html: r => r.group !== 'off_market' ? '' : r.remove_request_id ? (r.remove_request_status === 'cannot_complete' ? 'Asked — can\'t complete' : 'Asked for')
+          : (r.transaction_id ? `<a href="./sign-manager.html?type=remove&transactionId=${encodeURIComponent(r.transaction_id)}">Ask for removal</a>` : 'Not asked for') }],
+    ], { empty: 'No signs match.' })}`;
+  document.getElementById('inv-office').onchange = e => { INV.office = e.target.value; drawInventory(); };
+  document.getElementById('inv-group').onchange = e => { INV.group = e.target.value; drawInventory(); };
+  const clear = document.getElementById('inv-clear');
+  if (clear) clear.onclick = () => { INV.office = ''; INV.group = ''; INV.q = ''; drawInventory(); };
+  const qi = document.getElementById('inv-q');
+  qi.oninput = () => { INV.q = qi.value; const pos = qi.selectionStart; drawInventoryList(offices); const n = document.getElementById('inv-q'); n.focus(); n.setSelectionRange(pos, pos); };
+}
+
 /* ── CSV ── */
 function csv(id) {
   const t = TABLES[id];
@@ -291,5 +399,6 @@ function dur(h) { if (h == null) return ''; h = +h; return h < 48 ? `${Math.roun
 function monthName(ym) { const [y, m] = ym.split('-'); return new Date(+y, +m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); }
 function listingLink(id, text) { return id ? `<a href="./sign-manager.html?transactionId=${encodeURIComponent(id)}">${esc(text)}</a>` : esc(text); }
 </script>
+<div id="inv-tip"></div>
 </body>
 </html>
