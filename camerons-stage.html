@@ -879,7 +879,13 @@ async function loadListingPhotosAndGoToCurate() {
   document.getElementById('photoList').innerHTML = `<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>`;
   try {
     const { listing } = await GET(`/camerons-stage/listing/${encodeURIComponent(STATE.mlsId)}`);
-    if (!listing) { toast('Could not find that listing in DeltaNet.'); return; }
+    // Not in DeltaNet (yet): say so where the photos would be, not just in a passing toast,
+    // so a tour isn't built and saved without photos (5 Sherbury Ct, 2026-11-04)
+    if (!listing) {
+      document.getElementById('photoList').innerHTML = `<div class="state-msg"><span class="icon">📷</span>No photos found for MLS #${escapeHtml(STATE.mlsId)} in DeltaNet. A new listing's photos can take a little while to reach DeltaNet: try again later. A tour needs at least one photo.</div>`;
+      toast('No photos found for that listing in DeltaNet yet.');
+      return;
+    }
     STATE.deltaListingId = listing._delta_listing_id || null;
     if (!STATE.address) {
       // Same unit-number fallback chain used server-side for listing_cache.
@@ -1249,6 +1255,10 @@ function onTileDragEnd(e) {
 ═══════════════════════════════════════════════════════════════════ */
 async function doSave() {
   const btn = document.getElementById('saveBtn');
+  if (!(STATE.photos || []).some((p) => p.included)) {
+    toast('Choose at least one photo for the tour first.');
+    return;
+  }
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div> Saving…';
 
