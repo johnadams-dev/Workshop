@@ -1418,6 +1418,21 @@ function CrossSystemReport({ settings, onImport, onViewForm }) {
   );
 }
 
+// Daytona MLS (John Adams, 2026-11-16): Remarks holds 1,000 characters; anything more goes in
+// Additional Remarks, a separate field. Split at the last sentence end that fits (as Cameron's Lens does).
+const DAYTONA_REMARKS = 1000;
+function splitRemarks(text, max) {
+  const t = String(text || "").trim();
+  if (t.length <= max) return [t, ""];
+  const head = t.slice(0, max + 1);
+  let cut = -1;
+  const re = /[.!?]["'”’)]?(?=\s)|\n/g;
+  for (let m; (m = re.exec(head)) && m.index + m[0].length <= max;) cut = m.index + m[0].length;
+  if (cut < max * 0.5) cut = head.lastIndexOf(" ", max);
+  if (cut <= 0) cut = max;
+  return [t.slice(0, cut).trim(), t.slice(cut).trim()];
+}
+
 // ─── TAB: MLS Input Sheets ────────────────────────────────────────────────
 function FormsOutput({ formData }) {
   const [tab, setTab] = useState(formData._defaultFormTab || "stellar");
@@ -1455,6 +1470,7 @@ function FormsOutput({ formData }) {
   };
   const fs = (key) => checkChoice("stellar", key, fmt(key));
   const fd = (key) => checkChoice("daytona", key, fmt(key));
+  const [dbRemarks, dbAdditional] = splitRemarks(fmt("publicRemarks") || "", DAYTONA_REMARKS);
   const room = (pattern) => {
     const r = (formData.rooms || []).find(x => pattern.test(x.type));
     return r ? [r.type, r.level, r.size].filter(Boolean).join(" · ") : null;
@@ -1819,7 +1835,8 @@ function FormsOutput({ formData }) {
         ["Utilities", fd("utilities"), true],
       ]},
       { title: "REMARKS", color: colors.daytona, fields: [
-        ["Public Remarks", fd("publicRemarks"), true],
+        [`Remarks (${dbRemarks.length.toLocaleString()} of 1,000 characters)`, dbRemarks || null, true],
+        ...(dbAdditional ? [[`Additional Remarks (${dbAdditional.length.toLocaleString()} characters)`, dbAdditional]] : []),
         ["Private Remarks", fd("privateRemarks")],
         ["Office Remarks", fd("officeRemarks")],
       ]},
