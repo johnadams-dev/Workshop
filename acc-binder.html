@@ -345,6 +345,7 @@ let STATE = {
   agents: [],
   agentsLoaded: false,
   selectedAgentEmail: "",   // "" = acting as self; only meaningful for staff
+  fsLoadedFor: null,        // the account (selectedAgentEmail) the transaction list was loaded for
   agentNRDSID: null,
   fsTransactions: [],
   fsLoading: false,
@@ -624,7 +625,10 @@ async function initStep2() {
       console.error("Failed to load agent list:", e.message);
     }
   }
-  if (!STATE.fsTransactions.length && !STATE.fsLoading) await loadFsTransactions();
+  // Load once per account. (It used to reload whenever the list was empty: an account with no
+  // open transactions reloaded and redrew the page nonstop, closing the "Acting as" dropdown as
+  // soon as it opened. John Adams, 2026-11-16.)
+  if (STATE.fsLoadedFor !== STATE.selectedAgentEmail && !STATE.fsLoading) await loadFsTransactions();
 }
 
 // FS transaction names are almost always the property address, the seller
@@ -650,12 +654,15 @@ function findBestTransactionMatch(transactions, txnDetails) {
 }
 
 async function loadFsTransactions() {
+  const forEmail = STATE.selectedAgentEmail;
+  STATE.fsLoadedFor = forEmail; // set before the request, so a redraw meanwhile doesn't start another
   STATE.fsLoading = true;
   STATE.fsError = null;
   render();
   try {
-    const body = STATE.selectedAgentEmail ? { agentEmail: STATE.selectedAgentEmail } : {};
+    const body = forEmail ? { agentEmail: forEmail } : {};
     const result = await api('/acc-binder/fs/transactions', { method: "POST", body: JSON.stringify(body) });
+    if (STATE.selectedAgentEmail !== forEmail) { STATE.fsLoading = false; render(); return; } // switched accounts meanwhile: the redraw loads the new account
     STATE.agentNRDSID = result.agentNRDSID;
     STATE.fsTransactions = (result.transactions || []).map((t) => ({
       id: t.transId,
@@ -667,6 +674,7 @@ async function loadFsTransactions() {
     }));
     STATE.suggestedTxn = findBestTransactionMatch(STATE.fsTransactions, STATE.txnDetails);
   } catch (e) {
+    if (STATE.selectedAgentEmail !== forEmail) { STATE.fsLoading = false; render(); return; }
     STATE.fsError = e.message;
   }
   STATE.fsLoading = false;
@@ -969,7 +977,7 @@ function resetSession() {
     ...STATE,
     step: 0, files: [], analysisResult: null, analysisError: null, formOverrides: {}, splitTarget: null,
     splitting: false, splitPDFs: {}, txnDetails: { sellerName: "", buyerName: "", propertyAddress: "", propertyType: "Residential", transactionType: "Contract on My Listing" },
-    selectedAgentEmail: "", agentNRDSID: null, fsTransactions: [], fsLoading: false, fsError: null,
+    selectedAgentEmail: "", agentNRDSID: null, fsTransactions: [], fsLoading: false, fsError: null, fsLoadedFor: null,
     suggestedTxn: null, selectedTxn: null, downloaded: {}, uploadResults: [], uploading: false, uploadProgress: null, uploadDone: false,
   };
   render();
