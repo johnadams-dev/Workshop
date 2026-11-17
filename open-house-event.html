@@ -308,7 +308,7 @@ function taskHtml(t) {
   </div>`;
 }
 
-const DRAFT_LABEL = { social_copy: 'Social post drafts', neighbor_note: 'Neighbor courtesy note', theme: 'Theme ideas (optional)' };
+const DRAFT_LABEL = { social_copy: 'Social post drafts', theme: 'Theme ideas (optional)' };
 function draftBlock(kind) {
   const { event: ev, roles } = S.d;
   const text = ev.drafts?.[kind] || '';
@@ -320,8 +320,7 @@ function draftBlock(kind) {
     <div class="task-actions no-print">
       <button class="btn small ${text ? '' : 'primary'}" onclick="genDraft('${kind}', this)">${text ? 'Write a new draft' : 'Write a draft'}</button>
       ${text ? `<button class="btn small" onclick="saveDraft('${kind}')">Save edits</button>
-        <button class="btn small" onclick="copyDraft('${kind}')">Copy</button>
-        ${kind === 'neighbor_note' ? `<button class="btn small" onclick="printNote()">Print</button>` : ''}` : ''}
+        <button class="btn small" onclick="copyDraft('${kind}')">Copy</button>` : ''}
     </div>
   </div>`;
 }
@@ -332,7 +331,6 @@ function deliverableHtml(t) {
       <div class="task-actions no-print"><input id="themeInput" value="${esc(ev.theme || '')}" placeholder="Your theme, if any" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:.85rem;min-width:0;flex:1" aria-label="Theme">
       <button class="btn small" onclick="saveTheme()">Save theme</button></div>` : '');
   }
-  if (t.template_key === 'neighbors') return draftBlock('neighbor_note');
   if (t.template_key === 'wrap_up' && S.d.roles.isHost && t.status === 'pending') return '<div class="links"><a href="#wrapup">Go to the wrap-up form ↓</a></div>';
   return '';
 }
@@ -377,21 +375,8 @@ async function saveTheme() {
   try { S.d = await api(`/open-house/events/${EVENT_ID}`, { method: 'PATCH', body: JSON.stringify({ theme: document.getElementById('themeInput').value.trim() }) }); render(); toast('Theme saved.'); }
   catch (e) { toast(e.message, true); }
 }
-// The courtesy note as a printable page, to pair with the neighbor notice from Property Flyers.
-function printNote() {
-  const text = document.getElementById('d-neighbor_note').value;
-  const h = S.d.host;
-  const w = window.open('', '_blank');
-  if (!w) { toast('Allow pop-ups to print the note.', true); return; }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Neighbor note</title>
-    <style>body{font:16px/1.6 Georgia,serif;max-width:620px;margin:40px auto;padding:0 20px;color:#1a1d23}
-    .sig{display:flex;gap:14px;align-items:center;margin-top:28px;font-family:Helvetica,Arial,sans-serif;font-size:14px}
-    .sig img{width:72px;height:72px;border-radius:50%;object-fit:cover}.brand{color:#1B3A5C;font-weight:700}</style></head>
-    <body><div style="white-space:pre-wrap">${esc(text)}</div>
-    <div class="sig">${h.photo_url ? `<img src="${esc(h.photo_url)}" alt="">` : ''}<div><strong>${esc(h.name)}</strong><br>${esc(h.phone || '')}<br>${esc(h.email)}<br><span class="brand">Adams, Cameron &amp; Co. Realtors</span></div></div>
-    <script>setTimeout(()=>print(),400)<\/script></body></html>`);
-  w.document.close();
-}
+// The neighbors' courtesy note is the Open House Notice to Neighbors in Property Flyers, which the
+// "Let the neighbors know" task opens (John Adams, 2026-11-16); there's no separate drafted note.
 
 // ── Cancel / decide / reschedule ───────────────────────────────────────────
 async function cancelEvent() {
