@@ -352,7 +352,7 @@ textarea.fi.tall{min-height:130px}
       <div class="flbl">MLS Target</div>
       <select class="fi" id="descMLS" onchange="updateMLSInfo('')">
         <option value="stellar">Stellar MLS — 3,500 character limit</option>
-        <option value="daytona">Daytona Beach MLS — 10,000 character limit</option>
+        <option value="daytona">Daytona Beach MLS — 1,000 in Remarks, the rest in Additional Remarks</option>
       </select>
     </div>
     <div id="stellarSpanish" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r)">
@@ -387,13 +387,21 @@ textarea.fi.tall{min-height:130px}
           <span id="descMLSLimit" style="font-size:11px;color:var(--mu)">Stellar limit: 3,500</span>
         </div>
         <div class="char-bar-wrap"><div class="char-bar" id="descCharBar"></div></div>
+        <div id="addlResult" style="display:none;flex-direction:column;gap:6px;margin-top:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mu)">Additional Remarks (Daytona)</div>
+            <span style="font-size:11px;color:var(--mu)" id="descAddlCount"></span>
+          </div>
+          <textarea readonly class="result-text" id="descResultTextAddl" style="min-height:100px;max-height:260px"></textarea>
+          <button class="btn-sec" style="font-size:12px;padding:8px" onclick="copyDescAddl('')">⎘ Copy Additional Remarks</button>
+        </div>
         <div id="spanishResult" style="display:none;flex-direction:column;gap:6px;margin-top:4px">
           <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mu)">🇪🇸 Spanish Version (Stellar)</div>
           <textarea readonly class="result-text" id="descResultTextES" style="min-height:100px;max-height:220px"></textarea>
           <button class="btn-sec" style="font-size:12px;padding:8px" onclick="copyDescES('')">⎘ Copy Spanish</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:4px">
-          <button class="btn-go" style="flex:1;padding:10px;font-size:13px" onclick="copyDesc('')">⎘ Copy English</button>
+          <button class="btn-go" style="flex:1;padding:10px;font-size:13px" onclick="copyDesc('')" id="descCopyBtn">⎘ Copy English</button>
           <button class="btn-sec" onclick="regenDesc('')">↺ Regenerate</button>
         </div>
       </div>
@@ -559,7 +567,7 @@ textarea.fi.tall{min-height:130px}
       <div class="flbl">MLS Target</div>
       <select class="fi" id="descMLSB" onchange="updateMLSInfo('B')">
         <option value="stellar">Stellar MLS — 3,500 character limit</option>
-        <option value="daytona">Daytona Beach MLS — 10,000 character limit</option>
+        <option value="daytona">Daytona Beach MLS — 1,000 in Remarks, the rest in Additional Remarks</option>
       </select>
     </div>
     <div id="stellarSpanishB" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r)">
@@ -594,13 +602,21 @@ textarea.fi.tall{min-height:130px}
           <span id="descMLSLimitB" style="font-size:11px;color:var(--mu)">Stellar limit: 3,500</span>
         </div>
         <div class="char-bar-wrap"><div class="char-bar" id="descCharBarB"></div></div>
+        <div id="addlResultB" style="display:none;flex-direction:column;gap:6px;margin-top:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mu)">Additional Remarks (Daytona)</div>
+            <span style="font-size:11px;color:var(--mu)" id="descAddlCountB"></span>
+          </div>
+          <textarea readonly class="result-text" id="descResultTextAddlB" style="min-height:100px;max-height:260px"></textarea>
+          <button class="btn-sec" style="font-size:12px;padding:8px" onclick="copyDescAddl('B')">⎘ Copy Additional Remarks</button>
+        </div>
         <div id="spanishResultB" style="display:none;flex-direction:column;gap:6px;margin-top:4px">
           <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mu)">🇪🇸 Spanish Version (Stellar)</div>
           <textarea readonly class="result-text" id="descResultTextESB" style="min-height:100px;max-height:220px"></textarea>
           <button class="btn-sec" style="font-size:12px;padding:8px" onclick="copyDescES('B')">⎘ Copy Spanish</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:4px">
-          <button class="btn-go" style="flex:1;padding:10px;font-size:13px" onclick="copyDesc('B')">⎘ Copy English</button>
+          <button class="btn-go" style="flex:1;padding:10px;font-size:13px" onclick="copyDesc('B')" id="descCopyBtnB">⎘ Copy English</button>
           <button class="btn-sec" onclick="regenDesc('B')">↺ Regenerate</button>
         </div>
       </div>
@@ -812,6 +828,9 @@ async function runDescription(panelSuffix) {
     + '\n- Do NOT use ALL CAPS'
     + '\n- 150-250 words unless agent specifies otherwise'
     + '\n- End with a subtle call to action'
+    + (getId('descMLS').value === 'daytona'
+      ? '\n- This is for Daytona Beach MLS: the first ' + DAYTONA_REMARKS.toLocaleString() + ' characters go in the Remarks field and anything after that in Additional Remarks. Put the strongest selling points in the first ' + DAYTONA_REMARKS.toLocaleString() + ' characters and make them read as a complete description on their own.'
+      : '')
     + '\n\nReturn only the finished listing description — no preamble, labels, or surrounding quotes.';
 
   const steps = [
@@ -855,7 +874,8 @@ async function runDescription(panelSuffix) {
     setDescProg(sfx, 100, 'Complete!');
     setTimeout(() => {
       showDescState(sfx, 'result');
-      getId('descResultText').value = text + warning;
+      getId('descResultText').dataset.full = text + warning;
+      renderDesc(sfx);
       updateCharBar(sfx);
       // Check if Spanish was requested
       const wantSpanish = document.getElementById('descSpanish' + sfx)?.checked;
@@ -905,6 +925,44 @@ function fallbackCopy(text) {
 
 // ── MLS CHAR LIMITS ────────────────────────────────────────────
 const MLS_LIMITS = { stellar: 3500, daytona: 10000 };
+// Daytona Beach MLS (John Adams, 2026-11-16): Remarks holds 1,000 characters; anything more
+// goes in Additional Remarks, a separate field. The split is made at a sentence end.
+const DAYTONA_REMARKS = 1000;
+function splitRemarks(text, max) {
+  const t = String(text || '').trim();
+  if (t.length <= max) return [t, ''];
+  const head = t.slice(0, max + 1);
+  // the last sentence end (or paragraph break) that fits; else the last space
+  let cut = -1;
+  const re = /[.!?]["'”’)]?(?=\s)|\n/g;
+  for (let m; (m = re.exec(head)) && m.index + m[0].length <= max;) cut = m.index + m[0].length;
+  if (cut < max * 0.5) cut = head.lastIndexOf(' ', max);
+  if (cut <= 0) cut = max;
+  return [t.slice(0, cut).trim(), t.slice(cut).trim()];
+}
+// Shows the description: whole for Stellar; Remarks + Additional Remarks for Daytona
+function renderDesc(sfx) {
+  const main = document.getElementById('descResultText' + sfx);
+  if (!main || main.dataset.full == null) return updateCharBar(sfx);
+  const daytona = (document.getElementById('descMLS' + sfx)?.value || 'stellar') === 'daytona';
+  const [remarks, extra] = daytona ? splitRemarks(main.dataset.full, DAYTONA_REMARKS) : [main.dataset.full, ''];
+  main.value = remarks;
+  const box = document.getElementById('addlResult' + sfx);
+  if (box) box.style.display = daytona && extra ? 'flex' : 'none';
+  const addl = document.getElementById('descResultTextAddl' + sfx);
+  if (addl) addl.value = extra;
+  const addlCount = document.getElementById('descAddlCount' + sfx);
+  if (addlCount) addlCount.textContent = extra.length.toLocaleString() + ' characters';
+  const btn = document.getElementById('descCopyBtn' + sfx);
+  if (btn) btn.textContent = daytona ? '⎘ Copy Remarks' : '⎘ Copy English';
+  updateCharBar(sfx);
+}
+function copyDescAddl(sfx) {
+  const text = document.getElementById('descResultTextAddl' + sfx)?.value || '';
+  try {
+    navigator.clipboard.writeText(text).then(() => toast('⎘', 'Additional Remarks copied!')).catch(() => fallbackCopy(text));
+  } catch (_) { fallbackCopy(text); }
+}
 
 function updateMLSInfo(sfx) {
   const mls = document.getElementById('descMLS' + sfx)?.value || 'stellar';
@@ -912,14 +970,14 @@ function updateMLSInfo(sfx) {
   const stellarPanel = document.getElementById('stellarSpanish' + sfx);
   if (stellarPanel) stellarPanel.style.display = mls === 'stellar' ? 'flex' : 'none';
   const limitEl = document.getElementById('descMLSLimit' + sfx);
-  if (limitEl) limitEl.textContent = (mls === 'stellar' ? 'Stellar' : 'Daytona') + ' limit: ' + limit.toLocaleString();
-  updateCharBar(sfx);
+  if (limitEl) limitEl.textContent = mls === 'stellar' ? 'Stellar limit: ' + limit.toLocaleString() : 'Daytona Remarks: ' + DAYTONA_REMARKS.toLocaleString() + ', the rest in Additional Remarks';
+  renderDesc(sfx);
 }
 
 function updateCharBar(sfx) {
   const text = document.getElementById('descResultText' + sfx)?.value || '';
   const mls = document.getElementById('descMLS' + sfx)?.value || 'stellar';
-  const limit = MLS_LIMITS[mls];
+  const limit = mls === 'daytona' ? DAYTONA_REMARKS : MLS_LIMITS[mls];
   const len = text.length;
   const pct = Math.min(100, (len / limit) * 100);
   const bar = document.getElementById('descCharBar' + sfx);
