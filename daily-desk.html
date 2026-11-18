@@ -8473,14 +8473,15 @@ async function foundationLoadPending() {
   csvBtn.disabled = false;
   el.innerHTML = `<table class="data-table">
     <thead><tr>
-      <th>Property</th><th>Side</th><th>Customer</th><th>Donor(s)</th><th>Close Date</th>
+      <th>Property</th><th>Side</th><th>Customer</th><th>Donor(s)</th><th>Close Date</th><th></th>
     </tr></thead>
-    <tbody>${foundationPending.map(r => `<tr>
+    <tbody>${foundationPending.map((r, i) => `<tr>
       <td style="font-size:12px;">${escapeHtml(r.property_address || '—')}</td>
       <td><span class="chip ${r.side === 'seller' ? 'chip-amber' : 'chip-blue'}">${r.side}</span></td>
       <td>${escapeHtml(r.customer_name)}${r.customer_address ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${escapeHtml(r.customer_address).replace(/\n/g, '<br>')}</div>` : ''}</td>
       <td style="font-size:12px;">${escapeHtml(r.donor_names)}</td>
       <td style="font-family:var(--mono);font-size:12px;">${fmtDate(r.closing_date)}</td>
+      <td><button class="btn btn-ghost btn-sm fl-one-btn" title="Make this letter's PDF and mark it sent" onclick="foundationGeneratePDFs(${i})">PDF</button></td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
@@ -8655,8 +8656,11 @@ function foundationTemplateToHtml(text) {
     .join('');
 }
 
-async function foundationGeneratePDFs() {
+// onlyIndex: one pending letter by itself (John Adams, 2026-11-18); omitted, all of them.
+async function foundationGeneratePDFs(onlyIndex) {
   if (!foundationPending.length) return;
+  const rows = onlyIndex == null ? foundationPending : [foundationPending[onlyIndex]].filter(Boolean);
+  if (!rows.length) return;
   const template = document.getElementById('fl-template-body').value;
   if (!template.trim()) { alert('Please save a letter template first.'); return; }
   const btn = document.getElementById('fl-generate-btn');
@@ -8666,7 +8670,9 @@ async function foundationGeneratePDFs() {
   try {
     await foundationEnsureLibs();
     const { jsPDF } = window.jspdf;
-    const pdf   = new jsPDF('p', 'mm', 'a4');
+    // US Letter, the office's paper and letterhead (was A4, 18mm taller, so a full
+    // letter ran past the bottom of the sheet)
+    const pdf   = new jsPDF('p', 'mm', 'letter');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const allGiftIds = [];
@@ -8683,21 +8689,23 @@ async function foundationGeneratePDFs() {
     const marginBottomMm = 15;
     const contentHmm     = pageH - marginTopMm - marginBottomMm;
 
-    for (let i = 0; i < foundationPending.length; i++) {
+    const overflow = []; // letters that couldn't be fitted on one sheet
+    document.querySelectorAll('.fl-one-btn').forEach((b) => (b.disabled = true));
+    for (let i = 0; i < rows.length; i++) {
       // Real progress text, not just a static "Generating…" — each
       // html2canvas call below is heavy synchronous work, and this only
       // actually paints once the yield at the bottom of the loop hands
       // control back to the browser, so if it's updating, the tab is not
       // actually frozen (helpful for telling a real hang apart from "just
       // slow" when a batch this size takes a while).
-      btn.textContent = `⏳ Generating… (${i + 1}/${foundationPending.length})`;
+      btn.textContent = `⏳ Generating… (${i + 1}/${rows.length})`;
       // Setting textContent doesn't itself force a repaint -- without an
       // actual yield here, the browser can go straight from this DOM write
       // into the heavy synchronous work below without ever painting the
       // update, which is exactly why the button looked stuck on the
       // original static text even once per-letter progress was added.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const row = foundationPending[i];
+      const row = rows[i];
       allGiftIds.push(...row.gift_ids);
 
       const closingDateStr = row.closing_date
@@ -8749,6 +8757,19 @@ async function foundationGeneratePDFs() {
       if (i > 0) pdf.addPage();
 
       const imgH    = (canvas.height * pageW) / canvas.width;
+      // One sheet per letter (John Adams, 2026-11-18: a letter that ran onto a
+      // second page pushed every later letter onto the wrong letterhead sheet). A
+      // letter a little too long is shrunk to fit, centred, down to 85%; past that
+      // it keeps its second page and the agent is told which one.
+      const fit = contentHmm / imgH;
+      if (imgH > contentHmm && fit >= 0.85) {
+        const w = pageW * fit;
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (pageW - w) / 2, marginTopMm, w, contentHmm);
+        canvas.width = 0; canvas.height = 0;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        continue;
+      }
+      if (imgH > contentHmm) overflow.push(row.customer_name || row.property_address || 'a letter');
       let remaining = imgH;
       let srcY      = 0;
       let firstSlice = true;
@@ -8783,7 +8804,9 @@ async function foundationGeneratePDFs() {
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    pdf.save(`Foundation_Letters_${today}.pdf`);
+    const one = onlyIndex != null ? '_' + String(rows[0].customer_name || 'letter').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '') : '';
+    pdf.save(`Foundation_Letter${one ? '' : 's'}_${today}${one}.pdf`);
+    if (overflow.length) alert(`${overflow.length === 1 ? 'This letter is' : 'These letters are'} too long for one page, even made slightly smaller, so ${overflow.length === 1 ? 'it runs' : 'they run'} onto a second sheet: ${overflow.join(', ')}. Shorten the template, or print ${overflow.length === 1 ? 'it' : 'them'} separately.`);
 
     await POST('/daily-desk/foundation/mark-sent', { giftIds: allGiftIds });
     await Promise.all([foundationLoadPending(), foundationLoadSent()]);
@@ -8794,6 +8817,7 @@ async function foundationGeneratePDFs() {
   } finally {
     btn.textContent = origText;
     btn.disabled = foundationPending.length === 0;
+    document.querySelectorAll('.fl-one-btn').forEach((b) => (b.disabled = false));
   }
 }
 </script>
