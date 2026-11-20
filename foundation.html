@@ -393,17 +393,23 @@ function renderGiftHistory(gifts) {
     }
     return '—';
   };
+  // One gift per closing (John Adams, 2026-11-20): there's a row for each
+  // customer (and each side, for an agent on both), so the amount is shown on
+  // a closing's first row only.
+  const seen = new Set();
   el.innerHTML =
     '<table>' +
       '<thead><tr><th>Closing Date</th><th>Customer</th><th>Side</th><th>Gift</th></tr></thead>' +
-      '<tbody>' + gifts.map(g =>
-        '<tr>' +
+      '<tbody>' + gifts.map(g => {
+        const key = g.transaction_id || (g.closing_date + '|' + g.customer_name);
+        const repeat = seen.has(key); seen.add(key);
+        return '<tr>' +
           '<td style="font-variant-numeric:tabular-nums">' + fmtDate(g.closing_date) + '</td>' +
           '<td>' + escapeHtml(g.customer_name || '—') + '</td>' +
           '<td>' + (g.side === 'buyer' ? 'Buyer-side' : 'Seller-side') + '</td>' +
-          '<td>' + fmtGiftAmount(g) + '</td>' +
-        '</tr>'
-      ).join('') +
+          '<td>' + (repeat ? '<span style="color:var(--muted)">same closing</span>' : fmtGiftAmount(g)) + '</td>' +
+        '</tr>';
+      }).join('') +
       '</tbody>' +
     '</table>';
 }

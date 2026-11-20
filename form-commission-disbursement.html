@@ -206,7 +206,7 @@ function row2(l1, v1, l2, v2) {
 // %/$/Ck#/Date/OTT/NSC/ACF are filled in by hand, never computed, since
 // per-agent splits/checks aren't tracked in the system. Skips agents with
 // no name on file (e.g. no co-listing agent) instead of printing a blank row.
-function agentWorkRow(a, donor, sideComm) {
+function agentWorkRow(a, donor, sideComm, countedAbove) {
   const name = agentName(a);
   if (!name) return '';
   const badge = donor ? `<span class="foundation-badge">🌱 Foundation ${donationLabel(donor)}</span>` : '';
@@ -216,10 +216,13 @@ function agentWorkRow(a, donor, sideComm) {
   // both already known at print time. sideComm is THIS agent's own side
   // (listingSideCommOnly or buyerSideCommOnly from render()), not the deal's combined
   // GCI -- see donationAmount()'s own comment for why.
-  const acf = donationAmount(donor, sideComm);
+  // countedAbove: the same agent is on the other side too -- the Foundation
+  // gift is per closing, so it's shown once, on their first row.
+  const acf = countedAbove ? null : donationAmount(donor, sideComm);
+  const acfCell = countedAbove && donor ? '<span style="font-size:7pt;color:#555;">one per closing — above</span>' : acf != null ? fmtMoney(acf) : '&nbsp;';
   return `<tr>
     <td class="agent-name">${name}${badge}</td>
-    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>${acf != null ? fmtMoney(acf) : '&nbsp;'}</td>
+    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>${acfCell}</td>
   </tr>`;
 }
 
@@ -345,18 +348,34 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
   const donors = foundation_donors || [];
   const donorByAgentId = new Map(donors.map(d => [d.agent_id, d]));
 
-  // Total Foundation contribution pledged against THIS closing, across
-  // however many of the four participant slots are donors (a listing agent
-  // and a buyer's agent can each independently be donors on the same deal —
-  // that's two separate pledges, not a conflict, so they're summed here).
-  // Paired with each agent's OWN side's commission (excl. NSC), same as the
-  // work-table rows below — a listing-side donor's percentage never touches
-  // buyerSideCommOnly and vice versa, so two donors on the same deal can
-  // land on different dollar amounts even at an identical rate.
-  const foundationParticipants = [
-    [listing_agent, listingSideCommOnly], [co_listing_agent, listingSideCommOnly],
-    [buyers_agent, buyerSideCommOnly], [co_buyers_agent, buyerSideCommOnly],
-  ].filter(([a]) => a && donorByAgentId.has(a.agent_id));
+  // Total Foundation contribution pledged against THIS closing. A Foundation
+  // gift is per CLOSING, not per side (John Adams, 2026-11-20): two different
+  // Adams, Cameron agents on a closing each give, but one agent on both the
+  // listing and the buying side gives once. So donors are taken once per
+  // agent. A percentage pledge is on that agent's own commission (excl. NSC)
+  // -- both sides' for an agent on both -- never another agent's side.
+  const slots = [
+    [listing_agent, 'seller'], [co_listing_agent, 'seller'],
+    [buyers_agent, 'buyer'], [co_buyers_agent, 'buyer'],
+  ].filter(([a]) => a && a.agent_id != null && donorByAgentId.has(a.agent_id));
+  const donorSides = new Map();
+  for (const [a, side] of slots) {
+    if (!donorSides.has(a.agent_id)) donorSides.set(a.agent_id, { agent: a, sides: new Set() });
+    donorSides.get(a.agent_id).sides.add(side);
+  }
+  const foundationParticipants = [...donorSides.values()].map(({ agent, sides }) => {
+    const parts = [...sides].map(sd => sd === 'seller' ? listingSideCommOnly : buyerSideCommOnly);
+    return [agent, parts.some(v => v != null) ? parts.reduce((sum, v) => sum + (v || 0), 0) : null, sides.size > 1];
+  });
+  const commByAgent = new Map(foundationParticipants.map(([a, c]) => [a.agent_id, c]));
+  // Work-table rows: the gift goes on an agent's first row only.
+  const shownAcf = new Set();
+  const workRow = (a, sideComm) => {
+    const donor = donorByAgentId.get(a?.agent_id);
+    const above = !!donor && shownAcf.has(a.agent_id);
+    if (donor) shownAcf.add(a.agent_id);
+    return agentWorkRow(a, donor, donor ? commByAgent.get(a.agent_id) : sideComm, above);
+  };
   const foundationTotal = foundationParticipants.reduce((sum, [a, sideComm]) => {
     const amt = donationAmount(donorByAgentId.get(a.agent_id), sideComm);
     return sum + (amt || 0);
@@ -387,11 +406,11 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
       </thead>
       <tbody>
         <tr><td colspan="8" class="subhead">Listing Agent</td></tr>
-        ${agentWorkRow(listing_agent, donorByAgentId.get(listing_agent?.agent_id), listingSideCommOnly) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_listing_agent, donorByAgentId.get(co_listing_agent?.agent_id), listingSideCommOnly)}
+        ${workRow(listing_agent, listingSideCommOnly) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${workRow(co_listing_agent, listingSideCommOnly)}
         <tr><td colspan="8" class="subhead">Selling Agent</td></tr>
-        ${agentWorkRow(buyers_agent, donorByAgentId.get(buyers_agent?.agent_id), buyerSideCommOnly) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
-        ${agentWorkRow(co_buyers_agent, donorByAgentId.get(co_buyers_agent?.agent_id), buyerSideCommOnly)}
+        ${workRow(buyers_agent, buyerSideCommOnly) || `<tr><td class="agent-name">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>`}
+        ${workRow(co_buyers_agent, buyerSideCommOnly)}
       </tbody>
     </table>
 
@@ -433,9 +452,9 @@ function render({ transaction: t, mls_number, listing_agent, co_listing_agent, b
         <td style="font-size:8pt; color:#555; font-weight:400;">Commission Amount plus NSC</td>
       </tr>
       ${foundationTotal > 0 ? `<tr style="background:#fdf3d8">
-        <td>🌱 Foundation Contribution — ${foundationParticipants.map(([a]) => agentName(a)).join(', ')}</td>
+        <td>🌱 Foundation Contribution — ${foundationParticipants.map(([a, , both]) => agentName(a) + (both ? ' (both sides, one gift)' : '')).join(', ')}</td>
         <td class="amt">${fmtMoney(foundationTotal)}</td>
-        <td style="font-size:8pt; color:#555;">Pledged per agent (flat, or % of that agent's own side commission, excl. NSC) — informational, not deducted from GCI</td>
+        <td style="font-size:8pt; color:#555;">One per agent per closing (flat, or % of that agent's own commission, excl. NSC) — informational, not deducted from GCI</td>
       </tr>` : ''}
     </table>
 
