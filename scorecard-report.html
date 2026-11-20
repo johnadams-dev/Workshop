@@ -290,8 +290,10 @@ function esc(str) {
 const SCORECARD = [
   // GCI by month for our agents (2026-11-10, John Adams): computed live from
   // Daily Desk by the GCI rule; follows the office filter. From July 2026.
+  // Beside it, the next 90 days' expected GCI (2026-11-20): see renderForecastCard.
   { section: "Production", items: [
     { key: "derived_gci", label: "GCI" },
+    { key: "forecast_gci", forecast: true, label: "GCI Forecast — 90 days" },
   ]},
   { section: "Retention & Recruiting", items: [
     { key: "derived_added_rate",          label: "Added (annualized)",              support: ["associates_added", "dbpr_active_acc"] },
@@ -362,6 +364,10 @@ async function loadData() {
   const qs = new URLSearchParams({ end_month: document.getElementById("filter-month").value, months: MONTHS_FETCHED });
   const officeId = document.getElementById("filter-office").value;
   if (officeId) qs.set("office_id", officeId);
+  if (_forecastOffice !== officeId) {
+    _forecastOffice = officeId; _forecast = null;
+    loadForecast().then(() => { if (_forecastOffice === officeId && _data && ["main", "forecast"].includes(currentRoute().view)) render(); });
+  }
   try {
     const data = await GET(`/scorecard/metrics/trend?${qs}`);
     if (seq !== _loadSeq) return;
@@ -384,6 +390,7 @@ function currentRoute() {
   const h = decodeURIComponent(location.hash.replace(/^#/, ""));
   if (h === "all") return { view: "all" };
   if (h === "desk") return { view: "desk" };
+  if (h === "forecast") return { view: "forecast" };
   if (h.startsWith("m=")) return { view: "detail", key: h.slice(2) };
   return { view: "main" };
 }
@@ -405,6 +412,7 @@ function render() {
   const out = document.getElementById("report-output");
   if (route.view === "all") out.innerHTML = renderAllMetrics();
   else if (route.view === "detail") { out.innerHTML = renderDetail(route.key); loadOfficePanel(route.key); }
+  else if (route.view === "forecast") out.innerHTML = renderForecastDetail();
   else out.innerHTML = renderMain();
   if (route.view !== "main") window.scrollTo(0, 0);
 }
@@ -618,6 +626,182 @@ document.addEventListener("pointermove", (ev) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// GCI forecast — the next 90 days (2026-11-20, John Adams). GET /scorecard/forecast
+// (scorecard/forecast.js on the server): pending contracts, current listings and
+// new business, each as an expected value per month, with an 80% range. Shown
+// beside the GCI card, with actual GCI for the months before. It always starts
+// today, whatever month is picked above; it follows the office filter.
+// ════════════════════════════════════════════════════════════════════════════
+const FC_PARTS = [
+  { key: "pending",  name: "Under contract",   color: "var(--series-1)" },
+  { key: "listings", name: "Current listings", color: "var(--series-3)" },
+  { key: "newBiz",   name: "New business",     color: "var(--series-2)" },
+];
+const FC_ACTUAL = "#6e7681";
+let _forecast = null, _forecastOffice = null;
+
+async function loadForecast() {
+  const officeId = document.getElementById("filter-office").value;
+  try { _forecast = await GET(`/scorecard/forecast${officeId ? `?office_id=${encodeURIComponent(officeId)}` : ""}`); }
+  catch (e) { _forecast = { error: e.message }; }
+}
+
+function fcMonthLabel(m, f) {
+  const [y, mo] = m.month.split("-").map(Number);
+  const last = m.to && m.to.slice(0, 7) === m.month ? Number(m.to.slice(8)) - 1 : 0;
+  const partial = last ? ` (to ${ordinal(last)})` : "";
+  return `${MON[mo - 1]} '${String(y).slice(2)}${partial}`;
+}
+function ordinal(n) { const t = n % 100, u = n % 10; return n + (t >= 11 && t <= 13 ? "th" : u === 1 ? "st" : u === 2 ? "nd" : u === 3 ? "rd" : "th"); }
+const fcParts = (m) => ({ pending: m.gci.pending, listings: m.gci.listings, newBiz: m.gci.newListings + m.gci.newBuyers });
+
+// Bars: actual GCI for past months (grey), then the forecast months stacked by
+// source with the 80% range as a whisker; the current month is actual-so-far
+// plus the forecast for the rest of it.
+function fcBars(f, { months = 6, width = 760, height = 300, compact = false } = {}) {
+  const thisMonth = f.months[0].month;
+  const hist = (f.history || []).filter(h => h.month < thisMonth && h.gci != null).slice(-months); // months before tracking began are left out
+  const actualNow = ((f.history || []).find(h => h.month === thisMonth) || {}).gci || 0;
+  const cols = [
+    ...hist.map(h => ({ label: compact ? MON[Number(h.month.slice(5)) - 1] : `${MON[Number(h.month.slice(5)) - 1]} '${h.month.slice(2, 4)}`, tip: monthLabel(h.month + "-01"), actual: h.gci, parts: null })),
+    ...f.months.map((m, i) => ({ label: compact ? MON[Number(m.month.slice(5)) - 1] : fcMonthLabel(m), tip: fcMonthLabel(m), actual: i === 0 ? actualNow : 0, parts: fcParts(m), low: m.low, high: m.high, closings: m.closings.total })),
+  ];
+  const id = "c" + (++_chartSeq);
+  const fontSize = compact ? 10.5 : 11.5, left = compact ? 40 : 54, right = 10, top = compact ? 8 : 14, bottom = compact ? 18 : 26;
+  const tops = cols.map(c => (c.actual || 0) + (c.parts ? (c.parts.pending + c.parts.listings + c.parts.newBiz) : 0));
+  const maxV = Math.max(1, ...tops, ...cols.map(c => c.parts ? (c.actual || 0) + c.high : 0));
+  const ticks = niceTicks(0, maxV, compact ? 2 : 4), y1v = ticks[ticks.length - 1];
+  const n = cols.length, slot = (width - left - right) / n, bw = Math.min(compact ? 22 : 46, slot * 0.62);
+  const X = i => left + slot * (i + 0.5), Y = v => top + (1 - v / (y1v || 1)) * (height - top - bottom);
+  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="GCI by month: actual, then the 90-day forecast" font-size="${fontSize}" font-family="IBM Plex Sans, sans-serif">`;
+  for (const t of ticks) {
+    svg += `<line x1="${left}" x2="${width - right}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 ? "var(--axis)" : "var(--grid)"}" stroke-width="1"/>`;
+    if (!compact || t === 0 || t === y1v) svg += `<text x="${left - 6}" y="${Y(t) + 4}" text-anchor="end" fill="var(--text-muted)">${esc(fmtValue(t, "currency", { compact: true }))}</text>`;
+  }
+  if (hist.length) { // a faint divider between actual and forecast
+    const xd = left + slot * hist.length;
+    svg += `<line x1="${xd}" x2="${xd}" y1="${top}" y2="${height - bottom}" stroke="var(--axis)" stroke-dasharray="3 3"/>`;
+    if (!compact) svg += `<text x="${xd + 6}" y="${top + 10}" fill="var(--text-muted)">Forecast →</text>`;
+  }
+  cols.forEach((c, i) => {
+    const x = X(i) - bw / 2; let base = 0;
+    const seg = (v, color, op = 1) => { if (!v) return; svg += `<rect x="${x}" y="${Y(base + v)}" width="${bw}" height="${Math.max(0, Y(base) - Y(base + v) - 1)}" fill="${color}" ${op < 1 ? `fill-opacity="${op}"` : ""} rx="1"/>`; base += v; };
+    seg(c.actual, FC_ACTUAL);
+    if (c.parts) for (const p of FC_PARTS) seg(c.parts[p.key], p.color, 0.9);
+    if (c.parts && c.high > c.low) { // 80% range
+      const xl = X(i), a = Y((c.actual || 0) + c.low), b = Y((c.actual || 0) + c.high);
+      svg += `<line x1="${xl}" x2="${xl}" y1="${a}" y2="${b}" stroke="var(--text)" stroke-width="1.25" stroke-opacity=".75"/>`;
+      svg += `<line x1="${xl - 4}" x2="${xl + 4}" y1="${a}" y2="${a}" stroke="var(--text)" stroke-opacity=".75"/><line x1="${xl - 4}" x2="${xl + 4}" y1="${b}" y2="${b}" stroke="var(--text)" stroke-opacity=".75"/>`;
+    }
+    if (!compact) svg += `<text x="${X(i)}" y="${Y(tops[i]) - 6 - (c.parts ? Math.max(0, Y(tops[i]) - Y((c.actual || 0) + c.high)) : 0)}" text-anchor="middle" fill="var(--text)" font-weight="600">${esc(fmtValue(tops[i], "currency", { compact: true }))}</text>`;
+    svg += `<text x="${X(i)}" y="${height - 6}" text-anchor="middle" fill="var(--text-muted)">${esc(c.label)}</text>`;
+    if (!compact) svg += `<rect class="bar-hit" data-chart="${id}" data-i="${i}" x="${X(i) - slot / 2}" y="${top}" width="${slot}" height="${height - top - bottom}" fill="transparent"/>`;
+  });
+  svg += `</svg>`;
+  if (!compact) CHARTS.set(id, { bars: cols });
+  return `<div class="chart-wrap" id="${id}">${svg}${compact ? "" : `<div class="chart-tip"></div>`}</div>`;
+}
+// tooltip for the bar chart
+document.addEventListener("pointermove", (ev) => {
+  const hit = ev.target.closest && ev.target.closest(".bar-hit");
+  if (!hit) return;
+  const c = CHARTS.get(hit.dataset.chart); if (!c || !c.bars) return;
+  const col = c.bars[Number(hit.dataset.i)], wrap = hit.closest(".chart-wrap"), tip = wrap.querySelector(".chart-tip");
+  const row = (color, val, name) => `<div class="tip-row"><i class="legend-key" style="background:${color};margin-right:0"></i><strong>${esc(fmtValue(val, "currency"))}</strong><span>${esc(name)}</span></div>`;
+  let html = `<div class="tip-month">${esc(col.tip)}</div>`;
+  if (col.actual) html += row(FC_ACTUAL, col.actual, col.parts ? "Actual so far" : "Actual GCI");
+  if (col.parts) {
+    for (const p of FC_PARTS) html += row(p.color, col.parts[p.key], p.name);
+    html += `<div class="tip-row"><span>80% range ${esc(fmtValue((col.actual || 0) + col.low, "currency", { compact: true }))}–${esc(fmtValue((col.actual || 0) + col.high, "currency", { compact: true }))} · about ${Math.round(col.closings)} closings</span></div>`;
+  }
+  tip.innerHTML = html; tip.style.display = "block";
+  const box = wrap.getBoundingClientRect();
+  tip.style.left = Math.min(Math.max(0, ev.clientX - box.left + 12), box.width - tip.offsetWidth) + "px";
+  tip.style.top = Math.max(0, ev.clientY - box.top - tip.offsetHeight - 12) + "px";
+});
+document.addEventListener("pointerleave", () => document.querySelectorAll(".chart-tip").forEach(t => t.style.display = "none"), true);
+
+function fcDate(d, year = true) { const [y, m, dd] = d.split("-").map(Number); return `${MON[m - 1]} ${dd}${year ? ", " + y : ""}`; }
+function fcLegend() {
+  return `<div class="legend">${[{ name: "Actual GCI", color: FC_ACTUAL }, ...FC_PARTS].map(p => `<span><i class="legend-key" style="background:${p.color};height:8px;width:10px"></i>${esc(p.name)}</span>`).join("")}<span>┃ 80% range</span></div>`;
+}
+
+function renderForecastCard(cfg) {
+  const f = _forecast;
+  if (!f) return `<div class="kpi-card untracked"><div class="kpi-head"><span class="kpi-label">${esc(cfg.label)}</span></div><div class="kpi-value">Loading…</div></div>`;
+  if (f.error) return `<div class="kpi-card untracked"><div class="kpi-head"><span class="kpi-label">${esc(cfg.label)}</span></div><div class="kpi-value">Unavailable</div><p>${esc(f.error)}</p></div>`;
+  return `<a class="kpi-card" href="#forecast" aria-label="${esc(cfg.label)} — open detail">
+    <div class="kpi-head"><span class="kpi-label">${esc(cfg.label)}</span><span class="kpi-month">to ${esc(fcDate(f.through, false))}</span></div>
+    <div class="kpi-value-row"><span class="kpi-value">${fmtValue(f.total.gci, "currency", { compact: true })}</span></div>
+    <div class="kpi-goal">Likely ${fmtValue(f.total.low, "currency", { compact: true })}–${fmtValue(f.total.high, "currency", { compact: true })} · about ${f.total.closings} closings</div>
+    <div class="kpi-delta">${document.getElementById("filter-office").value ? esc(officeName()) : "All offices"} · from today</div>
+    <div class="kpi-chart">${fcBars(f, { months: 3, width: 300, height: 92, compact: true })}</div>
+  </a>`;
+}
+
+function renderForecastDetail() {
+  const back = `<a class="detail-back" href="#">← Scorecard</a>`;
+  const f = _forecast;
+  if (!f) return `${back}<div class="loading">Loading…</div>`;
+  if (f.error) return `${back}<div class="empty-state" style="color:var(--red)">Error: ${esc(f.error)}</div>`;
+  const money = v => fmtValue(v, "currency");
+  const r = f.rates || {};
+  const pct = v => `${Math.round(v * 100)}%`;
+  const row = (label, k) => `<tr><td>${label}</td>${f.months.map(m => `<td class="num">${money(k(m))}</td>`).join("")}<td class="num">${money(f.months.reduce((s, m) => s + k(m), 0))}</td></tr>`;
+  const n = f.notes || {};
+  const flags = [
+    n.pendingPastDue ? `${n.pendingPastDue} pending deal${n.pendingPastDue === 1 ? " is" : "s are"} past the closing date in Daily Desk; counted as closing now — update the date or record the closing.` : "",
+    n.pendingNoDate ? `${n.pendingNoDate} pending deal${n.pendingNoDate === 1 ? " has" : "s have"} no closing date in Daily Desk and ${n.pendingNoDate === 1 ? "isn't" : "aren't"} counted.` : "",
+    n.pendingAfterWindow ? `${n.pendingAfterWindow} pending deal${n.pendingAfterWindow === 1 ? " closes" : "s close"} after the 90 days.` : "",
+    n.estimatedRates ? `${n.estimatedRates} deal${n.estimatedRates === 1 ? " has" : "s have"} no commission rate (or no buy-side rate) in Daily Desk; the usual rate was used (${f.defaults.listRate}% list side, ${f.defaults.buyRate}% buy side).` : "",
+  ].filter(Boolean);
+  return `${back}
+    <div class="detail-head">
+      <div>
+        <h1>GCI Forecast — next 90 days</h1>
+        <div class="detail-sub">${esc(fcDate(f.asOf, false))} to ${esc(fcDate(f.through))} · ${document.getElementById("filter-office").value ? esc(officeName()) : "all offices"} · the GCI rule (our agents' side commission, without NSC)</div>
+      </div>
+      <div class="detail-stats">
+        <div class="stat"><div class="stat-label">Expected GCI</div><div class="stat-value">${money(f.total.gci)}</div></div>
+        <div class="stat"><div class="stat-label">Likely range (80%)</div><div class="stat-value">${fmtValue(f.total.low, "currency", { compact: true })}–${fmtValue(f.total.high, "currency", { compact: true })}</div></div>
+        <div class="stat"><div class="stat-label">Expected closings</div><div class="stat-value">${f.total.closings}</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Actual GCI, then the forecast</div>
+      <div class="panel-sub">Grey bars are GCI already earned (this month: so far). Hover for each part.</div>
+      ${fcLegend()}
+      ${fcBars(f, { width: 1100, height: 340 })}
+    </div>
+    <div class="panel">
+      <div class="panel-title">By month and source</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Expected GCI</th>${f.months.map(m => `<th class="num">${esc(fcMonthLabel(m))}</th>`).join("")}<th class="num">90 days</th></tr></thead>
+        <tbody>
+          ${row(`Under contract <span class="metric-detail">${f.counts.pending} deals</span>`, m => m.gci.pending)}
+          ${row(`Current listings <span class="metric-detail">${f.counts.listings} listings</span>`, m => m.gci.listings)}
+          ${row(`New listings <span class="metric-detail">${f.counts.newListings90} in the last 90 days</span>`, m => m.gci.newListings)}
+          ${row(`New buyer contracts <span class="metric-detail">${f.counts.newBuyers90} in the last 90 days</span>`, m => m.gci.newBuyers)}
+          <tr class="total-row"><td>Total</td>${f.months.map(m => `<td class="num">${money(m.gci.total)}</td>`).join("")}<td class="num">${money(f.total.gci)}</td></tr>
+          <tr><td class="metric-detail">Likely range (80%)</td>${f.months.map(m => `<td class="num metric-detail">${fmtValue(m.low, "currency", { compact: true })}–${fmtValue(m.high, "currency", { compact: true })}</td>`).join("")}<td class="num metric-detail">${fmtValue(f.total.low, "currency", { compact: true })}–${fmtValue(f.total.high, "currency", { compact: true })}</td></tr>
+          <tr><td class="metric-detail">Expected closings</td>${f.months.map(m => `<td class="num metric-detail">${Math.round(m.closings.total)}</td>`).join("")}<td class="num metric-detail">${f.total.closings}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    ${flags.length ? `<div class="panel"><div class="panel-title">To tidy in Daily Desk</div>${flags.map(t => `<p class="panel-sub" style="margin:.3rem 0">${esc(t)}</p>`).join("")}</div>` : ""}
+    <div class="panel">
+      <div class="panel-title">How it's worked out</div>
+      <ul class="panel-sub" style="margin:.3rem 0 0 1.1rem;line-height:1.6">
+        <li><b>Under contract:</b> each deal's GCI × ${pct(r.pendingClose)} chance of closing (${pct(r.pendingCloseBoth)} when both sides are ours), in the month of its closing date.</li>
+        <li><b>Current listings:</b> each listing's list-side GCI at ${pct(r.closeToList)} of its price × the chance a listing of its age closes in each month — a new listing about 37% within 90 days, one a year old about 15%.</li>
+        <li><b>New business:</b> listings and buyer-only contracts at the last 90 days' pace, each closing on our usual timing (a new listing ~75 days, a contract ~30), at the average GCI per side of the last 180 days' closings (${money(f.avgGci.list)} list side, ${money(f.avgGci.buy)} buy side).</li>
+        <li>Listings and new business follow the busy and slow months of 2023–2025 (January runs about a quarter below an average month, May a fifth above).</li>
+        <li>Rates come from Daily Desk's contracts since June 2026 and both MLSs' records of our listings 2023–2025 (studied 2026-11-20). The range covers chance, not a change in the market.</li>
+      </ul>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Main page — the scorecard
 // ════════════════════════════════════════════════════════════════════════════
 function renderMain() {
@@ -630,6 +814,7 @@ function renderMain() {
 }
 
 function renderCard(cfg) {
+  if (cfg.forecast) return renderForecastCard(cfg);
   if (cfg.untracked) {
     return `<div class="kpi-card untracked">
       <div class="kpi-head"><span class="kpi-label">${esc(cfg.label)}</span>${cfg.goalText ? `<span class="kpi-month">Goal ${esc(cfg.goalText)}</span>` : ""}</div>
