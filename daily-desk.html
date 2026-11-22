@@ -4238,7 +4238,29 @@ function closeActionModal() {
 }
 
 async function deleteTransaction(id, address) {
-  const msg = `Delete "${address}"?\n\nThis will permanently remove the transaction and all related records (participants, events, customers, checklist progress, etc.).\n\nThis cannot be undone.`;
+  // Warn first when a sign request is open, a sign is still up, or a lockbox
+  // is checked out to this listing (2026-11-22). The delete removes the sign
+  // records with the transaction; it doesn't touch lockboxes.
+  let field = [], bucks = [];
+  try {
+    const c = await api(`/daily-desk/transactions/${id}/delete-check`);
+    if ((c.blockers || []).length) { alert(`"${address}" can't be deleted.\n\n${c.blockers.join('\n')}`); return; }
+    const d = v => v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const req = { install: 'Install', remove: 'Removal', repair: 'Repair' };
+    for (const r of c.signRequests || []) field.push(`• ${req[r.request_type] || r.request_type} request still open (asked ${d(r.requested_at)}${r.status === 'cannot_complete' ? ', flagged can\'t complete' : ''})`);
+    for (const s of c.signsUp || []) field.push(`• ${s.ownership === 'agent' ? "Agent's" : 'Company'} ${s.sign_type || ''} sign still up (installed ${d(s.installed_at)})`.replace(/\s+sign/, ' sign'));
+    for (const b of c.lockboxes || []) field.push(`• Lockbox ${b.lockbox_serial} checked out${b.agent ? ' to ' + b.agent : ''} since ${d(b.checkout_at)}`);
+    for (const o of c.openHouses || []) field.push(`• Open house ${d(o.starts_at)}${o.host ? ' hosted by ' + o.host : ''} (it will be deleted; let the host know)`);
+    for (const m of c.marketingBucks || []) bucks.push(`• $${Number(m.amount).toFixed(0)} for ${m.agent || 'an agent'}: ${m.status === 'eligible' ? 'eligible, not issued yet' : 'issued, expires ' + d(m.expires_at)}`);
+  } catch (e) {
+    field = [`• Couldn't check for signs, lockboxes, open houses and Marketing Bucks (${e.message}).`];
+  }
+  const warn = (field.length
+    ? `\n\n⚠ Still out for this property:\n${field.join('\n')}\n\nDeleting removes its sign requests and sign history from Sign Manager, so nobody will be asked to pick up a sign that's still up. Lockboxes stay checked out in Lockbox Manager; check them in there.`
+    : '') + (bucks.length
+    ? `\n\n⚠ Outstanding Marketing Bucks from this transaction:\n${bucks.join('\n')}\n\nThey stay outstanding in Marketing Bucks (with the address in the reason); they're just no longer linked to a transaction.`
+    : '');
+  const msg = `Delete "${address}"?\n\nThis will permanently remove the transaction and all related records (participants, events, customers, checklist progress, sign requests, open houses, etc.).${warn}\n\nThis cannot be undone.`;
   if (!confirm(msg)) return;
   try {
     await DELETE(`/daily-desk/transactions/${id}`);
