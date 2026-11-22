@@ -425,8 +425,20 @@ let _certState = null; // { agentName, reason, amount, issuedAt, id, designIdx }
 // credit, held by the first), otherwise the credit holder.
 const certNames = r => r.certificate_names || (r.agent_first_name + ' ' + r.agent_last_name);
 
-function openPrintCert(id, agentName, reason, amount, issuedAt) {
-  _certState = { id, agentName, reason: reason || '—', amount, issuedAt, designIdx: 0 };
+// Marketing Bucks are good for six months: the server sets expires_at to the
+// issue date + 180 days. A credit printed straight after issuing has no
+// expires_at on hand yet, so work it out the same way.
+function certExpires(issuedAt, expiresAt) {
+  if (expiresAt) return String(expiresAt).slice(0, 10);
+  const d = new Date(String(issuedAt || todayStr()).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return null;
+  d.setUTCDate(d.getUTCDate() + 180);
+  return d.toISOString().slice(0, 10);
+}
+const shortDate = v => { const [y, m, d] = String(v || '').slice(0, 10).split('-'); return y && m && d ? `${+m}/${+d}/${y}` : '—'; };
+
+function openPrintCert(id, agentName, reason, amount, issuedAt, expiresAt) {
+  _certState = { id, agentName, reason: reason || '—', amount, issuedAt, expiresAt: certExpires(issuedAt, expiresAt), designIdx: 0 };
   const picker = document.getElementById('design-picker');
   picker.innerHTML = CERT_DESIGNS.map((d, i) =>
     `<button type="button" class="design-thumb ${i === 0 ? 'active' : ''}" onclick="selectCertDesign(${i})">
@@ -443,7 +455,7 @@ function selectCertDesign(idx) {
 }
 
 function renderCertPreview() {
-  const { agentName, reason, amount, issuedAt, id, designIdx } = _certState;
+  const { agentName, reason, amount, issuedAt, expiresAt, id, designIdx } = _certState;
   const d = CERT_DESIGNS[designIdx];
   document.getElementById('cert-bg').src = d.file;
   document.getElementById('cert-preview').style.aspectRatio = `${d.w} / ${d.h}`;
@@ -465,7 +477,7 @@ function renderCertPreview() {
 
   const fDate = document.getElementById('cert-field-date');
   fDate.style.cssText = styleFor(d.pos.date);
-  fDate.textContent = `Issue Date: ${fmtDate(issuedAt)}`;
+  fDate.textContent = `Issued ${shortDate(issuedAt || todayStr())}  ·  Expires ${shortDate(expiresAt)}`;
 
   const fSig = document.getElementById('cert-field-sig');
   fSig.style.cssText = posOnly(d.pos.sig);
@@ -718,7 +730,7 @@ async function loadOutstanding() {
 function printFromOutstanding(id) {
   const r = _outstandingCache.find(x => x.id === id);
   if (!r) return;
-  openPrintCert(id, certNames(r), r.reason || r.property_address, r.amount, r.issued_at);
+  openPrintCert(id, certNames(r), r.reason || r.property_address, r.amount, r.issued_at, r.expires_at);
 }
 
 function renderOutstandingRow(r) {
@@ -942,7 +954,7 @@ function printFromDrilldown(agentId, creditId) {
   if (!agentRow) return;
   const c = agentRow.credits.find(x => x.id === creditId);
   if (!c) return;
-  openPrintCert(c.id, c.certificate_names || (agentRow.agent_first_name + ' ' + agentRow.agent_last_name), c.reason, c.amount, c.issued_at);
+  openPrintCert(c.id, c.certificate_names || (agentRow.agent_first_name + ' ' + agentRow.agent_last_name), c.reason, c.amount, c.issued_at, c.expires_at);
 }
 
 // ── Google auth (shared auth.js) ───────────────────────────────────────────────
