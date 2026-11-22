@@ -4237,7 +4237,11 @@ function closeActionModal() {
   document.getElementById('actionModal').classList.remove('open');
 }
 
-async function deleteTransaction(id, address) {
+// Statuses whose delete needs the status typed in (same list on the server)
+const DELETE_CONFIRM_STATUSES = { under_contract: 'Under Contract', pending: 'Pending', closed: 'Closed' };
+const normStatusWord = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+
+async function deleteTransaction(id, address, status) {
   // Warn first when a sign request is open, a sign is still up, or a lockbox
   // is checked out to this listing (2026-11-22). The delete removes the sign
   // records with the transaction; it doesn't touch lockboxes.
@@ -4262,8 +4266,19 @@ async function deleteTransaction(id, address) {
     : '');
   const msg = `Delete "${address}"?\n\nThis will permanently remove the transaction and all related records (participants, events, customers, checklist progress, sign requests, open houses, etc.).${warn}\n\nThis cannot be undone.`;
   if (!confirm(msg)) return;
+  // A deal that's under contract or closed has real consequences (commission,
+  // reporting, the agent's production), so the admin types its status to go
+  // ahead (2026-11-22). The server checks the same word.
+  let typed = '';
+  if (DELETE_CONFIRM_STATUSES[status]) {
+    const word = DELETE_CONFIRM_STATUSES[status];
+    const ans = prompt(`"${address}" is ${word}.\n\nDeleting a transaction that's ${word} removes it from production, commission and reporting.\n\nTo delete it anyway, type ${word.toUpperCase()} below.`);
+    if (ans === null) return;
+    if (normStatusWord(ans) !== normStatusWord(word)) { alert(`Not deleted. You typed "${ans}", not ${word.toUpperCase()}.`); return; }
+    typed = ans;
+  }
   try {
-    await DELETE(`/daily-desk/transactions/${id}`);
+    await DELETE(`/daily-desk/transactions/${id}${typed ? `?confirm=${encodeURIComponent(typed)}` : ''}`);
     closeActionModal();
     cvToast('✓', 'Transaction deleted.');
     await renderAll();
@@ -4314,7 +4329,7 @@ function amShowChoose() {
   if (STATE.isAdmin) {
     listEl.innerHTML += `
       <div style="border-top:1px solid var(--ink-border);margin-top:10px;padding-top:10px">
-        <div class="action-item" onclick="deleteTransaction('${amState.id}','${(amState.address||'').replace(/'/g,"\\'")}')">
+        <div class="action-item" onclick="deleteTransaction('${amState.id}','${(amState.address||'').replace(/'/g,"\\'")}','${amState.status||''}')">
           <div class="action-item-icon">🗑</div>
           <div class="action-item-text">
             <div class="action-item-title" style="color:var(--red)">Delete Transaction</div>
