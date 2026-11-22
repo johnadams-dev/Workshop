@@ -250,3 +250,13 @@
     get proxyKey() { return store.get(K.proxyKey) || ''; },
   };
 })();
+
+// The Back button for pages opened as a home-screen app (app-back.js, 2026-11-22),
+// loaded from here so every page on auth.js has it.
+(function () {
+  if (window.__appBack || document.querySelector('script[src$="app-back.js"]')) return;
+  const s = document.createElement('script');
+  s.src = (document.currentScript && document.currentScript.src ? new URL('app-back.js', document.currentScript.src).href : 'app-back.js');
+  s.defer = true;
+  document.head.appendChild(s);
+})();
