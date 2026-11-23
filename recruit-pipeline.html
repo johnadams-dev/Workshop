@@ -411,8 +411,8 @@ function drawDrawer({ prospect: p, touches, household }) {
         <div class="chips" id="log-outcome">${Object.entries(OUTCOME_LABELS).map(([k, l]) => `<button class="chip" data-v="${k}">${l}</button>`).join('')}</div>
         <div class="control"><label for="log-body">Notes</label><textarea id="log-body" rows="3" placeholder="What was said, what they're thinking, when to follow up"></textarea></div>
         <div class="grid2" style="margin-top:8px">
-          <div class="control"><label for="log-next">Then next step</label><input id="log-next" placeholder="Leave blank to keep: ${esc(p.next_action || 'none')}"></div>
-          <div class="control"><label for="log-next-at">Due</label><select id="log-next-at"><option value="">Keep as is</option><option value="1">Tomorrow</option><option value="3">In 3 days</option><option value="7">In a week</option><option value="14">In 2 weeks</option><option value="30">In a month</option><option value="none">No next step</option></select></div>
+          <div class="control"><label for="log-next">Then next step</label><input id="log-next" placeholder="Leave blank to keep: ${esc(p.next_action || 'Follow up')}"></div>
+          <div class="control"><label for="log-next-at">Due</label><select id="log-next-at"><option value="1" selected>Tomorrow</option><option value="3">In 3 days</option><option value="7">In a week</option><option value="14">In 2 weeks</option><option value="30">In a month</option><option value="none">No next step</option></select></div>
         </div>
         <div style="margin-top:8px"><button class="btn primary sm" onclick="logTouch()">Save contact</button></div>
       </div>
@@ -570,9 +570,12 @@ async function logTouch() {
   const nextTxt = document.getElementById('log-next').value.trim();
   const body = { channel, direction: channel === 'note' ? 'none' : chipVal('log-dir'),
     outcome: channel === 'call' ? chipVal('log-outcome') : null, body: document.getElementById('log-body').value.trim() || null };
-  if (nextSel === 'none') { body.next_action = null; body.next_action_at = null; }
-  else if (nextSel) { body.next_action = nextTxt || CURRENT.next_action || 'Follow up'; body.next_action_at = plusDays(+nextSel); }
-  else if (nextTxt) { body.next_action = nextTxt; body.next_action_at = CURRENT.next_action_at ? String(CURRENT.next_action_at).slice(0, 10) : todayIso(); }
+  // Every contact sets the next step: tomorrow unless picked otherwise, so no one
+  // is reached twice in a day (John Adams, 2026-11-23). A meeting's next step is
+  // the thank-you text, today, unless one is typed.
+  if (channel === 'meeting' && !nextTxt && nextSel !== 'none' && !['joined', 'not_interested', 'do_not_contact'].includes(CURRENT.stage)) { body.next_action = 'Send a thank-you text'; body.next_action_at = todayIso(); }
+  else if (nextSel === 'none') { body.next_action = null; body.next_action_at = null; }
+  else { body.next_action = nextTxt || CURRENT.next_action || 'Follow up'; body.next_action_at = plusDays(+nextSel || 1); }
   try {
     const r = await Auth.api(`/recruit-pipeline/prospects/${CURRENT.id}/touches`, { method: 'POST', body: JSON.stringify(body) });
     toast(r.stage !== CURRENT.stage ? `Saved — now ${SUMMARY.labels[r.stage]}` : 'Saved'); afterChange();
@@ -733,7 +736,7 @@ async function renderMailings() {
     MAIL.people = d.people; MAIL.picked = new Set(d.people.map(p => p.id));
     const el = document.getElementById('m-list');
     const intro = MAIL.letter === 1
-      ? 'New prospects who haven\'t had letter 1. Letters print on letterhead (top margin on Settings); labels are Avery 5160 / 8160, 30 to a sheet.'
+      ? 'New, contacted and engaged prospects who haven\'t had letter 1 (a text or call first doesn\'t skip it). Letters print on letterhead (top margin on Settings); labels are Avery 5160 / 8160, 30 to a sheet.'
       : `Contacted prospects whose letter 1 went out ${d.letter2AfterDays}+ days ago and who haven't had letter 2. Put a magazine in with each.`;
     if (!d.people.length) { el.innerHTML = `<p class="small muted" style="margin-bottom:8px">${intro}</p><div class="empty">Nobody is due for ${esc(d.name)}.${d.noAddress ? ` (${d.noAddress} without a street address can't be mailed.)` : ''}</div>`; return; }
     el.innerHTML = `<p class="small muted" style="margin-bottom:8px">${intro} Untick anyone you don't want to mail — for a household, you may only want one letter.${d.noAddress ? ` ${d.noAddress} more have no street address and aren't listed.` : ''}</p>
