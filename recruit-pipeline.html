@@ -879,7 +879,7 @@ function drawZips() {
   document.querySelectorAll('[data-i]').forEach(inp => inp.onchange = () => { ZIPS[+inp.dataset.i][inp.dataset.k] = inp.value; });
 }
 async function saveZips() {
-  try { const r = await Auth.api('/recruit-pipeline/zip-routing', { method: 'PUT', body: JSON.stringify({ rows: ZIPS }) }); toast(`Saved ${r.count} zips`); renderSettings(); }
+  try { const r = await Auth.api('/recruit-pipeline/zip-routing', { method: 'PUT', body: JSON.stringify({ rows: ZIPS }) }); toast(`Saved ${r.count} zips${r.updated ? `; ${r.updated} prospect${r.updated === 1 ? '' : 's'} filled in from the list` : ''}`); renderSettings(); }
   catch (e) { toast(e.message); }
 }
 </script>
