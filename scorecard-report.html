@@ -894,6 +894,7 @@ function renderDetail(key) {
       ${mainHtml}
     </div>
 
+    ${key === "derived_gci" ? `<div class="panel" id="office-stack-panel"><div class="panel-title">By office, stacked</div><div class="loading">Loading offices…</div></div>` : ""}
     ${renderYoyPanel(m, label, goal)}
     ${m.grain === "office" ? `<div class="panel" id="office-panel"><div class="panel-title">By office</div><div class="loading">Loading offices…</div></div>` : ""}
     ${renderSupport(cfg, m)}
@@ -979,11 +980,14 @@ async function loadOfficePanel(key) {
   } catch (e) {
     const p = document.getElementById("office-panel");
     if (p) p.innerHTML = `<div class="panel-title">By office</div><div class="empty-state" style="color:var(--red)">Error: ${esc(e.message)}</div>`;
+    const s = document.getElementById("office-stack-panel");
+    if (s) s.remove();
     return;
   }
   const panel = document.getElementById("office-panel");
   if (!panel || currentRoute().key !== key) return;
   const range = Number(document.getElementById("filter-range").value);
+  if (key === "derived_gci") renderOfficeStack(m, data, range);
   const cfg = SCORECARD_BY_KEY[key];
   const goal = effectiveGoal(m, cfg);
   const offices = data.offices.filter(o => o.series.slice(-range).some(p => p.value != null));
@@ -1002,6 +1006,89 @@ async function loadOfficePanel(key) {
       </div>`;
     }).join("")}</div>`;
 }
+
+// GCI stacked by office (2026-11-23, John Adams): one bar per month, a segment
+// per office, on the GCI detail page. Always every office, whatever office is
+// picked above. Colors follow the office (alphabetical, the by-office order),
+// the dataviz reference palette's dark steps, validated all 8 against the card
+// surface #161b22; a 9th office onward folds into "Other offices". GCI with no
+// office on the deal or the agent shows as "No office" (all-offices view only).
+const OFFICE_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#0ca30c", "#9085e9", "#e66767"];
+function renderOfficeStack(m, data, range) {
+  const panel = document.getElementById("office-stack-panel");
+  if (!panel) return;
+  const months = m.series.slice(-range).map(p => p.period_date)
+    .filter(d => data.offices.some(o => (o.series.find(p => p.period_date === d) || {}).value != null));
+  if (!months.length) { panel.remove(); return; }
+  const val = (o, d) => (o.series.find(p => p.period_date === d) || {}).value || 0;
+  let groups = data.offices.map((o, k) => ({ name: o.office_name, color: OFFICE_COLORS[k], values: months.map(d => val(o, d)) }));
+  if (groups.length > OFFICE_COLORS.length) {
+    const rest = groups.slice(OFFICE_COLORS.length - 1);
+    groups = [...groups.slice(0, OFFICE_COLORS.length - 1), { name: "Other offices", color: "#8b949e", values: months.map((_, i) => rest.reduce((s, g) => s + g.values[i], 0)) }];
+  }
+  if (!document.getElementById("filter-office").value) { // the trend total is all offices here
+    const none = months.map((d, i) => {
+      const total = (m.series.find(p => p.period_date === d) || {}).value || 0;
+      const r = total - groups.reduce((s, g) => s + g.values[i], 0);
+      return Math.abs(r) >= 1 ? r : 0;
+    });
+    if (none.some(v => v)) groups.push({ name: "No office", color: FC_ACTUAL, values: none });
+  }
+  const totals = months.map((_, i) => groups.reduce((s, g) => s + g.values[i], 0));
+  const money = v => fmtValue(v, "currency");
+  panel.innerHTML = `<div class="panel-title">By office, stacked</div>
+    <div class="panel-sub">Each month's GCI split by the office on the deal — every office, whatever office is picked above. Hover a bar for each office.</div>
+    <div class="legend">${groups.map(g => `<span><i class="legend-key" style="background:${g.color};height:8px;width:10px"></i>${esc(g.name)}</span>`).join("")}</div>
+    ${stackBars(months, groups, totals)}
+    <div class="tbl-wrap" style="margin-top:.8rem"><table>
+      <thead><tr><th>Office</th>${months.map(d => `<th class="num">${esc(shortMonth(d))}</th>`).join("")}<th class="num">Total</th></tr></thead>
+      <tbody>
+        ${groups.map(g => `<tr><td><i class="legend-key" style="background:${g.color};height:8px;width:10px"></i>${esc(g.name)}</td>${g.values.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(g.values.reduce((a, b) => a + b, 0))}</td></tr>`).join("")}
+        <tr class="total-row"><td>Total</td>${totals.map(v => `<td class="num">${money(v)}</td>`).join("")}<td class="num">${money(totals.reduce((a, b) => a + b, 0))}</td></tr>
+      </tbody>
+    </table></div>`;
+}
+function stackBars(months, groups, totals, { width = 1100, height = 320 } = {}) {
+  const id = "c" + (++_chartSeq);
+  const left = 54, right = 10, top = 18, bottom = 26;
+  const ticks = niceTicks(0, Math.max(1, ...totals), 4), y1v = ticks[ticks.length - 1];
+  const n = months.length, slot = (width - left - right) / n, bw = Math.min(56, slot * 0.62);
+  const X = i => left + slot * (i + 0.5), Y = v => top + (1 - v / (y1v || 1)) * (height - top - bottom);
+  let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="GCI by month, stacked by office" font-size="11.5" font-family="IBM Plex Sans, sans-serif">`;
+  for (const t of ticks) {
+    svg += `<line x1="${left}" x2="${width - right}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 ? "var(--axis)" : "var(--grid)"}" stroke-width="1"/>`;
+    svg += `<text x="${left - 6}" y="${Y(t) + 4}" text-anchor="end" fill="var(--text-muted)">${esc(fmtValue(t, "currency", { compact: true }))}</text>`;
+  }
+  months.forEach((d, i) => {
+    const x = X(i) - bw / 2; let base = 0;
+    for (const g of groups) {
+      const v = Math.max(0, g.values[i]);
+      if (!v) continue;
+      svg += `<rect x="${x}" y="${Y(base + v)}" width="${bw}" height="${Math.max(0, Y(base) - Y(base + v) - 2)}" fill="${g.color}" rx="1"/>`;
+      base += v;
+    }
+    svg += `<text x="${X(i)}" y="${Y(totals[i]) - 6}" text-anchor="middle" fill="var(--text)" font-weight="600">${esc(fmtValue(totals[i], "currency", { compact: true }))}</text>`;
+    svg += `<text x="${X(i)}" y="${height - 6}" text-anchor="middle" fill="var(--text-muted)">${esc(shortMonth(d))}</text>`;
+    svg += `<rect class="stack-hit" data-chart="${id}" data-i="${i}" x="${X(i) - slot / 2}" y="${top}" width="${slot}" height="${height - top - bottom}" fill="transparent"/>`;
+  });
+  svg += `</svg>`;
+  CHARTS.set(id, { stack: { months, groups, totals } });
+  return `<div class="chart-wrap" id="${id}">${svg}<div class="chart-tip"></div></div>`;
+}
+document.addEventListener("pointermove", (ev) => {
+  const hit = ev.target.closest && ev.target.closest(".stack-hit");
+  if (!hit) return;
+  const c = CHARTS.get(hit.dataset.chart); if (!c || !c.stack) return;
+  const i = Number(hit.dataset.i), { months, groups, totals } = c.stack;
+  const wrap = hit.closest(".chart-wrap"), tip = wrap.querySelector(".chart-tip");
+  const row = (color, val, name) => `<div class="tip-row"><i class="legend-key" style="background:${color};margin-right:0"></i><strong>${esc(fmtValue(val, "currency"))}</strong><span>${esc(name)}</span></div>`;
+  let html = `<div class="tip-month">${esc(monthLabel(months[i]))} · ${esc(fmtValue(totals[i], "currency"))}</div>`;
+  for (const g of [...groups].reverse()) if (g.values[i]) html += row(g.color, g.values[i], g.name); // top of the stack first
+  tip.innerHTML = html; tip.style.display = "block";
+  const box = wrap.getBoundingClientRect();
+  tip.style.left = Math.min(Math.max(0, ev.clientX - box.left + 12), box.width - tip.offsetWidth) + "px";
+  tip.style.top = Math.max(0, ev.clientY - box.top - tip.offsetHeight - 12) + "px";
+});
 
 // ── Goal editing (stored metrics only; computed ratios carry a fixed goal) ──
 function openGoalEdit(metricKey) {
