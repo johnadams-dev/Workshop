@@ -337,6 +337,11 @@ function start() {
   const id = new URLSearchParams(location.search).get('id');
   if (pending) resumeRun(pending);
   else if (id) openBriefing(id);
+  // From the New Recruit Pipeline: ?name= starts the MLS search for that agent (2026-11-23).
+  else if (s.kind !== 'partner') {
+    const name = (new URLSearchParams(location.search).get('name') || '').trim();
+    if (name) { const box = document.getElementById('mls-search'); box.value = name; onSearch(); box.focus(); }
+  }
 }
 
 // Partner mode: their brokerage's name and logo, no Stellar MLS (manual

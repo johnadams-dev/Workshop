@@ -69,6 +69,17 @@ h1{font-size:20px;color:var(--navy);margin-bottom:4px}
 .tag.hot{background:#FEF2F2;color:var(--red)} .tag.hh{background:#F5F3FF;color:#6D28D9} .tag.warn{background:#FFF7E8;color:var(--amber)}
 .tag.stage-engaged,.tag.stage-meeting_set,.tag.stage-met{background:#ECFDF3;color:var(--green)}
 .tag.stage-joined{background:var(--green);color:#fff}
+/* Experienced agents (2026-11-23): licensed, usually at another brokerage — among the most valuable recruits */
+.tag.exp{background:var(--gold);color:var(--navy)}
+.card.exp{border-left:4px solid var(--gold)}
+.tile.exp{border-color:var(--gold);background:#FFFBEB} .tile.exp .n{color:#8A6D1E}
+.head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.btn.add{background:var(--gold);border-color:var(--gold);color:var(--navy);font-size:15px;padding:10px 18px;border-radius:10px;box-shadow:0 2px 6px rgba(201,168,76,.35)}
+.btn.add:hover{background:#D9B95A;border-color:#B8942F}
+.kind-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.kind-pick button{border:2px solid var(--border);background:#fff;border-radius:10px;padding:10px;text-align:left;cursor:pointer}
+.kind-pick button b{display:block;color:var(--navy)} .kind-pick button span{font-size:12px;color:var(--muted)}
+.kind-pick button.on{border-color:var(--gold);background:#FFFBEB}
 .overdue{color:var(--red);font-weight:600}
 .tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -133,10 +144,14 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
   </div>
 
   <div class="main">
-    <h1>New Recruit Pipeline</h1>
-    <p class="intro">People heading into a real estate career: DBPR's weekly list of sales associate exam candidates in Volusia and Flagler, website sign-ups and referrals. Everyone has an owner, a stage and a next step, and every letter, call, text and note is kept on their timeline.</p>
+    <div class="head-row">
+      <div><h1>New Recruit Pipeline</h1>
+      <p class="intro">People heading into a real estate career (DBPR's weekly list of exam candidates in Volusia and Flagler, website sign-ups and referrals) and <b>experienced agents</b> we'd like to bring over. Everyone has an owner, a stage and a next step, and every letter, call, text and note is kept on their timeline.</p></div>
+      <button class="btn add" onclick="addProspectForm()">＋ Add a recruit</button>
+    </div>
     <div class="tabs" id="tabs">
       <button class="tab active" data-tab="today">Today</button>
+      <button class="tab" data-tab="experienced">★ Experienced</button>
       <button class="tab" data-tab="texts">Texts</button>
       <button class="tab" data-tab="prospects">Prospects</button>
       <button class="tab" data-tab="mailings">Mailings</button>
@@ -154,7 +169,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:#F8FAFC}
 
 <script>
 let ME = null, OWNERS = [], SUMMARY = null, TAB = 'today';
-let LIST = { q: '', stage: 'open', owner: '', source: '', household: '', offset: 0 };
+let LIST = { q: '', stage: 'open', owner: '', source: '', kind: '', household: '', offset: 0 };
+let EXP_STAGE = 'open';
 let TODAY_OWNER = 'mine';
 const LIMIT = 100;
 const SOURCE_LABELS = { dbpr_exam: 'DBPR exam list', website: 'Website', referral: 'Referral', manual: 'Added by hand' };
@@ -171,7 +187,10 @@ const plusDays = n => { const d = new Date(`${todayIso()}T12:00:00`); d.setDate(
 const ownerName = o => `${o.last_name}, ${o.first_name}`;
 function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600); }
 const stageTag = p => `<span class="tag stage-${p.stage}">${esc(SUMMARY?.labels?.[p.stage] || p.stage)}</span>`;
-const tagsFor = p => [p.hot ? '<span class="tag hot">Hot</span>' : '',
+const isExp = p => p.kind === 'experienced';
+// Recruiting Prep, with their name already in its MLS search
+const prepUrl = p => `recruit-prep.html?name=${encodeURIComponent(p.full_name || '')}`;
+const tagsFor = p => [isExp(p) ? '<span class="tag exp">★ Experienced</span>' : '', p.hot ? '<span class="tag hot">Hot</span>' : '',
   p.household_others ? `<span class="tag hh" title="Shares an address or phone with ${p.household_others} other prospect(s)">Household +${p.household_others}</span>` : '',
   ...(p.flags || []).map(f => `<span class="tag warn">${esc(FLAG_LABELS[f] || f)}</span>`)].join('');
 
@@ -187,7 +206,7 @@ Auth.ready({ tool: 'New Recruit Pipeline', button: document.getElementById('g-si
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => show(b.dataset.tab));
   const h = location.hash.slice(1);
   Auth.api('/recruit-pipeline/texts/config').then(c => { TEXTCFG = c; }).catch(() => {});
-  show(['today', 'texts', 'prospects', 'mailings', 'reports', 'imports', 'settings'].includes(h) ? h : 'today');
+  show(['today', 'experienced', 'texts', 'prospects', 'mailings', 'reports', 'imports', 'settings'].includes(h) ? h : 'today');
   const m = location.search.match(/[?&]id=(\d+)/); if (m) openProspect(+m[1]);
 });
 
@@ -195,7 +214,7 @@ function show(tab) {
   TAB = tab;
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   history.replaceState(null, '', `${location.pathname}${location.search}#${tab}`);
-  ({ today: renderToday, texts: renderTexts, prospects: renderProspects, mailings: renderMailings, reports: renderReports, imports: renderImports, settings: renderSettings })[tab]();
+  ({ today: renderToday, experienced: renderExperienced, texts: renderTexts, prospects: renderProspects, mailings: renderMailings, reports: renderReports, imports: renderImports, settings: renderSettings })[tab]();
 }
 async function refreshSummary() { try { SUMMARY = await Auth.api('/recruit-pipeline/summary'); } catch (_) {} }
 
@@ -204,6 +223,7 @@ function tilesHtml() {
   const open = ['new', 'contacted', 'letter2_mailed', 'engaged', 'meeting_set', 'met'];
   return `<div class="tiles">
     <div class="tile due" onclick="show('today')"><div class="n">${SUMMARY.due}</div><div class="l">Due today or overdue</div></div>
+    ${SUMMARY.experienced ? `<div class="tile exp" onclick="show('experienced')"><div class="n">${SUMMARY.experienced.open}</div><div class="l">★ Experienced agents</div></div>` : ''}
     ${open.map(k => `<div class="tile" onclick="LIST={...LIST,stage:'${k}',offset:0};show('prospects')"><div class="n">${s[k] || 0}</div><div class="l">${esc(SUMMARY.labels[k])}</div></div>`).join('')}
     <div class="tile" onclick="LIST={...LIST,stage:'joined',offset:0};show('prospects')"><div class="n">${s.joined || 0}</div><div class="l">Joined us</div></div>
   </div>`;
@@ -225,19 +245,58 @@ async function renderToday() {
     const el = document.getElementById('today-list');
     if (!d.prospects.length) { el.innerHTML = `<div class="empty">Nothing due${TODAY_OWNER === 'mine' ? ' for you' : ''}. ${TODAY_OWNER === 'mine' ? '<a href="#" onclick="TODAY_OWNER=\'\';renderToday();return false">See everyone\'s</a>' : ''}</div>`; return; }
     el.innerHTML = `<div class="list">${d.prospects.map(p => `
-      <div class="card">
+      <div class="card${isExp(p) ? ' exp' : ''}">
         <div class="who" onclick="openProspect(${p.id})">
           <div class="name">${esc(p.full_name)} ${stageTag(p)}${tagsFor(p)}</div>
+          ${isExp(p) ? expLine(p) : ''}
           <div class="meta">${esc(p.next_action || '')} · <span class="${p.next_action_at < d.today ? 'overdue' : ''}">due ${fmtDate(p.next_action_at)}</span>${p.owner_name ? ` · ${esc(p.owner_name)}` : ''}</div>
           <div class="meta">${esc([p.city, p.county && `${p.county} County`].filter(Boolean).join(', '))}${p.phone_e164 ? ` · ${fmtPhone(p.phone_e164)}` : ' · no phone'}${p.last_touch_at ? ` · last touch ${fmtDate(p.last_touch_at)}` : ''}</div>
         </div>
         <div class="act">
           ${p.phone_e164 ? `<a class="btn sm" href="tel:${esc(p.phone_e164)}">📞 Call</a>` : ''}
           ${p.phone_e164 && !p.sms_opted_out_at ? `<button class="btn sm" onclick="openProspect(${p.id}, 'text')">💬 Text</button>` : ''}
+          ${isExp(p) ? prepBtn(p) : ''}
           <button class="btn sm" onclick="openProspect(${p.id}, true)">Log contact</button>
         </div>
       </div>`).join('')}</div>`;
   } catch (e) { document.getElementById('today-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+
+// ── Experienced agents (2026-11-23) ─────────────────────────────────────────
+// Licensed agents, usually at another brokerage: where a new licensee who went
+// elsewhere is a closed file, an experienced agent elsewhere is the point.
+const expLine = p => `<div class="meta"><b>${esc(p.employer_name || 'Brokerage not recorded')}</b>${p.referred_by ? ` · referred by ${esc(p.referred_by)}` : ''}</div>`;
+const prepBtn = p => `<a class="btn sm" href="${prepUrl(p)}" target="_blank" rel="noopener" title="Talking points, production and what we'd offer, from Recruiting Prep">Prep ↗</a>`;
+async function renderExperienced() {
+  const v = document.getElementById('view');
+  v.innerHTML = tilesHtml() + `<div class="controls">
+      <div class="grow small muted" style="min-width:220px">Licensed agents we'd like to bring over, usually from another brokerage, including referrals. They get no letters, and the weekly licensee check never closes them as "licensed elsewhere". Before a meeting, <b>Prep ↗</b> opens Recruiting Prep with their name in the MLS search.</div>
+      <div class="control"><label for="x-stage">Show</label><select id="x-stage" onchange="EXP_STAGE=this.value;renderExperienced()">
+        ${[['open', 'Still working'], ['joined', 'Joined us'], ['', 'Everyone']].map(([k, l]) => `<option value="${k}" ${EXP_STAGE === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <button class="btn add" onclick="addProspectForm('experienced')">＋ Add an experienced agent</button>
+      <a class="btn" href="recruit-prep.html" target="_blank" rel="noopener">Recruiting Prep ↗</a>
+    </div><div id="x-list"><div class="loading">Loading…</div></div>`;
+  try {
+    const qs = new URLSearchParams({ kind: 'experienced', limit: 500, ...(EXP_STAGE ? { stage: EXP_STAGE } : {}) });
+    const d = await Auth.api(`/recruit-pipeline/prospects?${qs}`);
+    const el = document.getElementById('x-list');
+    if (!d.prospects.length) { el.innerHTML = `<div class="empty">No experienced agents here yet. Add one with <b>＋ Add an experienced agent</b>, or tick "★ Experienced agent" on anyone already in the pipeline.</div>`; return; }
+    const today = todayIso();
+    el.innerHTML = `<div class="list">${d.prospects.map(p => `
+      <div class="card exp">
+        <div class="who" onclick="openProspect(${p.id})">
+          <div class="name">${esc(p.full_name)} ${stageTag(p)}${tagsFor(p)}</div>
+          ${expLine(p)}
+          <div class="meta">${p.next_action ? `${esc(p.next_action)}${p.next_action_at ? ` · <span class="${p.next_action_at < today ? 'overdue' : ''}">due ${fmtDate(p.next_action_at)}</span>` : ''}` : 'No next step'}${p.owner_name ? ` · ${esc(p.owner_name)}` : ''}</div>
+          <div class="meta">${esc(p.city || '')}${p.phone_e164 ? `${p.city ? ' · ' : ''}${fmtPhone(p.phone_e164)}` : ''}${p.last_touch_at ? ` · last touch ${fmtDate(p.last_touch_at)}` : ' · not contacted yet'}</div>
+        </div>
+        <div class="act">
+          ${p.phone_e164 ? `<a class="btn sm" href="tel:${esc(p.phone_e164)}">📞 Call</a>` : ''}
+          ${prepBtn(p)}
+          <button class="btn sm" onclick="openProspect(${p.id}, true)">Log contact</button>
+        </div>
+      </div>`).join('')}</div>`;
+  } catch (e) { document.getElementById('x-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 
 // ── Prospects ───────────────────────────────────────────────────────────────
@@ -249,13 +308,14 @@ async function renderProspects() {
       <div class="control"><label for="p-stage">Stage</label><select id="p-stage">${stageOpts.map(([k, l]) => `<option value="${k}" ${LIST.stage === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
       <div class="control"><label for="p-owner">Owner</label><select id="p-owner"><option value="">Anyone</option><option value="mine" ${LIST.owner === 'mine' ? 'selected' : ''}>Mine</option>${ownerOptions(LIST.owner)}</select></div>
       <div class="control"><label for="p-source">Source</label><select id="p-source"><option value="">Any</option>${Object.entries(SOURCE_LABELS).map(([k, l]) => `<option value="${k}" ${LIST.source === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="control"><label for="p-kind">Kind</label><select id="p-kind"><option value="">Both</option><option value="new" ${LIST.kind === 'new' ? 'selected' : ''}>New to real estate</option><option value="experienced" ${LIST.kind === 'experienced' ? 'selected' : ''}>Experienced agents</option></select></div>
       <div class="control"><label for="p-hh">Households</label><select id="p-hh"><option value="">Everyone</option><option value="1" ${LIST.household === '1' ? 'selected' : ''}>Only shared address/phone</option></select></div>
       <button class="btn" onclick="addProspectForm()">＋ Add</button>
       <a class="btn" href="#" onclick="downloadCsv();return false">⬇ CSV</a>
     </div><div id="p-list"><div class="loading">Loading…</div></div>`;
   let t;
   document.getElementById('p-q').oninput = e => { clearTimeout(t); t = setTimeout(() => { LIST.q = e.target.value; LIST.offset = 0; loadProspects(); }, 300); };
-  for (const [id, k] of [['p-stage', 'stage'], ['p-owner', 'owner'], ['p-source', 'source'], ['p-hh', 'household']]) {
+  for (const [id, k] of [['p-stage', 'stage'], ['p-owner', 'owner'], ['p-source', 'source'], ['p-kind', 'kind'], ['p-hh', 'household']]) {
     document.getElementById(id).onchange = e => { LIST[k] = e.target.value; LIST.offset = 0; loadProspects(); };
   }
   loadProspects();
@@ -268,7 +328,7 @@ async function loadProspects() {
     if (!d.prospects.length) { el.innerHTML = '<div class="empty">No one matches.</div>'; return; }
     el.innerHTML = `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Stage</th><th>Eligible</th><th>Area</th><th>Phone</th><th>Owner</th><th>Next step</th><th>Last touch</th></tr></thead><tbody>
       ${d.prospects.map(p => `<tr class="click" onclick="openProspect(${p.id})">
-        <td><b>${esc(p.full_name)}</b>${tagsFor(p)}<div class="small muted">${esc(SOURCE_LABELS[p.source] || p.source)}${p.imported_from ? ' · from the sheet' : ''}</div></td>
+        <td><b>${esc(p.full_name)}</b>${tagsFor(p)}<div class="small muted">${isExp(p) ? `${esc(p.employer_name || 'Brokerage not recorded')} · ` : ''}${esc(SOURCE_LABELS[p.source] || p.source)}${p.referred_by ? ` · referred by ${esc(p.referred_by)}` : ''}${p.imported_from ? ' · from the sheet' : ''}</div></td>
         <td>${stageTag(p)}</td><td>${fmtDate(p.eligibility_date)}</td>
         <td>${esc(p.city || '')}${p.zip ? ` ${esc(p.zip)}` : ''}</td><td style="white-space:nowrap">${fmtPhone(p.phone_e164 || p.phone_raw)}</td>
         <td>${esc(p.owner_name || p.legacy_owner || '')}</td>
@@ -317,11 +377,14 @@ function drawDrawer({ prospect: p, touches, household }) {
           <div class="kv"><b>Phone</b>${p.phone_e164 ? `<a href="tel:${esc(p.phone_e164)}">${fmtPhone(p.phone_e164)}</a>` : `<span class="muted">${esc(p.phone_raw || 'none')}</span>`}</div>
           <div class="kv"><b>Email</b>${p.email ? `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '<span class="muted">none</span>'}</div>
           <div class="kv"><b>Address</b>${esc(p.address1 || '')}<br>${esc([p.city, p.state].filter(Boolean).join(', '))} ${esc(p.zip || '')}${p.county ? `<div class="small muted">${esc(p.county)} County</div>` : ''}</div>
-          <div class="kv"><b>Source</b>${esc(SOURCE_LABELS[p.source] || p.source)}${p.imported_from ? `<div class="small muted">Imported from the New Licensees sheet (${esc(p.imported_from.replace('sheet:', ''))} tab)</div>` : ''}${p.eligibility_date ? `<div class="small muted">Eligible to test ${fmtDate(p.eligibility_date)}${p.dbpr_transaction === '1046' ? ' (by endorsement)' : p.dbpr_transaction === '1011' ? ' (mutual recognition)' : ''}</div>` : ''}</div>
-          ${p.licensed_at ? `<div class="kv"><b>Licensed</b>${fmtDate(p.licensed_at)} ${esc(p.license_number || '')}<div class="small">${esc(p.employer_name || 'No brokerage yet')}</div></div>` : ''}
+          ${isExp(p) ? `<div class="kv"><b>Current brokerage</b>${esc(p.employer_name || 'Not recorded')}${p.license_number ? `<div class="small muted">${esc(p.license_number)}</div>` : ''}</div>` : ''}
+          <div class="kv"><b>Source</b>${esc(SOURCE_LABELS[p.source] || p.source)}${p.referred_by ? `<div class="small">Referred by ${esc(p.referred_by)}</div>` : ''}${p.imported_from ? `<div class="small muted">Imported from the New Licensees sheet (${esc(p.imported_from.replace('sheet:', ''))} tab)</div>` : ''}${p.eligibility_date ? `<div class="small muted">Eligible to test ${fmtDate(p.eligibility_date)}${p.dbpr_transaction === '1046' ? ' (by endorsement)' : p.dbpr_transaction === '1011' ? ' (mutual recognition)' : ''}</div>` : ''}</div>
+          ${p.licensed_at && !isExp(p) ? `<div class="kv"><b>Licensed</b>${fmtDate(p.licensed_at)} ${esc(p.license_number || '')}<div class="small">${esc(p.employer_name || 'No brokerage yet')}</div></div>` : ''}
           ${p.office_phrase ? `<div class="kv"><b>Nearest office (letter)</b>${esc(p.office_phrase)}</div>` : ''}
         </div>
-        <div style="margin-top:8px"><button class="btn sm" onclick="editContact()">Edit contact details</button></div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="btn sm" onclick="editContact()">Edit contact details</button>
+          ${isExp(p) ? `<a class="btn sm primary" href="${prepUrl(p)}" target="_blank" rel="noopener">Prepare with Recruiting Prep ↗</a>` : ''}
+          <label class="small" style="margin-left:auto"><input type="checkbox" ${isExp(p) ? 'checked' : ''} onchange="setKind(this.checked)"> ★ Experienced agent</label></div>
         <div id="contact-edit"></div>
       </div>
       ${household.length ? `<div class="box"><h3>Same household</h3><div class="small muted" style="margin-bottom:6px">Shares a street address or phone number — often a spouse, or a parent and child.</div>
@@ -387,6 +450,8 @@ function fillText(key, p) {
   return t.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (m, k) => (k in f ? f[k] : m)).replace(/[ \t]+/g, ' ').trim();
 }
 function suggestKey(p, sent) {
+  if (p.stage === 'met' && TEXTCFG?.templates?.thanks) return 'thanks';
+  if (isExp(p) && TEXTCFG?.templates?.experienced) return 'experienced';
   if (p.hot && p.licensed_at && !p.employer_name) return 'licensed';
   if (p.source === 'website') return sent ? 'followup' : 'website';
   return !sent ? 'first' : sent >= 2 ? 'last' : 'followup';
@@ -526,40 +591,68 @@ function editContact() {
     <div class="control"><label>Email</label><input id="e-email" type="email" value="${esc(p.email || '')}"></div>
     <div class="control"><label>Street</label><input id="e-addr" value="${esc(p.address1 || '')}"></div>
     <div class="control"><label>City / Zip</label><div style="display:flex;gap:6px"><input id="e-city" value="${esc(p.city || '')}"><input id="e-zip" value="${esc(p.zip || '')}" style="max-width:90px"></div></div>
+    <div class="control"><label>Current brokerage</label><input id="e-brokerage" value="${esc(p.employer_name || '')}"></div>
+    <div class="control"><label>Referred by</label><input id="e-ref" value="${esc(p.referred_by || '')}"></div>
     <div class="control" style="grid-column:1/-1"><label>Nearest office sentence (for letters)</label><input id="e-office" value="${esc(p.office_phrase || '')}"></div>
   </div><div style="margin-top:8px"><button class="btn primary sm" onclick="saveContact()">Save details</button></div>`;
+}
+async function setKind(experienced) {
+  try {
+    await Auth.api(`/recruit-pipeline/prospects/${CURRENT.id}`, { method: 'PATCH', body: JSON.stringify({ kind: experienced ? 'experienced' : 'new' }) });
+    toast(experienced ? 'Marked as an experienced agent' : 'Marked as new to real estate'); await refreshSummary(); afterChange();
+  } catch (e) { toast(e.message); }
 }
 async function saveContact() {
   const v = id => document.getElementById(id).value.trim();
   try {
     await Auth.api(`/recruit-pipeline/prospects/${CURRENT.id}`, { method: 'PATCH', body: JSON.stringify({
-      phone: v('e-phone'), email: v('e-email'), address1: v('e-addr'), city: v('e-city'), zip: v('e-zip'), office_phrase: v('e-office') }) });
+      phone: v('e-phone'), email: v('e-email'), address1: v('e-addr'), city: v('e-city'), zip: v('e-zip'), office_phrase: v('e-office'), brokerage: v('e-brokerage'), referred_by: v('e-ref') }) });
     toast('Saved'); afterChange();
   } catch (e) { toast(e.message); }
 }
 
 // ── Add someone ─────────────────────────────────────────────────────────────
-function addProspectForm() {
+// One form for both kinds (2026-11-23); a referral is the usual way in, so
+// "Referred by" has its own field and stays on their record.
+let ADD_KIND = 'new';
+function addProspectForm(kind) {
+  ADD_KIND = kind || (TAB === 'experienced' ? 'experienced' : 'new');
   const dr = document.getElementById('drawer');
   document.getElementById('drawer-bg').style.display = 'block';
   dr.classList.add('open');
-  dr.innerHTML = `<div class="d-head"><h2>Add someone</h2><button class="btn sm" onclick="closeDrawer()">✕</button></div>
-    <div class="d-body"><div class="box"><div class="grid2">
-      <div class="control"><label>First name</label><input id="a-first"></div>
-      <div class="control"><label>Last name</label><input id="a-last"></div>
-      <div class="control"><label>Phone</label><input id="a-phone"></div>
-      <div class="control"><label>Email</label><input id="a-email" type="email"></div>
-      <div class="control"><label>Street</label><input id="a-addr"></div>
-      <div class="control"><label>City / Zip</label><div style="display:flex;gap:6px"><input id="a-city"><input id="a-zip" style="max-width:90px"></div></div>
-      <div class="control"><label>Source</label><select id="a-source"><option value="referral">Referral</option><option value="website">Website</option><option value="manual">Other</option></select></div>
-      <div class="control"><label>Owner</label><select id="a-owner"><option value="">By zip</option>${ownerOptions('')}</select></div>
-      <div class="control" style="grid-column:1/-1"><label>Note</label><textarea id="a-note" rows="2" placeholder="Who referred them, what they said"></textarea></div>
+  dr.innerHTML = `<div class="d-head"><h2>Add a recruit</h2><button class="btn sm" onclick="closeDrawer()">✕</button></div>
+    <div class="d-body"><div class="box">
+    <div class="kind-pick" id="a-kind">
+      <button type="button" data-v="new"><b>New to real estate</b><span>Studying for the exam or newly licensed</span></button>
+      <button type="button" data-v="experienced"><b>★ Experienced agent</b><span>Licensed, usually at another brokerage</span></button>
+    </div>
+    <div class="grid2">
+      <div class="control"><label for="a-first">First name</label><input id="a-first"></div>
+      <div class="control"><label for="a-last">Last name</label><input id="a-last"></div>
+      <div class="control"><label for="a-phone">Phone</label><input id="a-phone"></div>
+      <div class="control"><label for="a-email">Email</label><input id="a-email" type="email"></div>
+      <div class="control" id="a-brokerage-wrap"><label for="a-brokerage">Current brokerage</label><input id="a-brokerage" placeholder="Where they work now"></div>
+      <div class="control"><label for="a-ref">Referred by</label><input id="a-ref" placeholder="Agent, staff member or friend"></div>
+      <div class="control"><label for="a-addr">Street</label><input id="a-addr"></div>
+      <div class="control"><label for="a-city">City / Zip</label><div style="display:flex;gap:6px"><input id="a-city"><input id="a-zip" aria-label="Zip" style="max-width:90px"></div></div>
+      <div class="control"><label for="a-source">Source</label><select id="a-source"><option value="referral">Referral</option><option value="website">Website</option><option value="manual">Other</option></select></div>
+      <div class="control"><label for="a-owner">Owner</label><select id="a-owner"><option value="">By zip</option>${ownerOptions('')}</select></div>
+      <div class="control" style="grid-column:1/-1"><label for="a-note">Note</label><textarea id="a-note" rows="2" placeholder="What they said, what they're looking for"></textarea></div>
     </div><div style="margin-top:10px"><button class="btn primary" onclick="addProspect()">Add</button></div></div></div>`;
+  const pick = document.getElementById('a-kind');
+  const paint = () => {
+    pick.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === ADD_KIND));
+    document.getElementById('a-brokerage-wrap').style.display = ADD_KIND === 'experienced' ? '' : 'none';
+  };
+  pick.onclick = e => { const b = e.target.closest('button'); if (b) { ADD_KIND = b.dataset.v; paint(); } };
+  paint();
+  document.getElementById('a-first').focus();
 }
 async function addProspect() {
   const v = id => document.getElementById(id).value.trim();
   try {
     const r = await Auth.api('/recruit-pipeline/prospects', { method: 'POST', body: JSON.stringify({
+      kind: ADD_KIND, brokerage: ADD_KIND === 'experienced' ? v('a-brokerage') : '', referred_by: v('a-ref'),
       first_name: v('a-first'), last_name: v('a-last'), phone: v('a-phone'), email: v('a-email'), address1: v('a-addr'),
       city: v('a-city'), zip: v('a-zip'), source: v('a-source'), owner_staff_id: v('a-owner') || null, note: v('a-note') }) });
     toast('Added'); await refreshSummary(); show(TAB); openProspect(r.id);
