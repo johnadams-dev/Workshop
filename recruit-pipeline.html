@@ -816,10 +816,11 @@ function lettersBox() {
   const field = (k, label, extra = '') => `<div class="control"><label for="ls-${k}">${label}</label><input id="ls-${k}" value="${esc(s[k])}" ${can ? '' : 'disabled'} ${extra}></div>`;
   return `<div class="box"><h3>Letters</h3>
     <p class="small muted" style="margin-bottom:8px">A blank line starts a new paragraph; a line starting "- " is a bullet; **bold**; *italic*; two blank lines leave room for a signature. Merge fields: ${LETTERS.fields.map(f => `<code>{{${f}}}</code>`).join(' ')}. <code>{{reach_out}}</code> reads "either to me directly or to the local office manager, Ashlee Selman," — or just "to me directly" for the signer's own zips.</p>
-    <div class="grid2">${field('recruit_signer_name', 'Signed by')}${field('recruit_signer_title', 'Title')}${field('recruit_phone', 'Call or text number')}${field('recruit_website', 'Website')}${field('recruit_letter_top_margin_in', 'Top margin for letterhead (inches)', 'type="number" step="0.05" min="0.5" max="3.5"')}</div>
+    <div class="grid2">${field('recruit_signer_name', 'Signed by')}${field('recruit_signer_title', 'Title')}${field('recruit_phone', 'Call or text number')}${field('recruit_website', 'Website')}${field('recruit_letter_top_margin_in', 'Top margin for letterhead (inches; letters without the logo)', 'type="number" step="0.05" min="0.5" max="3.5"')}</div>
     <p class="small muted" style="margin:10px 0 6px">Beside the signature, every letter has a QR code that opens the website tagged <code>?src=letter1</code> or <code>?src=letter2</code>, so a sign-up from the letter says "Came from: Letter 1" on their timeline. The box next to it:</p>
     <div class="grid2">${field('recruit_qr_heading', 'QR box heading')}${field('recruit_qr_text', 'QR box wording')}</div>
     ${[1, 2].map(n => `<div class="control" style="margin-top:10px"><label for="ls-recruit_letter${n}">${n === 1 ? 'Letter 1' : 'Letter 2 (goes with the magazine)'}</label>
+      <label class="small" style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text)"><input type="checkbox" id="ls-recruit_letter${n}_logo" ${s[`recruit_letter${n}_logo`] === 'true' ? 'checked' : ''} ${can ? '' : 'disabled'}> Print our logo at the top (plain paper). Unticked, it leaves room for preprinted letterhead.</label>
       <textarea id="ls-recruit_letter${n}" rows="14" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px" ${can ? '' : 'disabled'}>${esc(s[`recruit_letter${n}`])}</textarea>
       ${can ? `<a href="#" class="small" onclick="document.getElementById('ls-recruit_letter${n}').value=LETTERS.defaults.recruit_letter${n};return false">Put back the original wording</a>` : ''}</div>`).join('')}
     ${can ? '<div style="margin-top:8px"><button class="btn primary" onclick="saveLetters()">Save letters</button></div>' : '<p class="small muted">Only managers can change the letters.</p>'}
@@ -858,7 +859,7 @@ async function saveTexting() {
 }
 async function saveLetters() {
   const body = {};
-  for (const k of Object.keys(LETTERS.defaults)) { const el = document.getElementById(`ls-${k}`); if (el) body[k] = el.value; }
+  for (const k of Object.keys(LETTERS.defaults)) { const el = document.getElementById(`ls-${k}`); if (el) body[k] = el.type === 'checkbox' ? String(el.checked) : el.value; }
   try { await Auth.api('/recruit-pipeline/settings/letters', { method: 'PUT', body }); toast('Letters saved'); renderSettings(); }
   catch (e) { toast(e.message); }
 }
